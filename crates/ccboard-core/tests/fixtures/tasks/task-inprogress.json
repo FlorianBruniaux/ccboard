@@ -1,0 +1,7 @@
+{
+  "id": "task-456",
+  "status": "inprogress",
+  "subject": "Add edge case tests to MCP parser",
+  "description": "Retroactively add TDD edge cases to existing mcp_config.rs",
+  "blocked_by": ["task-123"]
+}

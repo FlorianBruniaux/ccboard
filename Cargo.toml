@@ -1,0 +1,72 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+authors = ["Florian Bruniaux"]
+repository = "https://github.com/FlorianBruniaux/ccboard"
+
+[workspace.dependencies]
+# Core - Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# Core - Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Core - Error handling
+anyhow = "1"
+thiserror = "2"
+
+# Core - Async
+tokio = { version = "1", features = ["sync", "fs", "rt-multi-thread", "io-util", "macros", "time"] }
+
+# Core - File watching
+notify = "7"
+notify-debouncer-mini = "0.5"
+
+# Core - File system
+walkdir = "2"
+dirs = "6"
+
+# Core - Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Core - Concurrency (AMENDED: parking_lot + dashmap)
+parking_lot = "0.12"
+dashmap = "6"
+
+# Core - Caching
+moka = { version = "0.12", features = ["future"] }
+
+# TUI
+ratatui = "0.30"
+crossterm = "0.28"
+
+# Web - Leptos (AMENDED: htmx -> Leptos)
+leptos = { version = "0.7", features = ["csr"] }
+leptos_axum = "0.7"
+leptos_router = "0.7"
+axum = "0.8"
+tower-http = { version = "0.6", features = ["cors", "fs"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+open = "5"
+
+# Internal crates
+ccboard-core = { path = "crates/ccboard-core" }
+ccboard-tui = { path = "crates/ccboard-tui" }
+ccboard-web = { path = "crates/ccboard-web" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

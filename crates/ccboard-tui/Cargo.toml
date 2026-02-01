@@ -1,0 +1,27 @@
+[package]
+name = "ccboard-tui"
+description = "TUI frontend for ccboard using Ratatui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+ccboard-core.workspace = true
+
+# TUI
+ratatui.workspace = true
+crossterm.workspace = true
+
+# Async
+tokio.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Error handling
+anyhow.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

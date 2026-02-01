@@ -1,5 +1,25 @@
+# Rust
 /target
 Cargo.lock
+
+# IDE
+.idea/
 *.swp
 *.swo
+.vscode/
+*.iml
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/settings.local.json
+.claude/cache/
+.claude/.task-*
+claudedocs/
+
+# Temporary files
+*.tmp
+*.bak
+*~
