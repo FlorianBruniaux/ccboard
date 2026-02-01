@@ -237,13 +237,13 @@ impl Ui {
         } else {
             // Tab-specific hints
             let hint = match app.active_tab {
-                Tab::Dashboard => "r refresh",
+                Tab::Dashboard => "F5 refresh",
                 Tab::Sessions => "←→ nav │ Enter detail │ / search",
                 Tab::Config => "←→ columns │ ↑↓ scroll",
                 Tab::Hooks => "←→ nav │ ↑↓ select",
                 Tab::Agents => "Tab switch │ Enter detail",
                 Tab::Costs => "Tab view │ 1-3 switch",
-                Tab::History => "/ search │ Tab stats │ c clear",
+                Tab::History => "Enter detail │ / search │ Tab stats │ c clear",
             };
 
             Line::from(vec![

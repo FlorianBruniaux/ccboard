@@ -125,7 +125,8 @@ impl App {
                 self.should_quit = true;
                 true
             }
-            KeyCode::Char('r') => {
+            KeyCode::F(5) => {
+                // F5 for refresh (was 'r', but 'r' conflicts with search input)
                 self.needs_refresh = true;
                 true
             }

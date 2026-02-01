@@ -21,6 +21,8 @@ pub struct HistoryTab {
     filtered_sessions: Vec<SessionMetadata>,
     /// Show stats panel
     show_stats: bool,
+    /// Show detail popup
+    show_detail: bool,
 }
 
 impl Default for HistoryTab {
@@ -40,6 +42,7 @@ impl HistoryTab {
             results_state,
             filtered_sessions: Vec::new(),
             show_stats: true,
+            show_detail: false,
         }
     }
 
@@ -75,6 +78,12 @@ impl HistoryTab {
                     let current = self.results_state.selected().unwrap_or(0);
                     let max = self.filtered_sessions.len().saturating_sub(1);
                     self.results_state.select(Some((current + 1).min(max)));
+                }
+                KeyCode::Enter => {
+                    self.show_detail = !self.show_detail;
+                }
+                KeyCode::Esc => {
+                    self.show_detail = false;
                 }
                 KeyCode::Tab => {
                     self.show_stats = !self.show_stats;
@@ -154,11 +163,16 @@ impl HistoryTab {
         // Search bar
         self.render_search(frame, chunks[0]);
 
-        // Content layout: results | stats (optional)
-        let content_constraints = if self.show_stats {
-            vec![Constraint::Percentage(65), Constraint::Percentage(35)]
-        } else {
-            vec![Constraint::Percentage(100)]
+        // Content layout: results | detail (optional) | stats (optional)
+        let content_constraints = match (self.show_detail, self.show_stats) {
+            (true, true) => vec![
+                Constraint::Percentage(40),
+                Constraint::Percentage(35),
+                Constraint::Percentage(25),
+            ],
+            (true, false) => vec![Constraint::Percentage(50), Constraint::Percentage(50)],
+            (false, true) => vec![Constraint::Percentage(65), Constraint::Percentage(35)],
+            (false, false) => vec![Constraint::Percentage(100)],
         };
 
         let content_chunks = Layout::default()
@@ -169,9 +183,20 @@ impl HistoryTab {
         // Results list
         self.render_results(frame, content_chunks[0]);
 
+        // Detail popup if open
+        let mut chunk_idx = 1;
+        if self.show_detail && content_chunks.len() > 1 {
+            let selected_session = self
+                .results_state
+                .selected()
+                .and_then(|i| self.filtered_sessions.get(i));
+            self.render_detail(frame, content_chunks[chunk_idx], selected_session);
+            chunk_idx += 1;
+        }
+
         // Stats panel
-        if self.show_stats && content_chunks.len() > 1 {
-            self.render_stats_panel(frame, content_chunks[1], stats);
+        if self.show_stats && content_chunks.len() > chunk_idx {
+            self.render_stats_panel(frame, content_chunks[chunk_idx], stats);
         }
     }
 
@@ -530,5 +555,110 @@ impl HistoryTab {
         } else {
             n.to_string()
         }
+    }
+
+    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&SessionMetadata>) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(Span::styled(
+                " Session Detail ",
+                Style::default().fg(Color::White).bold(),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let Some(session) = session else {
+            let empty =
+                Paragraph::new("No session selected").style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(empty, inner);
+            return;
+        };
+
+        let lines = vec![
+            Line::from(vec![
+                Span::styled("ID: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&session.id, Style::default().fg(Color::White)),
+            ]),
+            Line::from(vec![
+                Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&session.project_path, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("Started: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    session
+                        .first_timestamp
+                        .map(|ts| ts.format("%Y-%m-%d %H:%M:%S").to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    Style::default().fg(Color::White),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("Ended: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    session
+                        .last_timestamp
+                        .map(|ts| ts.format("%Y-%m-%d %H:%M:%S").to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    Style::default().fg(Color::White),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("Duration: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    session.duration_display(),
+                    Style::default().fg(Color::Green),
+                ),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("Messages: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    session.message_count.to_string(),
+                    Style::default().fg(Color::Cyan),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    Self::format_tokens(session.total_tokens),
+                    Style::default().fg(Color::Cyan),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("File Size: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(session.size_display(), Style::default().fg(Color::White)),
+            ]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("Models: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    if session.models_used.is_empty() {
+                        "unknown".to_string()
+                    } else {
+                        session.models_used.join(", ")
+                    },
+                    Style::default().fg(Color::Magenta),
+                ),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled(
+                "First message:",
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(Span::styled(
+                session
+                    .first_user_message
+                    .as_deref()
+                    .unwrap_or("No preview available"),
+                Style::default().fg(Color::White),
+            )),
+        ];
+
+        let detail = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(detail, inner);
     }
 }

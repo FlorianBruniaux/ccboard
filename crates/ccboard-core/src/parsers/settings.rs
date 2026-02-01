@@ -1,7 +1,9 @@
 //! Settings parser with explicit deep merge
 
 use crate::error::{CoreError, LoadError, LoadReport};
-use crate::models::{MergedConfig, Settings};
+use crate::models::{HookDefinition, HookGroup, MergedConfig, Settings};
+use crate::parsers::HooksParser;
+use std::collections::HashMap;
 use std::path::Path;
 use tracing::{debug, warn};
 
@@ -103,7 +105,92 @@ impl SettingsParser {
             report.settings_loaded = true;
         }
 
-        MergedConfig::from_layers(global, project, local)
+        // Scan .sh hooks from filesystem and inject into global settings
+        let mut global_with_hooks = global;
+        if let Some(ref mut settings) = global_with_hooks {
+            Self::inject_scanned_hooks(settings, claude_home, project_path);
+        } else {
+            // If no global settings, create minimal settings with scanned hooks
+            let mut settings = Settings::default();
+            Self::inject_scanned_hooks(&mut settings, claude_home, project_path);
+            if settings.hooks.is_some() {
+                global_with_hooks = Some(settings);
+            }
+        }
+
+        MergedConfig::from_layers(global_with_hooks, project, local)
+    }
+
+    /// Scan .sh files from hooks directories and inject into settings
+    fn inject_scanned_hooks(settings: &mut Settings, claude_home: &Path, project_path: Option<&Path>) {
+        let mut all_scanned_hooks: Vec<crate::parsers::Hook> = Vec::new();
+
+        // Scan global hooks: ~/.claude/hooks/*.sh
+        let global_hooks_dir = claude_home.join("hooks");
+        if let Ok(hooks) = HooksParser::scan_directory(&global_hooks_dir) {
+            all_scanned_hooks.extend(hooks);
+        }
+
+        // Scan project hooks: <project>/.claude/hooks/*.sh
+        if let Some(proj) = project_path {
+            let project_hooks_dir = proj.join(".claude").join("hooks");
+            if let Ok(hooks) = HooksParser::scan_directory(&project_hooks_dir) {
+                all_scanned_hooks.extend(hooks);
+            }
+        }
+
+        if all_scanned_hooks.is_empty() {
+            return;
+        }
+
+        // Convert scanned hooks to HookDefinition and group by type
+        let mut hooks_by_event: HashMap<String, Vec<HookGroup>> = settings
+            .hooks
+            .clone()
+            .unwrap_or_default();
+
+        for hook in all_scanned_hooks {
+            // Map HookType to event name
+            let event_name = match hook.hook_type {
+                crate::parsers::HookType::PreCommit => "PreCommit",
+                crate::parsers::HookType::PostCommit => "PostCommit",
+                crate::parsers::HookType::PrePush => "PrePush",
+                crate::parsers::HookType::UserPromptSubmit => "UserPromptSubmit",
+                crate::parsers::HookType::ToolResultReturn => "ToolResultReturn",
+                crate::parsers::HookType::Custom(ref name) => {
+                    // Try to infer event type from custom name
+                    if name.contains("pre") || name.contains("before") {
+                        "PreToolUse"
+                    } else {
+                        "Custom"
+                    }
+                }
+            };
+
+            // Create HookDefinition from scanned hook
+            let hook_def = HookDefinition {
+                command: hook.path.display().to_string(),
+                r#async: None,
+                timeout: None,
+                cwd: None,
+                env: None,
+            };
+
+            // Add to event group
+            let groups = hooks_by_event.entry(event_name.to_string()).or_default();
+
+            // Add to first group or create new group
+            if let Some(first_group) = groups.first_mut() {
+                first_group.hooks.push(hook_def);
+            } else {
+                groups.push(HookGroup {
+                    matcher: None,
+                    hooks: vec![hook_def],
+                });
+            }
+        }
+
+        settings.hooks = Some(hooks_by_event);
     }
 }
 

@@ -118,21 +118,35 @@ impl AgentsTab {
             return;
         }
 
-        let entries = match std::fs::read_dir(&dir) {
+        self.scan_recursive(&dir, entry_type);
+    }
+
+    fn scan_recursive(&mut self, dir: &Path, entry_type: AgentType) {
+        let entries = match std::fs::read_dir(dir) {
             Ok(e) => e,
             Err(_) => return,
         };
 
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().is_some_and(|e| e == "md") {
+
+            // Case 1: Direct .md file
+            if path.is_file() && path.extension().is_some_and(|e| e == "md") {
+                // Skip README files
+                if path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("README") || n.starts_with("_README"))
+                {
+                    continue;
+                }
+
                 let name = path
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("unknown")
                     .to_string();
 
-                // Try to extract description from frontmatter
                 let description = Self::extract_description(&path);
 
                 let target_list = match entry_type {
@@ -147,6 +161,35 @@ impl AgentsTab {
                     description,
                     entry_type,
                 });
+            }
+            // Case 2: Directory containing SKILL.md (standard skill format)
+            else if path.is_dir() {
+                let skill_md = path.join("SKILL.md");
+                if skill_md.exists() {
+                    let name = path
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+
+                    let description = Self::extract_description(&skill_md);
+
+                    let target_list = match entry_type {
+                        AgentType::Agent => &mut self.agents,
+                        AgentType::Command => &mut self.commands,
+                        AgentType::Skill => &mut self.skills,
+                    };
+
+                    target_list.push(AgentEntry {
+                        name,
+                        file_path: skill_md.display().to_string(),
+                        description,
+                        entry_type,
+                    });
+                } else {
+                    // Case 3: Directory without SKILL.md → scan recursively for .md files
+                    self.scan_recursive(&path, entry_type);
+                }
             }
         }
     }
