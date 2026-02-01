@@ -29,7 +29,7 @@ impl AgentType {
     fn label(&self) -> &'static str {
         match self {
             AgentType::Agent => "Agents",
-            AgentType::Command => "Commands",
+            AgentType::Command => "/ Commands",
             AgentType::Skill => "Skills",
         }
     }
@@ -306,11 +306,17 @@ impl AgentsTab {
         // Get list length first for selection clamping
         let list_len = self.current_list().len();
 
+        let title_text = if entry_type == AgentType::Command {
+            format!(" {} - Press / in Claude Code to use ", entry_type.label())
+        } else {
+            format!(" {} ", entry_type.label())
+        };
+
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray))
             .title(Span::styled(
-                format!(" {} ", entry_type.label()),
+                title_text,
                 Style::default().fg(Color::White).bold(),
             ));
 

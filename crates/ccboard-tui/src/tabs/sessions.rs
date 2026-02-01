@@ -23,9 +23,10 @@ pub struct SessionsTab {
     focus: usize,
     /// Cached project list (sorted)
     projects: Vec<String>,
-    /// Search filter (TODO: implement search)
-    #[allow(dead_code)]
+    /// Search filter
     search_filter: String,
+    /// Search mode active
+    search_active: bool,
     /// Show detail popup
     show_detail: bool,
 }
@@ -49,6 +50,7 @@ impl SessionsTab {
             focus: 0,
             projects: Vec::new(),
             search_filter: String::new(),
+            search_active: false,
             show_detail: false,
         }
     }
@@ -60,6 +62,27 @@ impl SessionsTab {
         _sessions_by_project: &HashMap<String, Vec<SessionMetadata>>,
     ) {
         use crossterm::event::KeyCode;
+
+        // Search mode has priority
+        if self.search_active {
+            match key {
+                KeyCode::Char(c) => {
+                    self.search_filter.push(c);
+                }
+                KeyCode::Backspace => {
+                    self.search_filter.pop();
+                }
+                KeyCode::Esc => {
+                    self.search_active = false;
+                    self.search_filter.clear();
+                }
+                KeyCode::Enter => {
+                    self.search_active = false;
+                }
+                _ => {}
+            }
+            return;
+        }
 
         match key {
             KeyCode::Left | KeyCode::Char('h') => {
@@ -94,7 +117,10 @@ impl SessionsTab {
                 self.show_detail = false;
             }
             KeyCode::Char('/') => {
-                // Toggle search mode (simplified)
+                self.search_active = !self.search_active;
+                if !self.search_active {
+                    self.search_filter.clear();
+                }
             }
             _ => {}
         }
@@ -126,6 +152,34 @@ impl SessionsTab {
         self.projects = sessions_by_project.keys().cloned().collect();
         self.projects.sort();
 
+        // Layout: [search bar (if active), content]
+        let main_layout = if self.search_active {
+            vec![Constraint::Length(3), Constraint::Min(0)]
+        } else {
+            vec![Constraint::Percentage(100)]
+        };
+
+        let main_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(main_layout)
+            .split(area);
+
+        let content_area = if self.search_active {
+            // Render search bar
+            let search_block = Block::default()
+                .title(" Search (Esc to cancel) ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan));
+
+            let search_input =
+                Paragraph::new(format!("/ {}", self.search_filter)).block(search_block);
+
+            frame.render_widget(search_input, main_chunks[0]);
+            main_chunks[1]
+        } else {
+            main_chunks[0]
+        };
+
         // Main layout: projects tree | session list | detail (if open)
         let constraints = if self.show_detail {
             vec![
@@ -140,7 +194,7 @@ impl SessionsTab {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(constraints)
-            .split(area);
+            .split(content_area);
 
         // Render projects tree
         self.render_projects(frame, chunks[0]);
@@ -152,11 +206,32 @@ impl SessionsTab {
             .and_then(|i| self.projects.get(i))
             .cloned();
 
-        let sessions = selected_project
+        let all_sessions = selected_project
             .as_ref()
             .and_then(|p| sessions_by_project.get(p))
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
+
+        // Filter sessions based on search
+        let sessions: Vec<SessionMetadata> = if self.search_filter.is_empty() {
+            all_sessions.to_vec()
+        } else {
+            let query_lower = self.search_filter.to_lowercase();
+            all_sessions
+                .iter()
+                .filter(|s| {
+                    s.id.to_lowercase().contains(&query_lower)
+                        || s.project_path.to_lowercase().contains(&query_lower)
+                        || s.first_user_message
+                            .as_ref()
+                            .is_some_and(|m| m.to_lowercase().contains(&query_lower))
+                        || s.models_used
+                            .iter()
+                            .any(|m: &String| m.to_lowercase().contains(&query_lower))
+                })
+                .cloned()
+                .collect()
+        };
 
         // Clamp session selection
         if let Some(sel) = self.session_state.selected() {
@@ -166,7 +241,7 @@ impl SessionsTab {
         }
 
         // Render session list
-        self.render_sessions(frame, chunks[1], sessions);
+        self.render_sessions(frame, chunks[1], &sessions);
 
         // Render detail popup if open
         if self.show_detail && chunks.len() > 2 {

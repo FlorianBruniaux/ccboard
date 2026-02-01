@@ -66,6 +66,22 @@ impl ConfigTab {
         mcp_config: Option<&McpConfig>,
         rules: &Rules,
     ) {
+        // Layout: [Help header (2 lines), Content columns]
+        let main_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(2), // Help text
+                Constraint::Min(0),    // Content
+            ])
+            .split(area);
+
+        // Render help header
+        let help_text = "Claude Code uses cascading configuration: Local > Project > Global. Merged shows final active configuration.";
+        let help = Paragraph::new(help_text)
+            .style(Style::default().fg(Color::Gray))
+            .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(help, main_chunks[0]);
+
         // 4-column layout
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -75,12 +91,12 @@ impl ConfigTab {
                 Constraint::Percentage(25),
                 Constraint::Percentage(25),
             ])
-            .split(area);
+            .split(main_chunks[1]);
 
         self.render_config_column(
             frame,
             chunks[0],
-            "Global",
+            "Global (All projects)",
             config.global.as_ref(),
             0,
             None,
@@ -89,7 +105,7 @@ impl ConfigTab {
         self.render_config_column(
             frame,
             chunks[1],
-            "Project",
+            "Project (This repo)",
             config.project.as_ref(),
             1,
             None,
@@ -98,7 +114,7 @@ impl ConfigTab {
         self.render_config_column(
             frame,
             chunks[2],
-            "Local",
+            "Local (You only)",
             config.local.as_ref(),
             2,
             None,
@@ -107,7 +123,7 @@ impl ConfigTab {
         self.render_config_column(
             frame,
             chunks[3],
-            "Merged",
+            "Merged (Active)",
             Some(&config.merged),
             3,
             mcp_config,
@@ -158,11 +174,16 @@ impl ConfigTab {
         frame.render_widget(block, area);
 
         let Some(settings) = settings else {
+            let message = if col_index == 3 {
+                // Merged column should never be empty
+                "Using defaults"
+            } else {
+                // Global/Project/Local can be missing
+                "Using defaults ✓"
+            };
+
             let empty = Paragraph::new(vec![
-                Line::from(Span::styled(
-                    "Not configured",
-                    Style::default().fg(Color::DarkGray),
-                )),
+                Line::from(Span::styled(message, Style::default().fg(Color::Green))),
                 Line::from(""),
                 Line::from(Span::styled(
                     source_indicator,
@@ -368,6 +389,60 @@ impl ConfigTab {
             } else {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  (No MCP config found)",
+                    Style::default().fg(Color::DarkGray),
+                ))));
+            }
+        }
+
+        // Rules section (only in merged column)
+        if is_merged {
+            items.push(ListItem::new(Line::from(Span::styled(
+                "─── Rules (CLAUDE.md) ───",
+                Style::default().fg(Color::DarkGray),
+            ))));
+
+            if let Some(ref global) = rules.global {
+                let size_kb = global.size as f64 / 1024.0;
+                items.push(ListItem::new(Line::from(vec![
+                    Span::styled("  Global: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("~/.claude/CLAUDE.md ({:.1}KB)", size_kb),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                ])));
+
+                // Preview first 3 lines
+                let preview = Rules::preview(global, 3);
+                for line in preview {
+                    let display_line: String = if line.len() > 50 {
+                        line.chars().take(47).collect::<String>() + "..."
+                    } else {
+                        line
+                    };
+                    items.push(ListItem::new(Line::from(Span::styled(
+                        format!("    > {}", display_line),
+                        Style::default().fg(Color::DarkGray),
+                    ))));
+                }
+            } else {
+                items.push(ListItem::new(Line::from(Span::styled(
+                    "  Global: (not found)",
+                    Style::default().fg(Color::DarkGray),
+                ))));
+            }
+
+            if let Some(ref project) = rules.project {
+                let size_kb = project.size as f64 / 1024.0;
+                items.push(ListItem::new(Line::from(vec![
+                    Span::styled("  Project: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!(".claude/CLAUDE.md ({:.1}KB)", size_kb),
+                        Style::default().fg(Color::Magenta),
+                    ),
+                ])));
+            } else {
+                items.push(ListItem::new(Line::from(Span::styled(
+                    "  Project: (not found)",
                     Style::default().fg(Color::DarkGray),
                 ))));
             }
