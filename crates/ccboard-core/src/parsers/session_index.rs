@@ -190,8 +190,13 @@ impl SessionIndexParser {
             if session_line.line_type == "assistant" {
                 message_count += 1;
 
-                // Accumulate tokens
-                if let Some(ref usage) = session_line.usage {
+                // Accumulate tokens from either root usage or message.usage
+                let usage_opt = session_line
+                    .usage
+                    .as_ref()
+                    .or_else(|| session_line.message.as_ref().and_then(|m| m.usage.as_ref()));
+
+                if let Some(usage) = usage_opt {
                     total_tokens += usage.total();
                 }
             }
@@ -340,7 +345,7 @@ mod tests {
         .unwrap();
         writeln!(
             file,
-            r#"{{"type": "assistant", "model": "claude-sonnet-4-20250514", "timestamp": "2025-01-15T10:02:00Z", "usage": {{"inputTokens": 100, "outputTokens": 50}}}}"#
+            r#"{{"type": "assistant", "model": "claude-sonnet-4-20250514", "timestamp": "2025-01-15T10:02:00Z", "usage": {{"input_tokens": 100, "output_tokens": 50}}}}"#
         )
         .unwrap();
         writeln!(
@@ -409,5 +414,39 @@ mod tests {
 
         assert_eq!(sessions.len(), 2);
         assert!(sessions.iter().all(|p| p.extension().unwrap() == "jsonl"));
+    }
+
+    #[tokio::test]
+    async fn test_token_extraction_with_cache() {
+        let mut file = NamedTempFile::new().unwrap();
+
+        // Real format from Claude Code JSONL with cache tokens in message.usage
+        writeln!(
+            file,
+            r#"{{"type": "user", "sessionId": "cache-test", "message": {{"content": "Test"}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            file,
+            r#"{{"type": "assistant", "model": "claude-sonnet-4-5-20250929", "message": {{"usage": {{"input_tokens": 100, "output_tokens": 50, "cache_read_input_tokens": 1000, "cache_creation_input_tokens": 500}}}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            file,
+            r#"{{"type": "assistant", "model": "claude-sonnet-4-5-20250929", "message": {{"usage": {{"input_tokens": 200, "output_tokens": 75}}}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            file,
+            r#"{{"type": "summary"}}"#
+        )
+        .unwrap();
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(file.path()).await.unwrap();
+
+        // Should accumulate all token types from both messages
+        // total = (100 + 50) + (200 + 75) = 150 + 275 = 425
+        assert_eq!(meta.total_tokens, 425);
     }
 }

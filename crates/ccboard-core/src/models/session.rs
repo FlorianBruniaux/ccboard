@@ -68,19 +68,27 @@ pub struct SessionMessage {
     /// Tool results
     #[serde(default)]
     pub tool_results: Option<Vec<serde_json::Value>>,
+
+    /// Token usage (for assistant messages)
+    #[serde(default)]
+    pub usage: Option<TokenUsage>,
 }
 
 /// Token usage for a message
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct TokenUsage {
     #[serde(default)]
     pub input_tokens: u64,
+
     #[serde(default)]
     pub output_tokens: u64,
-    #[serde(default)]
+
+    /// Cache read tokens (from cache_read_input_tokens in JSONL)
+    #[serde(default, alias = "cache_read_input_tokens")]
     pub cache_read_tokens: u64,
-    #[serde(default)]
+
+    /// Cache creation tokens (from cache_creation_input_tokens in JSONL)
+    #[serde(default, alias = "cache_creation_input_tokens")]
     pub cache_write_tokens: u64,
 }
 
