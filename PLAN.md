@@ -103,104 +103,152 @@
 
 ---
 
-## 🚀 Prochaines Étapes
+## 🚀 Prochaines Étapes — Focus Features
 
-### Phase 10 : Open Source Release (Priorité 🔴 P0 - En cours)
+### 🎯 Priorité Actuelle : Amélioration des fonctionnalités
 
-**Objectif** : Publier ccboard sur GitHub + crates.io
+**Décision** : Développement des features avant Open Source Release
+**Rationale** : Produit plus mature et complet pour la première release publique
 
-#### ✅ Tâches Complétées
+---
 
-1. **README.md** ✅
-   - Introduction + motivation
-   - Feature list avec emojis
-   - Installation (3 méthodes)
-   - Quick start (4 modes)
-   - Keybindings table complète
-   - Architecture overview
-   - Development guide
+### Phase 11 : Token Tracking & Invocation Counters (Priorité 🔴 P0 - 2-3 jours)
 
-2. **Documentation de base** ✅
-   - CHANGELOG.md (Phases 0-9.5)
-   - PLAN.md (complet)
-   - CLAUDE.md (guidance)
-   - TEST_GUIDE_PHASE6.md
+**Objectif** : Afficher les tokens réels et compter les invocations des agents/commands/skills
 
-#### 🔲 Reste à Faire (4-6h)
+#### 🎯 Features à Implémenter
 
-1. **Screenshots & Assets** (2h) 🔴 CRITIQUE
-   - Capturer les 8 tabs en action
-   - Command palette demo
-   - Breadcrumbs navigation
-   - GIF démo 30s (installation → navigation)
-   - Ajouter au README.md
+##### 1. Token Tracking Alternatif (1 jour)
 
-2. **Documentation légale** (30min)
-   - LICENSE file (MIT OR Apache-2.0)
-   - CONTRIBUTING.md
-   - CODE_OF_CONDUCT.md
+**Problème identifié** :
+- Claude Code JSONL : champ `usage` est `null` dans tous les messages
+- stats-cache.json : agrégats globaux uniquement, pas de tokens par session
+- **Solution** : Extraire tokens depuis les messages de continuation/résumé
 
-3. **GitHub setup** (1h)
-   - Issues templates (.github/ISSUE_TEMPLATE/)
-   - Pull request template (.github/PULL_REQUEST_TEMPLATE.md)
-   - Labels (bug, enhancement, documentation, good first issue)
+**Approche** :
+```rust
+// Stratégie 1: Parser tool_results pour extraire token info
+// Les tool results peuvent contenir des messages système avec tokens
+async fn extract_tokens_from_tool_results(session_path: &Path) -> u64 {
+    // Stream JSONL, chercher tool_results avec token info
+}
 
-4. **CI/CD Pipeline** (2h)
-   - GitHub Actions workflow (.github/workflows/ci.yml)
-   - Matrix build (Linux, macOS, Windows)
-   - Tests + clippy + fmt checks
-   - Release workflow avec binaries
+// Stratégie 2: Calculer depuis stats aggregate + proportions
+// Si 10 sessions, 10K tokens total → ~1K par session (rough estimate)
+async fn estimate_tokens_from_stats(session_id: &str, stats: &Stats) -> u64 {
+    // Heuristique basée sur message count, duration, models
+}
+```
 
-5. **Publish crates.io** (30min)
-   - Metadata Cargo.toml (keywords, categories, description)
-   - Documentation links
-   - `cargo publish --dry-run`
-   - `cargo publish`
+**Tâches** :
+- [ ] Analyser format JSONL pour trouver sources alternatives de tokens
+- [ ] Implémenter parser de tokens depuis tool_results ou summary events
+- [ ] Ajouter cache des tokens extraits (ne pas re-parser à chaque load)
+- [ ] Update SessionMetadata avec tokens réels
+- [ ] Tests avec fixtures JSONL réels
 
-6. **Annonce** (30min)
-   - Post r/rust avec screenshots
-   - Tweet avec GIF démo
-   - Discord Rust community
-   - Hacker News Show HN
-
-#### Validation Checklist
-
+**Validation** :
 ```bash
-# Documentation
-✅ README.md created (434 lignes)
-🔲 README.md screenshots (8 tabs + palette + breadcrumbs)
-🔲 CONTRIBUTING.md
-🔲 LICENSE file (MIT OR Apache-2.0)
-✅ CHANGELOG.md complete (Phase 0-9.5)
+# Sessions tab doit afficher tokens > 0
+ccboard
+# Naviguer vers Sessions → vérifier colonne tokens
+```
 
-# Quality
-✅ cargo test --all (88 tests pass)
-✅ cargo clippy --all-targets (0 warnings)
-✅ cargo fmt --all --check (formatted)
-🔲 cargo doc --no-deps (doc builds - à vérifier)
+##### 2. Invocation Counters (1-2 jours)
 
-# Cross-platform
-✅ macOS build success (développement)
-🔲 Linux build success (CI à configurer)
-🔲 Windows build success (CI à configurer)
+**Objectif** : Compter combien de fois chaque agent/command/skill a été invoqué
 
-# GitHub Setup
-🔲 Issues templates (.github/ISSUE_TEMPLATE/)
-🔲 PR template (.github/PULL_REQUEST_TEMPLATE.md)
-🔲 GitHub Actions CI/CD (.github/workflows/ci.yml)
-🔲 Labels (bug, enhancement, good first issue)
+**Détection patterns** :
+```rust
+// Agents: détection via Task tool
+if message.contains("Task tool") && message.contains("subagent_type") {
+    extract_agent_name();
+}
 
-# Publication
-🔲 cargo publish --dry-run (no errors)
-🔲 GitHub release with binaries (v0.2.0)
-🔲 crates.io publish
-🔲 r/rust post published
-🔲 HN Show HN post
+// Commands: détection via pattern /command
+if message.starts_with('/') {
+    extract_command_name();
+}
+
+// Skills: détection via Skill tool
+if message.contains("Skill tool") {
+    extract_skill_name();
+}
+```
+
+**Architecture** :
+```rust
+// Nouvelle structure dans store
+pub struct InvocationStats {
+    pub agents: HashMap<String, usize>,      // agent_name -> count
+    pub commands: HashMap<String, usize>,    // command_name -> count
+    pub skills: HashMap<String, usize>,      // skill_name -> count
+    pub last_computed: DateTime<Utc>,
+}
+
+// Méthode dans DataStore
+impl DataStore {
+    pub async fn compute_invocations(&self) -> InvocationStats {
+        // Stream toutes les sessions
+        // Détecter patterns
+        // Agréger compteurs
+    }
+}
+```
+
+**Tâches** :
+- [ ] Créer InvocationStats structure dans models
+- [ ] Implémenter session streaming pour détecter patterns
+- [ ] Parser agent invocations (Task tool calls)
+- [ ] Parser command invocations (/command pattern)
+- [ ] Parser skill invocations (Skill tool)
+- [ ] Cache résultats (recompute only on new sessions)
+- [ ] Update AgentsTab pour afficher counters
+- [ ] Ajouter tri par usage (most used first)
+- [ ] Tests unitaires pour detection patterns
+
+**UI Updates** :
+```rust
+// Dans agents.rs render
+Line::from(vec![
+    Span::styled(name, style),
+    Span::styled(format!(" ({}×)", count), Style::default().fg(Color::DarkGray)),
+])
+```
+
+**Validation** :
+```bash
+ccboard
+# Onglet Agents → Commands → voir "× 23" à côté de chaque command
+# Agents triés par usage décroissant
+```
+
+##### 3. Performance Optimization (0.5 jour)
+
+**Challenge** : Parsing 1000+ sessions peut être lent
+
+**Solutions** :
+- Incremental computation (compute only for new/modified sessions)
+- Background processing (tokio spawn)
+- Progress indicator dans TUI
+- Cache persistent (save to ~/.claude/ccboard-cache.json)
+
+**Tâches** :
+- [ ] Implémenter incremental computation
+- [ ] Add progress bar during initial compute
+- [ ] Cache results to disk
+- [ ] Background refresh on session changes
+
+**Validation** :
+```bash
+# Initial load avec 1000 sessions: <5s
+# Subsequent loads: <1s (from cache)
+time ccboard stats
 ```
 
 ---
 
-### Phase 11 : Web UI MVP (Priorité 🟡 P1 - 2-4 jours)
+### Phase 12 : Web UI MVP (Priorité 🟡 P1 - Différé)
 
 **Status** : Backend 100% complet, frontend 0% (pas de composants Leptos)
 
@@ -239,7 +287,7 @@ ccboard both
 
 ---
 
-### Phase 12+ : Feature Enhancements (Priorité 🟢 P2 - Futures)
+### Phase 14+ : Advanced Features (Priorité 🟢 P2 - Futures)
 
 **Possibilités d'évolution** :
 
@@ -268,6 +316,65 @@ ccboard both
    - Theme customization
    - Keybinding remapping
    - Column ordering
+
+---
+
+### Phase 13 : Open Source Release (Backlog - Différé)
+
+**Status** : En attente de Phase 11 complète
+
+**Objectif** : Publier ccboard sur GitHub + crates.io avec un produit mature
+
+#### ✅ Tâches Complétées
+
+1. **README.md** ✅ (434 lignes)
+   - Introduction + motivation
+   - Feature list complète
+   - Installation (3 méthodes)
+   - Quick start (4 modes)
+   - Keybindings table
+   - Architecture overview
+   - Development guide
+
+2. **Documentation de base** ✅
+   - CHANGELOG.md (Phase 0-9.5)
+   - PLAN.md (complet)
+   - CLAUDE.md (guidance)
+
+#### 🔲 Reste à Faire (4-6h)
+
+**Bloqué par** : Attendre Phase 11 (tokens + invocations) pour produit plus mature
+
+1. **Screenshots & Assets** (2h)
+   - Capturer les 8 tabs avec données réelles
+   - Command palette demo
+   - Breadcrumbs navigation
+   - GIF démo 30s (installation → navigation)
+   - Tokens et invocations visibles dans screenshots
+
+2. **Documentation légale** (30min)
+   - LICENSE file (MIT OR Apache-2.0)
+   - CONTRIBUTING.md
+   - CODE_OF_CONDUCT.md
+
+3. **GitHub setup** (1h)
+   - Issues templates
+   - Pull request template
+   - Labels
+
+4. **CI/CD Pipeline** (2h)
+   - GitHub Actions workflow
+   - Matrix build (Linux, macOS, Windows)
+   - Release binaries
+
+5. **Publish crates.io** (30min)
+   - Metadata Cargo.toml
+   - `cargo publish`
+
+6. **Annonces** (30min)
+   - r/rust post
+   - Twitter/X
+   - Hacker News
 
 ---
 
