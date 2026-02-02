@@ -4,7 +4,7 @@
 //! for stats/settings (better fairness than std::sync::RwLock).
 
 use crate::error::{DegradedState, LoadReport};
-use crate::event::{DataEvent, EventBus};
+use crate::event::{ConfigScope, DataEvent, EventBus};
 use crate::models::{MergedConfig, SessionMetadata, StatsCache};
 use crate::parsers::{McpConfig, Rules, SessionIndexParser, SettingsParser, StatsParser};
 use dashmap::DashMap;
@@ -389,6 +389,22 @@ impl DataStore {
             self.event_bus.publish(DataEvent::StatsUpdated);
             debug!("Stats reloaded");
         }
+    }
+
+    /// Reload settings from files (called when settings change)
+    pub async fn reload_settings(&self) {
+        let parser = SettingsParser::new();
+        let merged = parser
+            .load_merged(&self.claude_home, self.project_path.as_deref(), &mut LoadReport::new())
+            .await;
+
+        {
+            let mut guard = self.settings.write();
+            *guard = merged;
+        }
+
+        self.event_bus.publish(DataEvent::ConfigChanged(ConfigScope::Global));
+        debug!("Settings reloaded");
     }
 
     /// Add or update a session (called when session file changes)

@@ -12,3 +12,4 @@ pub mod watcher;
 pub use error::{CoreError, DegradedState, LoadReport};
 pub use event::{DataEvent, EventBus};
 pub use store::DataStore;
+pub use watcher::FileWatcher;

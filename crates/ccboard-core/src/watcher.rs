@@ -89,10 +89,10 @@ impl FileWatcher {
                     Some(result) = event_rx.recv() => {
                         match result {
                             Ok(event) => {
-                                if let Some(data_event) = Self::process_event(&event, &claude_home, project_path.as_deref()) {
+                                if let Some((data_event, path)) = Self::process_event(&event, &claude_home, project_path.as_deref()) {
                                     if debounce_state.should_emit(&data_event) {
                                         debug!(?data_event, "Emitting file change event");
-                                        Self::handle_event(data_event, &store, &event_bus).await;
+                                        Self::handle_event(data_event, Some(&path), &store, &event_bus).await;
                                     }
                                 }
                             }
@@ -119,12 +119,12 @@ impl FileWatcher {
         Ok(())
     }
 
-    /// Process a notify event into a DataEvent
+    /// Process a notify event into a DataEvent with its path
     fn process_event(
         event: &Event,
         claude_home: &Path,
         project_path: Option<&Path>,
-    ) -> Option<DataEvent> {
+    ) -> Option<(DataEvent, PathBuf)> {
         // Only process create/modify events
         match event.kind {
             EventKind::Create(_) | EventKind::Modify(_) => {}
@@ -142,7 +142,7 @@ impl FileWatcher {
             .map(|n| n == "stats-cache.json")
             .unwrap_or(false)
         {
-            return Some(DataEvent::StatsUpdated);
+            return Some((DataEvent::StatsUpdated, path.clone()));
         }
 
         // Session files
@@ -154,25 +154,25 @@ impl FileWatcher {
                 .unwrap_or("unknown")
                 .to_string();
 
-            return Some(DataEvent::SessionUpdated(session_id));
+            return Some((DataEvent::SessionUpdated(session_id), path.clone()));
         }
 
         // Global settings
         if *path == claude_home.join("settings.json") {
-            return Some(DataEvent::ConfigChanged(ConfigScope::Global));
+            return Some((DataEvent::ConfigChanged(ConfigScope::Global), path.clone()));
         }
 
         // Project settings
         if let Some(proj) = project_path {
             if *path == proj.join(".claude").join("settings.json") {
-                return Some(DataEvent::ConfigChanged(ConfigScope::Project(
+                return Some((DataEvent::ConfigChanged(ConfigScope::Project(
                     proj.to_string_lossy().to_string(),
-                )));
+                )), path.clone()));
             }
             if *path == proj.join(".claude").join("settings.local.json") {
-                return Some(DataEvent::ConfigChanged(ConfigScope::Local(
+                return Some((DataEvent::ConfigChanged(ConfigScope::Local(
                     proj.to_string_lossy().to_string(),
-                )));
+                )), path.clone()));
             }
         }
 
@@ -182,26 +182,32 @@ impl FileWatcher {
             .map(|n| n == "claude_desktop_config.json")
             .unwrap_or(false)
         {
-            return Some(DataEvent::ConfigChanged(ConfigScope::Mcp));
+            return Some((DataEvent::ConfigChanged(ConfigScope::Mcp), path.clone()));
         }
 
         None
     }
 
     /// Handle a data event by updating the store
-    async fn handle_event(event: DataEvent, store: &DataStore, event_bus: &EventBus) {
+    async fn handle_event(
+        event: DataEvent,
+        path: Option<&Path>,
+        store: &DataStore,
+        event_bus: &EventBus,
+    ) {
         match &event {
             DataEvent::StatsUpdated => {
                 store.reload_stats().await;
             }
-            DataEvent::SessionUpdated(id) | DataEvent::SessionCreated(id) => {
-                // We'd need the path to update - for now just publish the event
-                // The TUI/Web will decide how to handle it
-                debug!(session_id = %id, "Session change detected");
+            DataEvent::SessionUpdated(_id) | DataEvent::SessionCreated(_id) => {
+                // Update session with path
+                if let Some(p) = path {
+                    store.update_session(p).await;
+                }
             }
-            DataEvent::ConfigChanged(scope) => {
-                debug!(?scope, "Config change detected");
-                // TODO: Reload settings
+            DataEvent::ConfigChanged(_scope) => {
+                // Reload settings
+                store.reload_settings().await;
             }
             _ => {}
         }
@@ -313,7 +319,7 @@ mod tests {
         };
 
         let result = FileWatcher::process_event(&event, &claude_home, None);
-        assert!(matches!(result, Some(DataEvent::StatsUpdated)));
+        assert!(matches!(result, Some((DataEvent::StatsUpdated, _))));
     }
 
     #[test]
@@ -330,6 +336,6 @@ mod tests {
         };
 
         let result = FileWatcher::process_event(&event, &claude_home, None);
-        assert!(matches!(result, Some(DataEvent::SessionUpdated(id)) if id == "abc123"));
+        assert!(matches!(result, Some((DataEvent::SessionUpdated(id), _)) if id == "abc123"));
     }
 }

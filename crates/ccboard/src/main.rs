@@ -107,13 +107,26 @@ async fn run_tui(claude_home: PathBuf, project: Option<PathBuf>) -> Result<()> {
         return Ok(());
     }
 
+    // Start file watcher for live updates
+    let _watcher = ccboard_core::FileWatcher::start(
+        claude_home.clone(),
+        project.clone(),
+        Arc::clone(&store),
+        Default::default(),
+    )
+    .await
+    .context("Failed to start file watcher")?;
+
     // Run TUI
     ccboard_tui::run(store, claude_home, project).await
 }
 
 async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> Result<()> {
     // Initialize data store
-    let store = Arc::new(DataStore::with_defaults(claude_home, project));
+    let store = Arc::new(DataStore::with_defaults(
+        claude_home.clone(),
+        project.clone(),
+    ));
 
     // Load initial data
     let report = store.initial_load().await;
@@ -125,6 +138,16 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
         }
         return Ok(());
     }
+
+    // Start file watcher for live updates
+    let _watcher = ccboard_core::FileWatcher::start(
+        claude_home,
+        project,
+        Arc::clone(&store),
+        Default::default(),
+    )
+    .await
+    .context("Failed to start file watcher")?;
 
     // Run web server
     ccboard_web::run(store, port).await
@@ -147,6 +170,16 @@ async fn run_both(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> 
         }
         return Ok(());
     }
+
+    // Start file watcher for live updates (shared by TUI and web)
+    let _watcher = ccboard_core::FileWatcher::start(
+        claude_home.clone(),
+        project.clone(),
+        Arc::clone(&store),
+        Default::default(),
+    )
+    .await
+    .context("Failed to start file watcher")?;
 
     // Start web server in background
     let web_store = Arc::clone(&store);
