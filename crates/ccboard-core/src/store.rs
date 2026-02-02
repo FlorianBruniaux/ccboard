@@ -5,8 +5,8 @@
 
 use crate::error::{DegradedState, LoadReport};
 use crate::event::{ConfigScope, DataEvent, EventBus};
-use crate::models::{MergedConfig, SessionMetadata, StatsCache};
-use crate::parsers::{McpConfig, Rules, SessionIndexParser, SettingsParser, StatsParser};
+use crate::models::{InvocationStats, MergedConfig, SessionMetadata, StatsCache};
+use crate::parsers::{InvocationParser, McpConfig, Rules, SessionIndexParser, SettingsParser, StatsParser};
 use dashmap::DashMap;
 use moka::future::Cache;
 use parking_lot::RwLock;
@@ -71,6 +71,9 @@ pub struct DataStore {
     /// Rules from CLAUDE.md files
     rules: RwLock<Rules>,
 
+    /// Invocation statistics (agents, commands, skills)
+    invocation_stats: RwLock<InvocationStats>,
+
     /// Session metadata (high contention with many entries)
     sessions: DashMap<String, SessionMetadata>,
 
@@ -105,6 +108,7 @@ impl DataStore {
             settings: RwLock::new(MergedConfig::default()),
             mcp_config: RwLock::new(None),
             rules: RwLock::new(Rules::default()),
+            invocation_stats: RwLock::new(InvocationStats::new()),
             sessions: DashMap::new(),
             session_content_cache,
             event_bus: EventBus::default_capacity(),
@@ -329,6 +333,11 @@ impl DataStore {
         self.rules.read().clone()
     }
 
+    /// Get invocation statistics
+    pub fn invocation_stats(&self) -> InvocationStats {
+        self.invocation_stats.read().clone()
+    }
+
     /// Get session count
     pub fn session_count(&self) -> usize {
         self.sessions.len()
@@ -433,6 +442,37 @@ impl DataStore {
                 warn!(path = %path.display(), error = %e, "Failed to update session");
             }
         }
+    }
+
+    /// Compute invocation statistics from all sessions
+    ///
+    /// This scans all session files to count agent/command/skill invocations.
+    /// Should be called after initial load or when sessions are updated.
+    pub async fn compute_invocations(&self) {
+        let paths: Vec<_> = self
+            .sessions
+            .iter()
+            .map(|r| r.value().file_path.clone())
+            .collect();
+
+        debug!(session_count = paths.len(), "Computing invocation stats");
+
+        let parser = InvocationParser::new();
+        let stats = parser.scan_sessions(&paths).await;
+
+        let mut guard = self.invocation_stats.write();
+        *guard = stats;
+
+        debug!(
+            agents = guard.agents.len(),
+            commands = guard.commands.len(),
+            skills = guard.skills.len(),
+            total = guard.total_invocations(),
+            "Invocation stats computed"
+        );
+
+        // Note: Using LoadCompleted as there's no specific invocation stats event
+        self.event_bus.publish(DataEvent::LoadCompleted);
     }
 }
 

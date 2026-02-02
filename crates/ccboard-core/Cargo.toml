@@ -31,6 +31,9 @@ notify-debouncer-mini.workspace = true
 walkdir.workspace = true
 dirs.workspace = true
 
+# Regex
+regex.workspace = true
+
 # Logging
 tracing.workspace = true
 
