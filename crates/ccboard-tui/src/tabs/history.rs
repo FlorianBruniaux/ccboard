@@ -240,11 +240,17 @@ impl HistoryTab {
             Color::DarkGray
         };
 
+        let title_text = if self.search_query.is_empty() {
+            " / Search (Press / to focus) ".to_string()
+        } else {
+            format!(" / Search ({} results) ", self.filtered_sessions.len())
+        };
+
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
-                " / Search ",
+                title_text,
                 Style::default().fg(Color::White).bold(),
             ));
 
@@ -254,12 +260,12 @@ impl HistoryTab {
         let search_display = if self.search_query.is_empty() {
             if self.search_focused {
                 Line::from(Span::styled(
-                    "Type to search...",
+                    "Type to search across all sessions...",
                     Style::default().fg(Color::DarkGray),
                 ))
             } else {
                 Line::from(Span::styled(
-                    "Press / to search",
+                    "Search all messages across sessions",
                     Style::default().fg(Color::DarkGray),
                 ))
             }
