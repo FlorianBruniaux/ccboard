@@ -1,0 +1,16 @@
+{
+  "name": "ccboard-marketplace",
+  "version": "0.1.0",
+  "description": "Claude Code dashboard and monitoring tools",
+  "plugins": [
+    {
+      "name": "ccboard",
+      "path": "skills/ccboard",
+      "description": "Comprehensive TUI/Web dashboard for Claude Code",
+      "version": "0.1.0",
+      "author": "Florian Bruniaux",
+      "keywords": ["dashboard", "monitoring", "tui", "mcp", "sessions", "costs"],
+      "categories": ["productivity", "development-tools"]
+    }
+  ]
+}

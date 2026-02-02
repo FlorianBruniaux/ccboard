@@ -1,0 +1,7 @@
+{
+  "id": "task-123",
+  "status": "pending",
+  "subject": "Implement TaskParser with TDD methodology",
+  "description": "Apply Agent Academy TDD principles to create task.rs parser:\n1. Write failing tests first (RED)\n2. Implement minimal code to pass (GREEN)\n3. Refactor after tests pass",
+  "blocked_by": []
+}

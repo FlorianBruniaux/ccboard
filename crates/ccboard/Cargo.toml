@@ -1,0 +1,34 @@
+[package]
+name = "ccboard"
+description = "Unified Claude Code Management Dashboard - TUI + Web"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "ccboard"
+path = "src/main.rs"
+
+[dependencies]
+ccboard-core.workspace = true
+ccboard-tui.workspace = true
+ccboard-web.workspace = true
+
+# CLI
+clap.workspace = true
+open.workspace = true
+
+# Async
+tokio.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# Error handling
+anyhow.workspace = true
+
+# File system
+dirs.workspace = true

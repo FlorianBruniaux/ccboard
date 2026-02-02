@@ -1,0 +1,38 @@
+[package]
+name = "ccboard-web"
+description = "Web frontend for ccboard using Leptos + Axum"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+ccboard-core.workspace = true
+
+# Web - Leptos
+leptos.workspace = true
+leptos_axum.workspace = true
+leptos_router.workspace = true
+axum.workspace = true
+tower-http.workspace = true
+tokio-stream.workspace = true
+
+# Async
+tokio.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Error handling
+anyhow.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Streaming
+futures = "0.3"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
