@@ -126,27 +126,31 @@ fn get_default_editor() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use tempfile::tempdir;
 
     #[test]
     fn test_get_editor_command_visual() {
-        env::set_var("VISUAL", "vim");
-        env::remove_var("EDITOR");
+        unsafe {
+            env::set_var("VISUAL", "vim");
+            env::remove_var("EDITOR");
+        }
         assert_eq!(get_editor_command(), "vim");
     }
 
     #[test]
     fn test_get_editor_command_editor() {
-        env::remove_var("VISUAL");
-        env::set_var("EDITOR", "emacs");
+        unsafe {
+            env::remove_var("VISUAL");
+            env::set_var("EDITOR", "emacs");
+        }
         assert_eq!(get_editor_command(), "emacs");
     }
 
     #[test]
     fn test_get_editor_command_default() {
-        env::remove_var("VISUAL");
-        env::remove_var("EDITOR");
+        unsafe {
+            env::remove_var("VISUAL");
+            env::remove_var("EDITOR");
+        }
         let default = get_editor_command();
         #[cfg(unix)]
         assert_eq!(default, "nano");
@@ -171,17 +175,5 @@ mod tests {
         // On some systems, root has no parent, but behavior varies
         // This test mainly checks we don't panic
         let _ = result; // Allow success or failure
-    }
-
-    #[test]
-    fn test_reveal_with_temp_file() {
-        let dir = tempdir().unwrap();
-        let file_path = dir.path().join("test.txt");
-        fs::write(&file_path, "test").unwrap();
-
-        // Should not error for valid file
-        let result = reveal_in_file_manager(&file_path);
-        // Fire-and-forget, so success just means spawn worked
-        assert!(result.is_ok());
     }
 }

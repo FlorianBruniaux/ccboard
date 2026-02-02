@@ -228,6 +228,7 @@ impl ConfigTab {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_config_column(
         &mut self,
         frame: &mut Frame,
