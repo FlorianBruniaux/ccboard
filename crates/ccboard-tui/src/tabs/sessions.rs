@@ -190,33 +190,50 @@ impl SessionsTab {
         self.projects = sessions_by_project.keys().cloned().collect();
         self.projects.sort();
 
-        // Layout: [search bar (if active), content]
-        let main_layout = if self.search_active {
-            vec![Constraint::Length(3), Constraint::Min(0)]
-        } else {
-            vec![Constraint::Percentage(100)]
-        };
-
+        // Layout: [search bar (always visible), content]
         let main_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(main_layout)
+            .constraints([Constraint::Length(3), Constraint::Min(0)])
             .split(area);
 
-        let content_area = if self.search_active {
-            // Render search bar
-            let search_block = Block::default()
-                .title(" Search (Esc to cancel) ")
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Cyan));
-
-            let search_input =
-                Paragraph::new(format!("/ {}", self.search_filter)).block(search_block);
-
-            frame.render_widget(search_input, main_chunks[0]);
-            main_chunks[1]
+        // Render search bar (always visible)
+        let search_title = if self.search_active {
+            " Search (Esc to cancel) "
         } else {
-            main_chunks[0]
+            " Search (Press / to focus) "
         };
+        let search_placeholder = if self.search_filter.is_empty() {
+            "Search projects, messages, models..."
+        } else {
+            ""
+        };
+        let search_border_color = if self.search_active {
+            Color::Cyan
+        } else {
+            Color::DarkGray
+        };
+
+        let search_block = Block::default()
+            .title(search_title)
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(search_border_color));
+
+        let search_text = if self.search_filter.is_empty() {
+            format!("/ {}", search_placeholder)
+        } else {
+            format!("/ {}", self.search_filter)
+        };
+
+        let search_input = Paragraph::new(search_text)
+            .block(search_block)
+            .style(if self.search_filter.is_empty() {
+                Style::default().fg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::White)
+            });
+
+        frame.render_widget(search_input, main_chunks[0]);
+        let content_area = main_chunks[1];
 
         // Main layout: projects tree | session list | detail (if open)
         let constraints = if self.show_detail {
@@ -351,11 +368,17 @@ impl SessionsTab {
             Color::DarkGray
         };
 
+        let title_text = if self.search_filter.is_empty() {
+            format!(" Sessions ({}) ", sessions.len())
+        } else {
+            format!(" Sessions ({} results) ", sessions.len())
+        };
+
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
-                format!(" Sessions ({}) ", sessions.len()),
+                title_text,
                 Style::default().fg(Color::White).bold(),
             ));
 

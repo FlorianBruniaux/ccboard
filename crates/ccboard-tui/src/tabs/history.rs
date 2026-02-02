@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Sparkline},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Sparkline},
 };
 
 /// History tab state
@@ -240,11 +240,17 @@ impl HistoryTab {
             Color::DarkGray
         };
 
+        let title_text = if self.search_query.is_empty() {
+            " / Search (Press / to focus) ".to_string()
+        } else {
+            format!(" / Search ({} results) ", self.filtered_sessions.len())
+        };
+
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
-                " / Search ",
+                title_text,
                 Style::default().fg(Color::White).bold(),
             ));
 
@@ -254,12 +260,12 @@ impl HistoryTab {
         let search_display = if self.search_query.is_empty() {
             if self.search_focused {
                 Line::from(Span::styled(
-                    "Type to search...",
+                    "Type to search across all sessions...",
                     Style::default().fg(Color::DarkGray),
                 ))
             } else {
                 Line::from(Span::styled(
-                    "Press / to search",
+                    "Search all messages across sessions",
                     Style::default().fg(Color::DarkGray),
                 ))
             }
@@ -398,6 +404,24 @@ impl HistoryTab {
 
         let list = List::new(items).block(block);
         frame.render_stateful_widget(list, area, &mut self.results_state);
+
+        // Scrollbar for long result lists
+        let result_count = self.filtered_sessions.len();
+        if result_count > (area.height as usize - 2) {
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None);
+            let mut scrollbar_state = ScrollbarState::new(result_count)
+                .position(self.results_state.selected().unwrap_or(0));
+            frame.render_stateful_widget(
+                scrollbar,
+                area.inner(ratatui::layout::Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
+                &mut scrollbar_state,
+            );
+        }
     }
 
     fn render_stats_panel(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {

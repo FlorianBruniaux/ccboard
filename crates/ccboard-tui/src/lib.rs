@@ -2,7 +2,9 @@
 
 pub mod app;
 pub mod editor;
+pub mod empty_state;
 pub mod tabs;
+pub mod theme;
 pub mod ui;
 
 pub use app::App;

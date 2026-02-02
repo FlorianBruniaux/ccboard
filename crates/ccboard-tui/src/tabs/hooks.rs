@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 use std::collections::HashMap;
 
@@ -266,6 +266,24 @@ impl HooksTab {
 
         let list = List::new(items).block(block);
         frame.render_stateful_widget(list, area, &mut self.event_state);
+
+        // Scrollbar for long event lists
+        let event_count = self.event_names.len();
+        if event_count > (area.height as usize - 2) {
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None);
+            let mut scrollbar_state = ScrollbarState::new(event_count)
+                .position(self.event_state.selected().unwrap_or(0));
+            frame.render_stateful_widget(
+                scrollbar,
+                area.inner(ratatui::layout::Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
+                &mut scrollbar_state,
+            );
+        }
     }
 
     fn render_hook_details(
@@ -386,6 +404,17 @@ impl HooksTab {
 
         let list = List::new(items);
         frame.render_stateful_widget(list, inner, &mut self.hook_state);
+
+        // Scrollbar for long hook lists
+        let hook_count = all_hooks.len();
+        if hook_count > (inner.height as usize) {
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None);
+            let mut scrollbar_state = ScrollbarState::new(hook_count)
+                .position(self.hook_state.selected().unwrap_or(0));
+            frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
+        }
     }
 
     fn event_style(event: &str) -> (&'static str, Color) {
