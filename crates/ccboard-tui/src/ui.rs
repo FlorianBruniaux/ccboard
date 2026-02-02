@@ -1,6 +1,7 @@
 //! TUI rendering logic
 
 use crate::app::{App, Tab};
+use crate::components::{Breadcrumb, Breadcrumbs};
 use crate::tabs::{
     AgentsTab, ConfigTab, CostsTab, DashboardTab, HistoryTab, HooksTab, McpTab, SessionsTab,
 };
@@ -23,6 +24,7 @@ pub struct Ui {
     costs: CostsTab,
     history: HistoryTab,
     mcp: McpTab,
+    breadcrumbs: Breadcrumbs,
 }
 
 impl Default for Ui {
@@ -42,6 +44,7 @@ impl Ui {
             costs: CostsTab::new(),
             history: HistoryTab::new(),
             mcp: McpTab::new(),
+            breadcrumbs: Breadcrumbs::new(),
         }
     }
 
@@ -93,14 +96,14 @@ impl Ui {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3), // Header + Tab bar
+                Constraint::Length(3), // Header + Tab bar + Breadcrumbs
                 Constraint::Min(0),    // Content
                 Constraint::Length(1), // Status bar
             ])
             .split(size);
 
-        // Render header with tabs
-        self.render_header(frame, chunks[0], app.active_tab);
+        // Render header with tabs and breadcrumbs
+        self.render_header(frame, chunks[0], app.active_tab, app);
 
         // Render degraded state warning if needed
         let content_area =
@@ -116,7 +119,7 @@ impl Ui {
         app.command_palette.render(frame, size);
     }
 
-    fn render_header(&self, frame: &mut Frame, area: Rect, active: Tab) {
+    fn render_header(&mut self, frame: &mut Frame, area: Rect, active: Tab, app: &App) {
         let block = Block::default()
             .borders(Borders::BOTTOM)
             .border_style(Style::default().fg(Color::DarkGray));
@@ -124,21 +127,30 @@ impl Ui {
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        // Split header: logo left, tabs right
-        let header_chunks = Layout::default()
+        // Split header vertically: tab bar + breadcrumbs
+        let header_rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Tab bar
+                Constraint::Length(1), // Breadcrumbs
+            ])
+            .split(inner);
+
+        // Tab bar: split horizontally (logo left, tabs right)
+        let tab_bar_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Length(12), // Logo
                 Constraint::Min(0),     // Tabs
             ])
-            .split(inner);
+            .split(header_rows[0]);
 
         // Logo
         let logo = Paragraph::new(Line::from(vec![
             Span::styled("◈ ", Style::default().fg(Color::Cyan)),
             Span::styled("ccboard", Style::default().fg(Color::White).bold()),
         ]));
-        frame.render_widget(logo, header_chunks[0]);
+        frame.render_widget(logo, tab_bar_chunks[0]);
 
         // Tabs with icons
         let titles: Vec<Line> = Tab::all()
@@ -162,7 +174,12 @@ impl Ui {
             .select(active.index())
             .divider(Span::styled("│", Style::default().fg(Color::DarkGray)));
 
-        frame.render_widget(tabs, header_chunks[1]);
+        frame.render_widget(tabs, tab_bar_chunks[1]);
+
+        // Breadcrumbs (second row)
+        let breadcrumbs_path = self.get_breadcrumbs_for_tab(active, app);
+        self.breadcrumbs.set_path(breadcrumbs_path);
+        self.breadcrumbs.render(frame, header_rows[1]);
     }
 
     fn render_degraded_banner(&self, frame: &mut Frame, area: Rect, state: &DegradedState) -> Rect {
@@ -278,5 +295,39 @@ impl Ui {
 
         let bar = Paragraph::new(status).style(Style::default().bg(Color::DarkGray));
         frame.render_widget(bar, area);
+    }
+
+    /// Get breadcrumbs path for the active tab
+    fn get_breadcrumbs_for_tab(&self, tab: Tab, _app: &App) -> Vec<Breadcrumb> {
+        let mut path = vec![Breadcrumb::new("Dashboard").with_level(0)];
+
+        match tab {
+            Tab::Dashboard => {
+                // Just "Dashboard"
+            }
+            Tab::Sessions => {
+                path.push(Breadcrumb::new("Sessions").with_level(1));
+            }
+            Tab::Config => {
+                path.push(Breadcrumb::new("Config").with_level(1));
+            }
+            Tab::Hooks => {
+                path.push(Breadcrumb::new("Hooks").with_level(1));
+            }
+            Tab::Agents => {
+                path.push(Breadcrumb::new("Agents").with_level(1));
+            }
+            Tab::Costs => {
+                path.push(Breadcrumb::new("Costs").with_level(1));
+            }
+            Tab::History => {
+                path.push(Breadcrumb::new("History").with_level(1));
+            }
+            Tab::Mcp => {
+                path.push(Breadcrumb::new("MCP").with_level(1));
+            }
+        }
+
+        path
     }
 }
