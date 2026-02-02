@@ -22,6 +22,8 @@ pub struct ConfigTab {
     claude_home: Option<std::path::PathBuf>,
     /// Project directory (for file paths)
     project_path: Option<std::path::PathBuf>,
+    /// Show MCP detail modal
+    show_mcp_detail: bool,
 }
 
 impl Default for ConfigTab {
@@ -38,6 +40,7 @@ impl ConfigTab {
             error_message: None,
             claude_home: None,
             project_path: None,
+            show_mcp_detail: false,
         }
     }
 
@@ -69,13 +72,26 @@ impl ConfigTab {
                 state.select(Some(current + 1));
             }
             KeyCode::Char('e') => {
-                // Open config file based on focused column
-                if let Some(path) = self.get_focused_file_path() {
-                    if let Err(e) = crate::editor::open_in_editor(&path) {
-                        self.error_message = Some(format!("Failed to open editor: {}", e));
+                if self.show_mcp_detail {
+                    // In MCP modal: edit claude_desktop_config.json
+                    if let Some(ref claude_home) = self.claude_home {
+                        let config_path = claude_home.join("claude_desktop_config.json");
+                        if let Err(e) = crate::editor::open_in_editor(&config_path) {
+                            self.error_message = Some(format!("Failed to open editor: {}", e));
+                        }
+                        self.show_mcp_detail = false; // Close modal after opening editor
+                    } else {
+                        self.error_message = Some("Claude home directory not set".to_string());
                     }
                 } else {
-                    self.error_message = Some("No config file available for this column".to_string());
+                    // Normal mode: Open config file based on focused column
+                    if let Some(path) = self.get_focused_file_path() {
+                        if let Err(e) = crate::editor::open_in_editor(&path) {
+                            self.error_message = Some(format!("Failed to open editor: {}", e));
+                        }
+                    } else {
+                        self.error_message = Some("No config file available for this column".to_string());
+                    }
                 }
             }
             KeyCode::Char('o') => {
@@ -88,8 +104,16 @@ impl ConfigTab {
                     self.error_message = Some("No config file available for this column".to_string());
                 }
             }
+            KeyCode::Char('m') => {
+                // Show MCP detail modal (only in merged column)
+                if self.focus == 3 {
+                    self.show_mcp_detail = true;
+                }
+            }
             KeyCode::Esc => {
-                if self.error_message.is_some() {
+                if self.show_mcp_detail {
+                    self.show_mcp_detail = false;
+                } else if self.error_message.is_some() {
                     self.error_message = None;
                 }
             }
@@ -192,6 +216,11 @@ impl ConfigTab {
             mcp_config,
             rules,
         );
+
+        // Render MCP detail modal if requested
+        if self.show_mcp_detail {
+            self.render_mcp_detail_modal(frame, area, mcp_config);
+        }
 
         // Render error popup if present
         if self.error_message.is_some() {
@@ -557,6 +586,119 @@ impl ConfigTab {
             Span::styled(format!("{}: ", key), Style::default().fg(Color::DarkGray)),
             Span::styled(value.to_string(), Style::default().fg(value_color)),
         ]))
+    }
+
+    fn render_mcp_detail_modal(&self, frame: &mut Frame, area: Rect, mcp_config: Option<&McpConfig>) {
+        // Center modal (70% width, 70% height)
+        let modal_width = (area.width as f32 * 0.7).max(60.0) as u16;
+        let modal_height = (area.height as f32 * 0.7).max(20.0) as u16;
+        let modal_x = (area.width.saturating_sub(modal_width)) / 2;
+        let modal_y = (area.height.saturating_sub(modal_height)) / 2;
+
+        let modal_area = Rect {
+            x: area.x + modal_x,
+            y: area.y + modal_y,
+            width: modal_width,
+            height: modal_height,
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(Span::styled(
+                " MCP Servers Detail ",
+                Style::default().fg(Color::Cyan).bold(),
+            ));
+
+        let inner = block.inner(modal_area);
+        frame.render_widget(block, modal_area);
+
+        let mut lines = vec![];
+
+        if let Some(mcp) = mcp_config {
+            if mcp.servers.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    "No MCP servers configured",
+                    Style::default().fg(Color::DarkGray),
+                )));
+            } else {
+                let config_path = self.claude_home.as_ref()
+                    .map(|p| p.join("claude_desktop_config.json"))
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "~/.claude/claude_desktop_config.json".to_string());
+
+                lines.push(Line::from(Span::styled(
+                    format!("Config: {}", config_path),
+                    Style::default().fg(Color::DarkGray),
+                )));
+                lines.push(Line::from(""));
+
+                for (name, server) in &mcp.servers {
+                    // Server name
+                    lines.push(Line::from(Span::styled(
+                        format!("● {}", name),
+                        Style::default().fg(Color::Green).bold(),
+                    )));
+
+                    // Full command
+                    let full_cmd = format!("{} {}", server.command, server.args.join(" "));
+                    lines.push(Line::from(vec![
+                        Span::styled("  Command: ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(full_cmd, Style::default().fg(Color::White)),
+                    ]));
+
+                    // Environment variables
+                    if server.env.is_empty() {
+                        lines.push(Line::from(Span::styled(
+                            "  Env: (none)",
+                            Style::default().fg(Color::DarkGray),
+                        )));
+                    } else {
+                        lines.push(Line::from(Span::styled(
+                            format!("  Env: {} variables", server.env.len()),
+                            Style::default().fg(Color::DarkGray),
+                        )));
+                        for (key, value) in &server.env {
+                            lines.push(Line::from(vec![
+                                Span::styled("    ", Style::default()),
+                                Span::styled(format!("{}=", key), Style::default().fg(Color::Yellow)),
+                                Span::styled(value, Style::default().fg(Color::White)),
+                            ]));
+                        }
+                    }
+
+                    lines.push(Line::from(""));
+                }
+
+                // Remove last empty line
+                if !lines.is_empty() {
+                    lines.pop();
+                }
+            }
+        } else {
+            lines.push(Line::from(Span::styled(
+                "MCP config not found",
+                Style::default().fg(Color::DarkGray),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Expected at: ~/.claude/claude_desktop_config.json",
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
+
+        // Footer with help
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "[Esc: close | e: edit config]",
+            Style::default().fg(Color::DarkGray),
+        )));
+
+        let paragraph = Paragraph::new(lines)
+            .wrap(ratatui::widgets::Wrap { trim: false })
+            .scroll((0, 0));
+
+        frame.render_widget(paragraph, inner);
     }
 
     fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
