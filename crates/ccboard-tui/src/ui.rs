@@ -258,7 +258,8 @@ impl Ui {
             }
             Tab::Costs => {
                 let stats = app.store.stats();
-                self.costs.render(frame, area, stats.as_ref());
+                let billing_blocks = app.store.billing_blocks();
+                self.costs.render(frame, area, stats.as_ref(), Some(&billing_blocks));
             }
             Tab::History => {
                 let sessions: Vec<_> = app.store.recent_sessions(10000);

@@ -5,7 +5,7 @@
 
 use crate::error::{DegradedState, LoadReport};
 use crate::event::{ConfigScope, DataEvent, EventBus};
-use crate::models::{InvocationStats, MergedConfig, SessionMetadata, StatsCache};
+use crate::models::{BillingBlockManager, InvocationStats, MergedConfig, SessionMetadata, StatsCache};
 use crate::parsers::{InvocationParser, McpConfig, Rules, SessionIndexParser, SettingsParser, StatsParser};
 use dashmap::DashMap;
 use moka::future::Cache;
@@ -74,6 +74,9 @@ pub struct DataStore {
     /// Invocation statistics (agents, commands, skills)
     invocation_stats: RwLock<InvocationStats>,
 
+    /// Billing blocks (5h usage tracking)
+    billing_blocks: RwLock<BillingBlockManager>,
+
     /// Session metadata (high contention with many entries)
     sessions: DashMap<String, SessionMetadata>,
 
@@ -109,6 +112,7 @@ impl DataStore {
             mcp_config: RwLock::new(None),
             rules: RwLock::new(Rules::default()),
             invocation_stats: RwLock::new(InvocationStats::new()),
+            billing_blocks: RwLock::new(BillingBlockManager::new()),
             sessions: DashMap::new(),
             session_content_cache,
             event_bus: EventBus::default_capacity(),
@@ -473,6 +477,64 @@ impl DataStore {
 
         // Note: Using LoadCompleted as there's no specific invocation stats event
         self.event_bus.publish(DataEvent::LoadCompleted);
+    }
+
+    /// Compute billing blocks from all sessions
+    ///
+    /// This scans all sessions with timestamps and aggregates usage into 5-hour billing blocks.
+    /// Should be called after initial load or when sessions are updated.
+    pub async fn compute_billing_blocks(&self) {
+        debug!("Computing billing blocks from sessions");
+
+        let mut manager = BillingBlockManager::new();
+        let mut sessions_with_timestamps = 0;
+        let mut sessions_without_timestamps = 0;
+
+        for session in self.sessions.iter() {
+            let metadata = session.value();
+
+            // Skip sessions without timestamps
+            let Some(timestamp) = &metadata.first_timestamp else {
+                sessions_without_timestamps += 1;
+                continue;
+            };
+
+            sessions_with_timestamps += 1;
+
+            // Estimate cost based on total tokens (simplified pricing)
+            // TODO: Use actual pricing model based on model name
+            // Rough estimate: $0.002 per 1K tokens (average)
+            let estimated_cost = (metadata.total_tokens as f64 / 1000.0) * 0.002;
+
+            // For now, we don't have detailed token breakdown in metadata
+            // So we'll use total_tokens for input_tokens and 0 for others
+            // This will be improved when we add full session parsing
+            manager.add_usage(
+                timestamp,
+                metadata.total_tokens, // input_tokens (simplified)
+                0,                     // output_tokens (TODO: from session parsing)
+                0,                     // cache_creation_tokens (TODO: from session parsing)
+                0,                     // cache_read_tokens (TODO: from session parsing)
+                estimated_cost,
+            );
+        }
+
+        debug!(
+            sessions_with_timestamps,
+            sessions_without_timestamps,
+            blocks = manager.get_all_blocks().len(),
+            "Billing blocks computed"
+        );
+
+        let mut guard = self.billing_blocks.write();
+        *guard = manager;
+
+        self.event_bus.publish(DataEvent::LoadCompleted);
+    }
+
+    /// Get billing blocks (read-only access)
+    pub fn billing_blocks(&self) -> parking_lot::RwLockReadGuard<'_, BillingBlockManager> {
+        self.billing_blocks.read()
     }
 }
 

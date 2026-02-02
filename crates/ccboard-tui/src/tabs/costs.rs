@@ -1,6 +1,6 @@
 //! Costs tab - Token usage and estimated costs by model
 
-use ccboard_core::models::StatsCache;
+use ccboard_core::models::{BillingBlockManager, StatsCache};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -86,10 +86,10 @@ impl CostsTab {
 
         match key {
             KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
-                self.view_mode = (self.view_mode + 1) % 3;
+                self.view_mode = (self.view_mode + 1) % 4;
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                self.view_mode = (self.view_mode + 2) % 3; // +2 instead of -1 for wrapping
+                self.view_mode = (self.view_mode + 3) % 4; // +3 instead of -1 for wrapping
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 let current = self.model_state.selected().unwrap_or(0);
@@ -104,7 +104,13 @@ impl CostsTab {
     }
 
     /// Render the costs tab
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    pub fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        billing_blocks: Option<&BillingBlockManager>,
+    ) {
         // Main layout
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -122,12 +128,13 @@ impl CostsTab {
             0 => self.render_overview(frame, chunks[1], stats),
             1 => self.render_by_model(frame, chunks[1], stats),
             2 => self.render_daily(frame, chunks[1], stats),
+            3 => self.render_billing_blocks(frame, chunks[1], billing_blocks),
             _ => {}
         }
     }
 
     fn render_view_tabs(&self, frame: &mut Frame, area: Rect) {
-        let tabs = ["1. Overview", "2. By Model", "3. Daily Trend"];
+        let tabs = ["1. Overview", "2. By Model", "3. Daily", "4. Billing Blocks"];
 
         let block = Block::default()
             .borders(Borders::BOTTOM)
@@ -138,7 +145,7 @@ impl CostsTab {
 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Ratio(1, 3); 3])
+            .constraints(vec![Constraint::Ratio(1, 4); 4])
             .split(inner);
 
         for (i, (tab, chunk)) in tabs.iter().zip(chunks.iter()).enumerate() {
@@ -587,5 +594,112 @@ impl CostsTab {
         }
 
         capitalized
+    }
+
+    fn render_billing_blocks(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        billing_blocks: Option<&BillingBlockManager>,
+    ) {
+        let Some(blocks_manager) = billing_blocks else {
+            let no_data = Paragraph::new("No billing block data available")
+                .block(
+                    Block::default()
+                        .title("Billing Blocks (5h)")
+                        .borders(Borders::ALL),
+                )
+                .style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(no_data, area);
+            return;
+        };
+
+        let all_blocks = blocks_manager.get_all_blocks();
+
+        if all_blocks.is_empty() {
+            let no_data = Paragraph::new("No sessions with timestamps found")
+                .block(
+                    Block::default()
+                        .title("Billing Blocks (5h)")
+                        .borders(Borders::ALL),
+                )
+                .style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(no_data, area);
+            return;
+        }
+
+        // Group by date
+        let mut by_date = std::collections::HashMap::new();
+        for (block, usage) in &all_blocks {
+            by_date
+                .entry(block.date)
+                .or_insert_with(Vec::new)
+                .push((block, usage));
+        }
+
+        // Sort dates
+        let mut dates: Vec<_> = by_date.keys().collect();
+        dates.sort_by(|a, b| b.cmp(a)); // Most recent first
+
+        // Build rows
+        let mut rows = Vec::new();
+        for date in dates.iter().take(10) {
+            // Show last 10 days
+            if let Some(blocks) = by_date.get(date) {
+                for (block, usage) in blocks {
+                    let color = match BillingBlockManager::get_color_for_cost(usage.total_cost) {
+                        "green" => Color::Green,
+                        "yellow" => Color::Yellow,
+                        "red" => Color::Red,
+                        _ => Color::White,
+                    };
+
+                    let row_data = vec![
+                        date.format("%Y-%m-%d").to_string(),
+                        block.label(),
+                        format!("{:>8}", usage.total_tokens()),
+                        format!("{:>6}", usage.session_count),
+                        format!("${:>6.2}", usage.total_cost),
+                    ];
+
+                    rows.push(
+                        Row::new(row_data)
+                            .style(Style::default().fg(color))
+                            .height(1),
+                    );
+                }
+            }
+        }
+
+        // Header
+        let header = Row::new(vec!["Date", "Block (UTC)", "Tokens", "Sessions", "Cost"])
+            .style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .height(1);
+
+        // Table
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Length(12), // Date
+                Constraint::Length(15), // Block
+                Constraint::Length(10), // Tokens
+                Constraint::Length(10), // Sessions
+                Constraint::Length(10), // Cost
+            ],
+        )
+        .header(header)
+        .block(
+            Block::default()
+                .title("Billing Blocks (5h UTC) — Last 10 Days")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan)),
+        )
+        .column_spacing(2);
+
+        frame.render_widget(table, area);
     }
 }

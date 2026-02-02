@@ -110,6 +110,9 @@ async fn run_tui(claude_home: PathBuf, project: Option<PathBuf>) -> Result<()> {
     // Compute invocation statistics (agents/commands/skills usage)
     store.compute_invocations().await;
 
+    // Compute billing blocks (5h usage tracking)
+    store.compute_billing_blocks().await;
+
     // Start file watcher for live updates
     let _watcher = ccboard_core::FileWatcher::start(
         claude_home.clone(),
@@ -145,6 +148,9 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
     // Compute invocation statistics (agents/commands/skills usage)
     store.compute_invocations().await;
 
+    // Compute billing blocks (5h usage tracking)
+    store.compute_billing_blocks().await;
+
     // Start file watcher for live updates
     let _watcher = ccboard_core::FileWatcher::start(
         claude_home,
@@ -179,6 +185,9 @@ async fn run_both(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> 
 
     // Compute invocation statistics (agents/commands/skills usage)
     store.compute_invocations().await;
+
+    // Compute billing blocks (5h usage tracking)
+    store.compute_billing_blocks().await;
 
     // Start file watcher for live updates (shared by TUI and web)
     let _watcher = ccboard_core::FileWatcher::start(
