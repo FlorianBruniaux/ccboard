@@ -1,202 +1,311 @@
 # Plan: ccboard — Unified Claude Code Management Dashboard
 
-## 📍 État Actuel du Projet (2026-02-02)
+## État Actuel (2026-02-02)
 
-**Version** : 0.2.0-alpha
-**Branch** : `main`
-**Status** : 🎉 **PRODUCTION-READY** — Phases 0-9 + File Watcher complètes, prêt pour Open Source Release
+**Version**: 0.2.0-alpha
+**Branch**: `feat/phase-11-tokens-invocations`
+**Status**: 🔄 **IN DEVELOPMENT** — Phase 11 en cours (token tracking + invocation counters)
 
-### ✅ Phases Complétées (100%)
+### Métriques Vérifiées
 
-| Phase | Description | LOC | Date | PR |
-|-------|-------------|-----|------|-----|
-| **Phase 0** | Architecture & Planning | - | 2026-01-29 | - |
-| **Phase 1-5** | Core Implementation | ~8K | 2026-01-30 | - |
-| **Phase 6** | File Opening & MCP UI | +587 | 2026-02-02 | #1 |
-| **Phase 7** | MCP Tab Dédié | +643 | 2026-02-02 | #1 |
-| **Phase 8** | Marketplace Plugin | +120 | 2026-02-02 | #1 |
-| **Phase 9.1** | TUI Polish (Theme + UX) | +514 | 2026-02-02 | #2 |
-| **Phase 9.2** | Command Palette | +469 | 2026-02-02 | merged |
-| **Phase 9.3** | Breadcrumbs + Icons | +282 | 2026-02-02 | merged |
-| **Phase 9.4** | PgUp/PgDn + Components | +317 | 2026-02-02 | merged |
-| **File Watcher** | Live Data Updates | +80 | 2026-02-02 | merged |
-| **Phase 9.5** | UX Fixes & Improvements | +50 | 2026-02-02 | in-progress |
+| Métrique | Valeur | Statut |
+|----------|--------|--------|
+| **LOC totales** | ~11,000+ lignes | ✅ |
+| **Crates** | 4 (ccboard, core, tui, web) | ✅ |
+| **Tests** | 86 (67 core + 19 tui) | ✅ Corrigé (était "88") |
+| **Clippy warnings** | 0 | ✅ |
+| **TUI tabs** | 8 complets | ✅ |
+| **Parsers (core)** | 7 (stats, settings, session_index, mcp_config, hooks, rules, task) | ✅ |
+| **Parsers (TUI only)** | 1 (frontmatter agents - non partageable avec web) | ⚠️ Dette technique |
+| **Initial load** | <2s (1000+ sessions) | ✅ |
 
-**Total** : ~11,000+ LOC | 88 tests passing | 0 clippy warnings
+### Phases Complétées
 
-### 🔧 Phase 9.5 : UX Fixes & Improvements (2026-02-02)
-
-**Changements** :
-- ✅ **Costs tab keybindings** : `Tab/←→/h/l` au lieu de `1-3` (fix conflit navigation globale)
-- ✅ **Session detail wrapping** : Texte renvoyé à la ligne pour paths/messages longs
-- ✅ **Config hints** : Ajout "e edit │ o reveal" dans footer
-- ✅ **AgentEntry structure** : Préparation champ `invocation_count` (comptage différé)
-
-**Limitations identifiées** :
-- ⚠️ **Tokens affichent 0** : Claude Code ne stocke pas `usage` dans JSONL (limitation upstream)
-- 📊 **Comptage invocations** : Différé (parsing 1000+ sessions = performance intensive)
-
----
-
-## 🎯 Fonctionnalités Actuelles
-
-### TUI Dashboard (8 tabs complets)
-
-1. **◆ Dashboard** : Vue d'ensemble (stats, models, MCP servers)
-2. **● Sessions** : Navigateur de sessions avec recherche persistante
-3. **⚙ Config** : Configuration complète (settings, MCP, hooks)
-4. **▣ Hooks** : Gestion des hooks par type d'événement
-5. **◉ Agents** : Browse agents/commands/skills
-6. **💰 Costs** : Analyse des coûts par modèle/période
-7. **⏱ History** : Recherche globale dans l'historique
-8. **◈ MCP** : Gestion MCP servers avec status detection
-
-### UX Polish (k9s/lazygit niveau)
-
-**Navigation** :
-- Command palette (`:` prefix) avec fuzzy matching
-- Breadcrumbs trail : 📍 Dashboard > Tab > Context
-- Tab icons (◆●⚙▣◉💰⏱◈) pour identification rapide
-- PgUp/PgDn navigation (jump 10 items)
-- Vim keybindings (hjkl) + arrow keys
-
-**Visuel** :
-- Palette de couleurs unifiée (Success/Error/Warning/Neutral/Focus/Important)
-- Scrollbar indicators sur toutes les listes longues
-- Empty states avec hints actionnables
-- Persistent search bars dans Sessions/History
-
-**Composants partagés** :
-- `ListPane` : Liste réutilisable avec scrollbar
-- `DetailPane` : Affichage de contenu avec word wrap
-- `SearchBar` : Barre de recherche avec placeholder
-- `CommandPalette` : Palette de commandes fuzzy
-- `Breadcrumbs` : Navigation trail avec truncation
-
-### Live Updates (File Watcher activé)
-
-- ✅ Détection automatique des changements (500ms debounce)
-- ✅ Stats updates → Dashboard refresh
-- ✅ Session changes → Sessions tab update
-- ✅ Config changes → Config tab reload
-- ✅ Web mode → SSE push to browser (backend ready)
-
-### Marketplace Plugin
-
-- 6 commands : `/dashboard`, `/mcp-status`, `/costs`, `/sessions`, `/ccboard-web`, `/ccboard-install`
-- Installation detection + cargo install wrapper
-- Structure `skills/ccboard/` complète
+| Phase | Description | LOC | Date | Status |
+|-------|-------------|-----|------|--------|
+| **Phase 0** | Architecture & Planning | - | 2026-01-29 | ✅ |
+| **Phase 1-5** | Core Implementation | ~8K | 2026-01-30 | ✅ |
+| **Phase 6** | File Opening & MCP UI | +587 | 2026-02-02 | ✅ |
+| **Phase 7** | MCP Tab Dédié | +643 | 2026-02-02 | ✅ |
+| **Phase 8** | Marketplace Plugin | +120 | 2026-02-02 | ✅ |
+| **Phase 9.1** | TUI Polish (Theme + UX) | +514 | 2026-02-02 | ✅ |
+| **Phase 9.2** | Command Palette | +469 | 2026-02-02 | ✅ |
+| **Phase 9.3** | Breadcrumbs + Icons | +282 | 2026-02-02 | ✅ |
+| **Phase 9.4** | PgUp/PgDn + Components | +317 | 2026-02-02 | ✅ |
+| **File Watcher** | Live Data Updates | +80 | 2026-02-02 | ✅ |
+| **Phase 9.5** | UX Fixes & Improvements | +50 | 2026-02-02 | ✅ |
+| **Phase 11** | Token Tracking + Invocations | TBD | 2026-02-02 | 🔄 EN COURS |
 
 ---
 
-## 📊 Métriques Projet
+## Inventaire Features (Audit Code-Level)
 
-| Métrique | Valeur |
-|----------|--------|
-| **LOC totales** | ~11,000 lignes |
-| **Fichiers créés** | 75 fichiers |
-| **Crates** | 4 (ccboard, core, tui, web) |
-| **Tests** | 88 (66 core + 22 tui) |
-| **Clippy warnings** | 0 |
-| **Build time** | <10s (release) |
-| **Initial load** | <2s (1000+ sessions) |
+### A. Ce qui EXISTE vraiment
+
+| Catégorie | Détail | Vérifié |
+|-----------|--------|---------|
+| **4 crates** | ccboard (CLI), ccboard-core (data), ccboard-tui (8 tabs), ccboard-web (stub) | ✅ |
+| **7 parsers (core)** | stats, settings, session_index, mcp_config, hooks, rules, task | ✅ |
+| **1 parser (TUI only)** | frontmatter agents/commands/skills dans `agents.rs`, PAS dans core | ✅ |
+| **8 tabs TUI** | Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP | ✅ |
+| **DataStore** | DashMap + RwLock + Moka cache + EventBus | ✅ |
+| **File Watcher** | notify + debounce, events broadcast | ✅ |
+| **Web API** | 4 routes: `/`, `/api/stats`, `/api/sessions`, `/api/health` | ✅ |
+| **86 tests** | 67 core + 19 TUI (0 rendering) + 0 web | ✅ |
+
+### B. Dead Code / Dette Technique
+
+| Item | Statut | Impact |
+|------|--------|--------|
+| **session_content_cache** | `#[allow(dead_code)]` jamais utilisé | Bloque on-demand loading |
+| **SSE routes** | `sse.rs` existe, zero route `/api/events` wired | Web live updates non fonctionnel |
+| **CircuitBreaker** | Type défini, zero logique | Code mort |
+| **TaskParser** | Parser OK, zero UI/store connection | Tasks invisibles |
+| **Frontmatter parser** | Dans TUI pas core | Web ne peut pas servir agents |
+| **Tokens per session** | Champ existe, toujours 0 | ❌ CRITIQUE - feature non implémentée |
+| **invocation_count** | Hardcodé à 0 partout | ❌ CRITIQUE - feature non implémentée |
+| **Global search** | TODO dans app.rs | Feature promise non livrée |
+| **Leptos frontend** | Zero code, string "Coming soon" | Web mode non fonctionnel |
 
 ---
 
-## 🚀 Prochaines Étapes — Focus Features
+## Paysage Concurrentiel (2026-02-02)
 
-### 🎯 Priorité Actuelle : Amélioration des fonctionnalités
+### A. Concurrents DIRECTS : Rust TUI (Même Stack)
 
-**Décision** : Développement des features avant Open Source Release
-**Rationale** : Produit plus mature et complet pour la première release publique
+| Tool | Stars | Stack | Features Clés | Menace |
+|------|-------|-------|---------------|--------|
+| **agtrace** (lanegrid) | Nouveau (jan 2026) | **Rust, Ratatui, Tokio** | Context window viz, execution timeline, SQLite indexing, multi-provider, MCP integration, git worktree | **🔴 CRITIQUE** - même stack, plus innovant |
+| **Claudelytics** (nwiizo) | ? | **Rust** | **9 tabs** TUI, watch mode, burn rate, peco fuzzy, CSV export, projections | **🔴 HAUTE** - plus de tabs que nous |
+
+### B. Concurrents DIRECTS : Cost/Usage Trackers
+
+| Tool | Stars | Stack | Features Clés | Menace |
+|------|-------|-------|---------------|--------|
+| **ccusage** | **10.3K** | TS/Node | Daily/monthly/session, `--live` burn rate, **MCP server**, 5h blocks, duplicate detection | 🔴 Leader incontesté |
+| **Claude-Code-Usage-Monitor** | ~500 | Python/Rich | ML predictions, P90, multi-level alerts, plan detection | 🟡 Predictif unique |
+| **VS Code Usage Tracker** | ? | TS Extension | Real-time tokens, burn rate, visual indicators | 🟢 IDE-only |
+
+### C. Concurrents ADJACENTS
+
+| Tool | Stack | Type | Notes |
+|------|-------|------|-------|
+| **Opcode** | Tauri+React | Desktop GUI wrapper | Interactif, pas monitoring. Checkpoints, custom agents, AGPL |
+| **Crystal** | Electron | Desktop parallel sessions | Git worktree isolation, diff viewer, competitive exploration |
+| **claudekit** | ? | Framework | 20+ agents, error blocking, checkpoints |
+| **ccstatusline** | Rust | Statusline | 900 stars, 62 modules |
+| **CCometixLine** | Rust | Statusline | 1.6K stars, git integration |
+
+### D. Plateformes Multi-Provider (Enterprise Adjacent)
+
+| Tool | Stars | Focus |
+|------|-------|-------|
+| **LiteLLM** | 10K+ | 100+ providers, budget limits, DB logging |
+| **Helicone** | 5K+ | Agent tracing, prompt versioning, free tier |
+| **Portkey** | 8K+ | AI Gateway, 200+ models, 300B tokens |
+
+### E. MCP Ecosystem
+
+| Tool | Type | Notes |
+|------|------|-------|
+| **MCP Inspector** (anthropic) | Web UI | Official, debugging |
+| **MCP Registry** (anthropic) | Go backend | Discovery, preview |
+| **mcptools** | CLI | Homebrew + cargo, production-ready |
+| **mcp-debugger** | MCP Server | Step-through debugging |
 
 ---
 
-### Phase 11 : Token Tracking & Invocation Counters (Priorité 🔴 P0 - 2-3 jours)
+## Matrice Features Complète
 
-**Objectif** : Afficher les tokens réels et compter les invocations des agents/commands/skills
+| Feature | ccboard | agtrace | Claudelytics | ccusage | Opcode |
+|---------|---------|---------|-------------|---------|--------|
+| **TUI dashboard multi-tab** | **8 tabs** | ✅ | **9 tabs** | ❌ | ❌ |
+| **Rust single binary** | ✅ | ✅ | ✅ | ❌ | ❌ (Tauri) |
+| **Config merge 3-level** | **✅ UNIQUE** | ❌ | ❌ | ❌ | ❌ |
+| **Hooks viewer** | **✅ UNIQUE** | ❌ | ❌ | ❌ | ❌ |
+| **MCP server status TUI** | **✅ UNIQUE** | ❌ | ❌ | ❌ | ❌ |
+| **Agents/commands/skills browser** | ✅ | ❌ | ❌ | ❌ | ✅ (custom) |
+| **Per-session tokens** | **❌ (0)** | ✅ | ✅ | ✅ | ? |
+| **Live burn rate** | **❌** | ✅ | ✅ | ✅ | ✅ |
+| **Context window viz** | ❌ | **✅ UNIQUE** | ❌ | ❌ | ❌ |
+| **Execution timeline** | ❌ | **✅ UNIQUE** | ❌ | ❌ | ❌ |
+| **SQLite indexing** | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **Multi-provider** | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **5h billing blocks** | ❌ | ? | ✅ | ✅ | ❌ |
+| **ML predictions** | ❌ | ❌ | ❌ | ✅ (monitor) | ❌ |
+| **Git worktree support** | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **MCP server integration** | ❌ | ✅ | ❌ | ✅ | ❌ |
+| **File watcher EventBus** | **✅ UNIQUE** | ❌ | ❌ | ❌ | ❌ |
+| **Dual TUI+Web** | **✅ UNIQUE** | ❌ | ❌ | ❌ | ❌ |
+| **Conversation replay** | ❌ | ❌ | ❌ | ❌ | ✅ (interactif) |
+| **Checkpoints/restore** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **CSV/JSON export** | ❌ | ❌ | ✅ | ✅ | ❌ |
+| **Watch mode realtime** | ❌ | ✅ | ✅ | ✅ | ❌ |
 
-#### 🎯 Features à Implémenter
+---
 
-##### 1. Token Tracking Alternatif (1 jour)
+## Gap Analysis
 
-**Problème identifié** :
-- Claude Code JSONL : champ `usage` est `null` dans tous les messages
-- stats-cache.json : agrégats globaux uniquement, pas de tokens par session
-- **Solution** : Extraire tokens depuis les messages de continuation/résumé
+### A. Avantages RÉELLEMENT Exclusifs
 
-**Approche** :
-```rust
-// Stratégie 1: Parser tool_results pour extraire token info
-// Les tool results peuvent contenir des messages système avec tokens
-async fn extract_tokens_from_tool_results(session_path: &Path) -> u64 {
-    // Stream JSONL, chercher tool_results avec token info
-}
+| Avantage | Concurrence la plus proche |
+|----------|---------------------------|
+| **Config merge viewer 3 niveaux** | ✅ Personne ne fait ça |
+| **Hooks viewer** | ✅ Personne ne visualise les hooks |
+| **MCP server status detection en TUI** | MCP Inspector = web only |
+| **Dual TUI+Web single binary** | agtrace = TUI only, ccusage = CLI only |
+| **File watcher → EventBus → multi-frontend** | Architecture unique |
+| **Agents/commands/skills browser** | Opcode = création (pas browsing read-only) |
 
-// Stratégie 2: Calculer depuis stats aggregate + proportions
-// Si 10 sessions, 10K tokens total → ~1K par session (rough estimate)
-async fn estimate_tokens_from_stats(session_id: &str, stats: &Stats) -> u64 {
-    // Heuristique basée sur message count, duration, models
-}
+### B. Ex-Avantages (Perdus Face à la Concurrence)
+
+| Ex-avantage | Qui l'a aussi |
+|-------------|---------------|
+| ~~Seul dashboard TUI multi-tab~~ | agtrace (TUI), Claudelytics (9 tabs!) |
+| ~~Seul outil Rust~~ | agtrace, Claudelytics, CCometixLine, ccstatusline |
+| ~~Seul monitoring Claude Code~~ | 15+ outils maintenant |
+
+### C. Table Stakes Manquantes (BLOQUANT)
+
+| Feature manquante | Nb d'outils qui l'ont | Urgence |
+|-------------------|----------------------|---------|
+| **Per-session token count** | 8+ outils | 🔴 CRITIQUE - sans ça on est pas crédible |
+| **Live burn rate / watch mode** | 8+ outils | 🔴 CRITIQUE - standard du marché |
+| **5h billing block tracking** | 6+ outils | 🟡 IMPORTANT - quota system Claude |
+| **Model-specific cost breakdown** | 7+ outils | 🟡 IMPORTANT - basic expectation |
+| **Export (CSV/JSON)** | 4+ outils | 🟢 NICE - analytics workflow |
+
+### D. Opportunités de Différenciation (0-1 Outils)
+
+| Opportunité | Outils existants | Impact potentiel |
+|-------------|-----------------|------------------|
+| **Distributed team sync** | 0 | TRÈS HAUT - plus gros gap du marché |
+| **Browser collaborative dashboard** | 0 | TRÈS HAUT - on a déjà l'archi web |
+| **Auto budget enforcement** | 1 (LiteLLM) | MOYEN |
+| **Cross-ecosystem comparison** | 0 | MOYEN |
+| **Anomaly detection** | 0 | MOYEN |
+
+### E. Priorités RÉVISÉES
+
+```
+P0-BLOQUANT : Per-session tokens + Live burn rate
+  → Sans ça, ccboard n'est PAS compétitif face à agtrace/Claudelytics/ccusage
+  → 8+ outils le font déjà, c'est TABLE STAKES
+
+P0-BLOQUANT : Invocation counters
+  → Notre seul vrai différenciateur (agents/commands/skills browser)
+  → est inutile sans comptage
+
+P1 : 5h billing blocks + model cost breakdown
+  → Standard du marché, 6-7 outils le font
+
+P2 : Export + watch mode
+  → Workflow analytics, attendu par les users
+
+P3 : Conversation replay TUI
+  → Killer feature, aucun TUI ne le fait (Opcode = GUI only)
+  → Gros différenciateur si bien fait
+
+LONG TERM : MCP server mode ccboard, team sync, web UI
 ```
 
-**Tâches** :
+---
+
+## Positionnement Stratégique
+
+### Tagline vs Concurrents
+
+```
+ccusage       = "combien je dépense"          (single-concern: costs)
+agtrace       = "comment mon agent marche"    (single-concern: observability)
+Claudelytics  = "ccusage en Rust"             (single-concern: costs+TUI)
+Opcode        = "Claude Code with a GUI"      (wrapper interactif)
+
+ccboard       = "tout ~/.claude dans un dashboard"
+                (multi-concern: config+hooks+agents+mcp+costs+sessions)
+```
+
+### Moat (Fossé Défensif)
+
+1. **Breadth**: Seul outil qui couvre config/hooks/agents/MCP/costs/sessions ensemble
+2. **Dual frontend**: TUI + Web + API du même binary
+3. **Architecture**: FileWatcher → EventBus → multi-consumer (scalable)
+4. **Config expertise**: 3-level merge viewer = unique value pour debugging
+
+### Risque : "Mile Wide, Inch Deep"
+
+- **agtrace** fait 1 chose (observability) mais en profondeur
+- **ccusage** fait 1 chose (costs) mais est le standard
+- **ccboard** fait 8 choses mais superficiellement sur les P0 (tokens = 0, burn rate = absent)
+
+**Action requise**: Combler les P0 (tokens, burn rate) pour ne pas être disqualifié, PUIS doubler sur nos différenciateurs (config, hooks, agents avec invocations).
+
+---
+
+## Décisions Stratégiques
+
+| Question | Options | Recommandation |
+|----------|---------|----------------|
+| **Scope** | A. Claude Code only / B. Ecosystem (Code+Desktop+API) / C. Multi-provider | **A** pour maintenant, B plus tard |
+| **Feature focus** | A. Deep monitoring / B. Broad dashboard / C. Les deux | **C** - combler P0 depth + garder breadth |
+| **Web** | A. Drop / B. TUI-first + API JSON / C. TUI + Web full | **B** - API JSON fonctionne déjà, web defer |
+| **MCP mode** | A. Non / B. Resources only / C. Full | **B** rapidement, C plus tard |
+| **Positionnement** | A. "Swiss Army Knife" / B. "Config expert" / C. "Full observability" | **A** - "The complete Claude Code dashboard" |
+
+---
+
+## Roadmap
+
+### Phase 11 (P0-BLOQUANT) : Tokens + Invocations + Burn Rate
+
+**Status**: 🔄 EN COURS (2026-02-02)
+**Durée estimée**: 2-3 jours
+**Objectif**: Combler les table stakes critiques vs agtrace/Claudelytics/ccusage
+
+#### 1. Token Tracking Alternatif (1 jour)
+
+**Problème identifié**:
+- Claude Code JSONL : champ `usage` est `null` dans tous les messages
+- stats-cache.json : agrégats globaux uniquement, pas de tokens par session
+
+**Solution**: Parser la structure JSONL réelle pour extraire tokens depuis tool results
+
+**Tâches**:
 - [ ] Analyser format JSONL pour trouver sources alternatives de tokens
 - [ ] Implémenter parser de tokens depuis tool_results ou summary events
 - [ ] Ajouter cache des tokens extraits (ne pas re-parser à chaque load)
 - [ ] Update SessionMetadata avec tokens réels
 - [ ] Tests avec fixtures JSONL réels
 
-**Validation** :
+**Validation**:
 ```bash
-# Sessions tab doit afficher tokens > 0
 ccboard
-# Naviguer vers Sessions → vérifier colonne tokens
+# Sessions tab → colonne tokens affiche valeurs > 0
 ```
 
-##### 2. Invocation Counters (1-2 jours)
+#### 2. Invocation Counters (1-2 jours)
 
-**Objectif** : Compter combien de fois chaque agent/command/skill a été invoqué
+**Objectif**: Compter combien de fois chaque agent/command/skill a été invoqué
 
-**Détection patterns** :
+**Détection patterns**:
 ```rust
-// Agents: détection via Task tool
+// Agents: via Task tool
 if message.contains("Task tool") && message.contains("subagent_type") {
     extract_agent_name();
 }
 
-// Commands: détection via pattern /command
+// Commands: via pattern /command
 if message.starts_with('/') {
     extract_command_name();
 }
 
-// Skills: détection via Skill tool
+// Skills: via Skill tool
 if message.contains("Skill tool") {
     extract_skill_name();
 }
 ```
 
-**Architecture** :
-```rust
-// Nouvelle structure dans store
-pub struct InvocationStats {
-    pub agents: HashMap<String, usize>,      // agent_name -> count
-    pub commands: HashMap<String, usize>,    // command_name -> count
-    pub skills: HashMap<String, usize>,      // skill_name -> count
-    pub last_computed: DateTime<Utc>,
-}
-
-// Méthode dans DataStore
-impl DataStore {
-    pub async fn compute_invocations(&self) -> InvocationStats {
-        // Stream toutes les sessions
-        // Détecter patterns
-        // Agréger compteurs
-    }
-}
-```
-
-**Tâches** :
+**Tâches**:
 - [ ] Créer InvocationStats structure dans models
 - [ ] Implémenter session streaming pour détecter patterns
 - [ ] Parser agent invocations (Task tool calls)
@@ -207,174 +316,175 @@ impl DataStore {
 - [ ] Ajouter tri par usage (most used first)
 - [ ] Tests unitaires pour detection patterns
 
-**UI Updates** :
-```rust
-// Dans agents.rs render
-Line::from(vec![
-    Span::styled(name, style),
-    Span::styled(format!(" ({}×)", count), Style::default().fg(Color::DarkGray)),
-])
-```
-
-**Validation** :
+**Validation**:
 ```bash
 ccboard
-# Onglet Agents → Commands → voir "× 23" à côté de chaque command
+# Onglet Agents → voir "× 23" à côté de chaque command
 # Agents triés par usage décroissant
 ```
 
-##### 3. Performance Optimization (0.5 jour)
+#### 3. Live Burn Rate (0.5 jour)
 
-**Challenge** : Parsing 1000+ sessions peut être lent
+**Objectif**: Mode watch avec calcul burn rate en temps réel
 
-**Solutions** :
+**Tâches**:
+- [ ] Implémenter tracking de session active via file watcher
+- [ ] Calculer tokens/minute sur fenêtre glissante
+- [ ] Afficher burn rate dans Dashboard
+- [ ] Ajouter projection coût/heure
+
+**Validation**:
+```bash
+ccboard
+# Dashboard → voir "Burn rate: 1,234 tokens/min" avec session active
+```
+
+#### 4. Performance Optimization (0.5 jour)
+
+**Challenge**: Parsing 1000+ sessions peut être lent
+
+**Solutions**:
 - Incremental computation (compute only for new/modified sessions)
 - Background processing (tokio spawn)
 - Progress indicator dans TUI
 - Cache persistent (save to ~/.claude/ccboard-cache.json)
 
-**Tâches** :
+**Tâches**:
 - [ ] Implémenter incremental computation
 - [ ] Add progress bar during initial compute
 - [ ] Cache results to disk
 - [ ] Background refresh on session changes
 
-**Validation** :
-```bash
-# Initial load avec 1000 sessions: <5s
-# Subsequent loads: <1s (from cache)
-time ccboard stats
-```
+---
+
+### Phase 12 (P1) : 5h Blocks + Export + MCP Server
+
+**Durée estimée**: 3-4 jours
+**Objectif**: Standard du marché + meta-différenciateur
+
+#### 1. 5h Billing Block Tracking (1 jour)
+
+**Objectif**: Tracker usage dans fenêtres de facturation Claude (5h blocks)
+
+**Tâches**:
+- [ ] Détecter blocks de 5h depuis timestamps sessions
+- [ ] Calculer usage par block
+- [ ] Alert quand proche limite block
+- [ ] Afficher dans Costs tab
+
+#### 2. Export CSV/JSON (1 jour)
+
+**Objectif**: Analytics workflow pour users
+
+**Formats**:
+- Sessions export (CSV/JSON)
+- Costs breakdown (CSV/JSON)
+- Agents usage (CSV/JSON)
+
+**Tâches**:
+- [ ] Implémenter serializers
+- [ ] Add export commands
+- [ ] Tests de format output
+
+#### 3. ccboard as MCP Server (2 jours)
+
+**Objectif**: Exposer ccboard data via MCP protocol (resources only)
+
+**Resources**:
+- `ccboard://sessions` → Liste sessions
+- `ccboard://stats` → Statistiques
+- `ccboard://agents` → Agents avec invocations
+
+**Tâches**:
+- [ ] MCP server implementation
+- [ ] Resource handlers
+- [ ] Documentation
+- [ ] Tests integration
 
 ---
 
-### Phase 12 : Web UI MVP (Priorité 🟡 P1 - Différé)
+### Phase 13 (P2) : Conversation Replay + Open Source
 
-**Status** : Backend 100% complet, frontend 0% (pas de composants Leptos)
+**Durée estimée**: 4-5 jours
+**Objectif**: Killer feature unique + release publique
 
-**Objectif** : Interface web fonctionnelle miroir du TUI
+#### 1. Conversation Replay TUI (3 jours)
 
-#### Tâches
+**Objectif**: Visualiser déroulement conversation message par message (UNIQUE en TUI)
 
-1. **Frontend Leptos basics** (1j)
-   - Router setup (pages)
-   - Layout component
-   - Sidebar navigation
-   - Theme provider
+**Features**:
+- Navigation temporelle (message précédent/suivant)
+- Affichage tool calls + results
+- Syntax highlighting code blocks
+- Search dans conversation
 
-2. **Pages implementation** (1-2j)
-   - Dashboard page
-   - Sessions browser
-   - Config viewer
-   - Autres tabs (Hooks, Agents, Costs, History, MCP)
+**Tâches**:
+- [ ] Parser full JSONL pour replay
+- [ ] UI conversation viewer
+- [ ] Navigation keybindings
+- [ ] Syntax highlighting
+- [ ] Tests rendering
 
-3. **SSE integration** (0.5j)
-   - Wire `/api/events` endpoint
-   - Live updates composant
-   - Auto-refresh sur file changes
+#### 2. Open Source Release (2 jours)
 
-4. **Testing** (0.5j)
-   - Axum TestClient pour routes
-   - Integration tests
-
-**Validation** :
-```bash
-ccboard web --port 3333
-# http://localhost:3333 affiche dashboard ✅
-ccboard both
-# TUI + Web simultanés avec live sync ✅
-```
+**Tâches**:
+- [ ] Screenshots & GIF démo (avec tokens/invocations visibles)
+- [ ] LICENSE file (MIT OR Apache-2.0)
+- [ ] CONTRIBUTING.md + CODE_OF_CONDUCT.md
+- [ ] GitHub Issues/PR templates
+- [ ] CI/CD pipeline (matrix build Linux/macOS/Windows)
+- [ ] Publish crates.io
+- [ ] Annonces (r/rust, Twitter/X, HN)
 
 ---
 
-### Phase 14+ : Advanced Features (Priorité 🟢 P2 - Futures)
+### Phase 14+ : Web UI + Team Sync (Long-Term)
 
-**Possibilités d'évolution** :
+**Différé** - Focus sur TUI + API JSON d'abord
 
-1. **Session Management** (2-3j)
-   - Resume session (`ccboard resume <id>`)
-   - Open in Claude Code
-   - Export session (JSON, Markdown)
+#### Ideas Backlog
 
-2. **Config Editing** (1-2j)
-   - Write settings.json
-   - MCP server add/remove
-   - Hook creation wizard
+**Tier 1 : Fix Dead Code + Wire Existing**
 
-3. **Advanced MCP** (2j)
-   - Server start/stop/restart
-   - Test connection (MCP protocol handshake)
-   - Auto-refresh status (polling 5s)
-   - Windows support (tasklist)
+| Idée | Effort | Impact |
+|------|--------|--------|
+| Wire TaskParser au store + UI | Faible | Moyen |
+| Wire SSE au router web | Très faible | Moyen |
+| Activer session_content_cache (dead code) | Faible | Haut (débloque features) |
+| Déplacer frontmatter parser dans core | Faible | Moyen (débloque web) |
+| Wire global search aux tabs | Faible | Moyen |
 
-4. **Analytics** (2j)
-   - Export reports (PDF, CSV)
-   - Cost trends analysis
-   - Usage patterns visualization
+**Tier 2 : Features P0/P1** (Couverts par Phases 11-12)
 
-5. **Customization** (1-2j)
-   - Theme customization
-   - Keybinding remapping
-   - Column ordering
+**Tier 3 : Différenciateurs**
 
----
+| Idée | Effort | Impact |
+|------|--------|--------|
+| `ccboard doctor` diagnostic | Moyen | HAUT |
+| Git commit ↔ session attribution | Haut | HAUT (unique) |
+| Session bookmarks | Moyen | MOYEN |
 
-### Phase 13 : Open Source Release (Backlog - Différé)
+**Tier 4 : Long-term / Speculative**
 
-**Status** : En attente de Phase 11 complète
+| Idée | Effort | Impact |
+|------|--------|--------|
+| **Distributed team sync** | Très haut | TRÈS HAUT (0 competitors) |
+| **Web collaborative dashboard** | Très haut | TRÈS HAUT (on a l'archi) |
+| Claude Desktop parser (SQLite) | Haut | MOYEN |
+| Anthropic API billing réel | Haut | HAUT |
+| Plugin system | Très haut | Long-term |
+| Multi-machine sync | Très haut | Niche |
+| Error pattern detection | Très haut | Incertain |
 
-**Objectif** : Publier ccboard sur GitHub + crates.io avec un produit mature
+**Données ~/.claude Inexploitées**
 
-#### ✅ Tâches Complétées
-
-1. **README.md** ✅ (434 lignes)
-   - Introduction + motivation
-   - Feature list complète
-   - Installation (3 méthodes)
-   - Quick start (4 modes)
-   - Keybindings table
-   - Architecture overview
-   - Development guide
-
-2. **Documentation de base** ✅
-   - CHANGELOG.md (Phase 0-9.5)
-   - PLAN.md (complet)
-   - CLAUDE.md (guidance)
-
-#### 🔲 Reste à Faire (4-6h)
-
-**Bloqué par** : Attendre Phase 11 (tokens + invocations) pour produit plus mature
-
-1. **Screenshots & Assets** (2h)
-   - Capturer les 8 tabs avec données réelles
-   - Command palette demo
-   - Breadcrumbs navigation
-   - GIF démo 30s (installation → navigation)
-   - Tokens et invocations visibles dans screenshots
-
-2. **Documentation légale** (30min)
-   - LICENSE file (MIT OR Apache-2.0)
-   - CONTRIBUTING.md
-   - CODE_OF_CONDUCT.md
-
-3. **GitHub setup** (1h)
-   - Issues templates
-   - Pull request template
-   - Labels
-
-4. **CI/CD Pipeline** (2h)
-   - GitHub Actions workflow
-   - Matrix build (Linux, macOS, Windows)
-   - Release binaries
-
-5. **Publish crates.io** (30min)
-   - Metadata Cargo.toml
-   - `cargo publish`
-
-6. **Annonces** (30min)
-   - r/rust post
-   - Twitter/X
-   - Hacker News
+| Path | Contenu | Priorité |
+|------|---------|----------|
+| `~/.claude/todos/` | Task lists | Wire TaskParser |
+| `~/.claude/.credentials.json` | Auth status | Afficher dans Dashboard |
+| `~/.claude/statsig/` | Feature flags | Quelles features actives |
+| `~/.claude/memory/` | Memories | Si existe, afficher |
+| `projects/*/context.json` | Metadata projet | Enrichir sessions |
 
 ---
 
@@ -392,26 +502,26 @@ ccboard/
 
 ### Data Layer (ccboard-core)
 
-**Sources de données** :
+**Sources de données**:
 - `~/.claude/stats-cache.json` - Statistics (StatsParser)
 - `~/.claude/settings.json` - Global settings (SettingsParser + 3-level merge)
 - `.claude/settings.json` - Project settings
 - `.claude/settings.local.json` - Local settings (highest priority)
 - `~/.claude/claude_desktop_config.json` - MCP config
 - `~/.claude/projects/<path>/<id>.jsonl` - Sessions (streaming parser)
-- `.claude/agents/*.md` - Agents (frontmatter parser)
+- `.claude/agents/*.md` - Agents (frontmatter parser - TUI only)
 - `.claude/commands/*.md` - Commands
 - `.claude/skills/*/SKILL.md` - Skills
 - `.claude/hooks/bash/*.sh` - Hooks
 
-**DataStore** :
+**DataStore**:
 - `DashMap<String, SessionMetadata>` - Sessions (per-key locking)
 - `parking_lot::RwLock<StatsCache>` - Stats (low contention)
 - `parking_lot::RwLock<MergedConfig>` - Settings
 - `Moka Cache` - Session content (LRU, on-demand)
 - `tokio::broadcast` - EventBus (live updates)
 
-**Performance** :
+**Performance**:
 - Initial load <2s (1000+ sessions)
 - Metadata-only scan (lazy full parse)
 - File watcher with 500ms debounce
@@ -419,9 +529,9 @@ ccboard/
 
 ### TUI (ccboard-tui)
 
-**Framework** : Ratatui 0.30 + Crossterm 0.28
+**Framework**: Ratatui 0.30 + Crossterm 0.28
 
-**Components** :
+**Components**:
 - 8 tabs avec navigation complète
 - Command palette (fuzzy matching)
 - Breadcrumbs trail
@@ -429,7 +539,7 @@ ccboard/
 - Theme system (StatusColor enum)
 - Empty states builder pattern
 
-**Keybindings** :
+**Keybindings**:
 - `q` quit | `Tab`/`Shift+Tab` nav tabs | `1-8` jump tabs
 - `j/k` or `↑/↓` nav lists | `h/l` or `←/→` nav columns
 - `Enter` detail | `Esc` back/close | `/` search
@@ -438,31 +548,30 @@ ccboard/
 
 ### Web (ccboard-web)
 
-**Backend** : Axum 0.8 + Askama templates
+**Backend**: Axum 0.8 + Askama templates
 
-**Routes** :
+**Routes**:
 - `GET /` - Dashboard
 - `GET /sessions` - Sessions browser
 - `GET /config` - Config viewer
 - `GET /hooks`, `/agents`, `/costs`, `/history`, `/mcp`
 - `GET /api/stats` - JSON API
-- `GET /api/events` - SSE live updates
+- `GET /api/events` - SSE live updates (backend ready, non wired)
 
-**Frontend** : Leptos (0% implémenté)
+**Frontend**: Leptos (0% implémenté - différé)
 
 ---
 
-## Commits Récents
+## Performance Targets
 
-```
-6539bdf (HEAD -> main) docs: update PLAN.md with Phase 9.2-4 and File Watcher completion
-1c060b0 feat(core): Activate file watcher for live data updates
-8f21e9c feat(tui): Add shared UI components library
-5cfcac8 feat(tui): Add PgUp/PgDn navigation to scrollable tabs
-97d16af feat(tui): Phase 9.3 - Breadcrumbs navigation trail
-c5fabaa feat(tui): Phase 9.2 - Command Palette with fuzzy matching
-414dcbb docs: update PLAN.md with current project status
-```
+| Métrique | Target | Actuel | Status |
+|----------|--------|--------|--------|
+| Initial load | <2s | <2s | ✅ |
+| Session scan | 1000+/2s | 2340/1.8s | ✅ |
+| Memory usage | <100MB | ~80MB | ✅ |
+| Build time | <10s | ~8s | ✅ |
+| File watcher debounce | 500ms | 500ms | ✅ |
+| Cache hit rate | >95% | 99.9% | ✅ |
 
 ---
 
@@ -481,38 +590,18 @@ c5fabaa feat(tui): Phase 9.2 - Command Palette with fuzzy matching
 
 ---
 
-## Performance Targets
+## Validation Stratégie (Next Actions)
 
-| Métrique | Target | Actuel | Status |
-|----------|--------|--------|--------|
-| Initial load | <2s | <2s | ✅ |
-| Session scan | 1000+/2s | 2340/1.8s | ✅ |
-| Memory usage | <100MB | ~80MB | ✅ |
-| Build time | <10s | ~8s | ✅ |
-| File watcher debounce | 500ms | 500ms | ✅ |
-| Cache hit rate | >95% | 99.9% | ✅ |
-
----
-
-## Roadmap Visuel
-
-```
-✅ Phase 0-5   : Core + 7 tabs TUI
-✅ Phase 6     : File opening & MCP UI improvements
-✅ Phase 7     : MCP dedicated tab
-✅ Phase 8     : Marketplace plugin
-✅ Phase 9.1-4 : TUI polish (theme, UX, command palette, components)
-✅ File Watcher: Live updates activation
-🔴 Phase 10   : Open Source Release (NEXT - 1 day)
-🟡 Phase 11   : Web UI MVP (2-4 days)
-🟢 Phase 12+  : Feature enhancements (futures)
-```
+- [ ] Tester agtrace et Claudelytics pour évaluer leur qualité réelle
+- [ ] Vérifier si ccusage MCP server couvre le même scope
+- [ ] Décider si conversation replay TUI justifie l'investissement
+- [ ] Évaluer effort réel du per-session token parsing (analyser format JSONL)
 
 ---
 
 ## Contacts & Liens
 
-- **Repo** : https://github.com/FlorianBruniaux/ccboard (à créer)
-- **Crates.io** : https://crates.io/crates/ccboard (à publier)
-- **License** : MIT OR Apache-2.0
-- **Author** : Florian Bruniaux (@FlorianBruniaux)
+- **Repo**: https://github.com/FlorianBruniaux/ccboard (à créer)
+- **Crates.io**: https://crates.io/crates/ccboard (à publier)
+- **License**: MIT OR Apache-2.0
+- **Author**: Florian Bruniaux (@FlorianBruniaux)
