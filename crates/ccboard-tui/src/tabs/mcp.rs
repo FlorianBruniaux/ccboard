@@ -151,6 +151,18 @@ impl McpTab {
                 self.refresh_status(mcp_config);
             }
 
+            // Page navigation
+            KeyCode::PageUp if matches!(self.focus, Focus::List) && server_count > 0 => {
+                let current = self.server_list_state.selected().unwrap_or(0);
+                let new_idx = current.saturating_sub(10);
+                self.server_list_state.select(Some(new_idx));
+            }
+            KeyCode::PageDown if matches!(self.focus, Focus::List) && server_count > 0 => {
+                let current = self.server_list_state.selected().unwrap_or(0);
+                let new_idx = (current + 10).min(server_count - 1);
+                self.server_list_state.select(Some(new_idx));
+            }
+
             _ => {}
         }
     }

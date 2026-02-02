@@ -115,6 +115,17 @@ impl HistoryTab {
                     self.search_query.clear();
                     self.update_filter(sessions);
                 }
+                KeyCode::PageUp => {
+                    // Jump up by 10 items
+                    let current = self.results_state.selected().unwrap_or(0);
+                    self.results_state.select(Some(current.saturating_sub(10)));
+                }
+                KeyCode::PageDown => {
+                    // Jump down by 10 items
+                    let current = self.results_state.selected().unwrap_or(0);
+                    let max = self.filtered_sessions.len().saturating_sub(1);
+                    self.results_state.select(Some((current + 10).min(max)));
+                }
                 _ => {}
             }
         }

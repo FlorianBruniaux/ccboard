@@ -106,6 +106,24 @@ impl HooksTab {
                     self.error_message = None;
                 }
             }
+            KeyCode::PageUp => {
+                // Jump up by 10 items
+                if self.focus == 0 {
+                    self.move_event_selection(-10);
+                    self.hook_state.select(Some(0));
+                } else {
+                    self.move_hook_selection(-10);
+                }
+            }
+            KeyCode::PageDown => {
+                // Jump down by 10 items
+                if self.focus == 0 {
+                    self.move_event_selection(10);
+                    self.hook_state.select(Some(0));
+                } else {
+                    self.move_hook_selection(10);
+                }
+            }
             _ => {}
         }
     }

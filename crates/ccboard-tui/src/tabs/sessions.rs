@@ -149,6 +149,24 @@ impl SessionsTab {
                     self.search_filter.clear();
                 }
             }
+            KeyCode::PageUp => {
+                // Jump up by 10 items
+                if self.focus == 0 {
+                    self.move_project_selection(-10);
+                    self.session_state.select(Some(0));
+                } else {
+                    self.move_session_selection(-10);
+                }
+            }
+            KeyCode::PageDown => {
+                // Jump down by 10 items
+                if self.focus == 0 {
+                    self.move_project_selection(10);
+                    self.session_state.select(Some(0));
+                } else {
+                    self.move_session_selection(10);
+                }
+            }
             _ => {}
         }
     }

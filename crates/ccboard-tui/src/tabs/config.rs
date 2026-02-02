@@ -117,6 +117,18 @@ impl ConfigTab {
                     self.error_message = None;
                 }
             }
+            KeyCode::PageUp => {
+                // Jump up by 10 items
+                let state = &mut self.scroll_states[self.focus];
+                let current = state.selected().unwrap_or(0);
+                state.select(Some(current.saturating_sub(10)));
+            }
+            KeyCode::PageDown => {
+                // Jump down by 10 items
+                let state = &mut self.scroll_states[self.focus];
+                let current = state.selected().unwrap_or(0);
+                state.select(Some(current + 10));
+            }
             _ => {}
         }
     }
