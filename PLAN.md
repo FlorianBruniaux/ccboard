@@ -73,8 +73,8 @@
 
 | Tool | Stars | Stack | Features Clés | Menace |
 |------|-------|-------|---------------|--------|
-| **agtrace** (lanegrid) | Nouveau (jan 2026) | **Rust, Ratatui, Tokio** | Context window viz, execution timeline, SQLite indexing, multi-provider, MCP integration, git worktree | **🔴 CRITIQUE** - même stack, plus innovant |
-| **Claudelytics** (nwiizo) | ? | **Rust** | **9 tabs** TUI, watch mode, burn rate, peco fuzzy, CSV export, projections | **🔴 HAUTE** - plus de tabs que nous |
+| **agtrace** (lanegrid) | 23 (v0.7.0, jan 2026) | **Rust, Ratatui 0.29, 9 crates** | **6 MCP tools** (list_sessions, analyze_session, search_events), pointer-based SQLite indexing, context window viz, multi-provider (Claude+Codex+Gemini), git worktree, subagent tracking | **🟡 HAUTE** - focus observabilité ≠ dashboard, mais MCP self-reflection = killer feature |
+| **Claudelytics** (nwiizo) | 62 (v0.5.2, **STALE août 2025**) | **Rust** monolithique (1 crate, 35 fichiers) | **8 tabs** TUI (Basic + Advanced modes identiques), burn rate avec projections, 5h billing blocks, conversation viewer (thinking+tools), CSV export, rayon parallel | **🟢 MOYENNE** - STALE 6+ mois, bonne ref features mais projet en déclin |
 
 ### B. Concurrents DIRECTS : Cost/Usage Trackers
 
@@ -117,7 +117,7 @@
 
 | Feature | ccboard | agtrace | Claudelytics | ccusage | Opcode |
 |---------|---------|---------|-------------|---------|--------|
-| **TUI dashboard multi-tab** | **8 tabs** | ✅ | **9 tabs** | ❌ | ❌ |
+| **TUI dashboard multi-tab** | **8 tabs** | ✅ Single-view | **8 tabs** | ❌ | ❌ |
 | **Rust single binary** | ✅ | ✅ | ✅ | ❌ | ❌ (Tauri) |
 | **Config merge 3-level** | **✅ UNIQUE** | ❌ | ❌ | ❌ | ❌ |
 | **Hooks viewer** | **✅ UNIQUE** | ❌ | ❌ | ❌ | ❌ |
@@ -125,20 +125,21 @@
 | **Agents/commands/skills browser** | ✅ | ❌ | ❌ | ❌ | ✅ (custom) |
 | **Per-session tokens** | **❌ (0)** | ✅ | ✅ | ✅ | ? |
 | **Live burn rate** | **❌** | ✅ | ✅ | ✅ | ✅ |
-| **Context window viz** | ❌ | **✅ UNIQUE** | ❌ | ❌ | ❌ |
-| **Execution timeline** | ❌ | **✅ UNIQUE** | ❌ | ❌ | ❌ |
+| **Context window viz** | ❌ | **✅ UNIQUE** (barre colorée saturation) | ❌ | ❌ | ❌ |
+| **Turn history scrollable** | ❌ | ✅ | ❌ | ❌ | ❌ |
 | **SQLite indexing** | ❌ | ✅ | ❌ | ❌ | ❌ |
 | **Multi-provider** | ❌ | ✅ | ❌ | ❌ | ❌ |
 | **5h billing blocks** | ❌ | ? | ✅ | ✅ | ❌ |
 | **ML predictions** | ❌ | ❌ | ❌ | ✅ (monitor) | ❌ |
 | **Git worktree support** | ❌ | ✅ | ❌ | ❌ | ❌ |
-| **MCP server integration** | ❌ | ✅ | ❌ | ✅ | ❌ |
+| **MCP server integration** | ❌ | **✅ (6 tools)** | ❌ | ✅ | ❌ |
 | **File watcher EventBus** | **✅ UNIQUE** | ❌ | ❌ | ❌ | ❌ |
 | **Dual TUI+Web** | **✅ UNIQUE** | ❌ | ❌ | ❌ | ❌ |
 | **Conversation replay** | ❌ | ❌ | ❌ | ❌ | ✅ (interactif) |
 | **Checkpoints/restore** | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **CSV/JSON export** | ❌ | ❌ | ✅ | ✅ | ❌ |
-| **Watch mode realtime** | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Watch mode realtime** | ❌ | ✅ (poll 1000ms) | ✅ | ✅ | ❌ |
+| **Conversation viewer** | ❌ | ❌ | **✅ (thinking+tools)** | ❌ | ✅ |
 
 ---
 
@@ -159,7 +160,7 @@
 
 | Ex-avantage | Qui l'a aussi |
 |-------------|---------------|
-| ~~Seul dashboard TUI multi-tab~~ | agtrace (TUI), Claudelytics (9 tabs!) |
+| ~~Seul dashboard TUI multi-tab~~ | agtrace (single-view), Claudelytics (8 tabs) |
 | ~~Seul outil Rust~~ | agtrace, Claudelytics, CCometixLine, ccstatusline |
 | ~~Seul monitoring Claude Code~~ | 15+ outils maintenant |
 
@@ -237,6 +238,192 @@ ccboard       = "tout ~/.claude dans un dashboard"
 - **ccboard** fait 8 choses mais superficiellement sur les P0 (tokens = 0, burn rate = absent)
 
 **Action requise**: Combler les P0 (tokens, burn rate) pour ne pas être disqualifié, PUIS doubler sur nos différenciateurs (config, hooks, agents avec invocations).
+
+---
+
+## Analyse Concurrentielle Approfondie
+
+### A. agtrace : Architecture Pointer-Based & MCP Self-Reflection
+
+**Identité vérifiée**:
+- **23 stars**, v0.7.0 (jan 2026), développement actif
+- **9 crates** (types, core, providers, index, engine, runtime, SDK, CLI, testing)
+- **35,302 LOC** - projet professionnel, bien architecturé
+- License MIT OR Apache-2.0 (identique ccboard)
+
+**Décisions techniques clés** (inspirantes pour ccboard):
+
+1. **Pointer-Based Indexing** (SQLite metadata only, JAMAIS duplication JSONL)
+   - Database = disposable, reconstruit depuis raw logs
+   - Sessions table: IDs + timestamps + file paths uniquement
+   - Parsing au moment du query (schema-on-read) → résilient aux changements format
+   - **Leçon pour ccboard**: Considérer cache persistant `~/.claude/ccboard-cache.json` pour tokens/invocations extraits
+
+2. **6 MCP Tools** (killer feature - self-reflection agents):
+   - `list_sessions`, `get_project_info`, `analyze_session`, `search_events`, `list_turns`, `get_turns`
+   - Workflow documenté: Agent query son propre historique → 334,872 tokens, caching réduit coûts 85%
+   - **Leçon pour ccboard**: MCP Server mode = P1 confirmé, mais notre scope (resources only) OK pour MVP
+
+3. **Multi-Provider Support**:
+   - Claude Code ✅, Codex (OpenAI) ✅, Gemini CLI ⚠️
+   - Adapter pattern avec normalisation événements
+   - **Leçon pour ccboard**: Defer multi-provider (Claude Code = 95% du marché), focus breadth > depth
+
+4. **Git Worktree Support** (v0.7.0):
+   - RepositoryHash type, sessions trackent project_hash + repository_hash
+   - `--all-worktrees` flag pour listing cross-worktree
+   - **Leçon pour ccboard**: Nice-to-have Phase 13+, pas P0
+
+**Ce qu'agtrace fait MIEUX**:
+- MCP Server mode production-ready
+- Multi-provider (3 outils AI)
+- Schema-on-read résilient
+- Subagent tracking hiérarchique
+- Context window saturation viz (barre colorée)
+- Pointer-based indexing élégant
+
+**Ce qu'agtrace NE FAIT PAS** (nos avantages):
+- ❌ Config viewing/management
+- ❌ Hooks viewer
+- ❌ MCP server status (serveurs DE Claude)
+- ❌ Agents/commands/skills browser
+- ❌ Costs aggregation (trends, budgets, billing blocks)
+- ❌ Web interface
+- ❌ Dashboard multi-tab (vue unique watch)
+
+**Menace réelle**: 🟡 **HAUTE** (pas CRITIQUE) - 23 stars, focus différent (observabilité), complémentaire pas concurrent. Leur MCP self-reflection = game-changer mais scope orthogonal au nôtre.
+
+---
+
+### B. Claudelytics : Monolithe Feature-Rich mais STALE
+
+**Identité vérifiée**:
+- **62 stars**, v0.5.2 (août 2025)
+- **STALE 6+ mois** - dernier commit 15 août 2025, aucune activité sept 2025-fév 2026
+- **Monolithique**: 1 crate, 35 fichiers .rs, 57 fichiers total
+- Edition Rust 2024, publié sur crates.io
+
+**Décisions techniques vérifiées**:
+
+1. **Token Extraction Directe** (confirme notre Phase 11):
+   ```rust
+   pub struct Usage {
+       pub input_tokens: u64,
+       pub output_tokens: u64,
+       pub cache_creation_input_tokens: u64,
+       pub cache_read_input_tokens: u64,
+   }
+   ```
+   - Lit `message.usage` + `costUSD` fallback
+   - 3-level cost hierarchy: recalculer > costUSD field > fallback
+   - Bug historique corrigé v0.4.3: coûts 1000x trop bas
+   - **Leçon pour ccboard**: Notre approche Phase 11 validée par concurrent
+
+2. **5h Billing Blocks** (implementation complète):
+   - Blocks UTC: 00:00-04:59, 05:00-09:59, 10:00-14:59, 15:00-19:59, 20:00-23:59
+   - Normalization: `block_hour = (hour / 5) * 5`
+   - Color coding par seuil (green < $2.5, yellow < $5, red > $5)
+   - JSON export
+   - **Leçon pour ccboard**: Code référence pour notre Phase 12
+
+3. **8 Tabs TUI** (PAS 6 ni 9 - correction importante):
+   ```rust
+   enum Tab {
+       Overview, Daily, Sessions, Conversations,
+       Charts, BillingBlocks, Resume, Help,
+   }
+   ```
+   - Modes Basic/Advanced utilisent MÊMES 8 tabs
+   - Pas de variant 6/9 tabs comme documenté initialement
+   - **Correction**: Notre affirmation "9 tabs" était fausse
+
+4. **Burn Rate avec Projections**:
+   - Tokens/minute, tokens/hour
+   - Daily/monthly projections
+   - 9-hour workday assumption (pas 24h)
+   - ⚠️ Alerts NON implémentées (field exists, code dead)
+   - **Leçon pour ccboard**: Projections = P1, alerts = nice-to-have
+
+5. **Conversation Viewer** (UNIQUE en TUI):
+   - Message-by-message avec thinking blocks + tool usage
+   - Compact/Detailed modes
+   - Search avec highlighting
+   - Export markdown/JSON/text
+   - **Leçon pour ccboard**: Killer feature Phase 13, aucun autre TUI ne le fait
+
+6. **Parallel Processing Rayon**:
+   ```rust
+   let results: Vec<...> = jsonl_files
+       .par_iter()  // Parallel iterator
+       .filter_map(|file_path| { ... })
+       .collect();
+   ```
+   - Data parallelism CPU-bound (pas async)
+   - **Leçon pour ccboard**: Notre tokio::spawn OK pour event-driven, envisager rayon pour parsing massif
+
+**Ce que Claudelytics fait MIEUX**:
+- Token extraction fonctionnelle (nous = ✅ Phase 11 complété)
+- 5h billing blocks implémentés
+- Burn rate avec projections
+- Conversation viewer message par message
+- Analytics avancées (time-of-day, day-of-week, streaks)
+- Export CSV/JSON sur toutes commandes
+- Model registry avec aliases
+- Publié crates.io
+
+**Faiblesses Claudelytics**:
+- **STALE 6+ mois** → projet potentiellement abandonné
+- Monolithique (34 fichiers, `#[allow(dead_code)]` multiples)
+- Bug pricing historique (1000x erreur)
+- Ratatui 0.28 (2 versions derrière notre 0.30)
+- Pas de tests CLI
+- Pas de workspace (refactoring difficile)
+
+**Menace réelle**: 🟢 **MOYENNE** (pas HAUTE) - STALE, 62 stars. Excellente référence pour features à implémenter mais PAS concurrent actif.
+
+---
+
+### C. Insights Stratégiques pour ccboard
+
+**À intégrer rapidement (Phase 11-12)**:
+
+| Idée source | Adaptation ccboard | Priorité |
+|------------|-------------------|----------|
+| **Cache persistant** (agtrace SQLite) | `~/.claude/ccboard-cache.json` pour tokens/invocations | 🔴 Phase 11 (en cours) |
+| **Context saturation viz** (agtrace barre) | Dashboard indicator visuel | 🟡 Phase 12 |
+| **5h billing blocks** (Claudelytics code) | Copier logic normalization + color coding | 🟡 Phase 12 |
+| **Burn rate projections** (Claudelytics) | Daily/monthly/hourly estimations | 🟡 Phase 12 |
+| **Conversation viewer** (Claudelytics) | Message-by-message avec thinking+tools | 🟡 Phase 13 |
+
+**À intégrer plus tard**:
+
+| Idée | Adaptation | Priorité |
+|------|-----------|----------|
+| **MCP Server mode** (agtrace 6 tools) | Resources only (sessions/stats/agents) | 🔴 Phase 12 (confirmé P1) |
+| **Subagent tracking** (agtrace) | Enrichir parser Task tool sidechains | 🟡 Phase 13 |
+| **Lab grep** (agtrace) | Search globale History tab | 🟡 Phase 13 |
+| **JSON export** (Claudelytics) | Export sessions/stats/costs | 🟡 Phase 12 |
+| **Model registry** (Claudelytics) | Pricing + aliases | 🟡 Phase 12 |
+
+**À NE PAS copier**:
+
+| Idée | Raison |
+|------|--------|
+| 9 crates (agtrace) | Over-engineering pour notre taille, 4 crates = optimal |
+| Multi-provider | Defer, Claude Code only = 95% marché |
+| Poll-based watching 1000ms (agtrace) | Notre notify + debounce 500ms plus efficace |
+| Monolithe 34 fichiers (Claudelytics) | Anti-pattern, notre workspace meilleur |
+| Schema-on-read total | Notre parse-at-load OK perf, ajouter résilience via graceful degradation |
+
+**Corrections factuelles PLAN.md**:
+
+| Affirmation initiale | Réalité vérifiée |
+|---------------------|------------------|
+| "agtrace CRITIQUE" | 🟡 HAUTE - 23 stars, focus observabilité ≠ dashboard concurrent |
+| "Claudelytics HAUTE" | 🟢 MOYENNE - STALE 6+ mois, projet en déclin |
+| "Execution timeline agtrace" | Turn history scrollable, PAS timeline graphique |
+| "9 tabs Claudelytics" | 8 tabs (Basic + Advanced modes identiques) |
+| "MCP integration agtrace" | **6 tools** (était sous-estimé) - self-reflection workflow documenté |
 
 ---
 
@@ -319,40 +506,62 @@ ccboard       = "tout ~/.claude dans un dashboard"
 
 **Objectif**: Tracker usage dans fenêtres de facturation Claude (5h blocks)
 
+**Reference**: Claudelytics implementation (billing_blocks.rs)
+- Blocks UTC: 00:00-04:59, 05:00-09:59, 10:00-14:59, 15:00-19:59, 20:00-23:59
+- Normalization: `block_hour = (hour / 5) * 5`
+- Color coding: green < $2.5, yellow < $5, red > $5
+
 **Tâches**:
-- [ ] Détecter blocks de 5h depuis timestamps sessions
-- [ ] Calculer usage par block
-- [ ] Alert quand proche limite block
-- [ ] Afficher dans Costs tab
+- [ ] Créer `BillingBlockManager` structure (inspiré Claudelytics)
+- [ ] Implémenter normalization timestamps → 5h blocks
+- [ ] Calculer usage par block (input/output/cache tokens)
+- [ ] Color coding par seuil coût
+- [ ] Alert visuelle quand proche limite block
+- [ ] Afficher dans Costs tab avec breakdown
+- [ ] Tests avec fixtures timestamps
 
 #### 2. Export CSV/JSON (1 jour)
 
 **Objectif**: Analytics workflow pour users
 
+**Reference**: Claudelytics export.rs (CSV/JSON sur toutes commandes)
+
 **Formats**:
-- Sessions export (CSV/JSON)
-- Costs breakdown (CSV/JSON)
-- Agents usage (CSV/JSON)
+- Sessions export (CSV/JSON) - id, project, start, end, tokens, cost, model
+- Costs breakdown (CSV/JSON) - daily aggregates, billing blocks
+- Agents usage (CSV/JSON) - agent name, invocations, last_used
 
 **Tâches**:
-- [ ] Implémenter serializers
-- [ ] Add export commands
-- [ ] Tests de format output
+- [ ] Implémenter CSV serializers (csv crate)
+- [ ] Implémenter JSON serializers (serde_json pretty)
+- [ ] Add `ccboard export sessions --format csv|json`
+- [ ] Add `ccboard export costs --format csv|json`
+- [ ] Add `ccboard export agents --format csv|json`
+- [ ] Tests format output (fixtures + golden files)
+- [ ] Documentation export workflows
 
 #### 3. ccboard as MCP Server (2 jours)
 
 **Objectif**: Exposer ccboard data via MCP protocol (resources only)
 
-**Resources**:
-- `ccboard://sessions` → Liste sessions
-- `ccboard://stats` → Statistiques
-- `ccboard://agents` → Agents avec invocations
+**Reference**: agtrace MCP implementation (6 tools: list_sessions, get_project_info, analyze_session, search_events, list_turns, get_turns)
+
+**Scope ccboard MVP** (resources only, PAS tools):
+- `ccboard://sessions` → Liste sessions JSON (pagination cursor-based)
+- `ccboard://stats` → Statistiques globales JSON
+- `ccboard://agents` → Agents avec invocations JSON
+- `ccboard://costs` → Breakdown coûts + billing blocks JSON
+- `ccboard://config` → Config merged JSON (global+project+local)
 
 **Tâches**:
-- [ ] MCP server implementation
-- [ ] Resource handlers
-- [ ] Documentation
-- [ ] Tests integration
+- [ ] Add `@modelcontextprotocol/sdk` dependency
+- [ ] MCP server stdio transport
+- [ ] Resource handlers (5 resources)
+- [ ] Pagination cursor-based pour sessions (inspiré agtrace)
+- [ ] Documentation MCP integration
+- [ ] Tests integration (mock stdio)
+- [ ] Add `ccboard mcp` command mode
+- [ ] README example workflows
 
 ---
 
@@ -365,18 +574,27 @@ ccboard       = "tout ~/.claude dans un dashboard"
 
 **Objectif**: Visualiser déroulement conversation message par message (UNIQUE en TUI)
 
+**Reference**: Claudelytics conversation_parser.rs + conversation_display.rs (Compact/Detailed modes, thinking blocks, tool usage, search highlighting)
+
 **Features**:
-- Navigation temporelle (message précédent/suivant)
-- Affichage tool calls + results
-- Syntax highlighting code blocks
-- Search dans conversation
+- Navigation temporelle (message précédent/suivant, `j/k`)
+- Affichage thinking blocks (italics, special icons)
+- Affichage tool calls + results (code blocks, language-specific coloring)
+- Search dans conversation avec highlighting (yellow matches)
+- Modes Compact/Detailed toggle (`c`)
+- Token accounting par message
+- Rôle icons + colors (user/assistant)
 
 **Tâches**:
-- [ ] Parser full JSONL pour replay
-- [ ] UI conversation viewer
-- [ ] Navigation keybindings
-- [ ] Syntax highlighting
-- [ ] Tests rendering
+- [ ] Parser full JSONL pour replay (lazy load on demand)
+- [ ] `ConversationViewer` component Ratatui
+- [ ] Message rendering (role icons, word wrapping, timestamps)
+- [ ] Thinking block detection + styling
+- [ ] Tool call parsing + code block syntax highlighting
+- [ ] Navigation keybindings (`j/k` nav, `Enter` expand, `c` compact toggle)
+- [ ] Search integration (`/` search, `n/N` next/prev)
+- [ ] Tests rendering (snapshots avec fixtures JSONL)
+- [ ] Add to Sessions tab (press `Enter` → conversation viewer)
 
 #### 2. Open Source Release (2 jours)
 
@@ -411,23 +629,31 @@ ccboard       = "tout ~/.claude dans un dashboard"
 
 **Tier 3 : Différenciateurs**
 
-| Idée | Effort | Impact |
-|------|--------|--------|
-| `ccboard doctor` diagnostic | Moyen | HAUT |
-| Git commit ↔ session attribution | Haut | HAUT (unique) |
-| Session bookmarks | Moyen | MOYEN |
+| Idée | Effort | Impact | Source inspiration |
+|------|--------|--------|-------------------|
+| `ccboard doctor` diagnostic | Moyen | HAUT | - |
+| Git commit ↔ session attribution | Haut | HAUT (unique) | - |
+| Session bookmarks | Moyen | MOYEN | Claudelytics bookmark system |
+| Context saturation visualization | Faible | MOYEN | agtrace barre colorée |
+| Subagent tracking hiérarchique | Moyen | MOYEN | agtrace spawned_by context |
+| Session comparison side-by-side | Haut | MOYEN | Claudelytics Compare tab |
+| Time-of-day / day-of-week analytics | Moyen | MOYEN | Claudelytics analytics patterns |
+| Model registry + pricing aliases | Faible | MOYEN | Claudelytics models_registry.rs |
 
 **Tier 4 : Long-term / Speculative**
 
-| Idée | Effort | Impact |
-|------|--------|--------|
-| **Distributed team sync** | Très haut | TRÈS HAUT (0 competitors) |
-| **Web collaborative dashboard** | Très haut | TRÈS HAUT (on a l'archi) |
-| Claude Desktop parser (SQLite) | Haut | MOYEN |
-| Anthropic API billing réel | Haut | HAUT |
-| Plugin system | Très haut | Long-term |
-| Multi-machine sync | Très haut | Niche |
-| Error pattern detection | Très haut | Incertain |
+| Idée | Effort | Impact | Source inspiration |
+|------|--------|--------|-------------------|
+| **Distributed team sync** | Très haut | TRÈS HAUT (0 competitors) | - |
+| **Web collaborative dashboard** | Très haut | TRÈS HAUT (on a l'archi) | - |
+| **MCP tools mode** (vs resources only) | Très haut | TRÈS HAUT | agtrace 6 tools (analyze_session, search_events) |
+| Claude Desktop parser (SQLite) | Haut | MOYEN | - |
+| Anthropic API billing réel | Haut | HAUT | - |
+| Multi-provider support | Très haut | HAUT | agtrace (Claude+Codex+Gemini) |
+| Plugin system | Très haut | Long-term | - |
+| Multi-machine sync | Très haut | Niche | - |
+| Error pattern detection | Très haut | Incertain | - |
+| npm distribution wrapper | Faible | MOYEN (distribution) | agtrace npm install |
 
 **Données ~/.claude Inexploitées**
 
