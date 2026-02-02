@@ -2,7 +2,7 @@
 
 use crate::app::{App, Tab};
 use crate::tabs::{
-    AgentsTab, ConfigTab, CostsTab, DashboardTab, HistoryTab, HooksTab, SessionsTab,
+    AgentsTab, ConfigTab, CostsTab, DashboardTab, HistoryTab, HooksTab, McpTab, SessionsTab,
 };
 use ccboard_core::DegradedState;
 use ratatui::{
@@ -22,6 +22,7 @@ pub struct Ui {
     agents: AgentsTab,
     costs: CostsTab,
     history: HistoryTab,
+    mcp: McpTab,
 }
 
 impl Default for Ui {
@@ -40,6 +41,7 @@ impl Ui {
             agents: AgentsTab::new(),
             costs: CostsTab::new(),
             history: HistoryTab::new(),
+            mcp: McpTab::new(),
         }
     }
 
@@ -75,6 +77,10 @@ impl Ui {
             Tab::History => {
                 let sessions: Vec<_> = app.store.recent_sessions(10000);
                 self.history.handle_key(key, &sessions);
+            }
+            Tab::Mcp => {
+                let mcp_config = app.store.mcp_config();
+                self.mcp.handle_key(key, mcp_config.as_ref());
             }
         }
     }
@@ -226,6 +232,10 @@ impl Ui {
                 let stats = app.store.stats();
                 self.history.render(frame, area, &sessions, stats.as_ref());
             }
+            Tab::Mcp => {
+                let mcp_config = app.store.mcp_config();
+                self.mcp.render(frame, area, mcp_config.as_ref());
+            }
         }
     }
 
@@ -247,6 +257,7 @@ impl Ui {
                 Tab::Agents => "Tab switch │ Enter detail",
                 Tab::Costs => "Tab view │ 1-3 switch",
                 Tab::History => "Enter detail │ / search │ Tab stats │ c clear",
+                Tab::Mcp => "←→ focus │ ↑↓ select │ e edit │ o reveal │ r refresh",
             };
 
             Line::from(vec![

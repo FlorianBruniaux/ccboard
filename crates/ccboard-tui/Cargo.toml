@@ -23,5 +23,8 @@ tracing.workspace = true
 # Error handling
 anyhow.workspace = true
 
+# Utilities
+dirs.workspace = true
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

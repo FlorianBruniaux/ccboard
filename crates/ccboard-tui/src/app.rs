@@ -15,6 +15,7 @@ pub enum Tab {
     Agents,
     Costs,
     History,
+    Mcp,
 }
 
 impl Tab {
@@ -27,6 +28,7 @@ impl Tab {
             Tab::Agents,
             Tab::Costs,
             Tab::History,
+            Tab::Mcp,
         ]
     }
 
@@ -39,6 +41,7 @@ impl Tab {
             Tab::Agents => 4,
             Tab::Costs => 5,
             Tab::History => 6,
+            Tab::Mcp => 7,
         }
     }
 
@@ -51,6 +54,7 @@ impl Tab {
             4 => Tab::Agents,
             5 => Tab::Costs,
             6 => Tab::History,
+            7 => Tab::Mcp,
             _ => Tab::Dashboard,
         }
     }
@@ -64,6 +68,7 @@ impl Tab {
             Tab::Agents => "Agents",
             Tab::Costs => "Costs",
             Tab::History => "History",
+            Tab::Mcp => "MCP",
         }
     }
 
@@ -76,6 +81,7 @@ impl Tab {
             Tab::Agents => '5',
             Tab::Costs => '6',
             Tab::History => '7',
+            Tab::Mcp => '8',
         }
     }
 }
@@ -138,7 +144,7 @@ impl App {
                 self.prev_tab();
                 true
             }
-            KeyCode::Char(c) if ('1'..='7').contains(&c) => {
+            KeyCode::Char(c) if ('1'..='8').contains(&c) => {
                 let idx = (c as usize) - ('1' as usize);
                 self.active_tab = Tab::from_index(idx);
                 true
