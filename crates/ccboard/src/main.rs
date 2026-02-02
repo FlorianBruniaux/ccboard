@@ -7,9 +7,28 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 #[derive(Parser)]
-#[command(name = "ccboard")]
-#[command(about = "Unified Claude Code Management Dashboard")]
-#[command(version)]
+#[command(
+    name = "ccboard",
+    version,
+    about = "Unified Claude Code Management Dashboard",
+    long_about = "A comprehensive TUI and web dashboard for managing Claude Code data.\n\
+                  \n\
+                  Visualizes sessions, statistics, configuration, hooks, agents, costs, and history\n\
+                  from ~/.claude directories with real-time updates and file editing capabilities.\n\
+                  \n\
+                  Features:\n\
+                    • 7 interactive tabs (Dashboard, Sessions, Config, Hooks, Agents, Costs, History)\n\
+                    • File editing with $EDITOR integration (press 'e')\n\
+                    • MCP server management and visualization\n\
+                    • Real-time cost tracking and analytics\n\
+                    • Session search and exploration\n\
+                  \n\
+                  Examples:\n\
+                    ccboard                          # Run TUI (default)\n\
+                    ccboard web --port 8080          # Run web interface on port 8080\n\
+                    ccboard stats                    # Print stats summary\n\
+                    ccboard --project ~/myproject    # Focus on specific project"
+)]
 struct Cli {
     #[command(subcommand)]
     mode: Option<Mode>,
