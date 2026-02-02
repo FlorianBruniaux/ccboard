@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
-    Frame,
 };
 
 /// A single breadcrumb in the navigation path
@@ -83,8 +83,7 @@ impl Breadcrumbs {
 
         let spans = self.build_spans();
         let breadcrumb_line = Line::from(spans);
-        let paragraph = Paragraph::new(breadcrumb_line)
-            .style(Style::default().fg(Color::DarkGray));
+        let paragraph = Paragraph::new(breadcrumb_line).style(Style::default().fg(Color::DarkGray));
 
         frame.render_widget(paragraph, area);
     }
@@ -94,10 +93,7 @@ impl Breadcrumbs {
         let mut spans = Vec::new();
 
         // Add location pin icon
-        spans.push(Span::styled(
-            "📍 ",
-            Style::default().fg(Color::Cyan),
-        ));
+        spans.push(Span::styled("📍 ", Style::default().fg(Color::Cyan)));
 
         // Determine if we need to truncate
         let path_to_display = if self.path.len() > self.max_display {
@@ -122,10 +118,7 @@ impl Breadcrumbs {
 
             // Add separator (except after last item)
             if idx < path_to_display.len() - 1 {
-                spans.push(Span::styled(
-                    " > ",
-                    Style::default().fg(Color::DarkGray),
-                ));
+                spans.push(Span::styled(" > ", Style::default().fg(Color::DarkGray)));
             }
         }
 

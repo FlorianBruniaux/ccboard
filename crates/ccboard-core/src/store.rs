@@ -395,7 +395,11 @@ impl DataStore {
     pub async fn reload_settings(&self) {
         let parser = SettingsParser::new();
         let merged = parser
-            .load_merged(&self.claude_home, self.project_path.as_deref(), &mut LoadReport::new())
+            .load_merged(
+                &self.claude_home,
+                self.project_path.as_deref(),
+                &mut LoadReport::new(),
+            )
             .await;
 
         {
@@ -403,7 +407,8 @@ impl DataStore {
             *guard = merged;
         }
 
-        self.event_bus.publish(DataEvent::ConfigChanged(ConfigScope::Global));
+        self.event_bus
+            .publish(DataEvent::ConfigChanged(ConfigScope::Global));
         debug!("Settings reloaded");
     }
 

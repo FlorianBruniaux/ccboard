@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::Span,
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 /// Reusable detail pane component for displaying content
@@ -41,7 +41,9 @@ impl DetailPane {
                     .border_style(Style::default().fg(border_color))
                     .title(Span::styled(
                         format!(" {} ", self.title),
-                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
                     )),
             )
             .wrap(Wrap { trim: false })

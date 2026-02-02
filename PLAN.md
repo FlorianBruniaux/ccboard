@@ -20,8 +20,21 @@
 | **Phase 9.3** | Breadcrumbs + Icons | +282 | 2026-02-02 | merged |
 | **Phase 9.4** | PgUp/PgDn + Components | +317 | 2026-02-02 | merged |
 | **File Watcher** | Live Data Updates | +80 | 2026-02-02 | merged |
+| **Phase 9.5** | UX Fixes & Improvements | +50 | 2026-02-02 | in-progress |
 
 **Total** : ~11,000+ LOC | 88 tests passing | 0 clippy warnings
+
+### 🔧 Phase 9.5 : UX Fixes & Improvements (2026-02-02)
+
+**Changements** :
+- ✅ **Costs tab keybindings** : `Tab/←→/h/l` au lieu de `1-3` (fix conflit navigation globale)
+- ✅ **Session detail wrapping** : Texte renvoyé à la ligne pour paths/messages longs
+- ✅ **Config hints** : Ajout "e edit │ o reveal" dans footer
+- ✅ **AgentEntry structure** : Préparation champ `invocation_count` (comptage différé)
+
+**Limitations identifiées** :
+- ⚠️ **Tokens affichent 0** : Claude Code ne stocke pas `usage` dans JSONL (limitation upstream)
+- 📊 **Comptage invocations** : Différé (parsing 1000+ sessions = performance intensive)
 
 ---
 

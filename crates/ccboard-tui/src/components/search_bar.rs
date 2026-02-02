@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 
 /// Reusable search bar component for filtering lists
@@ -61,10 +61,7 @@ impl SearchBar {
                 Style::default().fg(Color::DarkGray),
             )
         } else {
-            (
-                self.query.as_str(),
-                Style::default().fg(Color::White),
-            )
+            (self.query.as_str(), Style::default().fg(Color::White))
         };
 
         let border_color = if self.active {
@@ -77,22 +74,28 @@ impl SearchBar {
             Span::styled("🔍 ", Style::default().fg(Color::Cyan)),
             Span::styled(text, style),
             if self.active {
-                Span::styled("_", Style::default().fg(Color::Cyan).add_modifier(Modifier::SLOW_BLINK))
+                Span::styled(
+                    "_",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::SLOW_BLINK),
+                )
             } else {
                 Span::raw("")
             },
         ]);
 
-        let paragraph = Paragraph::new(search_line)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(border_color))
-                    .title(Span::styled(
-                        " Search ",
-                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
-                    )),
-            );
+        let paragraph = Paragraph::new(search_line).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(border_color))
+                .title(Span::styled(
+                    " Search ",
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                )),
+        );
 
         frame.render_widget(paragraph, area);
     }

@@ -1,9 +1,11 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::Span,
-    widgets::{Block, Borders, List, ListItem, ListState, Scrollbar, ScrollbarOrientation, ScrollbarState},
-    Frame,
+    widgets::{
+        Block, Borders, List, ListItem, ListState, Scrollbar, ScrollbarOrientation, ScrollbarState,
+    },
 };
 
 /// Reusable list pane component for displaying selectable items
@@ -22,7 +24,12 @@ pub struct ListPane<'a> {
 
 impl<'a> ListPane<'a> {
     /// Create a new list pane
-    pub fn new(title: impl Into<String>, items: Vec<String>, state: &'a mut ListState, focused: bool) -> Self {
+    pub fn new(
+        title: impl Into<String>,
+        items: Vec<String>,
+        state: &'a mut ListState,
+        focused: bool,
+    ) -> Self {
         let item_count = items.len();
         Self {
             title: title.into(),
@@ -54,7 +61,9 @@ impl<'a> ListPane<'a> {
                     .border_style(Style::default().fg(border_color))
                     .title(Span::styled(
                         format!(" {} ({}) ", self.title, self.items.len()),
-                        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
                     )),
             )
             .highlight_style(

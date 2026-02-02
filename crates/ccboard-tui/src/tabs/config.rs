@@ -90,7 +90,8 @@ impl ConfigTab {
                             self.error_message = Some(format!("Failed to open editor: {}", e));
                         }
                     } else {
-                        self.error_message = Some("No config file available for this column".to_string());
+                        self.error_message =
+                            Some("No config file available for this column".to_string());
                     }
                 }
             }
@@ -101,7 +102,8 @@ impl ConfigTab {
                         self.error_message = Some(format!("Failed to open file manager: {}", e));
                     }
                 } else {
-                    self.error_message = Some("No config file available for this column".to_string());
+                    self.error_message =
+                        Some("No config file available for this column".to_string());
                 }
             }
             KeyCode::Char('m') => {
@@ -142,11 +144,15 @@ impl ConfigTab {
             }
             1 => {
                 // Project: .claude/settings.json
-                self.project_path.as_ref().map(|p| p.join(".claude/settings.json"))
+                self.project_path
+                    .as_ref()
+                    .map(|p| p.join(".claude/settings.json"))
             }
             2 => {
                 // Local: .claude/settings.local.json
-                self.project_path.as_ref().map(|p| p.join(".claude/settings.local.json"))
+                self.project_path
+                    .as_ref()
+                    .map(|p| p.join(".claude/settings.local.json"))
             }
             3 => {
                 // Merged: no single file, show error
@@ -601,7 +607,12 @@ impl ConfigTab {
         ]))
     }
 
-    fn render_mcp_detail_modal(&self, frame: &mut Frame, area: Rect, mcp_config: Option<&McpConfig>) {
+    fn render_mcp_detail_modal(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        mcp_config: Option<&McpConfig>,
+    ) {
         // Center modal (70% width, 70% height)
         let modal_width = (area.width as f32 * 0.7).max(60.0) as u16;
         let modal_height = (area.height as f32 * 0.7).max(20.0) as u16;
@@ -635,7 +646,9 @@ impl ConfigTab {
                     Style::default().fg(Color::DarkGray),
                 )));
             } else {
-                let config_path = self.claude_home.as_ref()
+                let config_path = self
+                    .claude_home
+                    .as_ref()
                     .map(|p| p.join("claude_desktop_config.json"))
                     .map(|p| p.display().to_string())
                     .unwrap_or_else(|| "~/.claude/claude_desktop_config.json".to_string());
@@ -674,7 +687,10 @@ impl ConfigTab {
                         for (key, value) in &server.env {
                             lines.push(Line::from(vec![
                                 Span::styled("    ", Style::default()),
-                                Span::styled(format!("{}=", key), Style::default().fg(Color::Yellow)),
+                                Span::styled(
+                                    format!("{}=", key),
+                                    Style::default().fg(Color::Yellow),
+                                ),
                                 Span::styled(value, Style::default().fg(Color::White)),
                             ]));
                         }
@@ -739,16 +755,10 @@ impl ConfigTab {
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
 
-        let error_text = self
-            .error_message
-            .as_deref()
-            .unwrap_or("Unknown error");
+        let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(
-                error_text,
-                Style::default().fg(Color::White),
-            )),
+            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",

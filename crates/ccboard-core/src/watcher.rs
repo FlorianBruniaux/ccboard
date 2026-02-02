@@ -165,14 +165,20 @@ impl FileWatcher {
         // Project settings
         if let Some(proj) = project_path {
             if *path == proj.join(".claude").join("settings.json") {
-                return Some((DataEvent::ConfigChanged(ConfigScope::Project(
-                    proj.to_string_lossy().to_string(),
-                )), path.clone()));
+                return Some((
+                    DataEvent::ConfigChanged(ConfigScope::Project(
+                        proj.to_string_lossy().to_string(),
+                    )),
+                    path.clone(),
+                ));
             }
             if *path == proj.join(".claude").join("settings.local.json") {
-                return Some((DataEvent::ConfigChanged(ConfigScope::Local(
-                    proj.to_string_lossy().to_string(),
-                )), path.clone()));
+                return Some((
+                    DataEvent::ConfigChanged(ConfigScope::Local(
+                        proj.to_string_lossy().to_string(),
+                    )),
+                    path.clone(),
+                ));
             }
         }
 

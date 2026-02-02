@@ -131,7 +131,8 @@ impl SessionsTab {
                 if self.focus == 1 {
                     if let Some(session) = self.get_selected_session(_sessions_by_project) {
                         if let Err(e) = crate::editor::reveal_in_file_manager(&session.file_path) {
-                            self.error_message = Some(format!("Failed to open file manager: {}", e));
+                            self.error_message =
+                                Some(format!("Failed to open file manager: {}", e));
                         }
                     }
                 }
@@ -242,13 +243,13 @@ impl SessionsTab {
             format!("/ {}", self.search_filter)
         };
 
-        let search_input = Paragraph::new(search_text)
-            .block(search_block)
-            .style(if self.search_filter.is_empty() {
+        let search_input = Paragraph::new(search_text).block(search_block).style(
+            if self.search_filter.is_empty() {
                 Style::default().fg(Color::DarkGray)
             } else {
                 Style::default().fg(Color::White)
-            });
+            },
+        );
 
         frame.render_widget(search_input, main_chunks[0]);
         let content_area = main_chunks[1];
@@ -593,7 +594,7 @@ impl SessionsTab {
             )),
         ];
 
-        let detail = Paragraph::new(lines);
+        let detail = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(detail, inner);
     }
 
@@ -642,16 +643,10 @@ impl SessionsTab {
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
 
-        let error_text = self
-            .error_message
-            .as_deref()
-            .unwrap_or("Unknown error");
+        let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(
-                error_text,
-                Style::default().fg(Color::White),
-            )),
+            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",

@@ -32,7 +32,7 @@ pub fn open_in_editor(file_path: &Path) -> Result<()> {
     // Exit alternate screen and disable raw mode
     use crossterm::{
         execute,
-        terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
+        terminal::{LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     };
     use std::io::stdout;
 
@@ -92,9 +92,7 @@ pub fn reveal_in_file_manager(file_path: &Path) -> Result<()> {
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        let parent = file_path
-            .parent()
-            .context("File has no parent directory")?;
+        let parent = file_path.parent().context("File has no parent directory")?;
 
         Command::new("xdg-open")
             .arg(parent)
@@ -163,10 +161,7 @@ mod tests {
     fn test_open_in_editor_nonexistent_file() {
         let result = open_in_editor(Path::new("/nonexistent/file.txt"));
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("does not exist"));
+        assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
 
     #[test]

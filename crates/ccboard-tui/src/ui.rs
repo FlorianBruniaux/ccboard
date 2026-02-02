@@ -68,7 +68,13 @@ impl Ui {
                 self.config.handle_key(key);
             }
             Tab::Hooks => {
-                let hooks_map = app.store.settings().merged.hooks.clone().unwrap_or_default();
+                let hooks_map = app
+                    .store
+                    .settings()
+                    .merged
+                    .hooks
+                    .clone()
+                    .unwrap_or_default();
                 self.hooks.handle_key(key, &hooks_map);
             }
             Tab::Agents => {
@@ -223,7 +229,8 @@ impl Ui {
             Tab::Dashboard => {
                 let stats = app.store.stats();
                 let mcp_config = app.store.mcp_config();
-                self.dashboard.render(frame, area, stats.as_ref(), mcp_config.as_ref());
+                self.dashboard
+                    .render(frame, area, stats.as_ref(), mcp_config.as_ref());
             }
             Tab::Sessions => {
                 let sessions_by_project = app.store.sessions_by_project();
@@ -272,10 +279,10 @@ impl Ui {
             let hint = match app.active_tab {
                 Tab::Dashboard => "F5 refresh",
                 Tab::Sessions => "←→ nav │ Enter detail │ / search",
-                Tab::Config => "←→ columns │ ↑↓ scroll",
+                Tab::Config => "←→ columns │ ↑↓ scroll │ e edit │ o reveal",
                 Tab::Hooks => "←→ nav │ ↑↓ select",
                 Tab::Agents => "Tab switch │ Enter detail",
-                Tab::Costs => "Tab view │ 1-3 switch",
+                Tab::Costs => "Tab/←→/h/l switch views",
                 Tab::History => "Enter detail │ / search │ Tab stats │ c clear",
                 Tab::Mcp => "←→ focus │ ↑↓ select │ e edit │ o reveal │ r refresh",
             };

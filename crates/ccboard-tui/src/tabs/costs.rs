@@ -85,12 +85,12 @@ impl CostsTab {
         use crossterm::event::KeyCode;
 
         match key {
-            KeyCode::Tab => {
+            KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
                 self.view_mode = (self.view_mode + 1) % 3;
             }
-            KeyCode::Char('1') => self.view_mode = 0,
-            KeyCode::Char('2') => self.view_mode = 1,
-            KeyCode::Char('3') => self.view_mode = 2,
+            KeyCode::Left | KeyCode::Char('h') => {
+                self.view_mode = (self.view_mode + 2) % 3; // +2 instead of -1 for wrapping
+            }
             KeyCode::Up | KeyCode::Char('k') => {
                 let current = self.model_state.selected().unwrap_or(0);
                 self.model_state.select(Some(current.saturating_sub(1)));

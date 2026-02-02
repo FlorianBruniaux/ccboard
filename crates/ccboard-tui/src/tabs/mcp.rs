@@ -20,11 +20,11 @@ use crate::theme::ServerStatusColor;
 use ccboard_core::parsers::mcp_config::{McpConfig, McpServer};
 use crossterm::event::KeyCode;
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
-    Frame,
 };
 use std::collections::HashMap;
 use std::time::Instant;
@@ -188,7 +188,12 @@ impl McpTab {
     }
 
     /// Render server list pane
-    fn render_server_list(&mut self, frame: &mut Frame, area: Rect, mcp_config: Option<&McpConfig>) {
+    fn render_server_list(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        mcp_config: Option<&McpConfig>,
+    ) {
         let is_focused = matches!(self.focus, Focus::List);
         let border_color = if is_focused {
             Color::Cyan
@@ -283,7 +288,12 @@ impl McpTab {
     }
 
     /// Render server detail pane
-    fn render_server_detail(&mut self, frame: &mut Frame, area: Rect, mcp_config: Option<&McpConfig>) {
+    fn render_server_detail(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        mcp_config: Option<&McpConfig>,
+    ) {
         let is_focused = matches!(self.focus, Focus::Detail);
         let border_color = if is_focused {
             Color::Cyan
@@ -302,7 +312,10 @@ impl McpTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
-            .title(Span::styled(title, Style::default().fg(Color::White).bold()));
+            .title(Span::styled(
+                title,
+                Style::default().fg(Color::White).bold(),
+            ));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -542,10 +555,7 @@ impl McpTab {
 
         let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
         let lines = vec![
-            Line::from(Span::styled(
-                error_text,
-                Style::default().fg(Color::White),
-            )),
+            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",

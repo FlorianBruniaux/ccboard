@@ -20,7 +20,13 @@ impl DashboardTab {
     }
 
     /// Render the dashboard
-    pub fn render(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, mcp_config: Option<&McpConfig>) {
+    pub fn render(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        mcp_config: Option<&McpConfig>,
+    ) {
         // Main vertical layout
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -42,7 +48,13 @@ impl DashboardTab {
         self.render_model_gauges(frame, chunks[2], stats);
     }
 
-    fn render_stats_row(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, mcp_config: Option<&McpConfig>) {
+    fn render_stats_row(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        mcp_config: Option<&McpConfig>,
+    ) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -66,10 +78,12 @@ impl DashboardTab {
             .unwrap_or_else(|| ("—".into(), "—".into(), "—".into(), "—".into()));
 
         // MCP servers count
-        let mcp_count = mcp_config
-            .map(|config| config.servers.len())
-            .unwrap_or(0);
-        let mcp_color = if mcp_count > 0 { Color::Green } else { Color::DarkGray };
+        let mcp_count = mcp_config.map(|config| config.servers.len()).unwrap_or(0);
+        let mcp_color = if mcp_count > 0 {
+            Color::Green
+        } else {
+            Color::DarkGray
+        };
 
         self.render_stat_card(frame, chunks[0], "◆ Tokens", &tokens, Color::Cyan, "total");
         self.render_stat_card(

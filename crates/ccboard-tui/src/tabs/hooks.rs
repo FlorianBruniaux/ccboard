@@ -6,7 +6,10 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{
+        Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
+        ScrollbarState,
+    },
 };
 use std::collections::HashMap;
 
@@ -47,7 +50,11 @@ impl HooksTab {
     }
 
     /// Handle key input
-    pub fn handle_key(&mut self, key: crossterm::event::KeyCode, hooks_map: &HashMap<String, Vec<HookGroup>>) {
+    pub fn handle_key(
+        &mut self,
+        key: crossterm::event::KeyCode,
+        hooks_map: &HashMap<String, Vec<HookGroup>>,
+    ) {
         use crossterm::event::KeyCode;
 
         match key {
@@ -82,7 +89,8 @@ impl HooksTab {
                                 self.error_message = Some(format!("Failed to open editor: {}", e));
                             }
                         } else {
-                            self.error_message = Some("No file path available for this hook".to_string());
+                            self.error_message =
+                                Some("No file path available for this hook".to_string());
                         }
                     }
                 }
@@ -93,10 +101,12 @@ impl HooksTab {
                     if let Some(hook) = self.get_selected_hook(hooks_map) {
                         if let Some(ref path) = hook.file_path {
                             if let Err(e) = crate::editor::reveal_in_file_manager(path) {
-                                self.error_message = Some(format!("Failed to open file manager: {}", e));
+                                self.error_message =
+                                    Some(format!("Failed to open file manager: {}", e));
                             }
                         } else {
-                            self.error_message = Some("No file path available for this hook".to_string());
+                            self.error_message =
+                                Some("No file path available for this hook".to_string());
                         }
                     }
                 }
@@ -152,10 +162,7 @@ impl HooksTab {
         let groups = hooks_map.get(event_name)?;
 
         // Flatten all hooks from all groups
-        let all_hooks: Vec<&HookDefinition> = groups
-            .iter()
-            .flat_map(|g| &g.hooks)
-            .collect();
+        let all_hooks: Vec<&HookDefinition> = groups.iter().flat_map(|g| &g.hooks).collect();
 
         let hook_idx = self.hook_state.selected()?;
         all_hooks.get(hook_idx).copied()
@@ -291,8 +298,8 @@ impl HooksTab {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(None)
                 .end_symbol(None);
-            let mut scrollbar_state = ScrollbarState::new(event_count)
-                .position(self.event_state.selected().unwrap_or(0));
+            let mut scrollbar_state =
+                ScrollbarState::new(event_count).position(self.event_state.selected().unwrap_or(0));
             frame.render_stateful_widget(
                 scrollbar,
                 area.inner(ratatui::layout::Margin {
@@ -429,8 +436,8 @@ impl HooksTab {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(None)
                 .end_symbol(None);
-            let mut scrollbar_state = ScrollbarState::new(hook_count)
-                .position(self.hook_state.selected().unwrap_or(0));
+            let mut scrollbar_state =
+                ScrollbarState::new(hook_count).position(self.hook_state.selected().unwrap_or(0));
             frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
         }
     }
@@ -472,16 +479,10 @@ impl HooksTab {
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
 
-        let error_text = self
-            .error_message
-            .as_deref()
-            .unwrap_or("Unknown error");
+        let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(
-                error_text,
-                Style::default().fg(Color::White),
-            )),
+            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",

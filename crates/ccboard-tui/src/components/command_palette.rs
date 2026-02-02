@@ -1,11 +1,11 @@
 use crate::app::Tab;
 use crossterm::event::KeyCode;
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
-    Frame,
 };
 
 /// Action triggered by a command
@@ -47,7 +47,10 @@ impl Command {
         self.name.to_lowercase().contains(&query_lower)
             || self.shortcut.to_lowercase().contains(&query_lower)
             || self.description.to_lowercase().contains(&query_lower)
-            || self.tags.iter().any(|tag| tag.to_lowercase().contains(&query_lower))
+            || self
+                .tags
+                .iter()
+                .any(|tag| tag.to_lowercase().contains(&query_lower))
     }
 }
 
@@ -160,7 +163,11 @@ impl CommandPalette {
                 shortcut: "6".to_string(),
                 description: "Go to Costs tab".to_string(),
                 action: CommandAction::GoToTab(Tab::Costs),
-                tags: vec!["billing".to_string(), "usage".to_string(), "money".to_string()],
+                tags: vec![
+                    "billing".to_string(),
+                    "usage".to_string(),
+                    "money".to_string(),
+                ],
             },
             Command {
                 name: "history".to_string(),
@@ -248,7 +255,8 @@ impl CommandPalette {
         if self.query.is_empty() {
             self.results = self.commands.clone();
         } else {
-            self.results = self.commands
+            self.results = self
+                .commands
                 .iter()
                 .filter(|cmd| cmd.matches(&self.query))
                 .cloned()
@@ -274,7 +282,7 @@ impl CommandPalette {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3), // Input box
-                Constraint::Min(0),     // Results list
+                Constraint::Min(0),    // Results list
             ])
             .split(popup_area);
 
@@ -305,10 +313,7 @@ impl CommandPalette {
                     format!("{:<15}", cmd.name),
                     Style::default().fg(Color::White),
                 );
-                let desc = Span::styled(
-                    &cmd.description,
-                    Style::default().fg(Color::Gray),
-                );
+                let desc = Span::styled(&cmd.description, Style::default().fg(Color::Gray));
 
                 ListItem::new(Line::from(vec![shortcut, name, desc]))
             })

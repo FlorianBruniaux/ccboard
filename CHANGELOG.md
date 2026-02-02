@@ -11,10 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test guide (`TEST_GUIDE_PHASE6.md`) with manual testing procedures
 - Automated test verification script (`test_phase6.sh`)
 - Enhanced CLI help with detailed descriptions and examples
+- **Invocation count field** in AgentEntry structure (prepared for future counting from sessions)
+- **Config editing hints** in UI footer ("e edit │ o reveal")
+
+### Changed
+- **Costs tab keybindings**: Changed from `1-3` to `Tab/←→/h/l` to avoid conflict with main tab navigation
+- **Session detail panel**: Added text wrapping for long paths and messages
 
 ### Fixed
 - Clippy warnings in editor.rs (unsafe blocks for env var tests)
 - Removed unused tempfile dependency from tests
+- **Costs tab navigation**: Fixed keybinding conflict where `1-3` switched main tabs instead of Costs views
+
+### Known Issues
+- **Tokens display 0**: Claude Code JSONL files don't contain `usage` field. Stats-cache.json only has aggregate stats, not per-session tokens. This is a limitation of Claude Code itself, not ccboard.
 
 ## [0.1.0] - 2026-02-02
 

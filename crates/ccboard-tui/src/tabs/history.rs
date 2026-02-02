@@ -6,7 +6,10 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Sparkline},
+    widgets::{
+        Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Sparkline,
+    },
 };
 
 /// History tab state
@@ -97,7 +100,8 @@ impl HistoryTab {
                     // Reveal session file in file manager
                     if let Some(session) = self.get_selected_session() {
                         if let Err(e) = crate::editor::reveal_in_file_manager(&session.file_path) {
-                            self.error_message = Some(format!("Failed to open file manager: {}", e));
+                            self.error_message =
+                                Some(format!("Failed to open file manager: {}", e));
                         }
                     }
                 }
@@ -762,16 +766,10 @@ impl HistoryTab {
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
 
-        let error_text = self
-            .error_message
-            .as_deref()
-            .unwrap_or("Unknown error");
+        let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(
-                error_text,
-                Style::default().fg(Color::White),
-            )),
+            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",

@@ -5,7 +5,10 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Tabs},
+    widgets::{
+        Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Tabs,
+    },
 };
 use std::path::Path;
 
@@ -16,6 +19,8 @@ pub struct AgentEntry {
     pub file_path: String,
     pub description: Option<String>,
     pub entry_type: AgentType,
+    /// Number of times this agent/command/skill has been invoked (TODO: implement counting)
+    pub invocation_count: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -163,6 +168,7 @@ impl AgentsTab {
                     file_path: path.display().to_string(),
                     description,
                     entry_type,
+                    invocation_count: 0, // TODO: implement counting from sessions
                 });
             }
             // Case 2: Directory containing SKILL.md (standard skill format)
@@ -188,6 +194,7 @@ impl AgentsTab {
                         file_path: skill_md.display().to_string(),
                         description,
                         entry_type,
+                        invocation_count: 0, // TODO: implement counting from sessions
                     });
                 } else {
                     // Case 3: Directory without SKILL.md → scan recursively for .md files
@@ -387,7 +394,10 @@ impl AgentsTab {
         let list_len = self.current_list().len();
 
         let title_text = if entry_type == AgentType::Command {
-            format!(" {} - Press / in Claude Code to use • e:edit o:reveal ", entry_type.label())
+            format!(
+                " {} - Press / in Claude Code to use • e:edit o:reveal ",
+                entry_type.label()
+            )
         } else {
             format!(" {} • e:edit o:reveal ", entry_type.label())
         };
@@ -615,16 +625,10 @@ impl AgentsTab {
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
 
-        let error_text = self
-            .error_message
-            .as_deref()
-            .unwrap_or("Unknown error");
+        let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(
-                error_text,
-                Style::default().fg(Color::White),
-            )),
+            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",

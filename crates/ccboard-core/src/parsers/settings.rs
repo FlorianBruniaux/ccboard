@@ -122,7 +122,11 @@ impl SettingsParser {
     }
 
     /// Scan .sh files from hooks directories and inject into settings
-    fn inject_scanned_hooks(settings: &mut Settings, claude_home: &Path, project_path: Option<&Path>) {
+    fn inject_scanned_hooks(
+        settings: &mut Settings,
+        claude_home: &Path,
+        project_path: Option<&Path>,
+    ) {
         let mut all_scanned_hooks: Vec<crate::parsers::Hook> = Vec::new();
 
         // Scan global hooks: ~/.claude/hooks/*.sh
@@ -144,10 +148,8 @@ impl SettingsParser {
         }
 
         // Convert scanned hooks to HookDefinition and group by type
-        let mut hooks_by_event: HashMap<String, Vec<HookGroup>> = settings
-            .hooks
-            .clone()
-            .unwrap_or_default();
+        let mut hooks_by_event: HashMap<String, Vec<HookGroup>> =
+            settings.hooks.clone().unwrap_or_default();
 
         for hook in all_scanned_hooks {
             // Map HookType to event name

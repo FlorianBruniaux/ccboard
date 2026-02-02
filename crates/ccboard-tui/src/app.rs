@@ -142,8 +142,8 @@ impl App {
     /// Handle keyboard input
     /// Returns true if the key was handled as a global key
     pub fn handle_key(&mut self, key: crossterm::event::KeyCode) -> bool {
-        use crossterm::event::KeyCode;
         use crate::components::command_palette::CommandAction;
+        use crossterm::event::KeyCode;
 
         // If command palette is visible, handle keys there first
         if self.command_palette.is_visible() {
