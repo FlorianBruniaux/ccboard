@@ -108,6 +108,10 @@ pub struct HookDefinition {
     /// Environment variables
     #[serde(default)]
     pub env: Option<HashMap<String, String>>,
+
+    /// Source file path (not from JSON, populated during scanning)
+    #[serde(skip)]
+    pub file_path: Option<std::path::PathBuf>,
 }
 
 /// Merged configuration from all levels

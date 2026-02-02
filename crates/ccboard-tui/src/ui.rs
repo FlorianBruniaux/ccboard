@@ -62,7 +62,8 @@ impl Ui {
                 self.config.handle_key(key);
             }
             Tab::Hooks => {
-                self.hooks.handle_key(key);
+                let hooks_map = app.store.settings().merged.hooks.clone().unwrap_or_default();
+                self.hooks.handle_key(key, &hooks_map);
             }
             Tab::Agents => {
                 self.agents.handle_key(key);

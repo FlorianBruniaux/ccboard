@@ -20,6 +20,8 @@ pub struct HooksTab {
     focus: usize,
     /// Cached event names (sorted)
     event_names: Vec<String>,
+    /// Error message to display
+    error_message: Option<String>,
 }
 
 impl Default for HooksTab {
@@ -40,11 +42,12 @@ impl HooksTab {
             hook_state,
             focus: 0,
             event_names: Vec::new(),
+            error_message: None,
         }
     }
 
     /// Handle key input
-    pub fn handle_key(&mut self, key: crossterm::event::KeyCode) {
+    pub fn handle_key(&mut self, key: crossterm::event::KeyCode, hooks_map: &HashMap<String, Vec<HookGroup>>) {
         use crossterm::event::KeyCode;
 
         match key {
@@ -70,6 +73,39 @@ impl HooksTab {
                     self.move_hook_selection(1);
                 }
             }
+            KeyCode::Char('e') => {
+                // Open selected hook file in editor
+                if self.focus == 1 {
+                    if let Some(hook) = self.get_selected_hook(hooks_map) {
+                        if let Some(ref path) = hook.file_path {
+                            if let Err(e) = crate::editor::open_in_editor(path) {
+                                self.error_message = Some(format!("Failed to open editor: {}", e));
+                            }
+                        } else {
+                            self.error_message = Some("No file path available for this hook".to_string());
+                        }
+                    }
+                }
+            }
+            KeyCode::Char('o') => {
+                // Reveal hook file in file manager
+                if self.focus == 1 {
+                    if let Some(hook) = self.get_selected_hook(hooks_map) {
+                        if let Some(ref path) = hook.file_path {
+                            if let Err(e) = crate::editor::reveal_in_file_manager(path) {
+                                self.error_message = Some(format!("Failed to open file manager: {}", e));
+                            }
+                        } else {
+                            self.error_message = Some("No file path available for this hook".to_string());
+                        }
+                    }
+                }
+            }
+            KeyCode::Esc => {
+                if self.error_message.is_some() {
+                    self.error_message = None;
+                }
+            }
             _ => {}
         }
     }
@@ -87,6 +123,24 @@ impl HooksTab {
         let current = self.hook_state.selected().unwrap_or(0) as i32;
         let new_idx = (current + delta).max(0) as usize;
         self.hook_state.select(Some(new_idx));
+    }
+
+    fn get_selected_hook<'a>(
+        &self,
+        hooks_map: &'a HashMap<String, Vec<HookGroup>>,
+    ) -> Option<&'a HookDefinition> {
+        let event_idx = self.event_state.selected()?;
+        let event_name = self.event_names.get(event_idx)?;
+        let groups = hooks_map.get(event_name)?;
+
+        // Flatten all hooks from all groups
+        let all_hooks: Vec<&HookDefinition> = groups
+            .iter()
+            .flat_map(|g| &g.hooks)
+            .collect();
+
+        let hook_idx = self.hook_state.selected()?;
+        all_hooks.get(hook_idx).copied()
     }
 
     /// Render the hooks tab
@@ -124,6 +178,11 @@ impl HooksTab {
             .unwrap_or(&[]);
 
         self.render_hook_details(frame, chunks[1], &selected_event, hook_groups);
+
+        // Render error popup if present
+        if self.error_message.is_some() {
+            self.render_error_popup(frame, area);
+        }
     }
 
     fn render_events(
@@ -293,6 +352,17 @@ impl HooksTab {
                     ]));
                 }
 
+                // Show file path if present
+                if let Some(ref path) = hook.file_path {
+                    lines.push(Line::from(vec![
+                        Span::styled("    file: ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            path.display().to_string(),
+                            Style::default().fg(Color::Yellow),
+                        ),
+                    ]));
+                }
+
                 // Show async/timeout if present
                 let mut attrs = Vec::new();
                 if hook.r#async == Some(true) {
@@ -328,5 +398,51 @@ impl HooksTab {
             "Stop" => ("■", Color::Red),
             _ => ("●", Color::Gray),
         }
+    }
+
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
+        // Center popup (40% width, 30% height)
+        let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
+        let popup_height = (area.height as f32 * 0.3).max(8.0) as u16;
+        let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+        let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+        let popup_area = Rect {
+            x: area.x + popup_x,
+            y: area.y + popup_y,
+            width: popup_width,
+            height: popup_height,
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Red))
+            .title(Span::styled(
+                " Error ",
+                Style::default().fg(Color::Red).bold(),
+            ));
+
+        let inner = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+
+        let error_text = self
+            .error_message
+            .as_deref()
+            .unwrap_or("Unknown error");
+
+        let lines = vec![
+            Line::from(Span::styled(
+                error_text,
+                Style::default().fg(Color::White),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Press Esc to close",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ];
+
+        let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(paragraph, inner);
     }
 }

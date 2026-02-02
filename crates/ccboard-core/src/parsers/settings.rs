@@ -174,6 +174,7 @@ impl SettingsParser {
                 timeout: None,
                 cwd: None,
                 env: None,
+                file_path: Some(hook.path.clone()),
             };
 
             // Add to event group
