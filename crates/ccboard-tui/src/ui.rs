@@ -46,6 +46,7 @@ impl Ui {
     /// Initialize tabs that need data scan
     pub fn init(&mut self, claude_home: &std::path::Path, project_path: Option<&std::path::Path>) {
         self.agents.scan_directories(claude_home, project_path);
+        self.config.init(claude_home, project_path);
     }
 
     /// Handle key input for the active tab

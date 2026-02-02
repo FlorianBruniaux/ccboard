@@ -16,6 +16,12 @@ pub struct ConfigTab {
     focus: usize,
     /// Scroll state for each column
     scroll_states: [ListState; 4],
+    /// Error message to display
+    error_message: Option<String>,
+    /// Claude home directory (for file paths)
+    claude_home: Option<std::path::PathBuf>,
+    /// Project directory (for file paths)
+    project_path: Option<std::path::PathBuf>,
 }
 
 impl Default for ConfigTab {
@@ -29,7 +35,16 @@ impl ConfigTab {
         Self {
             focus: 3, // Start with merged view
             scroll_states: Default::default(),
+            error_message: None,
+            claude_home: None,
+            project_path: None,
         }
+    }
+
+    /// Initialize with paths (called from UI init)
+    pub fn init(&mut self, claude_home: &std::path::Path, project_path: Option<&std::path::Path>) {
+        self.claude_home = Some(claude_home.to_path_buf());
+        self.project_path = project_path.map(|p| p.to_path_buf());
     }
 
     /// Handle key input for this tab
@@ -53,7 +68,55 @@ impl ConfigTab {
                 let current = state.selected().unwrap_or(0);
                 state.select(Some(current + 1));
             }
+            KeyCode::Char('e') => {
+                // Open config file based on focused column
+                if let Some(path) = self.get_focused_file_path() {
+                    if let Err(e) = crate::editor::open_in_editor(&path) {
+                        self.error_message = Some(format!("Failed to open editor: {}", e));
+                    }
+                } else {
+                    self.error_message = Some("No config file available for this column".to_string());
+                }
+            }
+            KeyCode::Char('o') => {
+                // Reveal config file in file manager
+                if let Some(path) = self.get_focused_file_path() {
+                    if let Err(e) = crate::editor::reveal_in_file_manager(&path) {
+                        self.error_message = Some(format!("Failed to open file manager: {}", e));
+                    }
+                } else {
+                    self.error_message = Some("No config file available for this column".to_string());
+                }
+            }
+            KeyCode::Esc => {
+                if self.error_message.is_some() {
+                    self.error_message = None;
+                }
+            }
             _ => {}
+        }
+    }
+
+    /// Get the file path for the currently focused column
+    fn get_focused_file_path(&self) -> Option<std::path::PathBuf> {
+        match self.focus {
+            0 => {
+                // Global: ~/.claude/settings.json
+                self.claude_home.as_ref().map(|p| p.join("settings.json"))
+            }
+            1 => {
+                // Project: .claude/settings.json
+                self.project_path.as_ref().map(|p| p.join(".claude/settings.json"))
+            }
+            2 => {
+                // Local: .claude/settings.local.json
+                self.project_path.as_ref().map(|p| p.join(".claude/settings.local.json"))
+            }
+            3 => {
+                // Merged: no single file, show error
+                None
+            }
+            _ => None,
         }
     }
 
@@ -129,6 +192,11 @@ impl ConfigTab {
             mcp_config,
             rules,
         );
+
+        // Render error popup if present
+        if self.error_message.is_some() {
+            self.render_error_popup(frame, area);
+        }
     }
 
     fn render_config_column(
@@ -475,5 +543,51 @@ impl ConfigTab {
             Span::styled(format!("{}: ", key), Style::default().fg(Color::DarkGray)),
             Span::styled(value.to_string(), Style::default().fg(value_color)),
         ]))
+    }
+
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
+        // Center popup (40% width, 30% height)
+        let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
+        let popup_height = (area.height as f32 * 0.3).max(8.0) as u16;
+        let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+        let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+        let popup_area = Rect {
+            x: area.x + popup_x,
+            y: area.y + popup_y,
+            width: popup_width,
+            height: popup_height,
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Red))
+            .title(Span::styled(
+                " Error ",
+                Style::default().fg(Color::Red).bold(),
+            ));
+
+        let inner = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+
+        let error_text = self
+            .error_message
+            .as_deref()
+            .unwrap_or("Unknown error");
+
+        let lines = vec![
+            Line::from(Span::styled(
+                error_text,
+                Style::default().fg(Color::White),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Press Esc to close",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ];
+
+        let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(paragraph, inner);
     }
 }
