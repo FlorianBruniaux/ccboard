@@ -457,6 +457,67 @@ ec68e7c init: ccboard project with implementation plan
 - DataStore : intégration MCP + Rules
 - Tokio : ajout feature `time` pour stats parser
 
+## Phase 6 : File Opening & MCP UI (2026-02-02) - ✅ 60% COMPLÉTÉ
+
+**Objectif** : Ajouter file opening dans TUI + améliorer MCP UI
+
+### ✅ Complété (bb0fc03, 91be1df)
+
+**Feature 1 : File Opening & Reveal** :
+- ✅ Module `editor.rs` avec `open_in_editor()` et `reveal_in_file_manager()`
+- ✅ Keybinding `e` pour ouvrir fichiers dans `$EDITOR` (Agents, Sessions, History tabs)
+- ✅ Keybinding `o` pour révéler fichiers dans file manager
+- ✅ Display file_path dans Sessions et History detail panels
+- ✅ Error popups pour échecs editor/file manager
+- ✅ Support cross-platform (macOS, Linux, Windows)
+- ✅ Terminal state save/restore (alternate screen)
+
+**Feature 2 : Hooks File Path** :
+- ✅ Ajout champ `file_path` à `HookDefinition`
+- ✅ Population file_path pendant scan hooks (settings parser)
+- ✅ Display file path dans Hooks tab detail
+- ✅ Keybindings `e` et `o` pour Hooks tab
+
+**Commits créés** :
+- `bb0fc03` : feat(tui): add file opening and reveal keybindings (463 insertions)
+- `91be1df` : feat(tui): add file_path tracking to Hooks (124 insertions)
+
+### ⏳ En cours (tasks restantes)
+
+**Task 4** : Refactor Config tab to data-backed paths (2h estimées)
+- Créer struct `ConfigFileEntry { name, file_path, exists }`
+- Liste navigable des fichiers config (Global/Project/Local Settings, CLAUDE.md)
+- Keybinding `e` pour ouvrir config sélectionné
+- Check exists avant ouverture
+
+**Task 7** : Enhance MCP section in Config tab (1.5h estimées)
+- Multi-line formatting (3 lignes par server: name, command, env)
+- Green bullets pour servers configurés
+- Command display limit 40→60 chars
+- Show env var count au lieu de liste complète
+
+**Task 8** : Add MCP detail modal (1h estimée)
+- Modal popup avec `m` key pour détails MCP server
+- Affichage : name, full command, all env vars, config path
+- Keybinding `e` pour éditer claude_desktop_config.json
+- Esc pour fermer modal
+
+**Task 9** : Add MCP stat card to Dashboard (45min estimées)
+- 5ème card au Dashboard (layout 4→5 colonnes)
+- Affichage count MCP servers
+- Green si count > 0, DarkGray si 0
+
+### Statistiques Phase 6
+
+| Métrique | Valeur |
+|----------|--------|
+| Tasks complétées | 5/9 (56%) |
+| Commits créés | 2 |
+| Lignes ajoutées | 587 |
+| Fichiers modifiés | 9 |
+| Temps écoulé | ~4-5h |
+| Temps restant | ~3-4h |
+
 ## Prochaines étapes
 
 ### Priorité P0 (File Watcher) - 2h estimées

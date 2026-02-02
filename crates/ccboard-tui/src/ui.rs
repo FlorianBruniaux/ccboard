@@ -195,7 +195,8 @@ impl Ui {
         match app.active_tab {
             Tab::Dashboard => {
                 let stats = app.store.stats();
-                self.dashboard.render(frame, area, stats.as_ref());
+                let mcp_config = app.store.mcp_config();
+                self.dashboard.render(frame, area, stats.as_ref(), mcp_config.as_ref());
             }
             Tab::Sessions => {
                 let sessions_by_project = app.store.sessions_by_project();

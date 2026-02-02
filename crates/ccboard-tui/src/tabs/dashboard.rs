@@ -1,6 +1,7 @@
 //! Dashboard tab - Overview with sparkline, stats, model gauges, activity
 
 use ccboard_core::models::StatsCache;
+use ccboard_core::parsers::McpConfig;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -19,7 +20,7 @@ impl DashboardTab {
     }
 
     /// Render the dashboard
-    pub fn render(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, mcp_config: Option<&McpConfig>) {
         // Main vertical layout
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -31,8 +32,8 @@ impl DashboardTab {
             ])
             .split(area);
 
-        // Stats cards (4 columns)
-        self.render_stats_row(frame, chunks[0], stats);
+        // Stats cards (5 columns now)
+        self.render_stats_row(frame, chunks[0], stats, mcp_config);
 
         // Activity sparkline
         self.render_activity(frame, chunks[1], stats);
@@ -41,14 +42,15 @@ impl DashboardTab {
         self.render_model_gauges(frame, chunks[2], stats);
     }
 
-    fn render_stats_row(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_stats_row(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, mcp_config: Option<&McpConfig>) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
             ])
             .split(area);
 
@@ -62,6 +64,12 @@ impl DashboardTab {
                 )
             })
             .unwrap_or_else(|| ("—".into(), "—".into(), "—".into(), "—".into()));
+
+        // MCP servers count
+        let mcp_count = mcp_config
+            .map(|config| config.servers.len())
+            .unwrap_or(0);
+        let mcp_color = if mcp_count > 0 { Color::Green } else { Color::DarkGray };
 
         self.render_stat_card(frame, chunks[0], "◆ Tokens", &tokens, Color::Cyan, "total");
         self.render_stat_card(
@@ -87,6 +95,14 @@ impl DashboardTab {
             &cache,
             Color::Magenta,
             "ratio",
+        );
+        self.render_stat_card(
+            frame,
+            chunks[4],
+            "◉ MCP",
+            &mcp_count.to_string(),
+            mcp_color,
+            "servers",
         );
     }
 
