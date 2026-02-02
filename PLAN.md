@@ -1,5 +1,70 @@
 # Plan: ccboard — Unified Claude Code Management Dashboard
 
+## 📍 État Actuel du Projet (2026-02-02)
+
+**Version** : 0.1.0 (development)
+**Branch** : `main`
+**Status** : Phases 0-9.1 complètes, prêt pour Phase 10 (Open Source Release)
+
+### ✅ Phases Complétées
+
+| Phase | Description | Status | Date | PR |
+|-------|-------------|--------|------|-----|
+| **Phase 0** | Architecture & Planning | ✅ Complete | 2026-01-29 | - |
+| **Phase 1-5** | Core Implementation | ✅ Complete | 2026-01-30 | - |
+| **Phase 6** | File Opening & MCP UI | ✅ Complete | 2026-02-02 | #1 |
+| **Phase 7** | MCP Tab Dédié | ✅ Complete | 2026-02-02 | #1 |
+| **Phase 8** | Marketplace Plugin | ✅ Complete | 2026-02-02 | #1 |
+| **Phase 9.1** | TUI Polish (Quick Wins) | ✅ Complete | 2026-02-02 | #2 |
+
+### 🎯 Fonctionnalités Actuelles
+
+**TUI Dashboard (8 tabs)** :
+1. **Dashboard** : Vue d'ensemble (stats, models, MCP servers)
+2. **Sessions** : Navigateur de sessions avec recherche persistante
+3. **Config** : Configuration complète (settings, MCP, hooks)
+4. **Hooks** : Gestion des hooks par type d'événement
+5. **Agents** : Browse agents/commands/skills
+6. **Costs** : Analyse des coûts par modèle/période
+7. **History** : Recherche globale dans l'historique des sessions
+8. **MCP** : Gestion MCP servers avec status detection (NEW)
+
+**Système de Thème** :
+- Palette unifiée (Success/Error/Warning/Neutral/Focus/Important)
+- Scrollbar indicators sur toutes les listes longues
+- Empty states avec hints actionnables
+- Persistent search bars dans Sessions/History
+
+**Marketplace Plugin** :
+- 6 commands : `/dashboard`, `/mcp-status`, `/costs`, `/sessions`, `/ccboard-web`, `/ccboard-install`
+- Installation detection
+- Structure `skills/ccboard/` complète
+
+### 🚀 Prochaines Étapes Recommandées
+
+**Phase 10 : Open Source Release** (Priorité 🔴 High)
+1. Finaliser README.md avec screenshots
+2. Créer CONTRIBUTING.md
+3. Setup GitHub Actions CI/CD
+4. Publish crate sur crates.io
+5. Annonce sur r/rust, Twitter, etc.
+
+**Phase 9.2-4 : TUI Polish Suite** (Priorité 🟡 Medium, optionnel)
+- Command palette (`:` prefix k9s-style)
+- Breadcrumbs navigation
+- File watcher activation
+- Shared component library
+
+### 📊 Métriques
+
+- **LOC** : ~14,000 lignes (66 fichiers créés)
+- **Crates** : 4 (ccboard, ccboard-core, ccboard-tui, ccboard-web)
+- **Tests** : 66 core + 14 TUI (80 total)
+- **Clippy** : 0 warnings
+- **Build time** : <10s (release)
+
+---
+
 ## Decisions prises
 
 | Question | Choix |
@@ -605,9 +670,11 @@ ec68e7c init: ccboard project with implementation plan
 4. **Server Management** (1h) : Launch/Stop/Restart actions avec confirmations
 5. **Config Validation** (30min) : Check command existence (`which npx`), validate env vars
 
-## Phase 8 : Plugin Claude Code Marketplace (PLANIFIÉ)
+## Phase 8 : Plugin Claude Code Marketplace - ✅ COMPLÉTÉ (2026-02-02)
 
 **Objectif** : Créer un plugin compagnon pour distribuer ccboard via Claude Code marketplace
+
+**Status** : Implémenté et mergé dans main (PR #1)
 
 ### Architecture Hybrid Recommandée
 
@@ -831,6 +898,91 @@ Tâches :
 3. LICENSE (MIT OR Apache-2.0)
 4. CI GitHub Actions (test, clippy, fmt)
 5. Cross-platform validation (Linux, macOS, Windows)
+
+---
+
+## Phase 9 : TUI Polish & UX Enhancements - ✅ PHASE 1 COMPLÈTE (2026-02-02)
+
+**Objectif** : Améliorer l'expérience utilisateur du TUI en s'inspirant des meilleures pratiques de k9s, lazygit, et Opcode
+
+**Status** : Phase 1 complétée et mergée dans main (PR #2)
+
+### ✅ Phase 1 : Quick Wins (8-10h) - COMPLÉTÉ
+
+#### Étape 1.1 : Color-Coded Status System (3h)
+- Créé `theme.rs` avec palette de couleurs unifiée (278 lignes)
+- StatusColor enum : Success, Error, Warning, Neutral, Focus, Important
+- Types sémantiques : ServerStatus, SessionStatus, HookEvent, CostLevel, UsageIntensity, Staleness
+- Appliqué au MCP tab (remplacement couleurs hardcodées)
+- Convention k9s/lazygit :
+  - 🟢 Green : Running/Healthy/Success
+  - 🔴 Red : Failed/Error/Critical
+  - 🟡 Yellow : Warning/Pending/Attention
+  - ⚪ Gray : Unknown/Disabled/Neutral
+  - 🔵 Cyan : Selected/Focus/Interactive
+  - 🟣 Magenta : High value/Important/Cost alerts
+
+#### Étape 1.3 : Enhanced Empty States (2h)
+- EmptyState builder pattern pour états vides cohérents (236 lignes)
+- États prédéfinis : no_mcp_config, no_mcp_servers, no_sessions, no_agents, no_hooks, no_history, no_search_results, loading
+- Hints actionnables avec keybindings (inspiré lazygit)
+- Appliqué au MCP tab
+- Format : Titre (yellow) + Message (gray) + Actions (cyan/green)
+
+#### Étape 1.2 : Scrollbar Indicators (2h)
+- Ajout Scrollbar + ScrollbarState aux tabs Agents, Hooks, History
+- Scrollbars pour listes longues (>viewport height)
+- Scrollbar vertical sur bord droit avec indicateur de position
+- Appliqué à : Liste agents, Liste événements hooks, Détails hooks, Résultats history
+- Sessions tab avait déjà des scrollbars
+
+#### Étape 1.4 : Persistent Search Bar (3h)
+- Barre de recherche toujours visible dans Sessions et History tabs
+- Placeholder text quand vide : "Search projects, messages, models..."
+- Bordure change de couleur quand focus (Cyan) vs unfocus (DarkGray)
+- Titre affiche "Sessions (X results)" quand recherche active
+- Améliore découvrabilité pour nouveaux utilisateurs
+
+**Fichiers créés** :
+- `crates/ccboard-tui/src/theme.rs` (278 lignes)
+- `crates/ccboard-tui/src/empty_state.rs` (236 lignes)
+
+**Fichiers modifiés** :
+- `crates/ccboard-tui/src/lib.rs` (imports)
+- `crates/ccboard-tui/src/tabs/agents.rs` (scrollbars)
+- `crates/ccboard-tui/src/tabs/hooks.rs` (scrollbars)
+- `crates/ccboard-tui/src/tabs/history.rs` (scrollbars, persistent search)
+- `crates/ccboard-tui/src/tabs/sessions.rs` (persistent search)
+- `crates/ccboard-tui/src/tabs/mcp.rs` (theme integration)
+
+**Bénéfices** :
+- ✅ Découvrabilité : Recherche visible immédiatement
+- ✅ Context : Placeholder explique ce qui est cherchable
+- ✅ Feedback : Compteur de résultats immédiat
+- ✅ Professionnalisme : TUI comparable à k9s/lazygit
+
+**Tests** : 14 passed, clippy clean
+
+### 📋 Phase 2-4 : TODO (Optionnel)
+
+#### Phase 2 : Navigation Overhaul (8-10h)
+- Command palette avec `:` prefix (k9s-inspired)
+- Fuzzy matching pour commands
+- Breadcrumbs navigation
+- Improved tab bar (tous tabs visibles avec icons)
+- `PgUp`/`PgDn` keybindings
+
+#### Phase 3 : Data Freshness (3-5h)
+- Activate file watcher (code existe, pas activé)
+- Auto-refresh indicator en status bar
+- Background polling optionnel
+
+#### Phase 4 : Code Quality (8-10h)
+- Shared component library (Modal, StatusBar, EmptyState, SearchBar)
+- Unified error handling (UiError enum)
+- TUI testing expansion (30+ tests vs 8 currently)
+
+---
 
 ### Priorité P3 (Phase 6+) - Futures
 
