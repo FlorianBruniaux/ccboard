@@ -528,6 +528,251 @@ ec68e7c init: ccboard project with implementation plan
 | Temps estimé | 12-16h |
 | **Performance** | **+44% plus rapide** |
 
+## Phase 7 : MCP Tab Dédié (2026-02-02) - ✅ COMPLÉTÉ
+
+**Objectif** : Créer un 8ème onglet dédié pour la gestion MCP avec interface dual-pane et détection de status
+
+### ✅ Complété (5c3220a)
+
+**Architecture** :
+- ✅ Nouveau 8ème onglet `Tab::Mcp` accessible avec touche `8`
+- ✅ Integration complète dans app.rs, ui.rs, tabs/mod.rs
+- ✅ Structure McpTab avec state management (ListState, Focus, status_cache)
+- ✅ Ajout dépendance `dirs` pour accès home directory
+
+**Interface Dual-Pane** :
+- ✅ Layout 35% liste serveurs | 65% panneau détails
+- ✅ Liste servers avec status icons (● vert Running, ○ rouge Stopped, ? gris Unknown)
+- ✅ Panneau détails : Command, Arguments, Environment, Config File, Actions
+- ✅ Focus switching avec bordures cyan/gris (←/→, h/l, Enter)
+
+**Détection Status** (Unix uniquement - Phase 1 MVP) :
+- ✅ Extraction package name depuis commande (ex: `@modelcontextprotocol/server-playwright` → `server-playwright`)
+- ✅ Process listing via `ps aux | grep <package>`
+- ✅ PID extraction quand trouvé
+- ✅ Graceful fallback : `ServerStatus::Unknown` sur Windows
+- ✅ Cache status avec refresh manuel (`r` key)
+
+**Opérations Fichiers** :
+- ✅ `e` : Edit `~/.claude/claude_desktop_config.json` dans `$EDITOR`
+- ✅ `o` : Reveal file dans Finder/Explorer
+- ✅ `r` : Refresh status detection
+- ✅ Gestion état terminal (exit/enter alternate screen, raw mode)
+
+**Navigation** :
+- ✅ Vim-style : h/j/k/l (left/down/up/right)
+- ✅ Arrow keys : ←/→ focus switch, ↑/↓ server selection
+- ✅ Enter : focus detail panel
+- ✅ Esc : close error popup
+
+**Empty States & Errors** :
+- ✅ No MCP config : message explicite + path
+- ✅ No servers : message + lien pour éditer config (`[e] Edit config`)
+- ✅ Error popup : overlay centré 60%×30% avec message + Esc to close
+- ✅ Border colors adaptés selon focus
+
+**Tests & Qualité** :
+- ✅ 3 unit tests : `test_status_icon`, `test_new_tab`, `test_focus_switching`
+- ✅ Tous les tests passent (cargo test)
+- ✅ Clippy clean (0 warnings)
+- ✅ Build success
+
+**Fichiers** :
+- `crates/ccboard-tui/Cargo.toml` (+3 lines) : Added dirs dependency
+- `crates/ccboard-tui/src/app.rs` (+8 lines) : Added Tab::Mcp variant
+- `crates/ccboard-tui/src/tabs/mod.rs` (+2 lines) : Export McpTab
+- `crates/ccboard-tui/src/tabs/mcp.rs` (NEW 619 lines) : Core implementation
+- `crates/ccboard-tui/src/ui.rs` (+13 lines) : Render + handle_key
+
+**Statistiques** :
+- Total : 643 insertions, 2 deletions
+- Commit : `5c3220a` - feat(tui): add dedicated MCP tab with dual-pane interface
+
+### Limitations Phase 1 (attendu)
+
+- ⚠️ Status détection heuristique (70-80% accuracy) : match par package name seulement
+- ⚠️ Windows non supporté : retourne `Unknown` (Phase 2 : tasklist parsing)
+- ⚠️ Pas d'auto-refresh : status cache manuel uniquement (Phase 2 : polling 5s)
+- ⚠️ Pas de test connection MCP : juste process detection (Phase 2 : protocol handshake)
+- ⚠️ Pas de server management : start/stop actions absentes (Phase 2+)
+
+### Phase 2 Enhanced (future - 4h estimées)
+
+**Fonctionnalités avancées** :
+1. **Enhanced Status Detection** (1h) : Full command matching, Windows support, confidence score
+2. **Test Connection** (1h) : Modal avec spinner, MCP protocol handshake, timeout 5s
+3. **Auto-Refresh** (30min) : Background polling 5s, toggle on/off avec `a` key
+4. **Server Management** (1h) : Launch/Stop/Restart actions avec confirmations
+5. **Config Validation** (30min) : Check command existence (`which npx`), validate env vars
+
+## Phase 8 : Plugin Claude Code Marketplace (PLANIFIÉ)
+
+**Objectif** : Créer un plugin compagnon pour distribuer ccboard via Claude Code marketplace
+
+### Architecture Hybrid Recommandée
+
+**Principe** : Ccboard reste un binaire standalone indépendant + plugin léger qui facilite l'accès
+
+**Avantages** :
+- ✅ Distribution marketplace Claude (découvrabilité)
+- ✅ Shortcuts pratiques (`/dashboard`, `/mcp`, `/costs`)
+- ✅ Ccboard reste totalement indépendant
+- ✅ Installation guidée (détection + cargo install)
+
+### Structure Plugin
+
+```
+.claude-plugin/
+  marketplace.json              # Liste des plugins offerts
+└── skills/
+    └── ccboard/
+        ├── .claude-plugin/
+        │   └── plugin.json     # Metadata plugin
+        ├── commands/
+        │   ├── dashboard.md    # /dashboard → ccboard
+        │   ├── mcp-status.md   # /mcp → ccboard --tab mcp
+        │   ├── costs.md        # /costs → ccboard --tab costs
+        │   └── web.md          # /web → ccboard web --port 3333
+        ├── scripts/
+        │   ├── check-install.sh    # Detect if ccboard installed
+        │   └── install-ccboard.sh  # cargo install ccboard
+        ├── SKILL.md            # Documentation principale
+        └── README.md
+```
+
+### Commands Proposés
+
+| Command | Action | Description |
+|---------|--------|-------------|
+| `/dashboard` | `ccboard` | Launch TUI dashboard |
+| `/mcp-status` | `ccboard --tab mcp` | Open MCP servers tab directly |
+| `/costs` | `ccboard --tab costs` | Open costs analysis tab |
+| `/sessions` | `ccboard --tab sessions` | Browse sessions history |
+| `/ccboard-web` | `ccboard web --port 3333` | Launch web UI on port 3333 |
+| `/ccboard-install` | `cargo install ccboard` | Install/update ccboard binary |
+
+### Exemple plugin.json
+
+```json
+{
+  "name": "ccboard",
+  "version": "0.1.0",
+  "description": "Comprehensive TUI/Web dashboard for Claude Code monitoring",
+  "author": "Florian Bruniaux",
+  "homepage": "https://github.com/florianbruniaux/ccboard",
+  "requires": {
+    "binary": "ccboard",
+    "rustVersion": "1.70+"
+  },
+  "keywords": ["dashboard", "monitoring", "tui", "mcp", "sessions"],
+  "categories": ["productivity", "development-tools"]
+}
+```
+
+### Exemple Command `/dashboard`
+
+```markdown
+---
+name: dashboard
+description: Launch ccboard TUI dashboard
+category: monitoring
+---
+
+Launch the interactive ccboard TUI to visualize:
+- Sessions, statistics, costs tracking
+- MCP servers management
+- Hooks, agents, configuration
+- Real-time file monitoring
+
+## Usage
+
+\`\`\`bash
+# Launch TUI
+/dashboard
+
+# Or with specific tab
+/mcp-status    # MCP servers tab
+/costs         # Costs analysis tab
+\`\`\`
+
+## Installation
+
+If ccboard is not installed:
+\`\`\`bash
+cargo install ccboard
+\`\`\`
+
+## Implementation
+
+\`\`\`bash
+#!/bin/bash
+
+# Check if ccboard is installed
+if ! command -v ccboard &> /dev/null; then
+    echo "❌ ccboard not installed"
+    echo ""
+    echo "Install with: cargo install ccboard"
+    echo "Or run: /ccboard-install"
+    exit 1
+fi
+
+# Launch ccboard TUI
+ccboard
+\`\`\`
+```
+
+### Tâches Phase 8 (1-2h estimées)
+
+1. **Structure plugin** (30min)
+   - Créer `.claude-plugin/marketplace.json`
+   - Créer `.claude-plugin/plugin.json`
+   - Structure folders (commands, scripts, skills)
+
+2. **Commands de base** (1h)
+   - `/dashboard` : Lance ccboard
+   - `/mcp-status` : Lance avec tab MCP
+   - `/costs` : Lance avec tab Costs
+   - `/ccboard-web` : Lance web UI
+   - `/ccboard-install` : Installation guidée
+
+3. **Scripts utilitaires** (30min)
+   - `check-install.sh` : Détection ccboard
+   - `install-ccboard.sh` : Installation cargo
+   - Error handling et messages clairs
+
+4. **Documentation** (30min)
+   - `SKILL.md` : Guide complet du plugin
+   - `README.md` : Quick start
+   - Screenshots et exemples
+
+### Validation
+
+```bash
+# Test plugin localement
+cp -r .claude-plugin ~/.claude/skills/ccboard/
+
+# Dans Claude Code
+/dashboard    # Devrait lancer ccboard
+/mcp-status   # Devrait lancer ccboard sur tab MCP
+
+# Publication marketplace (future)
+# Suivre process Anthropic marketplace submission
+```
+
+### Notes Techniques
+
+**Apprentissages de @fcamblor** (Slack) :
+- `.claude-plugin/marketplace.json` liste tous les plugins offerts
+- `plugin.json` décrit chaque plugin individuellement
+- Structure : agents, commands, hooks, skills avec assets/references/scripts
+- Spec skills : https://agentskills.io/home
+- Documentation marketplace limitée mais fonctionnelle via itérations
+
+**Alternatives considérées** :
+1. ❌ Plugin intégré natif : Trop lourd, perd indépendance
+2. ✅ Hybrid approach : Binaire standalone + plugin shortcuts
+3. ❌ Standalone only : Moins de découvrabilité
+
 ## Prochaines étapes
 
 ### Priorité P0 (File Watcher) - 2h estimées
