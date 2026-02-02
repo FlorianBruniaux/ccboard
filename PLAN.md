@@ -4,7 +4,7 @@
 
 **Version** : 0.1.0 (development)
 **Branch** : `main`
-**Status** : Phases 0-9.1 complètes, prêt pour Phase 10 (Open Source Release)
+**Status** : Phases 0-9 complètes, live updates activés, prêt pour Phase 10 (Open Source Release)
 
 ### ✅ Phases Complétées
 
@@ -16,6 +16,10 @@
 | **Phase 7** | MCP Tab Dédié | ✅ Complete | 2026-02-02 | #1 |
 | **Phase 8** | Marketplace Plugin | ✅ Complete | 2026-02-02 | #1 |
 | **Phase 9.1** | TUI Polish (Quick Wins) | ✅ Complete | 2026-02-02 | #2 |
+| **Phase 9.2** | Command Palette | ✅ Complete | 2026-02-02 | - |
+| **Phase 9.3** | Breadcrumbs + Icons | ✅ Complete | 2026-02-02 | - |
+| **Phase 9.4** | PgUp/PgDn + Components | ✅ Complete | 2026-02-02 | - |
+| **File Watcher** | Live Data Updates | ✅ Complete | 2026-02-02 | - |
 
 ### 🎯 Fonctionnalités Actuelles
 
@@ -29,11 +33,23 @@
 7. **History** : Recherche globale dans l'historique des sessions
 8. **MCP** : Gestion MCP servers avec status detection (NEW)
 
-**Système de Thème** :
+**Système de Thème & UX** :
 - Palette unifiée (Success/Error/Warning/Neutral/Focus/Important)
 - Scrollbar indicators sur toutes les listes longues
 - Empty states avec hints actionnables
 - Persistent search bars dans Sessions/History
+- Command palette (`:` prefix) avec fuzzy matching
+- Breadcrumbs navigation trail (📍 Dashboard > Tab > Context)
+- Tab icons (◆●⚙▣◉💰⏱◈) pour identification rapide
+- PgUp/PgDn navigation (jump 10 items) dans tous les tabs
+- Shared UI components (ListPane, DetailPane, SearchBar)
+
+**Live Updates (File Watcher)** :
+- Détection automatique des changements de fichiers (500ms debounce)
+- Stats updates → Dashboard refresh
+- Session changes → Sessions tab update
+- Config changes → Config tab reload
+- Web mode → SSE push to browser
 
 **Marketplace Plugin** :
 - 6 commands : `/dashboard`, `/mcp-status`, `/costs`, `/sessions`, `/ccboard-web`, `/ccboard-install`
