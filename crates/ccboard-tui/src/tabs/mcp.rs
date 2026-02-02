@@ -15,6 +15,8 @@
 //! - r: Refresh status detection
 //! - Esc: Close error popup
 
+use crate::empty_state;
+use crate::theme::ServerStatusColor;
 use ccboard_core::parsers::mcp_config::{McpConfig, McpServer};
 use crossterm::event::KeyCode;
 use ratatui::{
@@ -46,13 +48,14 @@ enum ServerStatus {
 }
 
 impl ServerStatus {
-    /// Get display icon and color for this status
+    /// Get display icon and color for this status (using unified theme)
     fn icon(&self) -> (&'static str, Color) {
-        match self {
-            ServerStatus::Running(_) => ("●", Color::Green),
-            ServerStatus::Stopped => ("○", Color::Red),
-            ServerStatus::Unknown => ("?", Color::DarkGray),
-        }
+        let color_status = match self {
+            ServerStatus::Running(_) => ServerStatusColor::Running,
+            ServerStatus::Stopped => ServerStatusColor::Stopped,
+            ServerStatus::Unknown => ServerStatusColor::Unknown,
+        };
+        (color_status.icon(), color_status.to_color())
     }
 
     /// Get status text for display
@@ -194,28 +197,7 @@ impl McpTab {
             let inner = block.inner(area);
             frame.render_widget(block, area);
 
-            let empty = Paragraph::new(vec![
-                Line::from(""),
-                Line::from(Span::styled(
-                    "No MCP config found",
-                    Style::default().fg(Color::DarkGray),
-                )),
-                Line::from(""),
-                Line::from(Span::styled(
-                    "Create config file:",
-                    Style::default().fg(Color::DarkGray),
-                )),
-                Line::from(Span::styled(
-                    "~/.claude/",
-                    Style::default().fg(Color::Yellow),
-                )),
-                Line::from(Span::styled(
-                    "claude_desktop_config.json",
-                    Style::default().fg(Color::Yellow),
-                )),
-            ])
-            .alignment(Alignment::Center);
-
+            let empty = empty_state::no_mcp_config();
             frame.render_widget(empty, inner);
             return;
         }
@@ -236,29 +218,7 @@ impl McpTab {
             let inner = block.inner(area);
             frame.render_widget(block, area);
 
-            let empty = Paragraph::new(vec![
-                Line::from(""),
-                Line::from(Span::styled(
-                    "No servers configured",
-                    Style::default().fg(Color::DarkGray),
-                )),
-                Line::from(""),
-                Line::from(Span::styled(
-                    "Add servers in:",
-                    Style::default().fg(Color::DarkGray),
-                )),
-                Line::from(Span::styled(
-                    "~/.claude/claude_desktop_config.json",
-                    Style::default().fg(Color::Yellow),
-                )),
-                Line::from(""),
-                Line::from(Span::styled(
-                    "[e] Edit config",
-                    Style::default().fg(Color::Cyan),
-                )),
-            ])
-            .alignment(Alignment::Center);
-
+            let empty = empty_state::no_mcp_servers();
             frame.render_widget(empty, inner);
             return;
         }

@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Tabs},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Tabs},
 };
 use std::path::Path;
 
@@ -479,6 +479,23 @@ impl AgentsTab {
         );
 
         frame.render_stateful_widget(widget, area, &mut self.list_states[self.sub_tab]);
+
+        // Scrollbar for long lists
+        if list_len > (area.height as usize - 2) {
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None);
+            let mut scrollbar_state = ScrollbarState::new(list_len)
+                .position(self.list_states[self.sub_tab].selected().unwrap_or(0));
+            frame.render_stateful_widget(
+                scrollbar,
+                area.inner(ratatui::layout::Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
+                &mut scrollbar_state,
+            );
+        }
     }
 
     fn render_detail(&self, frame: &mut Frame, area: Rect) {
