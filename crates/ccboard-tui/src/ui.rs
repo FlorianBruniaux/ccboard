@@ -86,7 +86,7 @@ impl Ui {
     }
 
     /// Render the full UI
-    pub fn render(&mut self, frame: &mut Frame, app: &App) {
+    pub fn render(&mut self, frame: &mut Frame, app: &mut App) {
         let size = frame.area();
 
         // Main layout
@@ -111,6 +111,9 @@ impl Ui {
 
         // Render status bar
         self.render_status_bar(frame, chunks[2], app);
+
+        // Render command palette (overlay on top of everything)
+        app.command_palette.render(frame, size);
     }
 
     fn render_header(&self, frame: &mut Frame, area: Rect, active: Tab) {
@@ -137,7 +140,7 @@ impl Ui {
         ]));
         frame.render_widget(logo, header_chunks[0]);
 
-        // Tabs
+        // Tabs with icons
         let titles: Vec<Line> = Tab::all()
             .iter()
             .map(|t| {
@@ -149,7 +152,7 @@ impl Ui {
                     Style::default().fg(Color::DarkGray)
                 };
                 Line::from(Span::styled(
-                    format!(" {} {} ", t.shortcut(), t.name()),
+                    format!(" {} {} {} ", t.icon(), t.shortcut(), t.name()),
                     style,
                 ))
             })

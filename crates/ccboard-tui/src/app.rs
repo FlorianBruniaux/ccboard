@@ -1,5 +1,6 @@
 //! TUI Application state and event loop
 
+use crate::components::CommandPalette;
 use ccboard_core::{DataEvent, DataStore};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -84,6 +85,19 @@ impl Tab {
             Tab::Mcp => '8',
         }
     }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Tab::Dashboard => "◆",
+            Tab::Sessions => "●",
+            Tab::Config => "⚙",
+            Tab::Hooks => "▣",
+            Tab::Agents => "◉",
+            Tab::Costs => "💰",
+            Tab::History => "⏱",
+            Tab::Mcp => "◈",
+        }
+    }
 }
 
 /// TUI Application state
@@ -105,6 +119,9 @@ pub struct App {
 
     /// Error/warning message to display
     pub status_message: Option<String>,
+
+    /// Command palette (k9s-style `:` prefix)
+    pub command_palette: CommandPalette,
 }
 
 impl App {
@@ -118,6 +135,7 @@ impl App {
             should_quit: false,
             needs_refresh: true,
             status_message: None,
+            command_palette: CommandPalette::new(),
         }
     }
 
@@ -125,8 +143,36 @@ impl App {
     /// Returns true if the key was handled as a global key
     pub fn handle_key(&mut self, key: crossterm::event::KeyCode) -> bool {
         use crossterm::event::KeyCode;
+        use crate::components::command_palette::CommandAction;
 
+        // If command palette is visible, handle keys there first
+        if self.command_palette.is_visible() {
+            if let Some(action) = self.command_palette.handle_key(key) {
+                // Execute the command action
+                match action {
+                    CommandAction::Quit => self.should_quit = true,
+                    CommandAction::RefreshData => self.needs_refresh = true,
+                    CommandAction::GoToTab(tab) => self.active_tab = tab,
+                    CommandAction::Search(query) => {
+                        // TODO: Implement search functionality when History/Sessions support it
+                        self.status_message = Some(format!("Search: {}", query));
+                    }
+                    CommandAction::ShowHelp => {
+                        // Show palette with empty query to list all commands
+                        self.command_palette.show();
+                    }
+                }
+            }
+            return true;
+        }
+
+        // Global keybindings (when palette is not active)
         match key {
+            KeyCode::Char(':') => {
+                // Show command palette
+                self.command_palette.show();
+                true
+            }
             KeyCode::Char('q') => {
                 self.should_quit = true;
                 true

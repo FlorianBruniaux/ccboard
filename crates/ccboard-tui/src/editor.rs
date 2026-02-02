@@ -140,6 +140,7 @@ mod tests {
     fn test_get_editor_command_editor() {
         unsafe {
             env::remove_var("VISUAL");
+            env::remove_var("EDITOR");
             env::set_var("EDITOR", "emacs");
         }
         assert_eq!(get_editor_command(), "emacs");

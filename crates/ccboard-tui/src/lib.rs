@@ -1,6 +1,7 @@
 //! ccboard-tui - TUI frontend for ccboard using Ratatui
 
 pub mod app;
+pub mod components;
 pub mod editor;
 pub mod empty_state;
 pub mod tabs;
