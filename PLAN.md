@@ -105,48 +105,61 @@
 
 ## 🚀 Prochaines Étapes
 
-### Phase 10 : Open Source Release (Priorité 🔴 P0 - 1 jour)
+### Phase 10 : Open Source Release (Priorité 🔴 P0 - En cours)
 
 **Objectif** : Publier ccboard sur GitHub + crates.io
 
-#### Tâches Critiques (6-8h)
+#### ✅ Tâches Complétées
 
-1. **README.md complet** (2h)
+1. **README.md** ✅
    - Introduction + motivation
-   - Screenshots (8 tabs + command palette + breadcrumbs)
-   - Installation (cargo install, depuis source)
-   - Quick start guide
    - Feature list avec emojis
-   - Keybindings table
-   - Architecture diagram
+   - Installation (3 méthodes)
+   - Quick start (4 modes)
+   - Keybindings table complète
+   - Architecture overview
+   - Development guide
 
-2. **Documentation additionnelle** (1h)
-   - CONTRIBUTING.md (how to contribute)
+2. **Documentation de base** ✅
+   - CHANGELOG.md (Phases 0-9.5)
+   - PLAN.md (complet)
+   - CLAUDE.md (guidance)
+   - TEST_GUIDE_PHASE6.md
+
+#### 🔲 Reste à Faire (4-6h)
+
+1. **Screenshots & Assets** (2h) 🔴 CRITIQUE
+   - Capturer les 8 tabs en action
+   - Command palette demo
+   - Breadcrumbs navigation
+   - GIF démo 30s (installation → navigation)
+   - Ajouter au README.md
+
+2. **Documentation légale** (30min)
+   - LICENSE file (MIT OR Apache-2.0)
+   - CONTRIBUTING.md
    - CODE_OF_CONDUCT.md
-   - CHANGELOG.md (toutes les phases)
-   - LICENSE (MIT OR Apache-2.0)
 
 3. **GitHub setup** (1h)
-   - Issues templates
-   - Pull request template
-   - Labels (bug, enhancement, good first issue)
-   - GitHub Actions CI/CD
+   - Issues templates (.github/ISSUE_TEMPLATE/)
+   - Pull request template (.github/PULL_REQUEST_TEMPLATE.md)
+   - Labels (bug, enhancement, documentation, good first issue)
 
 4. **CI/CD Pipeline** (2h)
-   - GitHub Actions workflow
+   - GitHub Actions workflow (.github/workflows/ci.yml)
    - Matrix build (Linux, macOS, Windows)
-   - Cargo test + clippy + fmt
-   - Release binaries (cross-compile)
+   - Tests + clippy + fmt checks
+   - Release workflow avec binaries
 
-5. **Publish crates.io** (1h)
+5. **Publish crates.io** (30min)
    - Metadata Cargo.toml (keywords, categories, description)
    - Documentation links
    - `cargo publish --dry-run`
    - `cargo publish`
 
-6. **Annonce** (1h)
-   - Post r/rust
-   - Tweet with demo GIF
+6. **Annonce** (30min)
+   - Post r/rust avec screenshots
+   - Tweet avec GIF démo
    - Discord Rust community
    - Hacker News Show HN
 
@@ -154,26 +167,35 @@
 
 ```bash
 # Documentation
-✓ README.md with screenshots
-✓ CONTRIBUTING.md exists
-✓ LICENSE file (MIT OR Apache-2.0)
-✓ CHANGELOG.md complete
+✅ README.md created (434 lignes)
+🔲 README.md screenshots (8 tabs + palette + breadcrumbs)
+🔲 CONTRIBUTING.md
+🔲 LICENSE file (MIT OR Apache-2.0)
+✅ CHANGELOG.md complete (Phase 0-9.5)
 
 # Quality
-✓ cargo test --all (88 tests pass)
-✓ cargo clippy --all-targets (0 warnings)
-✓ cargo fmt --all --check (formatted)
-✓ cargo doc --no-deps (doc builds)
+✅ cargo test --all (88 tests pass)
+✅ cargo clippy --all-targets (0 warnings)
+✅ cargo fmt --all --check (formatted)
+🔲 cargo doc --no-deps (doc builds - à vérifier)
 
 # Cross-platform
-✓ Linux build success
-✓ macOS build success
-✓ Windows build success (cargo build --target x86_64-pc-windows-msvc)
+✅ macOS build success (développement)
+🔲 Linux build success (CI à configurer)
+🔲 Windows build success (CI à configurer)
+
+# GitHub Setup
+🔲 Issues templates (.github/ISSUE_TEMPLATE/)
+🔲 PR template (.github/PULL_REQUEST_TEMPLATE.md)
+🔲 GitHub Actions CI/CD (.github/workflows/ci.yml)
+🔲 Labels (bug, enhancement, good first issue)
 
 # Publication
-✓ cargo publish --dry-run (no errors)
-✓ GitHub release with binaries
-✓ r/rust post published
+🔲 cargo publish --dry-run (no errors)
+🔲 GitHub release with binaries (v0.2.0)
+🔲 crates.io publish
+🔲 r/rust post published
+🔲 HN Show HN post
 ```
 
 ---
