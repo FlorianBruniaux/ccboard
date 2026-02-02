@@ -49,8 +49,14 @@ impl Ui {
     }
 
     /// Initialize tabs that need data scan
-    pub fn init(&mut self, claude_home: &std::path::Path, project_path: Option<&std::path::Path>) {
+    pub fn init(
+        &mut self,
+        claude_home: &std::path::Path,
+        project_path: Option<&std::path::Path>,
+        invocation_stats: &ccboard_core::models::InvocationStats,
+    ) {
         self.agents.scan_directories(claude_home, project_path);
+        self.agents.update_invocation_counts(invocation_stats);
         self.config.init(claude_home, project_path);
     }
 

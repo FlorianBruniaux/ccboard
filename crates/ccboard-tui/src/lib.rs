@@ -37,11 +37,12 @@ pub async fn run(
     let mut terminal = Terminal::new(backend)?;
 
     // Create app state
-    let mut app = App::new(store);
+    let mut app = App::new(store.clone());
 
     // Create UI and initialize
     let mut ui = ui::Ui::new();
-    ui.init(&claude_home, project_path.as_deref());
+    let invocation_stats = store.invocation_stats();
+    ui.init(&claude_home, project_path.as_deref(), &invocation_stats);
 
     // Main loop
     let result = run_loop(&mut terminal, &mut app, &mut ui).await;

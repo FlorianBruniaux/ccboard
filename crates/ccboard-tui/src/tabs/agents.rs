@@ -114,10 +114,37 @@ impl AgentsTab {
             self.scan_directory(base_dir, "skills", AgentType::Skill);
         }
 
-        // Sort all lists
+        // Sort all lists by name initially (will be re-sorted by usage later if stats available)
         self.agents.sort_by(|a, b| a.name.cmp(&b.name));
         self.commands.sort_by(|a, b| a.name.cmp(&b.name));
         self.skills.sort_by(|a, b| a.name.cmp(&b.name));
+    }
+
+    /// Update invocation counts from stats and sort by usage
+    pub fn update_invocation_counts(&mut self, stats: &ccboard_core::models::InvocationStats) {
+        // Update agent counts
+        for agent in &mut self.agents {
+            agent.invocation_count = stats.agents.get(&agent.name).copied().unwrap_or(0);
+        }
+
+        // Update command counts (need to add / prefix for matching)
+        for command in &mut self.commands {
+            let key = format!("/{}", command.name);
+            command.invocation_count = stats.commands.get(&key).copied().unwrap_or(0);
+        }
+
+        // Update skill counts
+        for skill in &mut self.skills {
+            skill.invocation_count = stats.skills.get(&skill.name).copied().unwrap_or(0);
+        }
+
+        // Sort by usage (descending), then by name (ascending) as tie-breaker
+        self.agents
+            .sort_by(|a, b| b.invocation_count.cmp(&a.invocation_count).then(a.name.cmp(&b.name)));
+        self.commands
+            .sort_by(|a, b| b.invocation_count.cmp(&a.invocation_count).then(a.name.cmp(&b.name)));
+        self.skills
+            .sort_by(|a, b| b.invocation_count.cmp(&a.invocation_count).then(a.name.cmp(&b.name)));
     }
 
     fn scan_directory(&mut self, base: &Path, subdir: &str, entry_type: AgentType) {
@@ -471,14 +498,26 @@ impl AgentsTab {
                     })
                     .unwrap_or_default();
 
-                ListItem::new(Line::from(vec![
+                // Build spans with invocation count if > 0
+                let mut spans = vec![
                     Span::styled(
                         format!(" {} ", entry_type.icon()),
                         Style::default().fg(entry_type.color()),
                     ),
                     Span::styled(entry.name.clone(), style),
-                    Span::styled(desc_preview, Style::default().fg(Color::DarkGray)),
-                ]))
+                ];
+
+                // Add invocation count if present
+                if entry.invocation_count > 0 {
+                    spans.push(Span::styled(
+                        format!(" (× {})", entry.invocation_count),
+                        Style::default().fg(Color::Yellow),
+                    ));
+                }
+
+                spans.push(Span::styled(desc_preview, Style::default().fg(Color::DarkGray)));
+
+                ListItem::new(Line::from(spans))
             })
             .collect();
 
