@@ -63,6 +63,8 @@ pub struct AgentsTab {
     skills: Vec<AgentEntry>,
     /// Show detail panel
     show_detail: bool,
+    /// Error message to display (if any)
+    error_message: Option<String>,
 }
 
 impl Default for AgentsTab {
@@ -85,6 +87,7 @@ impl AgentsTab {
             commands: Vec::new(),
             skills: Vec::new(),
             show_detail: false,
+            error_message: None,
         }
     }
 
@@ -244,11 +247,40 @@ impl AgentsTab {
             KeyCode::Enter => {
                 self.show_detail = !self.show_detail;
             }
+            KeyCode::Char('e') => {
+                // Open selected file in editor
+                if let Some(entry) = self.get_selected_entry() {
+                    let path = std::path::Path::new(&entry.file_path);
+                    if let Err(e) = crate::editor::open_in_editor(path) {
+                        self.error_message = Some(format!("Failed to open editor: {}", e));
+                    }
+                }
+            }
+            KeyCode::Char('o') => {
+                // Reveal file in file manager
+                if let Some(entry) = self.get_selected_entry() {
+                    let path = std::path::Path::new(&entry.file_path);
+                    if let Err(e) = crate::editor::reveal_in_file_manager(path) {
+                        self.error_message = Some(format!("Failed to open file manager: {}", e));
+                    }
+                }
+            }
             KeyCode::Esc => {
-                self.show_detail = false;
+                if self.error_message.is_some() {
+                    self.error_message = None;
+                } else {
+                    self.show_detail = false;
+                }
             }
             _ => {}
         }
+    }
+
+    /// Get currently selected entry
+    fn get_selected_entry(&self) -> Option<&AgentEntry> {
+        let list = self.current_list();
+        let state = &self.list_states[self.sub_tab];
+        state.selected().and_then(|idx| list.get(idx))
     }
 
     fn move_selection(&mut self, delta: i32) {
@@ -301,6 +333,11 @@ impl AgentsTab {
         if self.show_detail && content_chunks.len() > 1 {
             self.render_detail(frame, content_chunks[1]);
         }
+
+        // Render error popup if present
+        if self.error_message.is_some() {
+            self.render_error_popup(frame, area);
+        }
     }
 
     fn render_sub_tabs(&self, frame: &mut Frame, area: Rect) {
@@ -350,9 +387,9 @@ impl AgentsTab {
         let list_len = self.current_list().len();
 
         let title_text = if entry_type == AgentType::Command {
-            format!(" {} - Press / in Claude Code to use ", entry_type.label())
+            format!(" {} - Press / in Claude Code to use • e:edit o:reveal ", entry_type.label())
         } else {
-            format!(" {} ", entry_type.label())
+            format!(" {} • e:edit o:reveal ", entry_type.label())
         };
 
         let block = Block::default()
@@ -529,5 +566,56 @@ impl AgentsTab {
 
         let detail = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(detail, inner);
+    }
+
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
+        use ratatui::widgets::Clear;
+
+        // Center popup (40% width, 30% height)
+        let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
+        let popup_height = (area.height as f32 * 0.3).max(8.0) as u16;
+        let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+        let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+        let popup_area = Rect {
+            x: area.x + popup_x,
+            y: area.y + popup_y,
+            width: popup_width,
+            height: popup_height,
+        };
+
+        // Clear background
+        frame.render_widget(Clear, popup_area);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Red))
+            .title(Span::styled(
+                " Error ",
+                Style::default().fg(Color::Red).bold(),
+            ));
+
+        let inner = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+
+        let error_text = self
+            .error_message
+            .as_deref()
+            .unwrap_or("Unknown error");
+
+        let lines = vec![
+            Line::from(Span::styled(
+                error_text,
+                Style::default().fg(Color::White),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Press Esc to close",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ];
+
+        let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(paragraph, inner);
     }
 }

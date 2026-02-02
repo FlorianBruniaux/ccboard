@@ -23,6 +23,8 @@ pub struct HistoryTab {
     show_stats: bool,
     /// Show detail popup
     show_detail: bool,
+    /// Error message to display
+    error_message: Option<String>,
 }
 
 impl Default for HistoryTab {
@@ -43,6 +45,7 @@ impl HistoryTab {
             filtered_sessions: Vec::new(),
             show_stats: true,
             show_detail: false,
+            error_message: None,
         }
     }
 
@@ -82,8 +85,28 @@ impl HistoryTab {
                 KeyCode::Enter => {
                     self.show_detail = !self.show_detail;
                 }
+                KeyCode::Char('e') => {
+                    // Open selected session file in editor
+                    if let Some(session) = self.get_selected_session() {
+                        if let Err(e) = crate::editor::open_in_editor(&session.file_path) {
+                            self.error_message = Some(format!("Failed to open editor: {}", e));
+                        }
+                    }
+                }
+                KeyCode::Char('o') => {
+                    // Reveal session file in file manager
+                    if let Some(session) = self.get_selected_session() {
+                        if let Err(e) = crate::editor::reveal_in_file_manager(&session.file_path) {
+                            self.error_message = Some(format!("Failed to open file manager: {}", e));
+                        }
+                    }
+                }
                 KeyCode::Esc => {
-                    self.show_detail = false;
+                    if self.error_message.is_some() {
+                        self.error_message = None;
+                    } else {
+                        self.show_detail = false;
+                    }
                 }
                 KeyCode::Tab => {
                     self.show_stats = !self.show_stats;
@@ -130,6 +153,11 @@ impl HistoryTab {
         if !self.filtered_sessions.is_empty() {
             self.results_state.select(Some(0));
         }
+    }
+
+    fn get_selected_session(&self) -> Option<&SessionMetadata> {
+        let idx = self.results_state.selected()?;
+        self.filtered_sessions.get(idx)
     }
 
     /// Initialize with session data
@@ -197,6 +225,11 @@ impl HistoryTab {
         // Stats panel
         if self.show_stats && content_chunks.len() > chunk_idx {
             self.render_stats_panel(frame, content_chunks[chunk_idx], stats);
+        }
+
+        // Render error popup if present
+        if self.error_message.is_some() {
+            self.render_error_popup(frame, area);
         }
     }
 
@@ -582,6 +615,13 @@ impl HistoryTab {
                 Span::styled(&session.id, Style::default().fg(Color::White)),
             ]),
             Line::from(vec![
+                Span::styled("File: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    session.file_path.display().to_string(),
+                    Style::default().fg(Color::Yellow),
+                ),
+            ]),
+            Line::from(vec![
                 Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(&session.project_path, Style::default().fg(Color::Yellow)),
             ]),
@@ -660,5 +700,51 @@ impl HistoryTab {
 
         let detail = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(detail, inner);
+    }
+
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
+        // Center popup (40% width, 30% height)
+        let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
+        let popup_height = (area.height as f32 * 0.3).max(8.0) as u16;
+        let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+        let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+        let popup_area = Rect {
+            x: area.x + popup_x,
+            y: area.y + popup_y,
+            width: popup_width,
+            height: popup_height,
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Red))
+            .title(Span::styled(
+                " Error ",
+                Style::default().fg(Color::Red).bold(),
+            ));
+
+        let inner = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+
+        let error_text = self
+            .error_message
+            .as_deref()
+            .unwrap_or("Unknown error");
+
+        let lines = vec![
+            Line::from(Span::styled(
+                error_text,
+                Style::default().fg(Color::White),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Press Esc to close",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ];
+
+        let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(paragraph, inner);
     }
 }
