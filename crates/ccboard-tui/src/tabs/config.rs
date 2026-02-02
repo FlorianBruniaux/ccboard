@@ -434,22 +434,36 @@ impl ConfigTab {
                 } else {
                     for (name, server) in &mcp.servers {
                         let cmd_display = format!("{} {}", server.command, server.args.join(" "));
-                        // Truncate if too long
-                        let cmd_short: String = if cmd_display.len() > 40 {
-                            cmd_display.chars().take(37).collect::<String>() + "..."
+                        // Truncate if too long (increased from 40 to 60)
+                        let cmd_short: String = if cmd_display.len() > 60 {
+                            cmd_display.chars().take(57).collect::<String>() + "..."
                         } else {
                             cmd_display
                         };
 
+                        // Line 1: Name with green bullet (configured)
                         items.push(ListItem::new(Line::from(vec![
                             Span::styled("  ● ", Style::default().fg(Color::Green)),
                             Span::styled(
-                                format!("{}: ", name),
+                                format!("{} (configured)", name),
                                 Style::default().fg(Color::Cyan).bold(),
                             ),
                         ])));
+
+                        // Line 2: Command
                         items.push(ListItem::new(Line::from(Span::styled(
                             format!("    {}", cmd_short),
+                            Style::default().fg(Color::White),
+                        ))));
+
+                        // Line 3: Env vars count (if present)
+                        let env_info = if server.env.is_empty() {
+                            "Env: (none)".to_string()
+                        } else {
+                            format!("Env: {} vars", server.env.len())
+                        };
+                        items.push(ListItem::new(Line::from(Span::styled(
+                            format!("    {}", env_info),
                             Style::default().fg(Color::DarkGray),
                         ))));
                     }
