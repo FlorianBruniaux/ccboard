@@ -73,6 +73,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Compatible with Excel, Google Sheets, LibreOffice
   - Tested with 3638 sessions → 104 billing blocks exported
 
+- **History Tab Export CSV/JSON** (Task C.2)
+  - Export filtered session results to CSV or JSON format
+  - Key binding: `x` in History tab → Format selection dialog
+  - CSV export: `export_sessions_to_csv(&sessions, &path)`
+    - Columns: Date, Time, Project, Session ID, Messages, Tokens, Models, Duration (min)
+    - Duration calculated from first/last timestamps
+    - Models joined with `;` separator
+  - JSON export: `export_sessions_to_json(&sessions, &path)`
+    - Pretty-printed JSON array of SessionMetadata
+    - Full metadata serialization (id, timestamps, tokens, models, etc.)
+  - Interactive dialog: `1` for CSV, `2` for JSON, `ESC` to cancel
+  - Success/error messages with color coding (green/red)
+  - Export location: `~/.claude/exports/sessions_export_YYYYMMDD_HHMMSS.{csv,json}`
+  - Timestamp in filename prevents overwrite
+  - Module: `ccboard-core/src/export.rs` (+135 LOC, 2 functions + 5 tests)
+  - TUI integration: `tabs/history.rs` (+95 LOC, export dialog + UI)
+  - Help modal updated with `x` keybinding documentation
+  - Tested: 5 unit tests (CSV empty/data, JSON empty/data, directory creation)
+  - Compatible with Excel, Google Sheets, jq, data analysis tools
+
 ### Changed
 - **Startup Flow**: TUI now starts immediately with loading screen instead of blocking
 - **Main Binary**: Removed blocking `initial_load()` before TUI start
@@ -92,8 +112,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Spinner: 3 tests (cycling, styles, custom color)
   - Help Modal: 2 tests (toggle, hide)
   - Search Highlighting: 5 tests (empty query, single/multiple matches, case-insensitive, no match)
-- Phase C: Export tests (5 tests total)
-  - CSV Export: 5 tests (empty manager, with data, parent dir creation, cost formatting, multi-date sorting)
+- Phase C: Export tests (10 tests total)
+  - Billing Blocks CSV: 5 tests (empty manager, with data, parent dir creation, cost formatting, multi-date sorting)
+  - Sessions Export: 5 tests (CSV empty/data, JSON empty/data, directory creation)
 
 ### Dependencies
 - Added `criterion = "0.5"` for benchmarking

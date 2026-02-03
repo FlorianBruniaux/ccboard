@@ -629,15 +629,15 @@ pub enum Event {
 
 ---
 
-### 🚧 PHASE C: Additional Features - EN COURS (2/8h)
+### 🚧 PHASE C: Additional Features - EN COURS (4/8h)
 
 **Tasks créées**:
 - ⏳ C.1: MCP Tab enhancements (2h)
-- ⏳ C.2: History Tab export CSV/JSON (2h)
+- ✅ C.2: History Tab export CSV/JSON (2h) **COMPLÉTÉ 2026-02-03**
 - ✅ C.3: Costs Tab billing blocks CSV export (2h) **COMPLÉTÉ 2026-02-03**
 - ⏳ C.4: Sessions Tab live refresh (2h)
 
-**Ordre suggéré**: C.3 ✅ → C.2 → C.1 → C.4
+**Ordre suggéré**: C.3 ✅ → C.2 ✅ → C.1 → C.4
 
 #### Task C.3: Billing Blocks CSV Export ✅ (COMPLÈTE)
 
@@ -718,6 +718,100 @@ Date,Block (UTC),Tokens,Sessions,Cost
 
 ---
 
+#### Task C.2: History Tab Export CSV/JSON ✅ (COMPLÈTE)
+
+**Durée réelle**: 2-3h (conforme à l'estimation)
+
+**Objectif**: Ajouter export CSV/JSON des sessions filtrées dans l'onglet History du TUI.
+
+**Solution Implémentée**:
+```rust
+// crates/ccboard-core/src/export.rs (+135 LOC)
+pub fn export_sessions_to_csv(
+    sessions: &[SessionMetadata],
+    path: &Path,
+) -> Result<()> {
+    // CSV format: Date, Time, Project, Session ID, Messages, Tokens, Models, Duration (min)
+    // BufWriter for performance
+    // Auto-creates parent directories
+}
+
+pub fn export_sessions_to_json(
+    sessions: &[SessionMetadata],
+    path: &Path,
+) -> Result<()> {
+    // Pretty-printed JSON array
+    // Full SessionMetadata serialization
+}
+```
+
+**Fonctionnalités**:
+- Export CSV avec colonnes : Date, Time, Project, Session ID, Messages, Tokens, Models, Duration
+- Export JSON avec métadata complète (pretty-printed)
+- Key binding 'x' dans History tab → Dialog de sélection format
+- Dialog interactif : '1' pour CSV, '2' pour JSON, 'Esc' pour annuler
+- Messages succès/erreur avec auto-clear
+- Export vers `~/.claude/exports/sessions_export_YYYYMMDD_HHMMSS.{csv,json}`
+- Timestamp dans filename pour éviter écrasement
+
+**Changements**:
+```
+crates/ccboard-core/src/export.rs                (+135 LOC, 2 functions + 5 tests)
+crates/ccboard-core/src/lib.rs                   (+2 LOC, re-exports)
+crates/ccboard-tui/src/tabs/history.rs           (+95 LOC, export logic + UI)
+crates/ccboard-tui/src/components/help_modal.rs  (+4 LOC, help text)
+crates/ccboard-tui/Cargo.toml                    (+1 LOC, chrono dep)
+```
+
+**Résultats**:
+- ✅ 5 tests unitaires (CSV empty/data, JSON empty/data, dirs)
+- ✅ Tous les 152 tests passent
+- ✅ Zero clippy warnings
+- ✅ Dialog export UI fonctionnel avec format selection
+- ✅ Export messages avec code couleur (vert=succès, rouge=erreur)
+- ✅ Help modal mis à jour avec keybinding 'x'
+
+**Validation**:
+```bash
+# Tests unitaires
+cargo test -p ccboard-core export::tests::test_export_sessions
+# ✓ 5 tests pass
+
+# Build & lint
+cargo fmt --all && cargo clippy --all-targets
+# ✓ 0 errors, 0 warnings
+
+# All tests
+cargo test --all
+# ✓ 152 tests pass
+```
+
+**Format CSV** (exemple):
+```csv
+Date,Time,Project,Session ID,Messages,Tokens,Models,Duration (min)
+"2026-02-03","14:30:00","/Users/test/project","abc123",25,15000,"sonnet;opus",45
+```
+
+**Format JSON** (exemple):
+```json
+[
+  {
+    "id": "abc123",
+    "project_path": "/Users/test/project",
+    "first_timestamp": "2026-02-03T14:30:00Z",
+    "message_count": 25,
+    "total_tokens": 15000,
+    "models_used": ["sonnet", "opus"]
+  }
+]
+```
+
+**Commit**: `a6707c3` - feat(history): Add CSV/JSON export for filtered sessions
+
+**Status**: ✅ **COMPLÉTÉ** (2026-02-03)
+
+---
+
 ### ⏸️ PHASE D: Arc Migration - PLANIFIÉ (2h)
 
 **Description**: Replace clones avec Arc<SessionMetadata> (400x less RAM)
@@ -726,6 +820,10 @@ Date,Block (UTC),Tokens,Sessions,Cost
 
 ## 🎯 Prochaine Action
 
-**Continuer Phase C** - Prochaine tâche: **C.2: History Tab export CSV/JSON**
+**Continuer Phase C** - Prochaine tâche: **C.1: MCP Tab enhancements** ou **C.4: Sessions Tab live refresh**
 
-Alternative: **C.1: MCP Tab enhancements** ou **C.4: Sessions Tab live refresh**
+**Progression Phase C**: 4/8h complétées (50%)
+- ✅ C.3: Billing blocks CSV export (2h) - COMPLÉTÉ
+- ✅ C.2: History Tab export CSV/JSON (2h) - COMPLÉTÉ
+- ⏳ C.1: MCP Tab enhancements (2h) - TODO
+- ⏳ C.4: Sessions Tab live refresh (2h) - TODO
