@@ -84,7 +84,8 @@ pub struct DataStore {
     billing_blocks: RwLock<BillingBlockManager>,
 
     /// Session metadata (high contention with many entries)
-    sessions: DashMap<String, SessionMetadata>,
+    /// Arc<SessionMetadata> for cheap cloning (8 bytes vs ~400 bytes)
+    sessions: DashMap<String, Arc<SessionMetadata>>,
 
     /// Session content cache (LRU for on-demand loading)
     #[allow(dead_code)]
@@ -304,9 +305,9 @@ impl DataStore {
             sessions
         };
 
-        // Insert into DashMap
+        // Insert into DashMap (wrap in Arc for cheap cloning)
         for session in sessions_to_add {
-            self.sessions.insert(session.id.clone(), session);
+            self.sessions.insert(session.id.clone(), Arc::new(session));
         }
 
         debug!(count = self.sessions.len(), "Sessions indexed");
@@ -356,13 +357,14 @@ impl DataStore {
 
     /// Calculate context window saturation from current sessions
     pub fn context_window_stats(&self) -> crate::models::ContextWindowStats {
-        // Clone metadata to avoid lifetime issues with DashMap iterators
+        // Clone Arc (cheap) to avoid lifetime issues with DashMap iterators
         let sessions: Vec<_> = self
             .sessions
             .iter()
-            .map(|entry| entry.value().clone())
+            .map(|entry| Arc::clone(entry.value()))
             .collect();
-        let refs: Vec<_> = sessions.iter().collect();
+        // Dereference Arc to get &SessionMetadata
+        let refs: Vec<_> = sessions.iter().map(|s| s.as_ref()).collect();
         crate::models::StatsCache::calculate_context_saturation(&refs, 30)
     }
 
@@ -392,8 +394,9 @@ impl DataStore {
     }
 
     /// Get session by ID
-    pub fn get_session(&self, id: &str) -> Option<SessionMetadata> {
-        self.sessions.get(id).map(|r| r.value().clone())
+    /// Returns Arc<SessionMetadata> for cheap cloning
+    pub fn get_session(&self, id: &str) -> Option<Arc<SessionMetadata>> {
+        self.sessions.get(id).map(|r| Arc::clone(r.value()))
     }
 
     /// Get all session IDs
@@ -402,15 +405,16 @@ impl DataStore {
     }
 
     /// Get sessions grouped by project
-    pub fn sessions_by_project(&self) -> std::collections::HashMap<String, Vec<SessionMetadata>> {
+    /// Returns Arc<SessionMetadata> for cheap cloning
+    pub fn sessions_by_project(&self) -> std::collections::HashMap<String, Vec<Arc<SessionMetadata>>> {
         let mut by_project = std::collections::HashMap::new();
 
         for entry in self.sessions.iter() {
-            let session = entry.value();
+            let session = Arc::clone(entry.value());
             by_project
                 .entry(session.project_path.clone())
                 .or_insert_with(Vec::new)
-                .push(session.clone());
+                .push(session);
         }
 
         // Sort sessions within each project by timestamp (newest first)
@@ -422,8 +426,9 @@ impl DataStore {
     }
 
     /// Get recent sessions (sorted by last timestamp, newest first)
-    pub fn recent_sessions(&self, limit: usize) -> Vec<SessionMetadata> {
-        let mut sessions: Vec<_> = self.sessions.iter().map(|r| r.value().clone()).collect();
+    /// Returns Arc<SessionMetadata> for cheap cloning
+    pub fn recent_sessions(&self, limit: usize) -> Vec<Arc<SessionMetadata>> {
+        let mut sessions: Vec<_> = self.sessions.iter().map(|r| Arc::clone(r.value())).collect();
         sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
         sessions.truncate(limit);
         sessions
@@ -478,7 +483,7 @@ impl DataStore {
                 let id = meta.id.clone();
                 let is_new = !self.sessions.contains_key(&id);
 
-                self.sessions.insert(id.clone(), meta);
+                self.sessions.insert(id.clone(), Arc::new(meta));
 
                 if is_new {
                     self.event_bus.publish(DataEvent::SessionCreated(id));

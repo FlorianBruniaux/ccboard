@@ -2,6 +2,7 @@
 
 use crate::components::highlight_matches;
 use ccboard_core::models::SessionMetadata;
+use std::sync::Arc;
 use std::time::Instant;
 use ratatui::{
     Frame,
@@ -73,7 +74,7 @@ impl SessionsTab {
     pub fn handle_key(
         &mut self,
         key: crossterm::event::KeyCode,
-        _sessions_by_project: &HashMap<String, Vec<SessionMetadata>>,
+        _sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
     ) {
         use crossterm::event::KeyCode;
 
@@ -200,8 +201,8 @@ impl SessionsTab {
 
     fn get_selected_session<'a>(
         &self,
-        sessions_by_project: &'a HashMap<String, Vec<SessionMetadata>>,
-    ) -> Option<&'a SessionMetadata> {
+        sessions_by_project: &'a HashMap<String, Vec<Arc<SessionMetadata>>>,
+    ) -> Option<&'a Arc<SessionMetadata>> {
         let project_idx = self.project_state.selected()?;
         let project = self.projects.get(project_idx)?;
         let sessions = sessions_by_project.get(project)?;
@@ -214,7 +215,7 @@ impl SessionsTab {
         &mut self,
         frame: &mut Frame,
         area: Rect,
-        sessions_by_project: &HashMap<String, Vec<SessionMetadata>>,
+        sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
     ) {
         // Update project cache
         self.projects = sessions_by_project.keys().cloned().collect();
@@ -297,8 +298,8 @@ impl SessionsTab {
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
 
-        // Filter sessions based on search
-        let sessions: Vec<SessionMetadata> = if self.search_filter.is_empty() {
+        // Filter sessions based on search (Arc clone is cheap: 8 bytes)
+        let sessions: Vec<Arc<SessionMetadata>> = if self.search_filter.is_empty() {
             all_sessions.to_vec()
         } else {
             let query_lower = self.search_filter.to_lowercase();
@@ -314,7 +315,7 @@ impl SessionsTab {
                             .iter()
                             .any(|m: &String| m.to_lowercase().contains(&query_lower))
                 })
-                .cloned()
+                .map(|s| Arc::clone(s))
                 .collect()
         };
 
@@ -393,7 +394,7 @@ impl SessionsTab {
         frame.render_stateful_widget(list, area, &mut self.project_state);
     }
 
-    fn render_sessions(&mut self, frame: &mut Frame, area: Rect, sessions: &[SessionMetadata]) {
+    fn render_sessions(&mut self, frame: &mut Frame, area: Rect, sessions: &[Arc<SessionMetadata>]) {
         let is_focused = self.focus == 1;
         let border_color = if is_focused {
             Color::Cyan
@@ -511,7 +512,7 @@ impl SessionsTab {
         }
     }
 
-    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&SessionMetadata>) {
+    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&Arc<SessionMetadata>>) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Cyan))

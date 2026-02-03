@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::models::{BillingBlockManager, SessionMetadata};
 
@@ -94,7 +95,7 @@ pub fn export_billing_blocks_to_csv(manager: &BillingBlockManager, path: &Path) 
 /// let path = Path::new("sessions.csv");
 /// export_sessions_to_csv(&sessions, &path).unwrap();
 /// ```
-pub fn export_sessions_to_csv(sessions: &[SessionMetadata], path: &Path) -> Result<()> {
+pub fn export_sessions_to_csv(sessions: &[Arc<SessionMetadata>], path: &Path) -> Result<()> {
     // Create parent directory if needed
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -178,16 +179,19 @@ pub fn export_sessions_to_csv(sessions: &[SessionMetadata], path: &Path) -> Resu
 /// let path = Path::new("sessions.json");
 /// export_sessions_to_json(&sessions, &path).unwrap();
 /// ```
-pub fn export_sessions_to_json(sessions: &[SessionMetadata], path: &Path) -> Result<()> {
+pub fn export_sessions_to_json(sessions: &[Arc<SessionMetadata>], path: &Path) -> Result<()> {
     // Create parent directories if needed
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
     }
 
+    // Dereference Arc to get &SessionMetadata for serialization
+    let sessions_ref: Vec<&SessionMetadata> = sessions.iter().map(|s| s.as_ref()).collect();
+
     // Serialize to JSON (pretty print)
     let json =
-        serde_json::to_string_pretty(sessions).context("Failed to serialize sessions to JSON")?;
+        serde_json::to_string_pretty(&sessions_ref).context("Failed to serialize sessions to JSON")?;
 
     // Write to file
     std::fs::write(path, json)
@@ -322,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_export_sessions_csv_empty() {
-        let sessions: Vec<SessionMetadata> = vec![];
+        let sessions: Vec<Arc<SessionMetadata>> = vec![];
         let temp_dir = TempDir::new().unwrap();
         let csv_path = temp_dir.path().join("sessions.csv");
 
@@ -338,8 +342,8 @@ mod tests {
     #[test]
     fn test_export_sessions_csv_with_data() {
         let sessions = vec![
-            create_test_session("abc123", "/Users/test/project1", 25, 15000),
-            create_test_session("def456", "/Users/test/project2", 10, 5000),
+            Arc::new(create_test_session("abc123", "/Users/test/project1", 25, 15000)),
+            Arc::new(create_test_session("def456", "/Users/test/project2", 10, 5000)),
         ];
 
         let temp_dir = TempDir::new().unwrap();
@@ -366,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_export_sessions_json_empty() {
-        let sessions: Vec<SessionMetadata> = vec![];
+        let sessions: Vec<Arc<SessionMetadata>> = vec![];
         let temp_dir = TempDir::new().unwrap();
         let json_path = temp_dir.path().join("sessions.json");
 
@@ -378,12 +382,12 @@ mod tests {
 
     #[test]
     fn test_export_sessions_json_with_data() {
-        let sessions = vec![create_test_session(
+        let sessions = vec![Arc::new(create_test_session(
             "abc123",
             "/Users/test/project1",
             25,
             15000,
-        )];
+        ))];
 
         let temp_dir = TempDir::new().unwrap();
         let json_path = temp_dir.path().join("sessions.json");
@@ -402,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_export_sessions_creates_dirs() {
-        let sessions = vec![create_test_session("test", "/test", 1, 100)];
+        let sessions = vec![Arc::new(create_test_session("test", "/test", 1, 100))];
         let temp_dir = TempDir::new().unwrap();
         let nested_path = temp_dir.path().join("exports/nested/sessions.csv");
 

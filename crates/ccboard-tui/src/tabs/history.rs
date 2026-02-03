@@ -3,6 +3,7 @@
 use crate::components::highlight_matches;
 use ccboard_core::models::{SessionMetadata, StatsCache};
 use chrono::Local;
+use std::sync::Arc;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -22,8 +23,8 @@ pub struct HistoryTab {
     search_focused: bool,
     /// Filtered results state
     results_state: ListState,
-    /// Cached filtered sessions
-    filtered_sessions: Vec<SessionMetadata>,
+    /// Cached filtered sessions (Arc for cheap cloning)
+    filtered_sessions: Vec<Arc<SessionMetadata>>,
     /// Show stats panel
     show_stats: bool,
     /// Show detail popup
@@ -61,7 +62,7 @@ impl HistoryTab {
     }
 
     /// Handle key input
-    pub fn handle_key(&mut self, key: crossterm::event::KeyCode, sessions: &[SessionMetadata]) {
+    pub fn handle_key(&mut self, key: crossterm::event::KeyCode, sessions: &[Arc<SessionMetadata>]) {
         use crossterm::event::KeyCode;
 
         if self.search_focused {
@@ -163,9 +164,9 @@ impl HistoryTab {
         }
     }
 
-    fn update_filter(&mut self, sessions: &[SessionMetadata]) {
+    fn update_filter(&mut self, sessions: &[Arc<SessionMetadata>]) {
         if self.search_query.is_empty() {
-            // Show all sessions sorted by date
+            // Show all sessions sorted by date (Arc clone is cheap)
             self.filtered_sessions = sessions.to_vec();
         } else {
             let query_lower = self.search_query.to_lowercase();
@@ -184,7 +185,7 @@ impl HistoryTab {
                             .iter()
                             .any(|m| m.to_lowercase().contains(&query_lower))
                 })
-                .cloned()
+                .map(|s| Arc::clone(s))
                 .collect();
         }
 
@@ -198,7 +199,7 @@ impl HistoryTab {
         }
     }
 
-    fn get_selected_session(&self) -> Option<&SessionMetadata> {
+    fn get_selected_session(&self) -> Option<&Arc<SessionMetadata>> {
         let idx = self.results_state.selected()?;
         self.filtered_sessions.get(idx)
     }
@@ -248,7 +249,7 @@ impl HistoryTab {
     }
 
     /// Initialize with session data
-    pub fn init(&mut self, sessions: &[SessionMetadata]) {
+    pub fn init(&mut self, sessions: &[Arc<SessionMetadata>]) {
         self.update_filter(sessions);
     }
 
@@ -257,7 +258,7 @@ impl HistoryTab {
         &mut self,
         frame: &mut Frame,
         area: Rect,
-        sessions: &[SessionMetadata],
+        sessions: &[Arc<SessionMetadata>],
         stats: Option<&StatsCache>,
     ) {
         // Ensure filtered sessions are initialized
@@ -717,7 +718,7 @@ impl HistoryTab {
         }
     }
 
-    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&SessionMetadata>) {
+    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&Arc<SessionMetadata>>) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Cyan))
