@@ -409,19 +409,61 @@ impl HistoryTab {
             ));
 
         if self.filtered_sessions.is_empty() {
-            let empty_msg = if self.search_query.is_empty() {
-                "No sessions found"
+            let empty_lines = if self.search_query.is_empty() {
+                vec![
+                    Line::from(""),
+                    Line::from(Span::styled("📂 No sessions found", Style::default().fg(Color::Yellow))),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "No Claude Code sessions detected across all projects",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "💡 Start a new session:",
+                        Style::default().fg(Color::Cyan),
+                    )),
+                    Line::from(Span::styled(
+                        "   cd <project-dir> && claude",
+                        Style::default().fg(Color::Green),
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "📁 Sessions stored in: ~/.claude/projects/",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                ]
             } else {
-                "No matching sessions"
+                vec![
+                    Line::from(""),
+                    Line::from(Span::styled("🔍 No matching sessions", Style::default().fg(Color::Yellow))),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        format!("No results for: \"{}\"", self.search_query),
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "💡 Try:",
+                        Style::default().fg(Color::Cyan),
+                    )),
+                    Line::from(Span::styled(
+                        "   • Shorter query (single word)",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                    Line::from(Span::styled(
+                        "   • Different keywords (project, model, message)",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                    Line::from(Span::styled(
+                        "   • Clear filter (press 'c')",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                ]
             };
-            let empty = Paragraph::new(vec![
-                Line::from(""),
-                Line::from(Span::styled(
-                    empty_msg,
-                    Style::default().fg(Color::DarkGray),
-                )),
-            ])
-            .block(block);
+            let empty = Paragraph::new(empty_lines)
+                .block(block)
+                .alignment(Alignment::Left);
             frame.render_widget(empty, area);
             return;
         }

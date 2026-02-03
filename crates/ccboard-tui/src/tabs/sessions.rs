@@ -418,9 +418,60 @@ impl SessionsTab {
             ));
 
         if sessions.is_empty() {
-            let empty = Paragraph::new("No sessions found")
+            let empty_msg = if self.search_filter.is_empty() {
+                // No sessions in selected project
+                vec![
+                    Line::from(""),
+                    Line::from(Span::styled("📂 No sessions found", Style::default().fg(Color::Yellow))),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "No Claude Code sessions in this project",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "💡 Start a session:",
+                        Style::default().fg(Color::Cyan),
+                    )),
+                    Line::from(Span::styled(
+                        "   cd <project-dir> && claude",
+                        Style::default().fg(Color::Green),
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "📁 Sessions stored in: ~/.claude/projects/",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                ]
+            } else {
+                // Search returned no results
+                vec![
+                    Line::from(""),
+                    Line::from(Span::styled("🔍 No matching sessions", Style::default().fg(Color::Yellow))),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        format!("No sessions match: \"{}\"", self.search_filter),
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "💡 Try:",
+                        Style::default().fg(Color::Cyan),
+                    )),
+                    Line::from(Span::styled(
+                        "   • Shorter query or different project",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                    Line::from(Span::styled(
+                        "   • Clear filter (Esc)",
+                        Style::default().fg(Color::DarkGray),
+                    )),
+                ]
+            };
+
+            let empty = Paragraph::new(empty_msg)
                 .block(block)
-                .style(Style::default().fg(Color::DarkGray));
+                .alignment(ratatui::layout::Alignment::Left);
             frame.render_widget(empty, area);
             return;
         }

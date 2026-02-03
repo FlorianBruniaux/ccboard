@@ -622,13 +622,35 @@ impl CostsTab {
         let all_blocks = blocks_manager.get_all_blocks();
 
         if all_blocks.is_empty() {
-            let no_data = Paragraph::new("No sessions with timestamps found")
+            let empty_msg = vec![
+                Line::from(""),
+                Line::from(Span::styled("📊 No cost data available", Style::default().fg(Color::Yellow))),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "No sessions with timestamps found",
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "💡 Costs are calculated from session timestamps:",
+                    Style::default().fg(Color::Cyan),
+                )),
+                Line::from(Span::styled(
+                    "   • Sessions must have first_timestamp",
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Line::from(Span::styled(
+                    "   • Grouped in 5-hour billing blocks",
+                    Style::default().fg(Color::DarkGray),
+                )),
+            ];
+            let no_data = Paragraph::new(empty_msg)
                 .block(
                     Block::default()
                         .title("Billing Blocks (5h)")
                         .borders(Borders::ALL),
                 )
-                .style(Style::default().fg(Color::DarkGray));
+                .alignment(ratatui::layout::Alignment::Left);
             frame.render_widget(no_data, area);
             return;
         }
