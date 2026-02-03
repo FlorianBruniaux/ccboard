@@ -44,6 +44,26 @@ pub struct Settings {
     pub extra: HashMap<String, serde_json::Value>,
 }
 
+impl Settings {
+    /// Get masked API key for display (SECURITY: never expose full key)
+    ///
+    /// Returns a masked version showing only prefix and suffix:
+    /// "sk-ant-1234567890abcdef" → "sk-ant-••••cdef"
+    pub fn masked_api_key(&self) -> Option<String> {
+        self.api_key.as_ref().map(|key| {
+            if key.len() <= 10 {
+                // Short key: mask everything except first 3 chars
+                format!("{}••••", &key.chars().take(3).collect::<String>())
+            } else {
+                // Standard key: show prefix and suffix
+                let prefix = key.chars().take(7).collect::<String>();
+                let suffix = key.chars().skip(key.len() - 4).collect::<String>();
+                format!("{}••••{}", prefix, suffix)
+            }
+        })
+    }
+}
+
 /// Permission configuration
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

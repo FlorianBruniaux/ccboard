@@ -123,7 +123,7 @@ pub struct SessionSummary {
 /// Metadata extracted from a session without full parse
 ///
 /// Created by streaming the JSONL until session_end event.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMetadata {
     /// Session ID (from filename or content)
     pub id: String,

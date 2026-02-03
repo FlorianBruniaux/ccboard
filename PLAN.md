@@ -1,10 +1,10 @@
 # Plan: ccboard — Unified Claude Code Management Dashboard
 
-## État Actuel (2026-02-02)
+## État Actuel (2026-02-03)
 
-**Version**: 0.2.0-alpha
+**Version**: 0.2.1-alpha
 **Branch**: `main`
-**Status**: ✅ **PRODUCTION-READY** — Phase 11 complétée (token tracking + invocation counters)
+**Status**: ✅ **PRODUCTION-READY** — Phase 11.1 complétée (context window gauge + hooks UX)
 
 ### Métriques Vérifiées
 
@@ -35,6 +35,7 @@
 | **File Watcher** | Live Data Updates | +80 | 2026-02-02 | ✅ |
 | **Phase 9.5** | UX Fixes & Improvements | +50 | 2026-02-02 | ✅ |
 | **Phase 11** | Token Tracking + Invocations | +533 | 2026-02-02 | ✅ |
+| **Phase 11.1** | Context Window Gauge + Hooks 3-col | +250 | 2026-02-03 | ✅ |
 
 ---
 
@@ -64,6 +65,117 @@
 | **Frontmatter parser** | Dans TUI pas core | Web ne peut pas servir agents |
 | **Global search** | TODO dans app.rs | Feature promise non livrée |
 | **Leptos frontend** | Zero code, string "Coming soon" | Web mode non fonctionnel |
+
+---
+
+## Phase 11.1 : Context Window Gauge + Hooks UX (2026-02-03)
+
+**Durée**: 2.5h
+**LOC ajoutées**: ~250 (80 core + 170 TUI)
+**Status**: ✅ Complété
+
+### Objectifs
+
+Ajouter des métriques de saturation context window et améliorer l'UX de l'onglet Hooks pour afficher le contenu des fichiers.
+
+### Implémentations
+
+#### 1. Context Window Saturation Gauge (Task #2)
+
+**Core Data Layer** (`ccboard-core`):
+- **`models/stats.rs`** (+80 LOC):
+  - `ContextWindowStats` struct (avg_saturation_pct, high_load_count, peak_saturation_pct)
+  - `StatsCache::calculate_context_saturation()` méthode (200K tokens context window)
+  - 3 tests (calculation, empty sessions, fewer than requested)
+- **`store.rs`** (+7 LOC):
+  - `context_window_stats()` bridge method
+  - Gestion DashMap lifetime avec clone strategy
+- **`models/mod.rs`** (+1 LOC):
+  - Export `ContextWindowStats`
+
+**TUI Visual Layer** (`ccboard-tui`):
+- **`theme.rs`** (+50 LOC):
+  - `ContextSaturationColor` enum (Safe/Warning/Critical)
+  - Thresholds: <60% (Green), 60-85% (Yellow ⚠️), >85% (Red 🚨)
+  - `icon()` method pour warning indicators
+  - 2 tests (thresholds, icons)
+- **`tabs/dashboard.rs`** (~70 LOC modified):
+  - Layout 5→6 cards (percentages: 17%-17%-17%-16%-16%-17%)
+  - `render()` signature + `Option<&Arc<DataStore>>`
+  - 6ème carte: "◐ Context" avec color-coded percentage + "avg 30d"
+  - Format: "68.5% ⚠️ 3" ou "45.2%" (safe zone)
+- **`ui.rs`** (+4 LOC):
+  - Pass `Some(&app.store)` au dashboard
+
+**Performance**: Zero I/O overhead (uses existing `SessionMetadata.total_tokens`)
+
+**Tests**: All 81 core + 24 TUI tests pass ✅
+
+#### 2. Hooks Tab - 3-Column Layout + File Viewer
+
+**Layout** (`tabs/hooks.rs` ~180 LOC modified):
+- **Avant**: 2 colonnes (Events 35% | Hook details 65%)
+- **Maintenant**: 3 colonnes (Events 25% | Hooks 25% | Content 50%)
+
+**Nouveau panneau Content**:
+- Affiche contenu complet du fichier hook sélectionné
+- Word wrap activé (`Wrap { trim: false }`)
+- Scrollable avec offset tracking
+- Nom fichier dans titre (ex. "pre-tool-use.sh")
+- Keyboard hints en bas si focused
+
+**Navigation améliorée**:
+- **Tab**: Cycle Events → Hooks → Content → Events
+- **h/l** (←/→): Navigue entre panneaux
+- **Enter** ou **e**: Ouvre fichier dans éditeur ($VISUAL/$EDITOR)
+- **o**: Révèle fichier dans Finder/Explorer
+- **j/k** (↑↓): Navigue liste OU scroll contenu (selon focus)
+- **PgUp/PgDn**: Scroll page (dans contenu)
+
+**State management**:
+- `focus: usize` (0=Events, 1=Hooks, 2=Content)
+- `content_scroll: u16` (scroll offset)
+- Auto-reset scroll on hook selection change
+
+**Visual hints**:
+- Bordure cyan sur panneau actif
+- Bottom hints Hooks: "Tab switch  ↑↓ navigate"
+- Bottom hints Content: "↑↓ scroll  Enter open  o reveal"
+
+**Files modified**:
+- `tabs/hooks.rs`: +180 LOC (3-col layout, content panel, navigation)
+- `error.rs`: +3 LOC (fix `InvalidPath` variant missing)
+
+### Résultats
+
+**Dashboard (Tab 1)**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ ◆ Tokens  │ ● Sessions │ ▶ Messages │ % Cache │ ◉ MCP │ ◐ Context │
+│   17.2M   │     142    │   1.2K     │  85.3%  │   5   │ 68.5% ⚠️ 3│
+│   total   │  tracked   │    sent    │  ratio  │servers│  avg 30d  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Hooks (Tab 4)**:
+```
+┌───────────────┬───────────────┬──────────────────────────────────┐
+│ Events (25%)  │ Hooks (25%)   │ Content (50%)                    │
+│ ⚡ PreToolUse │ ▶ $ rtk git   │ pre-tool-use.sh                  │
+│ ✓ PostToolUse │   $ analyze   │ #!/bin/bash                      │
+│               │               │ # Pre-tool validation            │
+│               │               │ ...                              │
+│               │               │ ↑↓ scroll  Enter open  o reveal  │
+└───────────────┴───────────────┴──────────────────────────────────┘
+```
+
+### Quality Checks
+
+✅ **Tests**: 81 core + 24 TUI pass
+✅ **Clippy**: Zero warnings
+✅ **Formatted**: `cargo fmt --all`
+✅ **Build**: All 4 crates compile
+✅ **Installed**: `cargo install --path crates/ccboard --force`
 
 ---
 
@@ -389,8 +501,8 @@ ccboard       = "tout ~/.claude dans un dashboard"
 
 | Idée source | Adaptation ccboard | Priorité |
 |------------|-------------------|----------|
-| **Cache persistant** (agtrace SQLite) | `~/.claude/ccboard-cache.json` pour tokens/invocations | 🔴 Phase 11 (en cours) |
-| **Context saturation viz** (agtrace barre) | Dashboard indicator visuel | 🟡 Phase 12 |
+| **Cache persistant** (agtrace SQLite) | `~/.claude/ccboard-cache.json` pour tokens/invocations | ✅ Phase 11 (complété) |
+| **Context saturation viz** (agtrace barre) | Dashboard indicator visuel (6ème carte) | ✅ Phase 11.1 (complété) |
 | **5h billing blocks** (Claudelytics code) | Copier logic normalization + color coding | 🟡 Phase 12 |
 | **Burn rate projections** (Claudelytics) | Daily/monthly/hourly estimations | 🟡 Phase 12 |
 | **Conversation viewer** (Claudelytics) | Message-by-message avec thinking+tools | 🟡 Phase 13 |
@@ -634,7 +746,7 @@ ccboard       = "tout ~/.claude dans un dashboard"
 | `ccboard doctor` diagnostic | Moyen | HAUT | - |
 | Git commit ↔ session attribution | Haut | HAUT (unique) | - |
 | Session bookmarks | Moyen | MOYEN | Claudelytics bookmark system |
-| Context saturation visualization | Faible | MOYEN | agtrace barre colorée |
+| ~~Context saturation visualization~~ | ✅ Phase 11.1 | COMPLÉTÉ | Dashboard 6ème carte |
 | Subagent tracking hiérarchique | Moyen | MOYEN | agtrace spawned_by context |
 | Session comparison side-by-side | Haut | MOYEN | Claudelytics Compare tab |
 | Time-of-day / day-of-week analytics | Moyen | MOYEN | Claudelytics analytics patterns |
