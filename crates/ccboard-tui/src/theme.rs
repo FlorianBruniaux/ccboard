@@ -168,6 +168,45 @@ impl UsageIntensityColor {
     }
 }
 
+/// Context window saturation semantic color
+pub enum ContextSaturationColor {
+    /// <60% saturation - Safe zone
+    Safe,
+    /// 60-85% saturation - Warning zone
+    Warning,
+    /// >85% saturation - Critical zone (near limit)
+    Critical,
+}
+
+impl ContextSaturationColor {
+    pub fn from_percentage(pct: f64) -> Self {
+        if pct >= 85.0 {
+            ContextSaturationColor::Critical
+        } else if pct >= 60.0 {
+            ContextSaturationColor::Warning
+        } else {
+            ContextSaturationColor::Safe
+        }
+    }
+
+    pub fn to_color(self) -> Color {
+        match self {
+            ContextSaturationColor::Safe => StatusColor::Success.to_color(), // Green
+            ContextSaturationColor::Warning => StatusColor::Warning.to_color(), // Yellow
+            ContextSaturationColor::Critical => StatusColor::Error.to_color(), // Red
+        }
+    }
+
+    /// Warning icon for display (only for Warning/Critical)
+    pub fn icon(&self) -> &'static str {
+        match self {
+            ContextSaturationColor::Safe => "",
+            ContextSaturationColor::Warning => "⚠️",
+            ContextSaturationColor::Critical => "🚨",
+        }
+    }
+}
+
 /// Staleness color based on time since last update
 pub enum StalenessColor {
     /// <5s
@@ -252,6 +291,43 @@ mod tests {
             UsageIntensityColor::from_percentage(85.0),
             UsageIntensityColor::High
         ));
+    }
+
+    #[test]
+    fn test_context_saturation_thresholds() {
+        assert!(matches!(
+            ContextSaturationColor::from_percentage(45.0),
+            ContextSaturationColor::Safe
+        ));
+        assert!(matches!(
+            ContextSaturationColor::from_percentage(72.5),
+            ContextSaturationColor::Warning
+        ));
+        assert!(matches!(
+            ContextSaturationColor::from_percentage(91.0),
+            ContextSaturationColor::Critical
+        ));
+
+        // Boundary tests
+        assert!(matches!(
+            ContextSaturationColor::from_percentage(59.9),
+            ContextSaturationColor::Safe
+        ));
+        assert!(matches!(
+            ContextSaturationColor::from_percentage(60.0),
+            ContextSaturationColor::Warning
+        ));
+        assert!(matches!(
+            ContextSaturationColor::from_percentage(85.0),
+            ContextSaturationColor::Critical
+        ));
+    }
+
+    #[test]
+    fn test_context_saturation_icons() {
+        assert_eq!(ContextSaturationColor::Safe.icon(), "");
+        assert_eq!(ContextSaturationColor::Warning.icon(), "⚠️");
+        assert_eq!(ContextSaturationColor::Critical.icon(), "🚨");
     }
 
     #[test]

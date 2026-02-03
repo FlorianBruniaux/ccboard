@@ -215,6 +215,74 @@ impl StatsCache {
         }
         cache_read as f64 / total_input as f64
     }
+
+    /// Context window size for Sonnet 4.5 (200K tokens)
+    pub const CONTEXT_WINDOW: u64 = 200_000;
+
+    /// Calculate context window saturation from session metadata
+    ///
+    /// NOTE: Requires session metadata to be passed from DataStore
+    /// since StatsCache doesn't have direct access to sessions.
+    pub fn calculate_context_saturation(
+        session_metadata: &[&crate::models::SessionMetadata],
+        last_n: usize,
+    ) -> ContextWindowStats {
+        if session_metadata.is_empty() {
+            return ContextWindowStats::default();
+        }
+
+        // Sort by last_timestamp descending (most recent first)
+        let mut sorted: Vec<_> = session_metadata
+            .iter()
+            .filter(|s| s.last_timestamp.is_some() && s.total_tokens > 0)
+            .collect();
+        sorted.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+
+        // Take last N sessions
+        let recent: Vec<_> = sorted.into_iter().take(last_n).collect();
+
+        if recent.is_empty() {
+            return ContextWindowStats::default();
+        }
+
+        // Calculate saturation percentages
+        let mut total_pct = 0.0;
+        let mut high_load_count = 0;
+        let mut peak_pct = 0.0;
+
+        for session in &recent {
+            let saturation_pct =
+                (session.total_tokens as f64 / Self::CONTEXT_WINDOW as f64) * 100.0;
+            total_pct += saturation_pct;
+
+            if saturation_pct > 85.0 {
+                high_load_count += 1;
+            }
+
+            if saturation_pct > peak_pct {
+                peak_pct = saturation_pct;
+            }
+        }
+
+        ContextWindowStats {
+            avg_saturation_pct: total_pct / recent.len() as f64,
+            high_load_count,
+            peak_saturation_pct: peak_pct,
+        }
+    }
+}
+
+/// Context window saturation statistics
+#[derive(Debug, Clone, Default)]
+pub struct ContextWindowStats {
+    /// Average saturation percentage across last N sessions (0.0-100.0)
+    pub avg_saturation_pct: f64,
+
+    /// Count of sessions exceeding 85% saturation (high-load)
+    pub high_load_count: usize,
+
+    /// Peak saturation percentage (max session, for future use)
+    pub peak_saturation_pct: f64,
 }
 
 #[cfg(test)]
@@ -305,5 +373,76 @@ mod tests {
         assert_eq!(stats.daily_activity.len(), 1);
         assert_eq!(stats.total_input_tokens(), 1000);
         assert_eq!(stats.total_output_tokens(), 500);
+    }
+
+    #[test]
+    fn test_context_saturation_calculation() {
+        use crate::models::SessionMetadata;
+        use chrono::Utc;
+        use std::path::PathBuf;
+
+        let mut sessions = vec![];
+        let now = Utc::now();
+
+        // Create 5 test sessions with varying token counts
+        for (i, tokens) in [50_000u64, 100_000, 150_000, 170_000, 190_000]
+            .iter()
+            .enumerate()
+        {
+            let mut meta = SessionMetadata::from_path(
+                PathBuf::from(format!("/test{}.jsonl", i)),
+                "test".to_string(),
+            );
+            meta.total_tokens = *tokens;
+            meta.last_timestamp = Some(now - chrono::Duration::seconds((4 - i) as i64 * 60));
+            sessions.push(meta);
+        }
+
+        let refs: Vec<_> = sessions.iter().collect();
+        let stats = StatsCache::calculate_context_saturation(&refs, 30);
+
+        // Average: (25% + 50% + 75% + 85% + 95%) / 5 = 66%
+        assert!((stats.avg_saturation_pct - 66.0).abs() < 1.0);
+
+        // High-load count (>85%): 1 session (190K tokens = 95%)
+        assert_eq!(stats.high_load_count, 1);
+
+        // Peak saturation: 95%
+        assert!((stats.peak_saturation_pct - 95.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_context_saturation_empty_sessions() {
+        let stats = StatsCache::calculate_context_saturation(&[], 30);
+        assert_eq!(stats.avg_saturation_pct, 0.0);
+        assert_eq!(stats.high_load_count, 0);
+    }
+
+    #[test]
+    fn test_context_saturation_fewer_than_requested() {
+        use crate::models::SessionMetadata;
+        use chrono::Utc;
+        use std::path::PathBuf;
+
+        let mut sessions = vec![];
+        let now = Utc::now();
+
+        // Only 3 sessions, requesting last 30
+        for (i, tokens) in [60_000u64, 80_000, 120_000].iter().enumerate() {
+            let mut meta = SessionMetadata::from_path(
+                PathBuf::from(format!("/test{}.jsonl", i)),
+                "test".to_string(),
+            );
+            meta.total_tokens = *tokens;
+            meta.last_timestamp = Some(now - chrono::Duration::seconds((2 - i) as i64 * 60));
+            sessions.push(meta);
+        }
+
+        let refs: Vec<_> = sessions.iter().collect();
+        let stats = StatsCache::calculate_context_saturation(&refs, 30);
+
+        // Should calculate average of available 3 sessions
+        // (30% + 40% + 60%) / 3 = 43.33%
+        assert!((stats.avg_saturation_pct - 43.33).abs() < 0.1);
     }
 }

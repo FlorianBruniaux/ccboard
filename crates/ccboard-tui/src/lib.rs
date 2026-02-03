@@ -22,6 +22,7 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::oneshot;
 
 /// Run the TUI application
 pub async fn run(
@@ -36,16 +37,41 @@ pub async fn run(
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Create app state
+    // Create app state (starts in loading mode)
     let mut app = App::new(store.clone());
 
-    // Create UI and initialize
+    // Create UI (will initialize after data loads)
     let mut ui = ui::Ui::new();
-    let invocation_stats = store.invocation_stats();
-    ui.init(&claude_home, project_path.as_deref(), &invocation_stats);
 
-    // Main loop
-    let result = run_loop(&mut terminal, &mut app, &mut ui).await;
+    // Channel to signal when loading completes
+    let (load_tx, mut load_rx) = oneshot::channel();
+
+    // Spawn background loading task
+    let store_clone = store.clone();
+    tokio::spawn(async move {
+        // Load initial data
+        let report = store_clone.initial_load().await;
+
+        // Compute invocation statistics
+        store_clone.compute_invocations().await;
+
+        // Compute billing blocks
+        store_clone.compute_billing_blocks().await;
+
+        // Signal completion
+        let _ = load_tx.send((report, store_clone.invocation_stats()));
+    });
+
+    // Main loop with loading check
+    let result = run_loop_with_loading(
+        &mut terminal,
+        &mut app,
+        &mut ui,
+        &mut load_rx,
+        &claude_home,
+        project_path.as_deref(),
+    )
+    .await;
 
     // Restore terminal
     disable_raw_mode()?;
@@ -59,19 +85,33 @@ pub async fn run(
     result
 }
 
-async fn run_loop<B: Backend>(
+async fn run_loop_with_loading<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     ui: &mut ui::Ui,
+    load_rx: &mut oneshot::Receiver<(ccboard_core::LoadReport, ccboard_core::models::InvocationStats)>,
+    claude_home: &std::path::Path,
+    project_path: Option<&std::path::Path>,
 ) -> Result<()>
 where
     <B as Backend>::Error: Send + Sync + 'static,
 {
     loop {
+        // Check if loading completed
+        if let Ok(result) = load_rx.try_recv() {
+            let (_report, invocation_stats) = result;
+
+            // Initialize UI now that data is loaded
+            ui.init(claude_home, project_path, &invocation_stats);
+
+            // Mark loading as complete
+            app.complete_loading();
+        }
+
         // Check for data events
         app.poll_events();
 
-        // Draw UI
+        // Draw UI (will show loading screen or normal UI based on is_loading)
         terminal.draw(|f| ui.render(f, app))?;
 
         // Handle input with timeout for event polling
@@ -81,8 +121,8 @@ where
                     // First check for global keys
                     let handled = app.handle_key(key.code);
 
-                    // If not a global key, pass to active tab
-                    if !handled {
+                    // If not a global key and not loading, pass to active tab
+                    if !handled && !app.is_loading {
                         ui.handle_tab_key(key.code, app);
                     }
                 }

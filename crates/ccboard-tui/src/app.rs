@@ -1,6 +1,6 @@
 //! TUI Application state and event loop
 
-use crate::components::CommandPalette;
+use crate::components::{CommandPalette, Spinner};
 use ccboard_core::{DataEvent, DataStore};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -122,6 +122,15 @@ pub struct App {
 
     /// Command palette (k9s-style `:` prefix)
     pub command_palette: CommandPalette,
+
+    /// Loading state (true during initial_load)
+    pub is_loading: bool,
+
+    /// Loading message to display
+    pub loading_message: Option<String>,
+
+    /// Loading spinner
+    pub spinner: Spinner,
 }
 
 impl App {
@@ -136,7 +145,21 @@ impl App {
             needs_refresh: true,
             status_message: None,
             command_palette: CommandPalette::new(),
+            is_loading: true,
+            loading_message: Some("Loading sessions...".to_string()),
+            spinner: Spinner::new(),
         }
+    }
+
+    /// Update loading message
+    pub fn set_loading_message(&mut self, message: impl Into<String>) {
+        self.loading_message = Some(message.into());
+    }
+
+    /// Mark loading as complete
+    pub fn complete_loading(&mut self) {
+        self.is_loading = false;
+        self.loading_message = None;
     }
 
     /// Handle keyboard input

@@ -139,12 +139,21 @@ impl AgentsTab {
         }
 
         // Sort by usage (descending), then by name (ascending) as tie-breaker
-        self.agents
-            .sort_by(|a, b| b.invocation_count.cmp(&a.invocation_count).then(a.name.cmp(&b.name)));
-        self.commands
-            .sort_by(|a, b| b.invocation_count.cmp(&a.invocation_count).then(a.name.cmp(&b.name)));
-        self.skills
-            .sort_by(|a, b| b.invocation_count.cmp(&a.invocation_count).then(a.name.cmp(&b.name)));
+        self.agents.sort_by(|a, b| {
+            b.invocation_count
+                .cmp(&a.invocation_count)
+                .then(a.name.cmp(&b.name))
+        });
+        self.commands.sort_by(|a, b| {
+            b.invocation_count
+                .cmp(&a.invocation_count)
+                .then(a.name.cmp(&b.name))
+        });
+        self.skills.sort_by(|a, b| {
+            b.invocation_count
+                .cmp(&a.invocation_count)
+                .then(a.name.cmp(&b.name))
+        });
     }
 
     fn scan_directory(&mut self, base: &Path, subdir: &str, entry_type: AgentType) {
@@ -515,7 +524,10 @@ impl AgentsTab {
                     ));
                 }
 
-                spans.push(Span::styled(desc_preview, Style::default().fg(Color::DarkGray)));
+                spans.push(Span::styled(
+                    desc_preview,
+                    Style::default().fg(Color::DarkGray),
+                ));
 
                 ListItem::new(Line::from(spans))
             })

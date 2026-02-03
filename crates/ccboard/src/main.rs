@@ -90,28 +90,11 @@ async fn main() -> Result<()> {
 }
 
 async fn run_tui(claude_home: PathBuf, project: Option<PathBuf>) -> Result<()> {
-    // Initialize data store
+    // Initialize data store (without loading data yet - TUI will handle that)
     let store = Arc::new(DataStore::with_defaults(
         claude_home.clone(),
         project.clone(),
     ));
-
-    // Load initial data
-    let report = store.initial_load().await;
-
-    if report.has_fatal_errors() {
-        eprintln!("Fatal errors during data load:");
-        for error in report.errors.iter() {
-            eprintln!("  - {}: {}", error.source, error.message);
-        }
-        return Ok(());
-    }
-
-    // Compute invocation statistics (agents/commands/skills usage)
-    store.compute_invocations().await;
-
-    // Compute billing blocks (5h usage tracking)
-    store.compute_billing_blocks().await;
 
     // Start file watcher for live updates
     let _watcher = ccboard_core::FileWatcher::start(
@@ -123,7 +106,7 @@ async fn run_tui(claude_home: PathBuf, project: Option<PathBuf>) -> Result<()> {
     .await
     .context("Failed to start file watcher")?;
 
-    // Run TUI
+    // Run TUI (will show loading spinner and load data in background)
     ccboard_tui::run(store, claude_home, project).await
 }
 

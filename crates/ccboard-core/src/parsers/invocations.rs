@@ -83,23 +83,39 @@ impl InvocationParser {
                     // Try to parse content as string or array
                     if let Ok(content_str) = serde_json::from_str::<String>(content) {
                         self.extract_invocations(&content_str, &mut stats);
-                    } else if let Ok(content_array) = serde_json::from_str::<Vec<serde_json::Value>>(content) {
+                    } else if let Ok(content_array) =
+                        serde_json::from_str::<Vec<serde_json::Value>>(content)
+                    {
                         for item in content_array {
                             if let Some(obj) = item.as_object() {
                                 // Check for Task tool
                                 if obj.get("name").and_then(|v| v.as_str()) == Some("Task") {
-                                    if let Some(input) = obj.get("input").and_then(|v| v.as_object()) {
-                                        if let Some(agent_type) = input.get("subagent_type").and_then(|v| v.as_str()) {
-                                            *stats.agents.entry(agent_type.to_string()).or_insert(0) += 1;
+                                    if let Some(input) =
+                                        obj.get("input").and_then(|v| v.as_object())
+                                    {
+                                        if let Some(agent_type) =
+                                            input.get("subagent_type").and_then(|v| v.as_str())
+                                        {
+                                            *stats
+                                                .agents
+                                                .entry(agent_type.to_string())
+                                                .or_insert(0) += 1;
                                             trace!(agent = agent_type, "Detected agent invocation");
                                         }
                                     }
                                 }
                                 // Check for Skill tool
                                 if obj.get("name").and_then(|v| v.as_str()) == Some("Skill") {
-                                    if let Some(input) = obj.get("input").and_then(|v| v.as_object()) {
-                                        if let Some(skill_name) = input.get("skill").and_then(|v| v.as_str()) {
-                                            *stats.skills.entry(skill_name.to_string()).or_insert(0) += 1;
+                                    if let Some(input) =
+                                        obj.get("input").and_then(|v| v.as_object())
+                                    {
+                                        if let Some(skill_name) =
+                                            input.get("skill").and_then(|v| v.as_str())
+                                        {
+                                            *stats
+                                                .skills
+                                                .entry(skill_name.to_string())
+                                                .or_insert(0) += 1;
                                             trace!(skill = skill_name, "Detected skill invocation");
                                         }
                                     }

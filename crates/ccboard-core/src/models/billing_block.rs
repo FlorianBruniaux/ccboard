@@ -151,7 +151,10 @@ impl BillingBlockManager {
     }
 
     /// Get blocks for a specific date
-    pub fn get_blocks_for_date(&self, date: chrono::NaiveDate) -> Vec<(BillingBlock, BillingBlockUsage)> {
+    pub fn get_blocks_for_date(
+        &self,
+        date: chrono::NaiveDate,
+    ) -> Vec<(BillingBlock, BillingBlockUsage)> {
         let mut blocks: Vec<_> = self
             .blocks
             .iter()

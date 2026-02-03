@@ -104,6 +104,12 @@ impl Ui {
     pub fn render(&mut self, frame: &mut Frame, app: &mut App) {
         let size = frame.area();
 
+        // If loading, show loading screen
+        if app.is_loading {
+            self.render_loading_screen(frame, size, app);
+            return;
+        }
+
         // Main layout
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -129,6 +135,81 @@ impl Ui {
 
         // Render command palette (overlay on top of everything)
         app.command_palette.render(frame, size);
+    }
+
+    fn render_loading_screen(&mut self, frame: &mut Frame, area: Rect, app: &mut App) {
+        // Tick spinner animation
+        app.spinner.tick();
+
+        // Center the loading message
+        let vertical = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(40),
+                Constraint::Length(7),
+                Constraint::Percentage(40),
+            ])
+            .split(area);
+
+        let horizontal = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(30),
+                Constraint::Percentage(40),
+                Constraint::Percentage(30),
+            ])
+            .split(vertical[1]);
+
+        let loading_area = horizontal[1];
+
+        // Create loading box
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(Span::styled(
+                " ccboard ",
+                Style::default().fg(Color::Cyan).bold(),
+            ));
+
+        let inner = block.inner(loading_area);
+        frame.render_widget(block, loading_area);
+
+        // Split inner area for spinner and message
+        let inner_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+
+        // Render spinner with message
+        let message = app
+            .loading_message
+            .as_deref()
+            .unwrap_or("Loading...");
+
+        let spinner_line = Line::from(vec![
+            Span::raw("  "),
+            app.spinner.render(),
+            Span::raw("  "),
+            Span::styled(message, Style::default().fg(Color::White)),
+        ]);
+
+        let spinner_widget = Paragraph::new(spinner_line);
+        frame.render_widget(spinner_widget, inner_chunks[2]);
+
+        // Render hint
+        let hint = Paragraph::new(Line::from(vec![Span::styled(
+            "Press 'q' to quit",
+            Style::default().fg(Color::DarkGray),
+        )]))
+        .alignment(ratatui::layout::Alignment::Center);
+
+        frame.render_widget(hint, inner_chunks[4]);
     }
 
     fn render_header(&mut self, frame: &mut Frame, area: Rect, active: Tab, app: &App) {
@@ -235,8 +316,13 @@ impl Ui {
             Tab::Dashboard => {
                 let stats = app.store.stats();
                 let mcp_config = app.store.mcp_config();
-                self.dashboard
-                    .render(frame, area, stats.as_ref(), mcp_config.as_ref());
+                self.dashboard.render(
+                    frame,
+                    area,
+                    stats.as_ref(),
+                    mcp_config.as_ref(),
+                    Some(&app.store),
+                );
             }
             Tab::Sessions => {
                 let sessions_by_project = app.store.sessions_by_project();
@@ -259,7 +345,8 @@ impl Ui {
             Tab::Costs => {
                 let stats = app.store.stats();
                 let billing_blocks = app.store.billing_blocks();
-                self.costs.render(frame, area, stats.as_ref(), Some(&billing_blocks));
+                self.costs
+                    .render(frame, area, stats.as_ref(), Some(&billing_blocks));
             }
             Tab::History => {
                 let sessions: Vec<_> = app.store.recent_sessions(10000);

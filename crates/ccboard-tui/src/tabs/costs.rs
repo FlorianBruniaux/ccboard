@@ -134,7 +134,12 @@ impl CostsTab {
     }
 
     fn render_view_tabs(&self, frame: &mut Frame, area: Rect) {
-        let tabs = ["1. Overview", "2. By Model", "3. Daily", "4. Billing Blocks"];
+        let tabs = [
+            "1. Overview",
+            "2. By Model",
+            "3. Daily",
+            "4. Billing Blocks",
+        ];
 
         let block = Block::default()
             .borders(Borders::BOTTOM)

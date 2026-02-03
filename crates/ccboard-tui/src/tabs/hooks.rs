@@ -19,12 +19,14 @@ pub struct HooksTab {
     event_state: ListState,
     /// Selected hook index within event
     hook_state: ListState,
-    /// Focus: events (0) or hooks (1)
+    /// Focus: events (0), hooks (1), or content (2)
     focus: usize,
     /// Cached event names (sorted)
     event_names: Vec<String>,
     /// Error message to display
     error_message: Option<String>,
+    /// Scroll offset for content view
+    content_scroll: u16,
 }
 
 impl Default for HooksTab {
@@ -46,6 +48,7 @@ impl HooksTab {
             focus: 0,
             event_names: Vec::new(),
             error_message: None,
+            content_scroll: 0,
         }
     }
 
@@ -58,29 +61,47 @@ impl HooksTab {
         use crossterm::event::KeyCode;
 
         match key {
+            KeyCode::Tab => {
+                // Cycle focus: events -> hooks -> content -> events
+                self.focus = (self.focus + 1) % 3;
+            }
             KeyCode::Left | KeyCode::Char('h') => {
-                self.focus = 0;
+                if self.focus > 0 {
+                    self.focus -= 1;
+                }
             }
             KeyCode::Right | KeyCode::Char('l') => {
-                self.focus = 1;
+                if self.focus < 2 {
+                    self.focus += 1;
+                }
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 if self.focus == 0 {
                     self.move_event_selection(-1);
                     self.hook_state.select(Some(0));
-                } else {
+                    self.content_scroll = 0;
+                } else if self.focus == 1 {
                     self.move_hook_selection(-1);
+                    self.content_scroll = 0;
+                } else {
+                    // Scroll content up
+                    self.content_scroll = self.content_scroll.saturating_sub(1);
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 if self.focus == 0 {
                     self.move_event_selection(1);
                     self.hook_state.select(Some(0));
-                } else {
+                    self.content_scroll = 0;
+                } else if self.focus == 1 {
                     self.move_hook_selection(1);
+                    self.content_scroll = 0;
+                } else {
+                    // Scroll content down
+                    self.content_scroll = self.content_scroll.saturating_add(1);
                 }
             }
-            KeyCode::Char('e') => {
+            KeyCode::Enter | KeyCode::Char('e') => {
                 // Open selected hook file in editor
                 if self.focus == 1 {
                     if let Some(hook) = self.get_selected_hook(hooks_map) {
@@ -117,21 +138,29 @@ impl HooksTab {
                 }
             }
             KeyCode::PageUp => {
-                // Jump up by 10 items
                 if self.focus == 0 {
                     self.move_event_selection(-10);
                     self.hook_state.select(Some(0));
-                } else {
+                    self.content_scroll = 0;
+                } else if self.focus == 1 {
                     self.move_hook_selection(-10);
+                    self.content_scroll = 0;
+                } else {
+                    // Scroll content up by page
+                    self.content_scroll = self.content_scroll.saturating_sub(10);
                 }
             }
             KeyCode::PageDown => {
-                // Jump down by 10 items
                 if self.focus == 0 {
                     self.move_event_selection(10);
                     self.hook_state.select(Some(0));
-                } else {
+                    self.content_scroll = 0;
+                } else if self.focus == 1 {
                     self.move_hook_selection(10);
+                    self.content_scroll = 0;
+                } else {
+                    // Scroll content down by page
+                    self.content_scroll = self.content_scroll.saturating_add(10);
                 }
             }
             _ => {}
@@ -181,10 +210,14 @@ impl HooksTab {
             })
             .unwrap_or_default();
 
-        // Layout: event list | hook details
+        // Layout: event list | hook list | hook content
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
+            .constraints([
+                Constraint::Percentage(25), // Events
+                Constraint::Percentage(25), // Hooks
+                Constraint::Percentage(50), // Content
+            ])
             .split(area);
 
         self.render_events(frame, chunks[0], hooks);
@@ -202,7 +235,14 @@ impl HooksTab {
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
 
-        self.render_hook_details(frame, chunks[1], &selected_event, hook_groups);
+        self.render_hook_list(frame, chunks[1], &selected_event, hook_groups);
+
+        // Render hook content
+        if let Some(hook) = self.get_selected_hook(hooks.unwrap_or(&HashMap::new())) {
+            self.render_hook_content(frame, chunks[2], hook);
+        } else {
+            self.render_empty_content(frame, chunks[2]);
+        }
 
         // Render error popup if present
         if self.error_message.is_some() {
@@ -311,7 +351,7 @@ impl HooksTab {
         }
     }
 
-    fn render_hook_details(
+    fn render_hook_list(
         &mut self,
         frame: &mut Frame,
         area: Rect,
@@ -328,7 +368,7 @@ impl HooksTab {
         let title = event
             .as_ref()
             .map(|e| format!(" {} Hooks ", e))
-            .unwrap_or_else(|| " Hook Details ".to_string());
+            .unwrap_or_else(|| " Hooks ".to_string());
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -336,7 +376,13 @@ impl HooksTab {
             .title(Span::styled(
                 title,
                 Style::default().fg(Color::White).bold(),
-            ));
+            ))
+            .title_bottom(Line::from(vec![
+                Span::styled("Tab", Style::default().fg(Color::Cyan)),
+                Span::styled(" switch  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("↑↓", Style::default().fg(Color::Cyan)),
+                Span::styled(" navigate", Style::default().fg(Color::DarkGray)),
+            ]));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -366,17 +412,24 @@ impl HooksTab {
         let items: Vec<ListItem> = all_hooks
             .iter()
             .enumerate()
-            .map(|(i, (matcher, hook))| {
+            .map(|(i, (_matcher, hook))| {
                 let is_selected = self.hook_state.selected() == Some(i);
 
-                let mut lines = vec![Line::from(vec![
+                // Simplified display: just command (truncated if too long)
+                let command = if hook.command.len() > 40 {
+                    format!("{}…", &hook.command[..37])
+                } else {
+                    hook.command.clone()
+                };
+
+                let line = Line::from(vec![
                     Span::styled(
                         if is_selected { "▶ " } else { "  " },
                         Style::default().fg(Color::Cyan),
                     ),
                     Span::styled("$ ", Style::default().fg(Color::Green)),
                     Span::styled(
-                        hook.command.clone(),
+                        command,
                         if is_selected {
                             Style::default()
                                 .fg(Color::White)
@@ -385,45 +438,9 @@ impl HooksTab {
                             Style::default().fg(Color::White)
                         },
                     ),
-                ])];
+                ]);
 
-                // Show matcher if present
-                if let Some(m) = matcher {
-                    lines.push(Line::from(vec![
-                        Span::styled("    match: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(m.clone(), Style::default().fg(Color::Yellow)),
-                    ]));
-                }
-
-                // Show file path if present
-                if let Some(ref path) = hook.file_path {
-                    lines.push(Line::from(vec![
-                        Span::styled("    file: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(
-                            path.display().to_string(),
-                            Style::default().fg(Color::Yellow),
-                        ),
-                    ]));
-                }
-
-                // Show async/timeout if present
-                let mut attrs = Vec::new();
-                if hook.r#async == Some(true) {
-                    attrs.push("async".to_string());
-                }
-                if let Some(timeout) = hook.timeout {
-                    attrs.push(format!("timeout: {}s", timeout));
-                }
-                if !attrs.is_empty() {
-                    lines.push(Line::from(Span::styled(
-                        format!("    [{}]", attrs.join(", ")),
-                        Style::default().fg(Color::DarkGray),
-                    )));
-                }
-
-                lines.push(Line::from("")); // spacing
-
-                ListItem::new(lines)
+                ListItem::new(line)
             })
             .collect();
 
@@ -440,6 +457,107 @@ impl HooksTab {
                 ScrollbarState::new(hook_count).position(self.hook_state.selected().unwrap_or(0));
             frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
         }
+    }
+
+    fn render_hook_content(&self, frame: &mut Frame, area: Rect, hook: &HookDefinition) {
+        let is_focused = self.focus == 2;
+        let border_color = if is_focused {
+            Color::Cyan
+        } else {
+            Color::DarkGray
+        };
+
+        let title = hook
+            .file_path
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            .map(|n| format!(" {} ", n))
+            .unwrap_or_else(|| " Hook Content ".to_string());
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(border_color))
+            .title(Span::styled(
+                title,
+                Style::default().fg(Color::White).bold(),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        // Read file content
+        let content = if let Some(ref path) = hook.file_path {
+            std::fs::read_to_string(path).unwrap_or_else(|e| format!("Error reading file: {}", e))
+        } else {
+            "No file path available".to_string()
+        };
+
+        // Split content into lines and apply scroll offset
+        let lines: Vec<Line> = content
+            .lines()
+            .skip(self.content_scroll as usize)
+            .take(inner.height as usize)
+            .map(|line| Line::from(Span::raw(line)))
+            .collect();
+
+        // Display hint at bottom if focused
+        let hint_height = if is_focused { 1 } else { 0 };
+        let content_area = Rect {
+            y: inner.y,
+            height: inner.height.saturating_sub(hint_height),
+            ..inner
+        };
+
+        let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: false });
+        frame.render_widget(paragraph, content_area);
+
+        // Show keyboard hints at bottom if focused
+        if is_focused && inner.height > 2 {
+            let hint_area = Rect {
+                y: inner.y + inner.height - 1,
+                height: 1,
+                ..inner
+            };
+            let hint = Paragraph::new(Line::from(vec![
+                Span::styled("↑↓", Style::default().fg(Color::Cyan)),
+                Span::styled(" scroll  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Enter", Style::default().fg(Color::Cyan)),
+                Span::styled(" open  ", Style::default().fg(Color::DarkGray)),
+                Span::styled("o", Style::default().fg(Color::Cyan)),
+                Span::styled(" reveal", Style::default().fg(Color::DarkGray)),
+            ]))
+            .style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(hint, hint_area);
+        }
+    }
+
+    fn render_empty_content(&self, frame: &mut Frame, area: Rect) {
+        let is_focused = self.focus == 2;
+        let border_color = if is_focused {
+            Color::Cyan
+        } else {
+            Color::DarkGray
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(border_color))
+            .title(Span::styled(
+                " Hook Content ",
+                Style::default().fg(Color::White).bold(),
+            ));
+
+        let empty = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "Select a hook to view its content",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ])
+        .block(block);
+
+        frame.render_widget(empty, area);
     }
 
     fn event_style(event: &str) -> (&'static str, Color) {

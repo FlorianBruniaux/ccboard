@@ -31,6 +31,9 @@ pub enum CoreError {
     #[error("Directory not found: {path}")]
     DirectoryNotFound { path: PathBuf },
 
+    #[error("Invalid path: {path} - {reason}")]
+    InvalidPath { path: PathBuf, reason: String },
+
     // ===================
     // Parse Errors
     // ===================

@@ -1,7 +1,9 @@
 //! Dashboard tab - Overview with sparkline, stats, model gauges, activity
 
+use crate::theme::ContextSaturationColor;
 use ccboard_core::models::StatsCache;
 use ccboard_core::parsers::McpConfig;
+use ccboard_core::store::DataStore;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -10,6 +12,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Gauge, Paragraph, Sparkline},
 };
+use std::sync::Arc;
 
 /// Dashboard tab state
 pub struct DashboardTab;
@@ -26,6 +29,7 @@ impl DashboardTab {
         area: Rect,
         stats: Option<&StatsCache>,
         mcp_config: Option<&McpConfig>,
+        store: Option<&Arc<DataStore>>,
     ) {
         // Main vertical layout
         let chunks = Layout::default()
@@ -38,8 +42,8 @@ impl DashboardTab {
             ])
             .split(area);
 
-        // Stats cards (5 columns now)
-        self.render_stats_row(frame, chunks[0], stats, mcp_config);
+        // Stats cards (6 columns now)
+        self.render_stats_row(frame, chunks[0], stats, mcp_config, store);
 
         // Activity sparkline
         self.render_activity(frame, chunks[1], stats);
@@ -54,15 +58,17 @@ impl DashboardTab {
         area: Rect,
         stats: Option<&StatsCache>,
         mcp_config: Option<&McpConfig>,
+        store: Option<&Arc<DataStore>>,
     ) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
+                Constraint::Percentage(17), // Tokens (adjusted from 20%)
+                Constraint::Percentage(17), // Sessions
+                Constraint::Percentage(17), // Messages
+                Constraint::Percentage(16), // Cache
+                Constraint::Percentage(16), // MCP
+                Constraint::Percentage(17), // Context (new)
             ])
             .split(area);
 
@@ -84,6 +90,25 @@ impl DashboardTab {
         } else {
             Color::DarkGray
         };
+
+        // Context window saturation
+        let (context_display, context_color) = store
+            .map(|s| {
+                let ctx_stats = s.context_window_stats();
+                let pct = ctx_stats.avg_saturation_pct;
+                let color_theme = ContextSaturationColor::from_percentage(pct);
+                let icon = color_theme.icon();
+
+                // Format: "68.5%  ⚠️ 3" or "45.2%" (no icon/count if safe)
+                let display = if ctx_stats.high_load_count > 0 {
+                    format!("{:.1}% {} {}", pct, icon, ctx_stats.high_load_count)
+                } else {
+                    format!("{:.1}%", pct)
+                };
+
+                (display, color_theme.to_color())
+            })
+            .unwrap_or_else(|| ("—".into(), Color::DarkGray));
 
         self.render_stat_card(frame, chunks[0], "◆ Tokens", &tokens, Color::Cyan, "total");
         self.render_stat_card(
@@ -117,6 +142,14 @@ impl DashboardTab {
             &mcp_count.to_string(),
             mcp_color,
             "servers",
+        );
+        self.render_stat_card(
+            frame,
+            chunks[5],
+            "◐ Context",
+            &context_display,
+            context_color,
+            "avg 30d",
         );
     }
 
