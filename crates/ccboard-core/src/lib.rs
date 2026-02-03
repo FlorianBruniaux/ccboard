@@ -5,6 +5,7 @@
 pub mod cache;
 pub mod error;
 pub mod event;
+pub mod export;
 pub mod models;
 pub mod parsers;
 pub mod store;
@@ -12,5 +13,6 @@ pub mod watcher;
 
 pub use error::{CoreError, DegradedState, LoadReport};
 pub use event::{DataEvent, EventBus};
+pub use export::export_billing_blocks_to_csv;
 pub use store::DataStore;
 pub use watcher::FileWatcher;
