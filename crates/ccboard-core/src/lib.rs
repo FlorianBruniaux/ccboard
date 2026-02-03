@@ -13,6 +13,6 @@ pub mod watcher;
 
 pub use error::{CoreError, DegradedState, LoadReport};
 pub use event::{DataEvent, EventBus};
-pub use export::export_billing_blocks_to_csv;
+pub use export::{export_billing_blocks_to_csv, export_sessions_to_csv, export_sessions_to_json};
 pub use store::DataStore;
 pub use watcher::FileWatcher;

@@ -231,6 +231,10 @@ impl HelpModal {
                     Span::styled("  c           ", Style::default().fg(Color::Cyan)),
                     Span::raw("Clear search"),
                 ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  x           ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Export filtered sessions (CSV/JSON)"),
+                ]));
             }
             Tab::Mcp => {
                 lines.push(Line::from(vec![

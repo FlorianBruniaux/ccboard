@@ -1,13 +1,13 @@
-//! CSV export functionality for billing blocks
+//! CSV/JSON export functionality for billing blocks and sessions
 //!
-//! Provides simple, testable CSV export with proper error handling.
+//! Provides simple, testable export with proper error handling.
 
 use anyhow::{Context, Result};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use crate::models::BillingBlockManager;
+use crate::models::{BillingBlockManager, SessionMetadata};
 
 /// Export billing blocks to CSV format matching TUI table display
 ///
@@ -67,6 +67,131 @@ pub fn export_billing_blocks_to_csv(manager: &BillingBlockManager, path: &Path) 
     }
 
     writer.flush().context("Failed to flush CSV writer")?;
+
+    Ok(())
+}
+
+/// Export sessions to CSV format
+///
+/// CSV columns: Date, Time, Project, Session ID, Messages, Tokens, Models, Duration (min)
+/// Rows sorted by date/time (most recent first in input)
+///
+/// # Arguments
+/// * `sessions` - Slice of SessionMetadata to export
+/// * `path` - Destination file path (created/overwritten)
+///
+/// # Errors
+/// Returns error if file creation or write operations fail
+///
+/// # Examples
+///
+/// ```no_run
+/// use ccboard_core::models::SessionMetadata;
+/// use ccboard_core::export::export_sessions_to_csv;
+/// use std::path::Path;
+///
+/// let sessions: Vec<SessionMetadata> = vec![]; // Load sessions
+/// let path = Path::new("sessions.csv");
+/// export_sessions_to_csv(&sessions, &path).unwrap();
+/// ```
+pub fn export_sessions_to_csv(sessions: &[SessionMetadata], path: &Path) -> Result<()> {
+    // Create parent directory if needed
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    let file = File::create(path)
+        .with_context(|| format!("Failed to create CSV file: {}", path.display()))?;
+
+    let mut writer = BufWriter::new(file);
+
+    // Write header
+    writeln!(
+        writer,
+        "Date,Time,Project,Session ID,Messages,Tokens,Models,Duration (min)"
+    )
+    .context("Failed to write CSV header")?;
+
+    // Write data rows
+    for session in sessions {
+        let date = session
+            .first_timestamp
+            .map(|ts| ts.format("%Y-%m-%d").to_string())
+            .unwrap_or_else(|| "N/A".to_string());
+
+        let time = session
+            .first_timestamp
+            .map(|ts| ts.format("%H:%M:%S").to_string())
+            .unwrap_or_else(|| "N/A".to_string());
+
+        let models = session.models_used.join(";");
+
+        let duration = if let (Some(first), Some(last)) =
+            (&session.first_timestamp, &session.last_timestamp)
+        {
+            let diff = last.signed_duration_since(*first);
+            diff.num_minutes()
+        } else {
+            0
+        };
+
+        writeln!(
+            writer,
+            "\"{}\",\"{}\",\"{}\",\"{}\",{},{},\"{}\",{}",
+            date,
+            time,
+            session.project_path,
+            session.id,
+            session.message_count,
+            session.total_tokens,
+            models,
+            duration
+        )
+        .with_context(|| format!("Failed to write row for session {}", session.id))?;
+    }
+
+    writer.flush().context("Failed to flush CSV writer")?;
+
+    Ok(())
+}
+
+/// Export sessions to JSON format
+///
+/// Pretty-printed JSON array of session metadata
+///
+/// # Arguments
+/// * `sessions` - Slice of SessionMetadata to export
+/// * `path` - Destination file path (created/overwritten)
+///
+/// # Errors
+/// Returns error if serialization or file write fails
+///
+/// # Examples
+///
+/// ```no_run
+/// use ccboard_core::models::SessionMetadata;
+/// use ccboard_core::export::export_sessions_to_json;
+/// use std::path::Path;
+///
+/// let sessions: Vec<SessionMetadata> = vec![]; // Load sessions
+/// let path = Path::new("sessions.json");
+/// export_sessions_to_json(&sessions, &path).unwrap();
+/// ```
+pub fn export_sessions_to_json(sessions: &[SessionMetadata], path: &Path) -> Result<()> {
+    // Create parent directories if needed
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    // Serialize to JSON (pretty print)
+    let json =
+        serde_json::to_string_pretty(sessions).context("Failed to serialize sessions to JSON")?;
+
+    // Write to file
+    std::fs::write(path, json)
+        .with_context(|| format!("Failed to write JSON file: {}", path.display()))?;
 
     Ok(())
 }
@@ -171,5 +296,118 @@ mod tests {
         assert!(lines[1].contains("2026-02-03")); // Feb 3
         assert!(lines[2].contains("2026-02-02")); // Feb 2
         assert!(lines[3].contains("2026-02-01")); // Feb 1
+    }
+
+    // Session export tests
+    use crate::models::SessionMetadata;
+    use std::path::PathBuf;
+
+    fn create_test_session(id: &str, project: &str, messages: u64, tokens: u64) -> SessionMetadata {
+        let timestamp = Utc.with_ymd_and_hms(2026, 2, 3, 14, 30, 0).unwrap();
+        SessionMetadata {
+            id: id.to_string(),
+            file_path: PathBuf::from(format!("/test/{}.jsonl", id)),
+            project_path: project.to_string(),
+            first_timestamp: Some(timestamp),
+            last_timestamp: Some(timestamp + chrono::Duration::minutes(45)),
+            message_count: messages,
+            total_tokens: tokens,
+            models_used: vec!["sonnet".to_string(), "opus".to_string()],
+            file_size_bytes: 1024,
+            first_user_message: Some("Test message".to_string()),
+            has_subagents: false,
+            duration_seconds: Some(2700), // 45 minutes
+        }
+    }
+
+    #[test]
+    fn test_export_sessions_csv_empty() {
+        let sessions: Vec<SessionMetadata> = vec![];
+        let temp_dir = TempDir::new().unwrap();
+        let csv_path = temp_dir.path().join("sessions.csv");
+
+        super::export_sessions_to_csv(&sessions, &csv_path).unwrap();
+
+        let contents = std::fs::read_to_string(&csv_path).unwrap();
+        assert_eq!(
+            contents,
+            "Date,Time,Project,Session ID,Messages,Tokens,Models,Duration (min)\n"
+        );
+    }
+
+    #[test]
+    fn test_export_sessions_csv_with_data() {
+        let sessions = vec![
+            create_test_session("abc123", "/Users/test/project1", 25, 15000),
+            create_test_session("def456", "/Users/test/project2", 10, 5000),
+        ];
+
+        let temp_dir = TempDir::new().unwrap();
+        let csv_path = temp_dir.path().join("sessions.csv");
+
+        super::export_sessions_to_csv(&sessions, &csv_path).unwrap();
+
+        let contents = std::fs::read_to_string(&csv_path).unwrap();
+        let lines: Vec<&str> = contents.lines().collect();
+
+        assert_eq!(lines.len(), 3); // Header + 2 sessions
+        assert_eq!(
+            lines[0],
+            "Date,Time,Project,Session ID,Messages,Tokens,Models,Duration (min)"
+        );
+        assert!(lines[1].contains("2026-02-03"));
+        assert!(lines[1].contains("14:30:00"));
+        assert!(lines[1].contains("abc123"));
+        assert!(lines[1].contains("25"));
+        assert!(lines[1].contains("15000"));
+        assert!(lines[1].contains("sonnet;opus"));
+        assert!(lines[1].contains("45")); // duration in minutes
+    }
+
+    #[test]
+    fn test_export_sessions_json_empty() {
+        let sessions: Vec<SessionMetadata> = vec![];
+        let temp_dir = TempDir::new().unwrap();
+        let json_path = temp_dir.path().join("sessions.json");
+
+        super::export_sessions_to_json(&sessions, &json_path).unwrap();
+
+        let contents = std::fs::read_to_string(&json_path).unwrap();
+        assert_eq!(contents, "[]");
+    }
+
+    #[test]
+    fn test_export_sessions_json_with_data() {
+        let sessions = vec![create_test_session(
+            "abc123",
+            "/Users/test/project1",
+            25,
+            15000,
+        )];
+
+        let temp_dir = TempDir::new().unwrap();
+        let json_path = temp_dir.path().join("sessions.json");
+
+        super::export_sessions_to_json(&sessions, &json_path).unwrap();
+
+        let contents = std::fs::read_to_string(&json_path).unwrap();
+
+        // Verify it's valid JSON
+        let parsed: Vec<SessionMetadata> = serde_json::from_str(&contents).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].id, "abc123");
+        assert_eq!(parsed[0].message_count, 25);
+        assert_eq!(parsed[0].total_tokens, 15000);
+    }
+
+    #[test]
+    fn test_export_sessions_creates_dirs() {
+        let sessions = vec![create_test_session("test", "/test", 1, 100)];
+        let temp_dir = TempDir::new().unwrap();
+        let nested_path = temp_dir.path().join("exports/nested/sessions.csv");
+
+        super::export_sessions_to_csv(&sessions, &nested_path).unwrap();
+
+        assert!(nested_path.exists());
     }
 }

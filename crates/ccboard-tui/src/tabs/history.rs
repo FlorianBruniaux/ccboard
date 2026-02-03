@@ -2,6 +2,7 @@
 
 use crate::components::highlight_matches;
 use ccboard_core::models::{SessionMetadata, StatsCache};
+use chrono::Local;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -29,6 +30,10 @@ pub struct HistoryTab {
     show_detail: bool,
     /// Error message to display
     error_message: Option<String>,
+    /// Show export dialog
+    show_export_dialog: bool,
+    /// Export success/error message
+    export_message: Option<String>,
 }
 
 impl Default for HistoryTab {
@@ -50,6 +55,8 @@ impl HistoryTab {
             show_stats: true,
             show_detail: false,
             error_message: None,
+            show_export_dialog: false,
+            export_message: None,
         }
     }
 
@@ -72,8 +79,26 @@ impl HistoryTab {
                 }
                 _ => {}
             }
+        } else if self.show_export_dialog {
+            match key {
+                KeyCode::Char('1') => {
+                    self.export_csv();
+                    self.show_export_dialog = false;
+                }
+                KeyCode::Char('2') => {
+                    self.export_json();
+                    self.show_export_dialog = false;
+                }
+                KeyCode::Esc => {
+                    self.show_export_dialog = false;
+                }
+                _ => {}
+            }
         } else {
             match key {
+                KeyCode::Char('x') | KeyCode::Char('X') => {
+                    self.show_export_dialog = true;
+                }
                 KeyCode::Char('/') => {
                     self.search_focused = true;
                 }
@@ -109,6 +134,8 @@ impl HistoryTab {
                 KeyCode::Esc => {
                     if self.error_message.is_some() {
                         self.error_message = None;
+                    } else if self.export_message.is_some() {
+                        self.export_message = None;
                     } else {
                         self.show_detail = false;
                     }
@@ -176,6 +203,50 @@ impl HistoryTab {
         self.filtered_sessions.get(idx)
     }
 
+    fn export_csv(&mut self) {
+        let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("sessions_export_{}.csv", timestamp);
+        let export_path = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(".claude/exports")
+            .join(filename);
+
+        match ccboard_core::export_sessions_to_csv(&self.filtered_sessions, &export_path) {
+            Ok(_) => {
+                self.export_message = Some(format!(
+                    "✓ Exported {} sessions to {}",
+                    self.filtered_sessions.len(),
+                    export_path.display()
+                ));
+            }
+            Err(e) => {
+                self.export_message = Some(format!("✗ Export failed: {}", e));
+            }
+        }
+    }
+
+    fn export_json(&mut self) {
+        let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+        let filename = format!("sessions_export_{}.json", timestamp);
+        let export_path = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(".claude/exports")
+            .join(filename);
+
+        match ccboard_core::export_sessions_to_json(&self.filtered_sessions, &export_path) {
+            Ok(_) => {
+                self.export_message = Some(format!(
+                    "✓ Exported {} sessions to {}",
+                    self.filtered_sessions.len(),
+                    export_path.display()
+                ));
+            }
+            Err(e) => {
+                self.export_message = Some(format!("✗ Export failed: {}", e));
+            }
+        }
+    }
+
     /// Initialize with session data
     pub fn init(&mut self, sessions: &[SessionMetadata]) {
         self.update_filter(sessions);
@@ -241,6 +312,16 @@ impl HistoryTab {
         // Stats panel
         if self.show_stats && content_chunks.len() > chunk_idx {
             self.render_stats_panel(frame, content_chunks[chunk_idx], stats);
+        }
+
+        // Render export dialog if open
+        if self.show_export_dialog {
+            self.render_export_dialog(frame, area);
+        }
+
+        // Render export message if present
+        if self.export_message.is_some() {
+            self.render_export_message(frame, area);
         }
 
         // Render error popup if present
@@ -795,5 +876,104 @@ impl HistoryTab {
 
         let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(paragraph, inner);
+    }
+
+    fn render_export_dialog(&self, frame: &mut Frame, area: Rect) {
+        use ratatui::widgets::Clear;
+
+        // Center dialog (40% width, 30% height)
+        let dialog_width = (area.width as f32 * 0.4).max(40.0) as u16;
+        let dialog_height = 12;
+        let dialog_x = (area.width.saturating_sub(dialog_width)) / 2;
+        let dialog_y = (area.height.saturating_sub(dialog_height)) / 2;
+
+        let dialog_area = Rect {
+            x: area.x + dialog_x,
+            y: area.y + dialog_y,
+            width: dialog_width,
+            height: dialog_height,
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(Span::styled(
+                " Export Sessions ",
+                Style::default().fg(Color::Cyan).bold(),
+            ));
+
+        let inner = block.inner(dialog_area);
+
+        // Clear background
+        frame.render_widget(Clear, dialog_area);
+        frame.render_widget(block, dialog_area);
+
+        let lines = vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "Select export format:",
+                Style::default().fg(Color::White).bold(),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  1. ", Style::default().fg(Color::Cyan).bold()),
+                Span::styled("CSV format", Style::default().fg(Color::White).bold()),
+            ]),
+            Line::from(Span::styled(
+                "     Date, Time, Project, Messages, Tokens",
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  2. ", Style::default().fg(Color::Cyan).bold()),
+                Span::styled("JSON format", Style::default().fg(Color::White).bold()),
+            ]),
+            Line::from(Span::styled(
+                "     Full session metadata",
+                Style::default().fg(Color::DarkGray),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Press ESC to cancel",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ];
+
+        let paragraph = Paragraph::new(lines).alignment(Alignment::Left);
+        frame.render_widget(paragraph, inner);
+    }
+
+    fn render_export_message(&mut self, frame: &mut Frame, area: Rect) {
+        let Some(msg) = &self.export_message else {
+            return;
+        };
+
+        // Show message at bottom of screen for 3 seconds
+        let msg_height = 3;
+        let msg_area = Rect {
+            x: area.x + 2,
+            y: area.y + area.height.saturating_sub(msg_height + 1),
+            width: area.width.saturating_sub(4),
+            height: msg_height,
+        };
+
+        let is_success = msg.starts_with('✓');
+        let border_color = if is_success { Color::Green } else { Color::Red };
+        let text_color = if is_success { Color::Green } else { Color::Red };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(border_color));
+
+        let inner = block.inner(msg_area);
+        frame.render_widget(block, msg_area);
+
+        let paragraph = Paragraph::new(msg.as_str())
+            .style(Style::default().fg(text_color))
+            .wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(paragraph, inner);
+
+        // Auto-clear message after showing
+        self.export_message = None;
     }
 }
