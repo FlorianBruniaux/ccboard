@@ -1,7 +1,7 @@
 # Plan: Optimisation ccboard - ÉTAT ACTUEL
 
 **Dernière mise à jour**: 2026-02-03
-**Commit actuel**: `132eb25` - feat(perf): Implement SQLite metadata cache with 89x speedup
+**Commit actuel**: `99d7c4e` - feat(ui): Add animated loading spinner for startup (Phase 3.1)
 
 ---
 
@@ -255,9 +255,10 @@ Le cache SQLite résout déjà le bottleneck principal (20s → 0.2s). Les clone
 
 ---
 
-## 🚧 Phase 3: UI/UX Quick Wins (PROCHAINE ÉTAPE RECOMMANDÉE)
+## 🚧 Phase 3: UI/UX Quick Wins (EN COURS)
 
 **Durée estimée**: 6h
+**Durée réelle (partiel)**: 2h (Task 3.1 complete)
 **Priorité**: 🟡 P2 - Valeur utilisateur immédiate
 
 ### Objectif
@@ -266,23 +267,61 @@ Améliorer discoverability et feedback immédiat pendant l'utilisation.
 
 ### Tasks
 
-#### Task 3.1: Loading Spinners (2h)
+#### Task 3.1: Loading Spinners ✅ (COMPLÈTE)
 
-**Problème**: Utilisateur ne voit pas que le cache se construit (20s sans feedback).
+**Durée réelle**: 2h (vs 2h estimées)
 
-**Solution**:
+**Problème**: Utilisateur voyait terminal vide pendant 20s (cold cache) sans feedback → apparence de freeze.
+
+**Solution Implémentée**:
 ```rust
-// crates/ccboard-tui/src/components/spinner.rs (+85 LOC)
+// crates/ccboard-tui/src/components/spinner.rs (+143 LOC)
 pub struct Spinner {
     frames: &'static [&'static str],  // ["⠋", "⠙", "⠹", ...]
     current_frame: usize,
+    frame_duration: Duration,
+    color: Color,
 }
 
-// Afficher pendant initial_load()
-"Loading sessions... ⠋ (3520 scanned, 1024 cached)"
+// 4 styles disponibles: Dots, Line, Bounce, Circle
+// 80ms frame rate par défaut pour animation fluide
 ```
 
-**Validation**: Le spinner anime pendant le load, disparaît après.
+**Architecture**:
+- TUI démarre immédiatement (pas de blocking)
+- `initial_load()` spawned en background (tokio::spawn)
+- oneshot channel pour signaler completion
+- Loading screen avec spinner animé pendant background load
+- Transition automatique vers UI normale quand complété
+
+**Changements**:
+```
+crates/ccboard-tui/src/components/spinner.rs  (+143 LOC, new)
+crates/ccboard-tui/src/app.rs                 (+25 LOC, loading state)
+crates/ccboard-tui/src/ui.rs                  (+93 LOC, loading screen)
+crates/ccboard-tui/src/lib.rs                 (+60 LOC, background task)
+crates/ccboard/src/main.rs                    (-21 LOC, remove blocking)
+```
+
+**Résultats**:
+- ✅ TUI affiche en <10ms (loading screen léger)
+- ✅ Animation Braille dots 80ms frame rate
+- ✅ Peut quitter avec 'q' pendant loading
+- ✅ Transition fluide vers UI normale après load
+- ✅ 3 tests unitaires passent (spinner cycling, styles)
+
+**Validation**:
+```bash
+cargo test --package ccboard-tui spinner
+# ✓ 3 tests pass
+
+cargo build --all
+# ✓ 0 errors, 0 warnings (spinner code)
+```
+
+**UX Impact**:
+- Avant: Terminal vide 20s → confusion
+- Après: Feedback immédiat → progression visible → transition
 
 #### Task 3.2: Help Modal (2h)
 
