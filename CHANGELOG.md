@@ -118,6 +118,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tested: 5 unit tests (CSV empty/data, JSON empty/data, directory creation)
   - Compatible with Excel, Google Sheets, jq, data analysis tools
 
+- **Sessions Tab Live Refresh** (Task C.4)
+  - Real-time session update indicators with visual feedback
+  - Timestamp tracking with `Instant::now()` for precise elapsed time
+  - Added fields to SessionsTab:
+    - `last_refresh: Instant` - tracks when data was last refreshed
+    - `refresh_message: Option<String>` - notification message
+    - `prev_session_count: usize` - detects session count changes
+  - Implemented `mark_refreshed()` to track and notify on data updates
+    - Detects session count changes: "+3 new", "-2 removed", "refreshed"
+    - Shows green notification banner on changes
+  - Implemented `format_time_ago()` for human-readable elapsed time
+    - Formats: "just now", "5s ago", "2m ago", "1h ago"
+  - Implemented `render_refresh_notification()` for bottom banner overlay
+    - 60% width, 3 lines height, centered at bottom
+    - Green borders and text for success feedback
+    - Auto-clears after one render cycle
+  - Modified `render_sessions()` title to show timestamp: "Sessions (15) • 2m ago"
+  - Call `mark_refreshed()` in ui.rs when Sessions tab renders with fresh data
+  - Integrates with FileWatcher EventBus for real-time updates
+    - DataEvent::SessionCreated, SessionUpdated, LoadCompleted trigger refresh
+  - Module: `tabs/sessions.rs` (+88 LOC)
+  - UI integration: `ui.rs` (+3 LOC to call mark_refreshed)
+  - All 152 tests passing, zero clippy warnings
+
 ### Changed
 - **Startup Flow**: TUI now starts immediately with loading screen instead of blocking
 - **Main Binary**: Removed blocking `initial_load()` before TUI start

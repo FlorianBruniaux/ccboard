@@ -1,7 +1,7 @@
 # Plan: Optimisation ccboard - ÉTAT ACTUEL
 
 **Dernière mise à jour**: 2026-02-03
-**Commit actuel**: `aa25266` - feat(ui): Add search highlighting in Sessions and History (Phase 3.3)
+**Commit actuel**: `8877362` - feat(sessions): Add live refresh indicators with time tracking (Phase C.4 - PHASE C COMPLETE)
 
 ---
 
@@ -629,13 +629,13 @@ pub enum Event {
 
 ---
 
-### 🚧 PHASE C: Additional Features - EN COURS (6/8h)
+### ✅ PHASE C: Additional Features - COMPLÈTE (8/8h)
 
 **Tasks créées**:
 - ✅ C.1: MCP Tab enhancements (2h) **COMPLÉTÉ 2026-02-03**
 - ✅ C.2: History Tab export CSV/JSON (2h) **COMPLÉTÉ 2026-02-03**
 - ✅ C.3: Costs Tab billing blocks CSV export (2h) **COMPLÉTÉ 2026-02-03**
-- ⏳ C.4: Sessions Tab live refresh (2h)
+- ✅ C.4: Sessions Tab live refresh (2h) **COMPLÉTÉ 2026-02-03**
 
 **Ordre suggéré**: C.3 ✅ → C.2 ✅ → C.1 ✅ → C.4
 
@@ -887,6 +887,63 @@ crates/ccboard-tui/src/components/help_modal.rs      (+7 LOC, 'y' keybinding)
 
 ---
 
+#### Task C.4: Sessions Tab Live Refresh ✅ (COMPLÈTE)
+
+**Durée réelle**: 2h (vs 2h estimées)
+
+**Objectif**: Ajouter des indicateurs visuels de rafraîchissement en temps réel dans le Sessions tab.
+
+**Solution Implémentée**:
+```rust
+// crates/ccboard-tui/src/tabs/sessions.rs (+88 LOC)
+pub struct SessionsTab {
+    last_refresh: Instant,           // Timestamp du dernier refresh
+    refresh_message: Option<String>, // Message de notification
+    prev_session_count: usize,       // Compteur précédent pour détection changements
+}
+
+pub fn mark_refreshed(&mut self, current_session_count: usize) {
+    // Détecte changements et affiche notification
+    // "✓ 3 new session(s) detected" ou "✓ Data refreshed"
+}
+
+fn format_time_ago(&self) -> String {
+    // Formate temps écoulé: "just now", "5s ago", "2m ago", "1h ago"
+}
+
+fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect) {
+    // Bannière verte en bas (60% width, 3 lines height)
+    // Auto-clear après affichage
+}
+```
+
+**Features**:
+- ✅ Timestamp en header: "Sessions (15) • 2m ago"
+- ✅ Notification verte en overlay bottom banner (60% width, centrée)
+- ✅ Détection changements de session count
+- ✅ Messages contextuels: "+3 new" / "-2 removed" / "refreshed"
+- ✅ Auto-clear notification après 1 render cycle
+- ✅ Intégration EventBus (SessionCreated, SessionUpdated, LoadCompleted)
+- ✅ Format temps humain (just now, 5s, 2m, 1h ago)
+- ✅ Call mark_refreshed() dans ui.rs quand données chargées
+
+**Tests**:
+- ✅ All 152 tests passing
+- ✅ Zero clippy warnings
+- ✅ Build successful
+
+**UI Behavior**:
+- Timestamp updates every render (shows elapsed time since last refresh)
+- Green notification banner appears when data refreshes
+- Notification auto-dismisses after one render cycle
+- Works with FileWatcher events for real-time updates
+
+**Commit**: `8877362` - feat(sessions): Add live refresh indicators with time tracking
+
+**Status**: ✅ **COMPLÉTÉ** (2026-02-03)
+
+---
+
 ### ⏸️ PHASE D: Arc Migration - PLANIFIÉ (2h)
 
 **Description**: Replace clones avec Arc<SessionMetadata> (400x less RAM)
@@ -895,10 +952,14 @@ crates/ccboard-tui/src/components/help_modal.rs      (+7 LOC, 'y' keybinding)
 
 ## 🎯 Prochaine Action
 
-**Continuer Phase C** - Dernière tâche: **C.4: Sessions Tab live refresh**
+**Phase C COMPLÈTE** ✅ - Toutes les tâches achevées!
 
-**Progression Phase C**: 6/8h complétées (75%)
+**Progression Phase C**: 8/8h complétées (100%)
 - ✅ C.3: Billing blocks CSV export (2h) - COMPLÉTÉ
 - ✅ C.2: History Tab export CSV/JSON (2h) - COMPLÉTÉ
 - ✅ C.1: MCP Tab enhanced detail pane (2h) - COMPLÉTÉ
-- ⏳ C.4: Sessions Tab live refresh (2h) - TODO
+- ✅ C.4: Sessions Tab live refresh (2h) - COMPLÉTÉ
+
+**Prochaines phases suggérées**:
+- Phase D: Arc Migration (2h) - Replace clones avec Arc<SessionMetadata>
+- Phase E: Additional UI/UX features (selon besoins utilisateur)
