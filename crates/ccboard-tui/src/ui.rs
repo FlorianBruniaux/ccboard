@@ -377,7 +377,7 @@ impl Ui {
                 Tab::Dashboard => "F5 refresh",
                 Tab::Sessions => "←→ nav │ / search │ gg/G/Home/End jump",
                 Tab::Config => "←→ columns │ ↑↓ scroll │ e edit │ o reveal",
-                Tab::Hooks => "←→ nav │ ↑↓ select",
+                Tab::Hooks => "←→ nav │ ↑↓ select │ t test │ e edit │ o reveal",
                 Tab::Agents => "Tab switch │ Enter detail",
                 Tab::Costs => "Tab/←→/h/l switch views",
                 Tab::History => "/ search │ gg/G/Home/End jump │ c clear │ x export",

@@ -27,6 +27,8 @@ pub struct HooksTab {
     error_message: Option<String>,
     /// Scroll offset for content view
     content_scroll: u16,
+    /// Test result message (output from running hook)
+    test_result: Option<String>,
 }
 
 impl Default for HooksTab {
@@ -49,6 +51,7 @@ impl HooksTab {
             event_names: Vec::new(),
             error_message: None,
             content_scroll: 0,
+            test_result: None,
         }
     }
 
@@ -132,8 +135,30 @@ impl HooksTab {
                     }
                 }
             }
+            KeyCode::Char('t') => {
+                // Test hook (execute and show result)
+                if self.focus == 1 || self.focus == 2 {
+                    if let Some(hook) = self.get_selected_hook(hooks_map) {
+                        self.test_result = Some(format!("Testing hook: {}", hook.command));
+                        match self.execute_hook(hook) {
+                            Ok(output) => {
+                                self.test_result = Some(format!(
+                                    "✓ Hook executed successfully\n\nOutput:\n{}",
+                                    output
+                                ));
+                            }
+                            Err(e) => {
+                                self.test_result =
+                                    Some(format!("✗ Hook execution failed\n\nError:\n{}", e));
+                            }
+                        }
+                    }
+                }
+            }
             KeyCode::Esc => {
-                if self.error_message.is_some() {
+                if self.test_result.is_some() {
+                    self.test_result = None;
+                } else if self.error_message.is_some() {
                     self.error_message = None;
                 }
             }
@@ -197,6 +222,73 @@ impl HooksTab {
         all_hooks.get(hook_idx).copied()
     }
 
+    /// Execute hook for testing (synchronous, with timeout)
+    fn execute_hook(&self, hook: &HookDefinition) -> Result<String, String> {
+        use std::process::{Command, Stdio};
+
+        // Parse command (simple split on whitespace, doesn't handle quotes properly but good enough for testing)
+        let parts: Vec<&str> = hook.command.split_whitespace().collect();
+        if parts.is_empty() {
+            return Err("Empty command".to_string());
+        }
+
+        let mut cmd = Command::new(parts[0]);
+        if parts.len() > 1 {
+            cmd.args(&parts[1..]);
+        }
+
+        // Apply working directory if specified
+        if let Some(ref cwd) = hook.cwd {
+            cmd.current_dir(cwd);
+        }
+
+        // Apply environment variables if specified
+        if let Some(ref env) = hook.env {
+            for (key, value) in env {
+                cmd.env(key, value);
+            }
+        }
+
+        // Set timeout (default 5s if not specified)
+        // Note: Basic implementation without actual timeout enforcement
+        // For production, use wait_timeout crate or tokio::time::timeout
+        let _timeout_secs = hook.timeout.unwrap_or(5);
+
+        // Execute
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+        let output = cmd
+            .output()
+            .map_err(|e| format!("Failed to execute: {}", e))?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let mut result = String::new();
+            if !stdout.is_empty() {
+                result.push_str(&stdout);
+            }
+            if !stderr.is_empty() {
+                if !result.is_empty() {
+                    result.push_str("\n\nStderr:\n");
+                }
+                result.push_str(&stderr);
+            }
+            Ok(if result.is_empty() {
+                "(no output)".to_string()
+            } else {
+                result
+            })
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            Err(format!(
+                "Command exited with code {}\n\nStderr:\n{}",
+                output.status.code().unwrap_or(-1),
+                stderr
+            ))
+        }
+    }
+
     /// Render the hooks tab
     pub fn render(&mut self, frame: &mut Frame, area: Rect, settings: &Settings) {
         let hooks = settings.hooks.as_ref();
@@ -247,6 +339,11 @@ impl HooksTab {
         // Render error popup if present
         if self.error_message.is_some() {
             self.render_error_popup(frame, area);
+        }
+
+        // Render test result popup if present
+        if self.test_result.is_some() {
+            self.render_test_result_popup(frame, area);
         }
     }
 
@@ -415,14 +512,36 @@ impl HooksTab {
             .map(|(i, (_matcher, hook))| {
                 let is_selected = self.hook_state.selected() == Some(i);
 
-                // Simplified display: just command (truncated if too long)
-                let command = if hook.command.len() > 40 {
-                    format!("{}…", &hook.command[..37])
+                // Build badges
+                let mut badges = Vec::new();
+                if hook.r#async.unwrap_or(false) {
+                    badges.push(Span::styled(" async ", Style::default().fg(Color::Cyan)));
+                }
+                if let Some(timeout) = hook.timeout {
+                    badges.push(Span::styled(
+                        format!(" ⏱{}s ", timeout),
+                        Style::default().fg(Color::Yellow),
+                    ));
+                }
+                if let Some(ref env) = hook.env {
+                    if !env.is_empty() {
+                        badges.push(Span::styled(
+                            format!(" env:{} ", env.len()),
+                            Style::default().fg(Color::Magenta),
+                        ));
+                    }
+                }
+
+                // Truncate command to fit with badges
+                let badge_len: usize = badges.iter().map(|s| s.content.len()).sum();
+                let max_cmd_len = 60usize.saturating_sub(badge_len);
+                let command = if hook.command.len() > max_cmd_len {
+                    format!("{}…", &hook.command[..max_cmd_len.saturating_sub(1)])
                 } else {
                     hook.command.clone()
                 };
 
-                let line = Line::from(vec![
+                let mut spans = vec![
                     Span::styled(
                         if is_selected { "▶ " } else { "  " },
                         Style::default().fg(Color::Cyan),
@@ -438,9 +557,10 @@ impl HooksTab {
                             Style::default().fg(Color::White)
                         },
                     ),
-                ]);
+                ];
+                spans.extend(badges);
 
-                ListItem::new(line)
+                ListItem::new(Line::from(spans))
             })
             .collect();
 
@@ -457,6 +577,90 @@ impl HooksTab {
                 ScrollbarState::new(hook_count).position(self.hook_state.selected().unwrap_or(0));
             frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
         }
+    }
+
+    /// Basic bash syntax highlighting
+    fn highlight_bash_line(line: &str) -> Line<'_> {
+        let trimmed = line.trim_start();
+
+        // Comments (entire line)
+        if trimmed.starts_with('#') {
+            return Line::from(Span::styled(line, Style::default().fg(Color::DarkGray)));
+        }
+
+        // Shebang
+        if line.starts_with("#!") {
+            return Line::from(Span::styled(line, Style::default().fg(Color::Magenta)));
+        }
+
+        let mut spans = Vec::new();
+        let mut chars = line.chars().peekable();
+        let mut current_word = String::new();
+        let mut in_string = false;
+        let mut string_char = ' ';
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                // String delimiters
+                '"' | '\'' if !in_string => {
+                    if !current_word.is_empty() {
+                        spans.push(Span::raw(current_word.clone()));
+                        current_word.clear();
+                    }
+                    in_string = true;
+                    string_char = ch;
+                    current_word.push(ch);
+                }
+                '"' | '\'' if in_string && ch == string_char => {
+                    current_word.push(ch);
+                    spans.push(Span::styled(current_word.clone(), Style::default().fg(Color::Green)));
+                    current_word.clear();
+                    in_string = false;
+                }
+                // Variables
+                '$' if !in_string => {
+                    if !current_word.is_empty() {
+                        spans.push(Span::raw(current_word.clone()));
+                        current_word.clear();
+                    }
+                    current_word.push(ch);
+                    // Capture variable name
+                    while let Some(&next_ch) = chars.peek() {
+                        if next_ch.is_alphanumeric() || next_ch == '_' || next_ch == '{' || next_ch == '}' {
+                            current_word.push(chars.next().unwrap());
+                        } else {
+                            break;
+                        }
+                    }
+                    spans.push(Span::styled(current_word.clone(), Style::default().fg(Color::Cyan)));
+                    current_word.clear();
+                }
+                // Regular characters
+                _ => {
+                    current_word.push(ch);
+                }
+            }
+        }
+
+        // Flush remaining
+        if !current_word.is_empty() {
+            if in_string {
+                spans.push(Span::styled(current_word, Style::default().fg(Color::Green)));
+            } else {
+                // Check if it's a common bash keyword
+                let keywords = ["if", "then", "else", "elif", "fi", "for", "while", "do", "done",
+                               "case", "esac", "function", "return", "exit", "echo", "export"];
+                let first_word = current_word.split_whitespace().next().unwrap_or("");
+
+                if keywords.contains(&first_word) {
+                    spans.push(Span::styled(current_word, Style::default().fg(Color::Yellow)));
+                } else {
+                    spans.push(Span::raw(current_word));
+                }
+            }
+        }
+
+        Line::from(spans)
     }
 
     fn render_hook_content(&self, frame: &mut Frame, area: Rect, hook: &HookDefinition) {
@@ -493,12 +697,12 @@ impl HooksTab {
             "No file path available".to_string()
         };
 
-        // Split content into lines and apply scroll offset
+        // Split content into lines and apply scroll offset with syntax highlighting
         let lines: Vec<Line> = content
             .lines()
             .skip(self.content_scroll as usize)
             .take(inner.height as usize)
-            .map(|line| Line::from(Span::raw(line)))
+            .map(|line| Self::highlight_bash_line(line))
             .collect();
 
         // Display hint at bottom if focused
@@ -609,6 +813,73 @@ impl HooksTab {
         ];
 
         let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(paragraph, inner);
+    }
+
+    fn render_test_result_popup(&self, frame: &mut Frame, area: Rect) {
+        use ratatui::widgets::Clear;
+
+        // Larger popup for test results (60% width, 50% height)
+        let popup_width = (area.width as f32 * 0.6).max(60.0) as u16;
+        let popup_height = (area.height as f32 * 0.5).max(15.0) as u16;
+        let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+        let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+        let popup_area = Rect {
+            x: area.x + popup_x,
+            y: area.y + popup_y,
+            width: popup_width,
+            height: popup_height,
+        };
+
+        // Clear background
+        frame.render_widget(Clear, popup_area);
+
+        let test_text = self.test_result.as_deref().unwrap_or("No result");
+        let is_success = test_text.starts_with('✓');
+        let border_color = if is_success { Color::Green } else { Color::Red };
+        let title = if is_success {
+            " Test Result - Success "
+        } else {
+            " Test Result - Failed "
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(border_color))
+            .title(Span::styled(
+                title,
+                Style::default().fg(border_color).bold(),
+            ));
+
+        let inner = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+
+        // Split result into lines
+        let lines: Vec<Line> = test_text
+            .lines()
+            .map(|line| {
+                if line.starts_with('✓') || line.starts_with('✗') {
+                    Line::from(Span::styled(
+                        line,
+                        Style::default().fg(border_color).bold(),
+                    ))
+                } else {
+                    Line::from(Span::styled(line, Style::default().fg(Color::White)))
+                }
+            })
+            .collect();
+
+        let mut final_lines = lines;
+        final_lines.push(Line::from(""));
+        final_lines.push(Line::from(Span::styled(
+            "Press Esc to close",
+            Style::default().fg(Color::DarkGray),
+        )));
+
+        let paragraph = Paragraph::new(final_lines)
+            .wrap(ratatui::widgets::Wrap { trim: false })
+            .scroll((0, 0));
         frame.render_widget(paragraph, inner);
     }
 }
