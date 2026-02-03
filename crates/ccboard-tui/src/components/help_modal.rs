@@ -239,11 +239,15 @@ impl HelpModal {
             Tab::Mcp => {
                 lines.push(Line::from(vec![
                     Span::styled("  ←/→         ", Style::default().fg(Color::Cyan)),
-                    Span::raw("Focus server/tool columns"),
+                    Span::raw("Focus server/detail panes"),
                 ]));
                 lines.push(Line::from(vec![
                     Span::styled("  ↑/↓         ", Style::default().fg(Color::Cyan)),
-                    Span::raw("Select server/tool"),
+                    Span::raw("Select server"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  y           ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Copy command to clipboard"),
                 ]));
                 lines.push(Line::from(vec![
                     Span::styled("  e           ", Style::default().fg(Color::Cyan)),
@@ -255,7 +259,7 @@ impl HelpModal {
                 ]));
                 lines.push(Line::from(vec![
                     Span::styled("  r           ", Style::default().fg(Color::Cyan)),
-                    Span::raw("Refresh servers"),
+                    Span::raw("Refresh server status"),
                 ]));
             }
         }

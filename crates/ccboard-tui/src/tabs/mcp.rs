@@ -80,6 +80,8 @@ pub struct McpTab {
     last_refresh: Instant,
     /// Error message to display in popup (if any)
     error_message: Option<String>,
+    /// Copy success message to display
+    copy_message: Option<String>,
 }
 
 impl Default for McpTab {
@@ -100,15 +102,22 @@ impl McpTab {
             status_cache: HashMap::new(),
             last_refresh: Instant::now(),
             error_message: None,
+            copy_message: None,
         }
     }
 
     /// Handle keyboard input
     pub fn handle_key(&mut self, key: KeyCode, mcp_config: Option<&McpConfig>) {
-        // Close error popup
-        if key == KeyCode::Esc && self.error_message.is_some() {
-            self.error_message = None;
-            return;
+        // Close error/copy message popup
+        if key == KeyCode::Esc {
+            if self.error_message.is_some() {
+                self.error_message = None;
+                return;
+            }
+            if self.copy_message.is_some() {
+                self.copy_message = None;
+                return;
+            }
         }
 
         let server_count = mcp_config.map(|c| c.servers.len()).unwrap_or(0);
@@ -146,6 +155,11 @@ impl McpTab {
                 self.handle_reveal_config();
             }
 
+            // Copy command to clipboard
+            KeyCode::Char('y') => {
+                self.handle_copy_command(mcp_config);
+            }
+
             // Refresh status
             KeyCode::Char('r') => {
                 self.refresh_status(mcp_config);
@@ -180,6 +194,11 @@ impl McpTab {
 
         // Render server detail
         self.render_server_detail(frame, chunks[1], mcp_config);
+
+        // Render copy message if present (overlay)
+        if self.copy_message.is_some() {
+            self.render_copy_message(frame, area);
+        }
 
         // Render error popup if present (overlay)
         if self.error_message.is_some() {
@@ -337,6 +356,15 @@ impl McpTab {
 
         let mut lines = vec![];
 
+        // Description (if known server type)
+        if let Some(desc) = Self::get_server_description(name, server) {
+            lines.push(Line::from(Span::styled(
+                desc,
+                Style::default().fg(Color::DarkGray).italic(),
+            )));
+            lines.push(Line::from(""));
+        }
+
         // Status line
         let (status_icon, status_color) = status.icon();
         let status_text = status.text();
@@ -361,22 +389,20 @@ impl McpTab {
         )));
         lines.push(Line::from(""));
 
-        // Arguments
+        // Arguments with syntax highlighting
         if !server.args.is_empty() {
             lines.push(Line::from(Span::styled(
                 "Arguments:",
                 Style::default().fg(Color::Yellow).bold(),
             )));
             for arg in &server.args {
-                lines.push(Line::from(Span::styled(
-                    format!("  {}", arg),
-                    Style::default().fg(Color::White),
-                )));
+                let spans = Self::highlight_arg(arg);
+                lines.push(Line::from(spans));
             }
             lines.push(Line::from(""));
         }
 
-        // Environment variables
+        // Environment variables with masking for sensitive values
         lines.push(Line::from(Span::styled(
             "Environment:",
             Style::default().fg(Color::Yellow).bold(),
@@ -387,10 +413,24 @@ impl McpTab {
                 Style::default().fg(Color::DarkGray),
             )));
         } else {
-            for (key, value) in &server.env {
+            // Sort env vars for consistent display
+            let mut env_vars: Vec<_> = server.env.iter().collect();
+            env_vars.sort_by_key(|(k, _)| *k);
+
+            for (key, value) in env_vars {
+                let masked_value = Self::mask_sensitive_env(key, value);
+                let value_color = if masked_value.contains("••••") {
+                    Color::DarkGray // Masked values in gray
+                } else {
+                    Color::White
+                };
+
                 lines.push(Line::from(vec![
-                    Span::styled(format!("  {}=", key), Style::default().fg(Color::Cyan)),
-                    Span::styled(value.clone(), Style::default().fg(Color::White)),
+                    Span::styled(
+                        format!("  {} = ", key),
+                        Style::default().fg(Color::Cyan).bold(),
+                    ),
+                    Span::styled(masked_value, Style::default().fg(value_color)),
                 ]));
             }
         }
@@ -416,7 +456,7 @@ impl McpTab {
             Style::default().fg(Color::Yellow).bold(),
         )));
         lines.push(Line::from(Span::styled(
-            "  [e] Edit config  [o] Reveal file  [r] Refresh status",
+            "  [y] Copy command  [e] Edit config  [o] Reveal file  [r] Refresh",
             Style::default().fg(Color::DarkGray),
         )));
 
@@ -523,6 +563,35 @@ impl McpTab {
         }
     }
 
+    /// Handle 'y' key - copy command to clipboard
+    fn handle_copy_command(&mut self, mcp_config: Option<&McpConfig>) {
+        let Some((name, server)) = self.get_selected_server(mcp_config) else {
+            self.error_message = Some("No server selected".to_string());
+            return;
+        };
+
+        // Build full command string
+        let command = if server.args.is_empty() {
+            server.command.clone()
+        } else {
+            format!("{} {}", server.command, server.args.join(" "))
+        };
+
+        // Copy to clipboard
+        match arboard::Clipboard::new() {
+            Ok(mut clipboard) => {
+                if let Err(e) = clipboard.set_text(&command) {
+                    self.error_message = Some(format!("Failed to copy: {}", e));
+                } else {
+                    self.copy_message = Some(format!("✓ Copied to clipboard: {}", name));
+                }
+            }
+            Err(e) => {
+                self.error_message = Some(format!("Clipboard error: {}", e));
+            }
+        }
+    }
+
     /// Render error popup overlay
     fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
         if self.error_message.is_none() {
@@ -565,6 +634,126 @@ impl McpTab {
 
         let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(paragraph, inner);
+    }
+
+    /// Render copy success message overlay
+    fn render_copy_message(&self, frame: &mut Frame, area: Rect) {
+        if self.copy_message.is_none() {
+            return;
+        }
+
+        // Bottom notification (80% width, 3 lines height)
+        let msg_width = (area.width as f32 * 0.8) as u16;
+        let msg_height = 3;
+        let msg_x = (area.width.saturating_sub(msg_width)) / 2;
+        let msg_y = area.height.saturating_sub(msg_height + 2);
+
+        let msg_area = Rect {
+            x: area.x + msg_x,
+            y: area.y + msg_y,
+            width: msg_width,
+            height: msg_height,
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Green));
+
+        let inner = block.inner(msg_area);
+        frame.render_widget(block, msg_area);
+
+        let msg_text = self.copy_message.as_deref().unwrap_or("");
+        let paragraph = Paragraph::new(msg_text)
+            .style(Style::default().fg(Color::Green))
+            .alignment(Alignment::Center);
+        frame.render_widget(paragraph, inner);
+    }
+
+    /// Highlight argument with syntax coloring
+    ///
+    /// Detects:
+    /// - Flags: --flag, -f (Cyan)
+    /// - Paths: /absolute, ./relative (Green)
+    /// - URLs: http://, https:// (Magenta)
+    /// - Values: normal (White)
+    fn highlight_arg(arg: &str) -> Vec<Span<'static>> {
+        let mut spans = vec![Span::raw("  ")];
+
+        // Flag detection (--flag or -f)
+        if arg.starts_with("--")
+            || (arg.starts_with('-') && !arg.starts_with("--") && arg.len() == 2)
+        {
+            spans.push(Span::styled(
+                arg.to_string(),
+                Style::default().fg(Color::Cyan).bold(),
+            ));
+        }
+        // URL detection
+        else if arg.starts_with("http://") || arg.starts_with("https://") {
+            spans.push(Span::styled(
+                arg.to_string(),
+                Style::default().fg(Color::Magenta),
+            ));
+        }
+        // Path detection (absolute or relative)
+        else if arg.starts_with('/') || arg.starts_with("./") || arg.starts_with("../") {
+            spans.push(Span::styled(
+                arg.to_string(),
+                Style::default().fg(Color::Green),
+            ));
+        }
+        // Regular value
+        else {
+            spans.push(Span::styled(
+                arg.to_string(),
+                Style::default().fg(Color::White),
+            ));
+        }
+
+        spans
+    }
+
+    /// Mask sensitive environment variable values
+    ///
+    /// Detects common patterns like API_KEY, TOKEN, SECRET, PASSWORD
+    /// and masks the value showing only first 4 and last 4 characters
+    fn mask_sensitive_env(key: &str, value: &str) -> String {
+        let key_lower = key.to_lowercase();
+        let is_sensitive = key_lower.contains("key")
+            || key_lower.contains("token")
+            || key_lower.contains("secret")
+            || key_lower.contains("password")
+            || key_lower.contains("api");
+
+        if is_sensitive && value.len() > 8 {
+            format!("{}••••{}", &value[..4], &value[value.len() - 4..])
+        } else {
+            value.to_string()
+        }
+    }
+
+    /// Detect known MCP server types and return description
+    fn get_server_description(name: &str, server: &McpServer) -> Option<String> {
+        // Check command/args for known servers
+        let cmd_str = format!("{} {}", server.command, server.args.join(" "));
+
+        if name.contains("playwright") || cmd_str.contains("playwright") {
+            Some("Browser automation and web testing server".to_string())
+        } else if name.contains("serena") || cmd_str.contains("serena") {
+            Some("Code search and semantic analysis server".to_string())
+        } else if name.contains("filesystem") || cmd_str.contains("filesystem") {
+            Some("File system operations server".to_string())
+        } else if name.contains("sequential") || cmd_str.contains("sequential") {
+            Some("Multi-step reasoning and analysis server".to_string())
+        } else if name.contains("context7") || cmd_str.contains("context7") {
+            Some("Documentation and context retrieval server".to_string())
+        } else if name.contains("perplexity") || cmd_str.contains("perplexity") {
+            Some("Web search and research server".to_string())
+        } else if name.contains("claude-in-chrome") || cmd_str.contains("claude-in-chrome") {
+            Some("Browser automation via Chrome extension".to_string())
+        } else {
+            None
+        }
     }
 }
 
