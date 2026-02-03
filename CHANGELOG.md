@@ -59,6 +59,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Highlights all occurrences in text
   - Black bold text on yellow background for contrast
 
+#### Export & Analysis Features (Phase C)
+- **Billing Blocks CSV Export** (Task C.3)
+  - Export billing blocks to CSV format for external analysis
+  - Function: `export_billing_blocks_to_csv(&manager, &path)`
+  - CSV columns: Date, Block (UTC), Tokens, Sessions, Cost
+  - Sorted by date/time (most recent first)
+  - Cost formatted with 3 decimal places ($X.XXX)
+  - Auto-creates parent directories
+  - BufWriter for efficient I/O on large datasets
+  - Example: `cargo run --example export_billing_blocks`
+  - Module: `ccboard-core/src/export.rs` (+175 LOC)
+  - Compatible with Excel, Google Sheets, LibreOffice
+  - Tested with 3638 sessions → 104 billing blocks exported
+
 ### Changed
 - **Startup Flow**: TUI now starts immediately with loading screen instead of blocking
 - **Main Binary**: Removed blocking `initial_load()` before TUI start
@@ -78,6 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Spinner: 3 tests (cycling, styles, custom color)
   - Help Modal: 2 tests (toggle, hide)
   - Search Highlighting: 5 tests (empty query, single/multiple matches, case-insensitive, no match)
+- Phase C: Export tests (5 tests total)
+  - CSV Export: 5 tests (empty manager, with data, parent dir creation, cost formatting, multi-date sorting)
 
 ### Dependencies
 - Added `criterion = "0.5"` for benchmarking
