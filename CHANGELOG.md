@@ -141,6 +141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Module: `tabs/sessions.rs` (+88 LOC)
   - UI integration: `ui.rs` (+3 LOC to call mark_refreshed)
   - All 152 tests passing, zero clippy warnings
+  - Test guide: `TEST_GUIDE_PHASE_C4.md` (comprehensive manual testing guide)
+  - Test script: `scripts/test_phase_c4.sh` (automated validation script)
 
 ### Changed
 - **Startup Flow**: TUI now starts immediately with loading screen instead of blocking
