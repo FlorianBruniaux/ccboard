@@ -1,6 +1,6 @@
 //! TUI Application state and event loop
 
-use crate::components::{CommandPalette, Spinner};
+use crate::components::{CommandPalette, HelpModal, Spinner};
 use ccboard_core::{DataEvent, DataStore};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -123,6 +123,9 @@ pub struct App {
     /// Command palette (k9s-style `:` prefix)
     pub command_palette: CommandPalette,
 
+    /// Help modal (toggle with `?`)
+    pub help_modal: HelpModal,
+
     /// Loading state (true during initial_load)
     pub is_loading: bool,
 
@@ -145,6 +148,7 @@ impl App {
             needs_refresh: true,
             status_message: None,
             command_palette: CommandPalette::new(),
+            help_modal: HelpModal::new(),
             is_loading: true,
             loading_message: Some("Loading sessions...".to_string()),
             spinner: Spinner::new(),
@@ -191,6 +195,16 @@ impl App {
 
         // Global keybindings (when palette is not active)
         match key {
+            KeyCode::Char('?') => {
+                // Toggle help modal
+                self.help_modal.toggle();
+                true
+            }
+            KeyCode::Esc if self.help_modal.is_visible() => {
+                // Close help modal with ESC
+                self.help_modal.hide();
+                true
+            }
             KeyCode::Char(':') => {
                 // Show command palette
                 self.command_palette.show();

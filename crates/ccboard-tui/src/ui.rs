@@ -135,6 +135,9 @@ impl Ui {
 
         // Render command palette (overlay on top of everything)
         app.command_palette.render(frame, size);
+
+        // Render help modal (overlay on top of command palette)
+        app.help_modal.render(frame, size, app.active_tab);
     }
 
     fn render_loading_screen(&mut self, frame: &mut Frame, area: Rect, app: &mut App) {
