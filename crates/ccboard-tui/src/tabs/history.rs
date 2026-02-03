@@ -1,5 +1,6 @@
 //! History tab - Search and filter prompt history
 
+use crate::components::highlight_matches;
 use ccboard_core::models::{SessionMetadata, StatsCache};
 use ratatui::{
     Frame,
@@ -386,6 +387,15 @@ impl HistoryTab {
                     Style::default().fg(Color::White)
                 };
 
+                // Build preview line with optional highlighting
+                let mut preview_line = vec![Span::styled("    ", Style::default())];
+                if !self.search_query.is_empty() {
+                    let highlighted = highlight_matches(&preview, &self.search_query);
+                    preview_line.extend(highlighted);
+                } else {
+                    preview_line.push(Span::styled(preview, style));
+                }
+
                 ListItem::new(vec![
                     Line::from(vec![
                         Span::styled(
@@ -396,10 +406,7 @@ impl HistoryTab {
                         Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                         Span::styled(project_short, Style::default().fg(Color::Green)),
                     ]),
-                    Line::from(vec![
-                        Span::styled("    ", Style::default()),
-                        Span::styled(preview, style),
-                    ]),
+                    Line::from(preview_line),
                     Line::from(vec![
                         Span::styled("    ", Style::default()),
                         Span::styled(
@@ -648,7 +655,7 @@ impl HistoryTab {
             return;
         };
 
-        let lines = vec![
+        let mut lines = vec![
             Line::from(vec![
                 Span::styled("ID: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(&session.id, Style::default().fg(Color::White)),
@@ -728,14 +735,23 @@ impl HistoryTab {
                 "First message:",
                 Style::default().fg(Color::DarkGray),
             )),
-            Line::from(Span::styled(
-                session
-                    .first_user_message
-                    .as_deref()
-                    .unwrap_or("No preview available"),
-                Style::default().fg(Color::White),
-            )),
         ];
+
+        // Add highlighted first message if searching
+        let first_msg = session
+            .first_user_message
+            .as_deref()
+            .unwrap_or("No preview available");
+
+        if !self.search_query.is_empty() {
+            let highlighted = highlight_matches(first_msg, &self.search_query);
+            lines.push(Line::from(highlighted));
+        } else {
+            lines.push(Line::from(Span::styled(
+                first_msg,
+                Style::default().fg(Color::White),
+            )));
+        }
 
         let detail = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(detail, inner);

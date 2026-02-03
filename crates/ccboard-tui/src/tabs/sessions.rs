@@ -1,5 +1,6 @@
 //! Sessions tab - Project tree + session list + detail view
 
+use crate::components::highlight_matches;
 use ccboard_core::models::SessionMetadata;
 use ratatui::{
     Frame,
@@ -448,7 +449,8 @@ impl SessionsTab {
                 let tokens_str = Self::format_tokens(session.total_tokens);
                 let msgs_str = format!("{}msg", session.message_count);
 
-                ListItem::new(Line::from(vec![
+                // Build preview spans with optional highlighting
+                let mut preview_spans = vec![
                     Span::styled(format!(" {} ", if is_selected { "▶" } else { " " }), style),
                     Span::styled(format!("{} ", date_str), Style::default().fg(Color::Yellow)),
                     Span::styled(
@@ -459,8 +461,17 @@ impl SessionsTab {
                         format!("{:>5} ", msgs_str),
                         Style::default().fg(Color::Green),
                     ),
-                    Span::styled(preview, style),
-                ]))
+                ];
+
+                // Add highlighted preview if searching, otherwise plain preview
+                if !self.search_filter.is_empty() {
+                    let highlighted = highlight_matches(&preview, &self.search_filter);
+                    preview_spans.extend(highlighted);
+                } else {
+                    preview_spans.push(Span::styled(preview, style));
+                }
+
+                ListItem::new(Line::from(preview_spans))
             })
             .collect();
 
