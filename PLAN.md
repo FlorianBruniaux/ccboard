@@ -944,9 +944,97 @@ fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect) {
 
 ---
 
-### ⏸️ PHASE D: Arc Migration - PLANIFIÉ (2h)
+### ⏸️ PHASE D: Arc Migration - PLANIFIÉ (4h)
 
-**Description**: Replace clones avec Arc<SessionMetadata> (400x less RAM)
+**Objectif**: Optimiser la consommation mémoire en remplaçant les clones de SessionMetadata par Arc<SessionMetadata>
+
+**Durée estimée**: 4h (vs 2h initialement - complexité sous-estimée)
+
+**Contexte**: Actuellement, chaque fois qu'une session est affichée ou passée entre composants, SessionMetadata est cloné. Avec 3500+ sessions, cela génère des allocations inutiles.
+
+#### Analyse d'Impact
+
+**Avant (Clones)**:
+```rust
+// Chaque tab clone les sessions
+let sessions: Vec<SessionMetadata> = store.recent_sessions(10000);  // Clone complet
+self.history.render(&sessions);  // Clone potential
+
+// HashMap values clonées
+let sessions_by_project: HashMap<String, Vec<SessionMetadata>> = store.sessions_by_project();
+```
+
+**Après (Arc)**:
+```rust
+// Shared ownership sans clone
+let sessions: Vec<Arc<SessionMetadata>> = store.recent_sessions(10000);  // Pas de clone
+self.history.render(&sessions);  // Arc clone = 8 bytes
+
+// HashMap avec Arc values
+let sessions_by_project: HashMap<String, Vec<Arc<SessionMetadata>>> = store.sessions_by_project();
+```
+
+**Gains attendus**:
+- **Mémoire**: SessionMetadata ~400 bytes → Arc<SessionMetadata> ~8 bytes (50x reduction per clone)
+- **Allocations**: Heap allocations drastiquement réduites
+- **Performance**: Moins de pression GC, moins de cache misses
+
+#### Tasks Breakdown
+
+**D.1: DataStore Arc Migration** (2h)
+- Modifier `sessions: DashMap<String, SessionMetadata>` → `DashMap<String, Arc<SessionMetadata>>`
+- Update `sessions_by_project()`, `recent_sessions()`, `get_session()` pour retourner `Arc<T>`
+- Modifier cache Moka: `Cache<PathBuf, SessionMetadata>` → `Cache<PathBuf, Arc<SessionMetadata>>`
+- Wrap nouvelles sessions dans Arc lors de l'insertion
+
+**D.2: Tabs & UI Arc Adaptation** (1.5h)
+- Sessions tab: `Vec<SessionMetadata>` → `Vec<Arc<SessionMetadata>>`
+- History tab: `Vec<SessionMetadata>` → `Vec<Arc<SessionMetadata>>`
+- Dashboard: `Arc<Stats>` déjà OK (no change)
+- Costs tab: Adapt billing blocks si nécessaire
+
+**D.3: Tests & Validation** (0.5h)
+- Run all tests (152 tests doivent passer)
+- Clippy clean (0 warnings)
+- Benchmark memory usage (before/after comparison)
+- Manual TUI testing (verify UI works correctly)
+
+#### Fichiers à Modifier
+
+```
+crates/ccboard-core/src/store.rs              (~50 LOC changes)
+crates/ccboard-core/src/parsers/session_index.rs  (~20 LOC)
+crates/ccboard-tui/src/tabs/sessions.rs       (~15 LOC)
+crates/ccboard-tui/src/tabs/history.rs        (~10 LOC)
+crates/ccboard-tui/src/tabs/costs.rs          (~5 LOC if needed)
+crates/ccboard-tui/src/ui.rs                  (~10 LOC)
+```
+
+#### Risques & Mitigation
+
+**Risque 1**: Arc<T> lifetime complexities
+- **Mitigation**: Arc n'a pas de lifetime, simplifie le code
+
+**Risque 2**: Breaking changes dans l'API
+- **Mitigation**: Changes isolés dans ccboard-core, API publique stable
+
+**Risque 3**: Performance regression si Arc mal utilisé
+- **Mitigation**: Benchmark avant/après, criterion tests
+
+#### Success Criteria
+
+- ✅ All 152 tests passing
+- ✅ Zero clippy warnings
+- ✅ Memory usage reduced (observable with `time` command)
+- ✅ No UI regressions (manual testing)
+- ✅ Benchmark confirms no perf degradation
+
+#### Next Steps After Phase D
+
+Si Phase D réussit, considérer:
+- **Phase E**: Additional UI/UX features (selon feedback utilisateur)
+- **Phase F**: Web interface completion (Leptos frontend)
+- **Phase G**: MCP Tools display (requires JSON-RPC client)
 
 ---
 
@@ -960,6 +1048,16 @@ fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect) {
 - ✅ C.1: MCP Tab enhanced detail pane (2h) - COMPLÉTÉ
 - ✅ C.4: Sessions Tab live refresh (2h) - COMPLÉTÉ
 
-**Prochaines phases suggérées**:
-- Phase D: Arc Migration (2h) - Replace clones avec Arc<SessionMetadata>
-- Phase E: Additional UI/UX features (selon besoins utilisateur)
+**Prochaines phases disponibles**:
+1. **Phase D: Arc Migration** (4h) - Optimisation mémoire critique
+   - Replace clones avec Arc<SessionMetadata> (50x reduction per clone)
+   - Reduce heap allocations et GC pressure
+   - 3 tasks: DataStore migration (2h) + UI adaptation (1.5h) + validation (0.5h)
+
+2. **Phase E: Additional UI/UX** (selon besoins utilisateur)
+   - Features à définir selon feedback
+
+3. **Phase F: Web Interface Completion** (Leptos frontend)
+   - Compléter l'interface web (actuellement placeholder)
+
+**Recommandation**: Démarrer Phase D en priorité (optimisation mémoire, impact direct sur performance)
