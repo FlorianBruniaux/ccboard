@@ -629,15 +629,15 @@ pub enum Event {
 
 ---
 
-### 🚧 PHASE C: Additional Features - EN COURS (4/8h)
+### 🚧 PHASE C: Additional Features - EN COURS (6/8h)
 
 **Tasks créées**:
-- ⏳ C.1: MCP Tab enhancements (2h)
+- ✅ C.1: MCP Tab enhancements (2h) **COMPLÉTÉ 2026-02-03**
 - ✅ C.2: History Tab export CSV/JSON (2h) **COMPLÉTÉ 2026-02-03**
 - ✅ C.3: Costs Tab billing blocks CSV export (2h) **COMPLÉTÉ 2026-02-03**
 - ⏳ C.4: Sessions Tab live refresh (2h)
 
-**Ordre suggéré**: C.3 ✅ → C.2 ✅ → C.1 → C.4
+**Ordre suggéré**: C.3 ✅ → C.2 ✅ → C.1 ✅ → C.4
 
 #### Task C.3: Billing Blocks CSV Export ✅ (COMPLÈTE)
 
@@ -812,6 +812,81 @@ Date,Time,Project,Session ID,Messages,Tokens,Models,Duration (min)
 
 ---
 
+#### Task C.1: MCP Tab Enhanced Detail Pane ✅ (COMPLÈTE)
+
+**Durée réelle**: 2h (conforme à l'estimation)
+
+**Objectif**: Améliorer l'affichage du detail pane du MCP tab avec highlighting, masking, et copy to clipboard.
+
+**Solution Implémentée**:
+```rust
+// crates/ccboard-tui/src/tabs/mcp.rs (+140 LOC, 3 helper functions)
+fn highlight_arg(arg: &str) -> Vec<Span<'static>> {
+    // Syntax highlighting: Flags (Cyan), Paths (Green), URLs (Magenta)
+}
+
+fn mask_sensitive_env(key: &str, value: &str) -> String {
+    // Auto-detect API_KEY, TOKEN, SECRET → "abcd••••efgh"
+}
+
+fn get_server_description(name: &str, server: &McpServer) -> Option<String> {
+    // Known servers: playwright, serena, sequential, context7, perplexity, etc.
+}
+
+fn handle_copy_command(&mut self, mcp_config: Option<&McpConfig>) {
+    // Copy full command to clipboard via arboard
+}
+```
+
+**Fonctionnalités**:
+- **Args syntax highlighting**:
+  - Flags (`--flag`, `-f`) → Cyan bold
+  - Paths (`/absolute`, `./relative`) → Green
+  - URLs (`http://`, `https://`) → Magenta
+  - Regular values → White
+- **Env variables enhancements**:
+  - Alphabetical sorting
+  - Sensitive value masking (API_KEY, TOKEN, SECRET, PASSWORD)
+  - Format: `KEY = value` (bold cyan key)
+  - Masked format: `abcd••••efgh` (gray color)
+- **Server descriptions**:
+  - Auto-detect known MCP server types
+  - Inline description (italic gray)
+  - Servers: playwright, serena, sequential, context7, perplexity, claude-in-chrome, filesystem
+- **Copy to clipboard**:
+  - Key binding: `y` (yank)
+  - Copies full command: `command arg1 arg2 ...`
+  - Success notification (green bottom banner)
+  - Cross-platform via `arboard` crate
+
+**Changements**:
+```
+Cargo.toml                                           (+1 LOC, arboard dep)
+crates/ccboard-tui/Cargo.toml                        (+1 LOC, arboard dep)
+crates/ccboard-tui/src/tabs/mcp.rs                   (+140 LOC, enhancements)
+crates/ccboard-tui/src/components/help_modal.rs      (+7 LOC, 'y' keybinding)
+```
+
+**Résultats**:
+- ✅ Args syntax highlighting fonctionne pour tous les types
+- ✅ Env masking détecte automatiquement les valeurs sensibles
+- ✅ 7 server types connus avec descriptions
+- ✅ Copy to clipboard cross-platform (macOS, Linux, Windows)
+- ✅ Copy message notification avec auto-dismiss (ESC)
+- ✅ All 152 tests passing
+- ✅ Zero clippy warnings
+- ✅ Help modal mis à jour
+
+**UI Before/After**:
+- Before: Args liste simple blanche, env `KEY=value`, aucune doc
+- After: Args color-coded, env masqués + triés, description server, copy 'y'
+
+**Commit**: `36daccf` - feat(mcp): Enhanced MCP tab detail pane (Phase C.1)
+
+**Status**: ✅ **COMPLÉTÉ** (2026-02-03)
+
+---
+
 ### ⏸️ PHASE D: Arc Migration - PLANIFIÉ (2h)
 
 **Description**: Replace clones avec Arc<SessionMetadata> (400x less RAM)
@@ -820,10 +895,10 @@ Date,Time,Project,Session ID,Messages,Tokens,Models,Duration (min)
 
 ## 🎯 Prochaine Action
 
-**Continuer Phase C** - Prochaine tâche: **C.1: MCP Tab enhancements** ou **C.4: Sessions Tab live refresh**
+**Continuer Phase C** - Dernière tâche: **C.4: Sessions Tab live refresh**
 
-**Progression Phase C**: 4/8h complétées (50%)
+**Progression Phase C**: 6/8h complétées (75%)
 - ✅ C.3: Billing blocks CSV export (2h) - COMPLÉTÉ
 - ✅ C.2: History Tab export CSV/JSON (2h) - COMPLÉTÉ
-- ⏳ C.1: MCP Tab enhancements (2h) - TODO
+- ✅ C.1: MCP Tab enhanced detail pane (2h) - COMPLÉTÉ
 - ⏳ C.4: Sessions Tab live refresh (2h) - TODO

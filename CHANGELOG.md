@@ -60,6 +60,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Black bold text on yellow background for contrast
 
 #### Export & Analysis Features (Phase C)
+
+- **MCP Tab Enhanced Detail Pane** (Task C.1)
+  - **Args syntax highlighting**: Color-coded display for better readability
+    - Flags (`--flag`, `-f`) → Cyan bold
+    - Paths (`/absolute`, `./relative`) → Green
+    - URLs (`http://`, `https://`) → Magenta
+    - Regular values → White
+  - **Environment variables masking**: Auto-detect and mask sensitive values
+    - Detects: API_KEY, TOKEN, SECRET, PASSWORD, API patterns
+    - Masked format: `abcd••••efgh` (first 4 + last 4 chars)
+    - Displayed in gray for masked values
+    - Alphabetically sorted for consistency
+  - **Server descriptions**: Inline documentation for known MCP servers
+    - Auto-detected servers: playwright, serena, sequential, context7, perplexity, claude-in-chrome, filesystem
+    - Displayed as italic gray text at top of detail pane
+  - **Copy to clipboard**: Press `y` to copy full command
+    - Copies: `command arg1 arg2 ...`
+    - Success notification with green bottom banner
+    - Cross-platform via `arboard` crate
+    - ESC to dismiss notification
+  - Helper functions: `highlight_arg()`, `mask_sensitive_env()`, `get_server_description()`
+  - Module: `tabs/mcp.rs` (+140 LOC)
+  - Help modal updated with `y` keybinding
+  - New dependency: `arboard = "3"` for clipboard support
+
 - **Billing Blocks CSV Export** (Task C.3)
   - Export billing blocks to CSV format for external analysis
   - Function: `export_billing_blocks_to_csv(&manager, &path)`
