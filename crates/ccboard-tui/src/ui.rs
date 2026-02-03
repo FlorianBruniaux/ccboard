@@ -326,6 +326,9 @@ impl Ui {
             }
             Tab::Sessions => {
                 let sessions_by_project = app.store.sessions_by_project();
+                // Count total sessions for refresh tracking
+                let session_count: usize = sessions_by_project.values().map(|v| v.len()).sum();
+                self.sessions.mark_refreshed(session_count);
                 self.sessions.render(frame, area, &sessions_by_project);
             }
             Tab::Config => {

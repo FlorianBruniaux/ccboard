@@ -2,6 +2,7 @@
 
 use crate::components::highlight_matches;
 use ccboard_core::models::SessionMetadata;
+use std::time::Instant;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
@@ -32,6 +33,12 @@ pub struct SessionsTab {
     show_detail: bool,
     /// Error message to display
     error_message: Option<String>,
+    /// Last refresh timestamp
+    last_refresh: Instant,
+    /// Refresh notification message
+    refresh_message: Option<String>,
+    /// Previous session count (to detect changes)
+    prev_session_count: usize,
 }
 
 impl Default for SessionsTab {
@@ -56,6 +63,9 @@ impl SessionsTab {
             search_active: false,
             show_detail: false,
             error_message: None,
+            last_refresh: Instant::now(),
+            refresh_message: None,
+            prev_session_count: 0,
         }
     }
 
@@ -328,6 +338,9 @@ impl SessionsTab {
         if self.error_message.is_some() {
             self.render_error_popup(frame, area);
         }
+
+        // Render refresh notification if present
+        self.render_refresh_notification(frame, area);
     }
 
     fn render_projects(&mut self, frame: &mut Frame, area: Rect) {
@@ -388,10 +401,11 @@ impl SessionsTab {
             Color::DarkGray
         };
 
+        let time_ago = self.format_time_ago();
         let title_text = if self.search_filter.is_empty() {
-            format!(" Sessions ({}) ", sessions.len())
+            format!(" Sessions ({}) • {} ", sessions.len(), time_ago)
         } else {
-            format!(" Sessions ({} results) ", sessions.len())
+            format!(" Sessions ({} results) • {} ", sessions.len(), time_ago)
         };
 
         let block = Block::default()
@@ -667,5 +681,77 @@ impl SessionsTab {
 
         let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(paragraph, inner);
+    }
+
+    /// Mark data as refreshed (called when new data is loaded)
+    pub fn mark_refreshed(&mut self, current_session_count: usize) {
+        let prev_count = self.prev_session_count;
+        self.prev_session_count = current_session_count;
+        self.last_refresh = Instant::now();
+
+        // Show notification if session count changed
+        if prev_count > 0 && current_session_count != prev_count {
+            let diff = current_session_count as i32 - prev_count as i32;
+            if diff > 0 {
+                self.refresh_message = Some(format!("✓ {} new session(s) detected", diff));
+            } else {
+                self.refresh_message = Some(format!("✓ {} session(s) removed", -diff));
+            }
+        } else if prev_count == 0 || current_session_count == prev_count {
+            self.refresh_message = Some("✓ Data refreshed".to_string());
+        }
+    }
+
+    /// Format time since last refresh
+    fn format_time_ago(&self) -> String {
+        let elapsed = self.last_refresh.elapsed();
+        let secs = elapsed.as_secs();
+
+        if secs < 5 {
+            "just now".to_string()
+        } else if secs < 60 {
+            format!("{}s ago", secs)
+        } else if secs < 3600 {
+            let mins = secs / 60;
+            format!("{}m ago", mins)
+        } else {
+            let hours = secs / 3600;
+            format!("{}h ago", hours)
+        }
+    }
+
+    /// Render refresh notification overlay (bottom banner)
+    fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect) {
+        let Some(msg) = &self.refresh_message else {
+            return;
+        };
+
+        // Bottom notification (60% width, 3 lines height)
+        let msg_width = (area.width as f32 * 0.6) as u16;
+        let msg_height = 3;
+        let msg_x = (area.width.saturating_sub(msg_width)) / 2;
+        let msg_y = area.height.saturating_sub(msg_height + 2);
+
+        let msg_area = Rect {
+            x: area.x + msg_x,
+            y: area.y + msg_y,
+            width: msg_width,
+            height: msg_height,
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Green));
+
+        let inner = block.inner(msg_area);
+        frame.render_widget(block, msg_area);
+
+        let paragraph = Paragraph::new(msg.as_str())
+            .style(Style::default().fg(Color::Green))
+            .alignment(ratatui::layout::Alignment::Center);
+        frame.render_widget(paragraph, inner);
+
+        // Auto-clear message after showing (will be cleared on next render)
+        self.refresh_message = None;
     }
 }
