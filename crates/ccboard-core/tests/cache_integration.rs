@@ -1,8 +1,8 @@
 //! Integration tests for metadata cache with real sessions
 
+use ccboard_core::DataStore;
 use ccboard_core::cache::MetadataCache;
 use ccboard_core::parsers::SessionIndexParser;
-use ccboard_core::DataStore;
 use std::sync::Arc;
 
 #[tokio::test]
@@ -44,7 +44,10 @@ async fn test_cache_write_real_file() {
     let parser = SessionIndexParser::new().with_cache(Arc::new(cache));
     let meta = parser.scan_session(&session_path).await.unwrap();
 
-    eprintln!("Parsed session: id={}, tokens={}", meta.id, meta.total_tokens);
+    eprintln!(
+        "Parsed session: id={}, tokens={}",
+        meta.id, meta.total_tokens
+    );
 
     // Get cache reference
     let cache_path = cache_dir.join("session-metadata.db");
@@ -218,7 +221,10 @@ async fn test_cache_hit_speedup() {
     if speedup > 5.0 {
         eprintln!("✅ Cache provides significant speedup");
     } else {
-        eprintln!("⚠️  WARNING: Cache speedup is only {:.2}x (expected >5x)", speedup);
+        eprintln!(
+            "⚠️  WARNING: Cache speedup is only {:.2}x (expected >5x)",
+            speedup
+        );
     }
 
     // Cleanup

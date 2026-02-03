@@ -278,7 +278,8 @@ impl DataStore {
             return;
         }
 
-        let mut parser = SessionIndexParser::new().with_concurrency(self.config.max_concurrent_scans);
+        let mut parser =
+            SessionIndexParser::new().with_concurrency(self.config.max_concurrent_scans);
 
         // Enable metadata cache if available (90% speedup)
         if let Some(ref cache) = self.metadata_cache {

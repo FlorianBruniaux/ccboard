@@ -11,5 +11,5 @@ pub use command_palette::CommandPalette;
 pub use detail_pane::DetailPane;
 pub use help_modal::HelpModal;
 pub use list_pane::ListPane;
-pub use search_bar::{highlight_matches, SearchBar};
+pub use search_bar::{SearchBar, highlight_matches};
 pub use spinner::{Spinner, SpinnerStyle};

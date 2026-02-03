@@ -3,12 +3,17 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 authors = ["Florian Bruniaux"]
 repository = "https://github.com/FlorianBruniaux/ccboard"
+homepage = "https://github.com/FlorianBruniaux/ccboard"
+documentation = "https://docs.rs/ccboard"
+keywords = ["claude", "dashboard", "tui", "monitoring", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
 
 [workspace.dependencies]
 # Core - Serialization
@@ -65,9 +70,9 @@ clap = { version = "4", features = ["derive"] }
 open = "5"
 
 # Internal crates
-ccboard-core = { path = "crates/ccboard-core" }
-ccboard-tui = { path = "crates/ccboard-tui" }
-ccboard-web = { path = "crates/ccboard-web" }
+ccboard-core = { version = "0.2.0", path = "crates/ccboard-core" }
+ccboard-tui = { version = "0.2.0", path = "crates/ccboard-tui" }
+ccboard-web = { version = "0.2.0", path = "crates/ccboard-web" }
 
 [profile.release]
 lto = true

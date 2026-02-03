@@ -71,7 +71,10 @@ async fn test_initial_load_under_2s() {
     );
 
     let speedup = cold_elapsed.as_millis() as f64 / warm_elapsed.as_millis().max(1) as f64;
-    eprintln!("\n🚀 Speedup: {:.2}x ({:?} → {:?})", speedup, cold_elapsed, warm_elapsed);
+    eprintln!(
+        "\n🚀 Speedup: {:.2}x ({:?} → {:?})",
+        speedup, cold_elapsed, warm_elapsed
+    );
 
     // Assert warm cache is under target
     assert!(
@@ -108,8 +111,7 @@ async fn test_session_scan_scales_linearly() {
 
         let expected_factor = count_large / count_small;
         let actual_factor = time_large.as_millis() / time_small.as_millis().max(1);
-        let max_allowed_factor =
-            (expected_factor * targets::SESSION_SCAN_LINEAR_FACTOR) as u128;
+        let max_allowed_factor = (expected_factor * targets::SESSION_SCAN_LINEAR_FACTOR) as u128;
 
         assert!(
             actual_factor <= max_allowed_factor,

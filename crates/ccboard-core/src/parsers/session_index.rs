@@ -8,7 +8,7 @@
 
 use crate::cache::MetadataCache;
 use crate::error::{CoreError, LoadError, LoadReport};
-use crate::models::{session::SessionSummary, SessionLine, SessionMetadata};
+use crate::models::{SessionLine, SessionMetadata, session::SessionSummary};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -159,13 +159,12 @@ impl SessionIndexParser {
                     let path_buf_clone = path_buf.clone();
 
                     // Try cache in blocking task
-                    let cached_result = tokio::task::spawn_blocking(move || {
-                        cache.get(&path_buf_clone, mtime)
-                    })
-                    .await
-                    .ok()
-                    .and_then(|r| r.ok())
-                    .and_then(|opt| opt);
+                    let cached_result =
+                        tokio::task::spawn_blocking(move || cache.get(&path_buf_clone, mtime))
+                            .await
+                            .ok()
+                            .and_then(|r| r.ok())
+                            .and_then(|opt| opt);
 
                     if let Some(cached) = cached_result {
                         trace!(path = %path.display(), "Using cached metadata");
@@ -187,14 +186,12 @@ impl SessionIndexParser {
                     let path_clone = path_buf.clone();
 
                     // Store in cache in blocking task (WAIT for completion)
-                    if let Ok(result) = tokio::task::spawn_blocking(move || {
+                    if let Ok(Err(e)) = tokio::task::spawn_blocking(move || {
                         cache.put(&path_clone, &meta_clone, mtime)
                     })
                     .await
                     {
-                        if let Err(e) = result {
-                            warn!(path = %path_buf.display(), error = %e, "Failed to cache metadata");
-                        }
+                        warn!(path = %path_buf.display(), error = %e, "Failed to cache metadata");
                     }
                 }
             }

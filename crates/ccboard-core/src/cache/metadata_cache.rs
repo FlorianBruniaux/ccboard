@@ -12,7 +12,7 @@
 
 use crate::models::SessionMetadata;
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
@@ -28,8 +28,9 @@ pub struct MetadataCache {
 impl MetadataCache {
     /// Create or open cache database
     pub fn new(cache_dir: &Path) -> Result<Self> {
-        std::fs::create_dir_all(cache_dir)
-            .with_context(|| format!("Failed to create cache directory: {}", cache_dir.display()))?;
+        std::fs::create_dir_all(cache_dir).with_context(|| {
+            format!("Failed to create cache directory: {}", cache_dir.display())
+        })?;
 
         let cache_path = cache_dir.join("session-metadata.db");
         let conn = Connection::open(&cache_path)
@@ -73,7 +74,6 @@ impl MetadataCache {
 
         Ok(cache)
     }
-
 
     /// Get cached metadata if fresh, otherwise None
     pub fn get(&self, path: &Path, current_mtime: SystemTime) -> Result<Option<SessionMetadata>> {
@@ -119,34 +119,34 @@ impl MetadataCache {
         let data = bincode::serialize(meta).context("Failed to serialize metadata")?;
 
         // Extract searchable fields
-        let models_used = serde_json::to_string(&meta.models_used)
-            .context("Failed to serialize models")?;
+        let models_used =
+            serde_json::to_string(&meta.models_used).context("Failed to serialize models")?;
 
         let conn = self.conn.lock().unwrap();
 
         conn.execute(
-                r#"
+            r#"
                 INSERT OR REPLACE INTO session_metadata
                 (path, mtime, project, session_id, first_timestamp, last_timestamp,
                  message_count, total_tokens, models_used, has_subagents, first_user_message, data)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
-                params![
-                    path_str.as_ref(),
-                    mtime_secs as i64,
-                    &meta.project_path,
-                    &meta.id,
-                    meta.first_timestamp.as_ref().map(|t| t.to_rfc3339()),
-                    meta.last_timestamp.as_ref().map(|t| t.to_rfc3339()),
-                    meta.message_count as i64,
-                    meta.total_tokens as i64,
-                    models_used,
-                    if meta.has_subagents { 1 } else { 0 },
-                    &meta.first_user_message,
-                    &data,
-                ],
-            )
-            .context("Failed to insert metadata")?;
+            params![
+                path_str.as_ref(),
+                mtime_secs as i64,
+                &meta.project_path,
+                &meta.id,
+                meta.first_timestamp.as_ref().map(|t| t.to_rfc3339()),
+                meta.last_timestamp.as_ref().map(|t| t.to_rfc3339()),
+                meta.message_count as i64,
+                meta.total_tokens as i64,
+                models_used,
+                if meta.has_subagents { 1 } else { 0 },
+                &meta.first_user_message,
+                &data,
+            ],
+        )
+        .context("Failed to insert metadata")?;
 
         debug!(path = %path.display(), "Metadata cached");
         Ok(())
@@ -159,10 +159,10 @@ impl MetadataCache {
         let conn = self.conn.lock().unwrap();
 
         conn.execute(
-                "DELETE FROM session_metadata WHERE path = ?",
-                params![path_str.as_ref()],
-            )
-            .context("Failed to delete cache entry")?;
+            "DELETE FROM session_metadata WHERE path = ?",
+            params![path_str.as_ref()],
+        )
+        .context("Failed to delete cache entry")?;
 
         debug!(path = %path.display(), "Cache entry invalidated");
         Ok(())
@@ -268,7 +268,6 @@ mod tests {
     use super::*;
     use crate::models::SessionMetadata;
     use chrono::Utc;
-    use std::collections::HashSet;
     use tempfile::tempdir;
 
     #[test]

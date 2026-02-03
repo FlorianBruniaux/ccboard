@@ -89,7 +89,10 @@ async fn run_loop_with_loading<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     ui: &mut ui::Ui,
-    load_rx: &mut oneshot::Receiver<(ccboard_core::LoadReport, ccboard_core::models::InvocationStats)>,
+    load_rx: &mut oneshot::Receiver<(
+        ccboard_core::LoadReport,
+        ccboard_core::models::InvocationStats,
+    )>,
     claude_home: &std::path::Path,
     project_path: Option<&std::path::Path>,
 ) -> Result<()>

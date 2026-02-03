@@ -79,7 +79,9 @@ impl HelpModal {
             .border_style(Style::default().fg(Color::Cyan))
             .title(Span::styled(
                 " Help - Keybindings ",
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             ))
             .title_alignment(Alignment::Center);
 
@@ -101,9 +103,12 @@ impl HelpModal {
         let mut lines = Vec::new();
 
         // Global keybindings
-        lines.push(Line::from(vec![
-            Span::styled("Global:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            "Global:",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]));
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
             Span::styled("  q           ", Style::default().fg(Color::Cyan)),
@@ -136,12 +141,12 @@ impl HelpModal {
         lines.push(Line::from(""));
 
         // Tab-specific keybindings
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!("{}:", active_tab.name()),
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("{}:", active_tab.name()),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]));
         lines.push(Line::from(""));
 
         match active_tab {
@@ -255,9 +260,19 @@ impl HelpModal {
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
             Span::styled("Press ", Style::default().fg(Color::DarkGray)),
-            Span::styled("?", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "?",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" or ", Style::default().fg(Color::DarkGray)),
-            Span::styled("ESC", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "ESC",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" to close", Style::default().fg(Color::DarkGray)),
         ]));
 

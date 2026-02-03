@@ -85,7 +85,6 @@ fn bench_session_scan_scaling(c: &mut Criterion) {
 /// Benchmark individual parsing operations
 fn bench_parsing_operations(c: &mut Criterion) {
     use ccboard_core::parsers::{SessionIndexParser, StatsParser};
-    use std::path::Path;
 
     let mut group = c.benchmark_group("parsing");
 

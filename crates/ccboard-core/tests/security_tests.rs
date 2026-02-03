@@ -12,13 +12,10 @@
 
 use ccboard_core::parsers::SessionIndexParser;
 use std::fs;
-use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
 
 // NOTE: Path validation is now implemented and tested in SessionIndexParser
 // These tests are kept for documentation but test the real implementation
 mod path_validation {
-    use super::*;
 
     // NOTE: These tests are now covered by SessionIndexParser unit tests
     // Path sanitization is implemented in extract_project_path()

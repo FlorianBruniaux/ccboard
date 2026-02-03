@@ -190,10 +190,7 @@ impl Ui {
             .split(inner);
 
         // Render spinner with message
-        let message = app
-            .loading_message
-            .as_deref()
-            .unwrap_or("Loading...");
+        let message = app.loading_message.as_deref().unwrap_or("Loading...");
 
         let spinner_line = Line::from(vec![
             Span::raw("  "),
