@@ -1,6 +1,7 @@
 pub mod breadcrumbs;
 pub mod command_palette;
 pub mod detail_pane;
+pub mod error_panel;
 pub mod help_modal;
 pub mod list_pane;
 pub mod search_bar;
@@ -9,6 +10,7 @@ pub mod spinner;
 pub use breadcrumbs::{Breadcrumb, Breadcrumbs};
 pub use command_palette::CommandPalette;
 pub use detail_pane::DetailPane;
+pub use error_panel::{render_error_panel, render_error_summary};
 pub use help_modal::HelpModal;
 pub use list_pane::ListPane;
 pub use search_bar::{SearchBar, highlight_matches};

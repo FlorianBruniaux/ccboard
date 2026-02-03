@@ -124,6 +124,8 @@ pub struct LoadError {
     pub source: String,
     pub message: String,
     pub severity: ErrorSeverity,
+    /// Actionable suggestion for user (optional)
+    pub suggestion: Option<String>,
 }
 
 impl LoadError {
@@ -132,6 +134,7 @@ impl LoadError {
             source: source.into(),
             message: message.into(),
             severity: ErrorSeverity::Warning,
+            suggestion: None,
         }
     }
 
@@ -140,6 +143,7 @@ impl LoadError {
             source: source.into(),
             message: message.into(),
             severity: ErrorSeverity::Error,
+            suggestion: None,
         }
     }
 
@@ -148,6 +152,64 @@ impl LoadError {
             source: source.into(),
             message: message.into(),
             severity: ErrorSeverity::Fatal,
+            suggestion: None,
+        }
+    }
+
+    /// Add an actionable suggestion to this error
+    pub fn with_suggestion(mut self, suggestion: impl Into<String>) -> Self {
+        self.suggestion = Some(suggestion.into());
+        self
+    }
+
+    /// Create user-friendly error from CoreError with context-aware suggestions
+    pub fn from_core_error(source: impl Into<String>, error: &CoreError) -> Self {
+        let source = source.into();
+        let (message, suggestion) = match error {
+            CoreError::FileNotFound { path } => (
+                format!("File not found: {}", path.display()),
+                Some(format!("Check if file exists: ls {}", path.display())),
+            ),
+            CoreError::FileRead { path, .. } => (
+                format!("Cannot read file: {}", path.display()),
+                Some(format!("Check permissions: chmod +r {}", path.display())),
+            ),
+            CoreError::DirectoryNotFound { path } => (
+                format!("Directory not found: {}", path.display()),
+                Some(format!(
+                    "Create directory: mkdir -p {}",
+                    path.display()
+                )),
+            ),
+            CoreError::JsonParse { path, message, .. } => (
+                format!("Invalid JSON in {}: {}", path.display(), message),
+                Some("Validate JSON syntax with: jq . <file>".to_string()),
+            ),
+            CoreError::JsonlParse {
+                path,
+                line_number,
+                message,
+            } => (
+                format!(
+                    "Malformed JSONL line {} in {}: {}",
+                    line_number,
+                    path.display(),
+                    message
+                ),
+                Some(format!("Inspect line: sed -n '{}p' {}", line_number, path.display())),
+            ),
+            CoreError::ClaudeHomeNotFound => (
+                "Claude home directory not found".to_string(),
+                Some("Run 'claude' CLI at least once to initialize ~/.claude".to_string()),
+            ),
+            _ => (error.to_string(), None),
+        };
+
+        Self {
+            source,
+            message,
+            severity: ErrorSeverity::Error,
+            suggestion,
         }
     }
 }
