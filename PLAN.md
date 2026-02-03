@@ -607,15 +607,48 @@ pub enum Event {
 
 ---
 
-## 🎬 Decision Finale
+## 🎬 État Actuel (2026-02-03)
 
-**Phases 0, 1, 2.1 COMPLÈTES** (20h, 89x speedup, sécurisé).
+### ✅ PHASE A: Polish & Release - COMPLÈTE (4.5h)
 
-**Commit disponible**: `132eb25`
+**Commit**: `857387a`
 
-**Prochaine étape recommandée**:
-- **Option A**: Phase 3 (UI/UX, 6h) → Feedback utilisateur
-- **Option B**: MVP release → Validation terrain
-- **Option C**: Stop ici → 89x speedup suffit pour l'instant
+**Complété**:
+- ✅ A.5: crates.io metadata (v0.2.0, keywords, categories)
+- ✅ A.6: Screenshots (13 images production, 5.4MB)
+- ✅ A.1: README.md complet avec screenshots + 89x speedup
+- ✅ A.2: CONTRIBUTING.md guide contributeur
+- ✅ A.3: CI/CD workflows (ci.yml + release.yml, 3 OS, 5 platforms)
+- ✅ A.4: Cross-platform validation guide
 
-**Choix ?**
+**Livrables**:
+- Documentation complète (README, CONTRIBUTING, CROSS_PLATFORM)
+- 13 screenshots tous les tabs
+- CI/CD automatisé (tests, coverage, security, release binaries)
+- crates.io metadata ready
+
+---
+
+### 🚧 PHASE C: Additional Features - EN COURS (0/8h)
+
+**Tasks créées**:
+- ⏳ C.1: MCP Tab enhancements (2h)
+- ⏳ C.2: History Tab export CSV/JSON (2h)
+- ⏳ C.3: Costs Tab billing blocks integration (2h)
+- ⏳ C.4: Sessions Tab live refresh (2h)
+
+**Ordre suggéré**: C.3 → C.2 → C.1 → C.4
+
+---
+
+### ⏸️ PHASE D: Arc Migration - PLANIFIÉ (2h)
+
+**Description**: Replace clones avec Arc<SessionMetadata> (400x less RAM)
+
+---
+
+## 🎯 Prochaine Action
+
+**Reprendre Phase C** - Commencer par **C.3: Costs Tab billing blocks**
+
+**Prompt de reprise** disponible dans `RESUME.md`
