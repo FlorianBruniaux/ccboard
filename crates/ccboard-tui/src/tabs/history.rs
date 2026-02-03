@@ -35,6 +35,8 @@ pub struct HistoryTab {
     show_export_dialog: bool,
     /// Export success/error message
     export_message: Option<String>,
+    /// Vim-style: waiting for second 'g' press
+    pending_gg: bool,
 }
 
 impl Default for HistoryTab {
@@ -58,6 +60,7 @@ impl HistoryTab {
             error_message: None,
             show_export_dialog: false,
             export_message: None,
+            pending_gg: false,
         }
     }
 
@@ -159,7 +162,40 @@ impl HistoryTab {
                     let max = self.filtered_sessions.len().saturating_sub(1);
                     self.results_state.select(Some((current + 10).min(max)));
                 }
-                _ => {}
+                KeyCode::Char('g') => {
+                    // Vim-style: 'gg' to go to top
+                    if self.pending_gg {
+                        self.results_state.select(Some(0));
+                        self.pending_gg = false;
+                    } else {
+                        self.pending_gg = true;
+                    }
+                }
+                KeyCode::Char('G') => {
+                    // Vim-style: 'G' to go to bottom
+                    if !self.filtered_sessions.is_empty() {
+                        self.results_state
+                            .select(Some(self.filtered_sessions.len() - 1));
+                    }
+                    self.pending_gg = false;
+                }
+                KeyCode::Home => {
+                    // Go to first item
+                    self.results_state.select(Some(0));
+                    self.pending_gg = false;
+                }
+                KeyCode::End => {
+                    // Go to last item
+                    if !self.filtered_sessions.is_empty() {
+                        self.results_state
+                            .select(Some(self.filtered_sessions.len() - 1));
+                    }
+                    self.pending_gg = false;
+                }
+                _ => {
+                    // Reset pending_gg on any other key
+                    self.pending_gg = false;
+                }
             }
         }
     }

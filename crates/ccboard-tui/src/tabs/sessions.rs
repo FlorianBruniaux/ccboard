@@ -40,6 +40,8 @@ pub struct SessionsTab {
     refresh_message: Option<String>,
     /// Previous session count (to detect changes)
     prev_session_count: usize,
+    /// Vim-style: waiting for second 'g' press
+    pending_gg: bool,
 }
 
 impl Default for SessionsTab {
@@ -67,6 +69,7 @@ impl SessionsTab {
             last_refresh: Instant::now(),
             refresh_message: None,
             prev_session_count: 0,
+            pending_gg: false,
         }
     }
 
@@ -180,7 +183,61 @@ impl SessionsTab {
                     self.move_session_selection(10);
                 }
             }
-            _ => {}
+            KeyCode::Char('g') => {
+                // Vim-style: 'gg' to go to top
+                if self.pending_gg {
+                    // Second 'g' - go to top
+                    if self.focus == 0 {
+                        self.project_state.select(Some(0));
+                        self.session_state.select(Some(0));
+                    } else {
+                        self.session_state.select(Some(0));
+                    }
+                    self.pending_gg = false;
+                } else {
+                    // First 'g' - wait for second
+                    self.pending_gg = true;
+                }
+            }
+            KeyCode::Char('G') => {
+                // Vim-style: 'G' to go to bottom
+                if self.focus == 0 {
+                    if !self.projects.is_empty() {
+                        self.project_state.select(Some(self.projects.len() - 1));
+                        self.session_state.select(Some(0));
+                    }
+                } else {
+                    // Will be clamped in render_sessions
+                    self.session_state.select(Some(usize::MAX));
+                }
+                self.pending_gg = false;
+            }
+            KeyCode::Home => {
+                // Go to first item
+                if self.focus == 0 {
+                    self.project_state.select(Some(0));
+                    self.session_state.select(Some(0));
+                } else {
+                    self.session_state.select(Some(0));
+                }
+                self.pending_gg = false;
+            }
+            KeyCode::End => {
+                // Go to last item
+                if self.focus == 0 {
+                    if !self.projects.is_empty() {
+                        self.project_state.select(Some(self.projects.len() - 1));
+                        self.session_state.select(Some(0));
+                    }
+                } else {
+                    self.session_state.select(Some(usize::MAX));
+                }
+                self.pending_gg = false;
+            }
+            _ => {
+                // Reset pending_gg on any other key
+                self.pending_gg = false;
+            }
         }
     }
 
