@@ -31,15 +31,27 @@ impl DashboardTab {
         mcp_config: Option<&McpConfig>,
         store: Option<&Arc<DataStore>>,
     ) {
+        // Check if we should show cache hint
+        let show_hint = stats
+            .map(|s| s.total_tokens() == 0 && s.session_count() > 0)
+            .unwrap_or(false);
+
         // Main vertical layout
+        let mut constraints = vec![
+            Constraint::Length(7), // Stats cards row
+            Constraint::Length(9), // Sparkline
+        ];
+
+        if show_hint {
+            constraints.push(Constraint::Length(3)); // Cache hint
+        }
+
+        constraints.push(Constraint::Min(12)); // Model gauges
+
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([
-                Constraint::Length(7), // Stats cards row
-                Constraint::Length(9), // Sparkline
-                Constraint::Min(12),   // Model gauges
-            ])
+            .constraints(constraints)
             .split(area);
 
         // Stats cards (6 columns now)
@@ -48,8 +60,16 @@ impl DashboardTab {
         // Activity sparkline
         self.render_activity(frame, chunks[1], stats);
 
+        // Cache hint (if needed)
+        let hint_idx = if show_hint {
+            self.render_cache_hint(frame, chunks[2]);
+            3
+        } else {
+            2
+        };
+
         // Model distribution as gauges
-        self.render_model_gauges(frame, chunks[2], stats);
+        self.render_model_gauges(frame, chunks[hint_idx], stats);
     }
 
     fn render_stats_row(
@@ -393,6 +413,36 @@ impl DashboardTab {
         }
 
         expanded
+    }
+
+    fn render_cache_hint(&self, frame: &mut Frame, area: Rect) {
+        let hint_text = vec![
+            Line::from(vec![
+                Span::styled("💡 ", Style::default().fg(Color::Yellow)),
+                Span::styled(
+                    "Stats look wrong? Run ",
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::styled(
+                    "ccboard clear-cache",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" to rebuild metadata.", Style::default().fg(Color::Yellow)),
+            ]),
+        ];
+
+        let hint = Paragraph::new(hint_text)
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Yellow))
+                    .style(Style::default().bg(Color::Black)),
+            );
+
+        frame.render_widget(hint, area);
     }
 
     fn format_model_name(name: &str) -> String {

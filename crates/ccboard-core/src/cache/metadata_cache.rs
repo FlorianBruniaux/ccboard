@@ -3,12 +3,17 @@
 //! Caches session metadata with mtime-based invalidation for 90% startup speedup.
 //!
 //! Schema:
-//! - session_metadata table: stores parsed metadata + mtime
+//! - session_metadata table: stores parsed metadata + mtime + cache_version
 //! - Indexes: project, mtime for fast queries
 //!
 //! Invalidation:
 //! - File watcher detects modification → delete cache entry
 //! - Startup: compare mtime → rescan if stale
+//! - Startup: compare cache_version → auto-clear if mismatch
+//!
+//! Cache Version History:
+//! - v1: Initial version (pre-TokenUsage fix)
+//! - v2: Fixed TokenUsage::total() to include cache_read_tokens + cache_write_tokens
 
 use crate::models::SessionMetadata;
 use anyhow::{Context, Result};
@@ -16,7 +21,17 @@ use rusqlite::{Connection, OptionalExtension, params};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
-use tracing::debug;
+use tracing::{debug, warn};
+
+/// Current cache version
+///
+/// **IMPORTANT**: Increment this version when changing how metadata is calculated:
+/// - TokenUsage fields added/removed
+/// - SessionMetadata structure changed
+/// - Parsing logic modified (e.g., token accumulation)
+///
+/// This triggers automatic cache invalidation on startup, preventing stale data bugs.
+const CACHE_VERSION: i32 = 2;
 
 /// SQLite-based metadata cache (thread-safe)
 pub struct MetadataCache {
@@ -43,6 +58,11 @@ impl MetadataCache {
         // Initialize schema
         conn.execute_batch(
             r#"
+            CREATE TABLE IF NOT EXISTS cache_metadata (
+                key TEXT PRIMARY KEY,
+                value INTEGER NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS session_metadata (
                 path TEXT PRIMARY KEY,
                 mtime INTEGER NOT NULL,
@@ -64,6 +84,52 @@ impl MetadataCache {
             "#,
         )
         .context("Failed to create schema")?;
+
+        // Check cache version and auto-invalidate if mismatch
+        let stored_version: Option<i32> = conn
+            .query_row(
+                "SELECT value FROM cache_metadata WHERE key = 'version'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .context("Failed to query cache version")?;
+
+        match stored_version {
+            Some(v) if v != CACHE_VERSION => {
+                warn!(
+                    stored = v,
+                    current = CACHE_VERSION,
+                    "Cache version mismatch detected, clearing stale cache"
+                );
+
+                // Clear all session entries
+                conn.execute("DELETE FROM session_metadata", [])
+                    .context("Failed to clear stale cache")?;
+
+                // Update version
+                conn.execute(
+                    "INSERT OR REPLACE INTO cache_metadata (key, value) VALUES ('version', ?)",
+                    params![CACHE_VERSION],
+                )
+                .context("Failed to update cache version")?;
+
+                debug!("Cache cleared and version updated to {}", CACHE_VERSION);
+            }
+            None => {
+                // First run, set version
+                conn.execute(
+                    "INSERT INTO cache_metadata (key, value) VALUES ('version', ?)",
+                    params![CACHE_VERSION],
+                )
+                .context("Failed to initialize cache version")?;
+
+                debug!("Cache version initialized to {}", CACHE_VERSION);
+            }
+            Some(_) => {
+                debug!("Cache version {} matches current", CACHE_VERSION);
+            }
+        }
 
         let cache = Self {
             conn: Mutex::new(conn),

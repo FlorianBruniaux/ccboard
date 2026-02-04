@@ -60,6 +60,8 @@ enum Mode {
     },
     /// Print stats to terminal and exit
     Stats,
+    /// Clear session metadata cache and exit
+    ClearCache,
 }
 
 #[tokio::main]
@@ -83,6 +85,9 @@ async fn main() -> Result<()> {
         }
         Mode::Stats => {
             run_stats(claude_home, cli.project).await?;
+        }
+        Mode::ClearCache => {
+            run_clear_cache(claude_home).await?;
         }
     }
 
@@ -263,6 +268,55 @@ async fn run_stats(claude_home: PathBuf, project: Option<PathBuf>) -> Result<()>
     }
 
     Ok(())
+}
+
+async fn run_clear_cache(claude_home: PathBuf) -> Result<()> {
+    let cache_dir = claude_home.join("cache");
+    let cache_path = cache_dir.join("session-metadata.db");
+
+    if !cache_path.exists() {
+        println!("❌ Cache not found at: {}", cache_path.display());
+        println!("   Nothing to clear.");
+        return Ok(());
+    }
+
+    // Get file size before deletion
+    let size_bytes = std::fs::metadata(&cache_path)
+        .with_context(|| format!("Failed to read cache metadata: {}", cache_path.display()))?
+        .len();
+
+    // Delete cache file
+    std::fs::remove_file(&cache_path)
+        .with_context(|| format!("Failed to delete cache: {}", cache_path.display()))?;
+
+    // Delete WAL files if they exist
+    let wal_path = cache_dir.join("session-metadata.db-wal");
+    let shm_path = cache_dir.join("session-metadata.db-shm");
+
+    if wal_path.exists() {
+        let _ = std::fs::remove_file(&wal_path);
+    }
+    if shm_path.exists() {
+        let _ = std::fs::remove_file(&shm_path);
+    }
+
+    println!("✅ Cache cleared successfully");
+    println!("   Location: {}", cache_path.display());
+    println!("   Freed: {}", format_size(size_bytes));
+    println!();
+    println!("💡 Next run will rebuild cache with fresh metadata.");
+
+    Ok(())
+}
+
+fn format_size(bytes: u64) -> String {
+    if bytes >= 1_048_576 {
+        format!("{:.1}MB", bytes as f64 / 1_048_576.0)
+    } else if bytes >= 1_024 {
+        format!("{:.1}KB", bytes as f64 / 1_024.0)
+    } else {
+        format!("{}B", bytes)
+    }
 }
 
 fn format_number(n: u64) -> String {

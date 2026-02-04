@@ -261,3 +261,37 @@ mod tests {
         assert_eq!(meta.size_display(), "2.5 MB");
     }
 }
+
+#[cfg(test)]
+mod token_tests {
+    use super::*;
+
+    #[test]
+    fn test_real_claude_token_format_deserialization() {
+        // CRITICAL: Real format from Claude Code v2.1.29+
+        let json = r#"{
+            "input_tokens": 10,
+            "cache_creation_input_tokens": 64100,
+            "cache_read_input_tokens": 19275,
+            "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 64100
+            },
+            "output_tokens": 1,
+            "service_tier": "standard"
+        }"#;
+
+        let result: Result<TokenUsage, _> = serde_json::from_str(json);
+
+        assert!(result.is_ok(), "Deserialization MUST succeed for real Claude format. Error: {:?}", result.err());
+
+        let usage = result.unwrap();
+        assert_eq!(usage.input_tokens, 10);
+        assert_eq!(usage.output_tokens, 1);
+        assert_eq!(usage.cache_read_tokens, 19275);
+        assert_eq!(usage.cache_write_tokens, 64100);
+
+        let total = usage.total();
+        assert_eq!(total, 83386, "Total should be 10+1+19275+64100 = 83386");
+    }
+}
