@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::path::PathBuf;
 
 /// A single line from a session JSONL file
@@ -57,9 +58,9 @@ pub struct SessionMessage {
     #[serde(default)]
     pub role: Option<String>,
 
-    /// Text content
+    /// Text content (can be String or Array of content blocks in newer Claude Code versions)
     #[serde(default)]
-    pub content: Option<String>,
+    pub content: Option<Value>,
 
     /// Tool calls made
     #[serde(default)]

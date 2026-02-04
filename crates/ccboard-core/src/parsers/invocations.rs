@@ -80,11 +80,10 @@ impl InvocationParser {
             // Detect agents: Task tool with subagent_type
             if let Some(ref message) = session_line.message {
                 if let Some(ref content) = message.content {
-                    // Try to parse content as string or array
-                    if let Ok(content_str) = serde_json::from_str::<String>(content) {
-                        self.extract_invocations(&content_str, &mut stats);
-                    } else if let Ok(content_array) =
-                        serde_json::from_str::<Vec<serde_json::Value>>(content)
+                    // Content is now Value (can be String or Array)
+                    if let Some(content_str) = content.as_str() {
+                        self.extract_invocations(content_str, &mut stats);
+                    } else if let Some(content_array) = content.as_array()
                     {
                         for item in content_array {
                             if let Some(obj) = item.as_object() {
@@ -129,7 +128,20 @@ impl InvocationParser {
             // Detect commands: user messages starting with /
             if session_line.line_type == "user" {
                 if let Some(ref message) = session_line.message {
-                    if let Some(ref text) = message.content {
+                    if let Some(ref content) = message.content {
+                        // Extract text from Value (String or Array)
+                        let text = match content {
+                            serde_json::Value::String(s) => s.as_str(),
+                            serde_json::Value::Array(blocks) => {
+                                // For array, try to get first text block
+                                blocks.first()
+                                    .and_then(|block| block.get("text"))
+                                    .and_then(|t| t.as_str())
+                                    .unwrap_or("")
+                            }
+                            _ => "",
+                        };
+
                         if let Some(caps) = command_regex().captures(text) {
                             let command = format!("/{}", &caps[1]);
                             *stats.commands.entry(command.clone()).or_insert(0) += 1;

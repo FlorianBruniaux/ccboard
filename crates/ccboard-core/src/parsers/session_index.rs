@@ -305,7 +305,19 @@ impl SessionIndexParser {
                 if metadata.first_user_message.is_none() {
                     if let Some(ref msg) = session_line.message {
                         if let Some(ref content) = msg.content {
-                            let preview: String = content.chars().take(PREVIEW_MAX_CHARS).collect();
+                            // Content can be String (old format) or Array (new format with content blocks)
+                            let text = match content {
+                                serde_json::Value::String(s) => s.clone(),
+                                serde_json::Value::Array(blocks) => {
+                                    // Extract text from content blocks
+                                    blocks.iter()
+                                        .filter_map(|block| block.get("text").and_then(|t| t.as_str()))
+                                        .collect::<Vec<_>>()
+                                        .join(" ")
+                                }
+                                _ => String::new(),
+                            };
+                            let preview: String = text.chars().take(PREVIEW_MAX_CHARS).collect();
                             metadata.first_user_message = Some(preview);
                         }
                     }
@@ -355,8 +367,13 @@ impl SessionIndexParser {
 
     /// Apply summary data to metadata
     fn apply_summary(metadata: &mut SessionMetadata, summary: &SessionSummary) {
-        metadata.total_tokens = summary.total_tokens;
-        metadata.message_count = summary.message_count;
+        // Only use summary values if they are non-zero (summary might be incomplete)
+        if summary.total_tokens > 0 {
+            metadata.total_tokens = summary.total_tokens;
+        }
+        if summary.message_count > 0 {
+            metadata.message_count = summary.message_count;
+        }
         metadata.duration_seconds = summary.duration_seconds;
 
         if let Some(ref models) = summary.models_used {
