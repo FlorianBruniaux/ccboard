@@ -793,7 +793,7 @@ impl CostsTab {
                     let row_data = vec![
                         date.format("%Y-%m-%d").to_string(),
                         block.label(),
-                        format!("{:>8}", usage.total_tokens()),
+                        format!("{:>8}", Self::format_short(usage.total_tokens())),
                         format!("{:>6}", usage.session_count),
                         format!("${:>6.2}", usage.total_cost),
                     ];
@@ -837,5 +837,18 @@ impl CostsTab {
         .column_spacing(2);
 
         frame.render_widget(table, area);
+    }
+
+    /// Format large numbers with K/M/B suffixes (compact, no decimals)
+    fn format_short(n: u64) -> String {
+        if n >= 1_000_000_000 {
+            format!("{}B", n / 1_000_000_000)
+        } else if n >= 1_000_000 {
+            format!("{}M", n / 1_000_000)
+        } else if n >= 1_000 {
+            format!("{}K", n / 1_000)
+        } else {
+            n.to_string()
+        }
     }
 }
