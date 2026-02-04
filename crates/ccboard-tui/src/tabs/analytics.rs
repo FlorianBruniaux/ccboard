@@ -499,9 +499,33 @@ impl AnalyticsTab {
             .map(|(i, &sessions)| (i as f64, sessions as f64 * 100.0)) // Scale for visibility
             .collect();
 
-        let max_tokens = data.trends.daily_tokens.iter().max().copied().unwrap_or(1) as f64;
+        // Forecast line (from last historical point to 30 days ahead)
+        let forecast_data = if data.forecast.unavailable_reason.is_none() && !token_data.is_empty() {
+            let last_day = token_data.len() as f64 - 1.0;
+            let last_tokens = token_data.last().map(|p| p.1).unwrap_or(0.0);
+            let forecast_end_tokens = data.forecast.next_30_days_tokens as f64;
 
-        let datasets = vec![
+            // Create intermediate points for smoother line
+            let mut points = vec![(last_day, last_tokens)];
+            for i in 1..=30 {
+                let x = last_day + i as f64;
+                let progress = i as f64 / 30.0;
+                let y = last_tokens + (forecast_end_tokens - last_tokens) * progress;
+                points.push((x, y));
+            }
+            points
+        } else {
+            vec![]
+        };
+
+        let max_tokens = data.trends.daily_tokens.iter().max().copied().unwrap_or(1) as f64;
+        let max_with_forecast = if !forecast_data.is_empty() {
+            forecast_data.iter().map(|p| p.1).fold(max_tokens, f64::max)
+        } else {
+            max_tokens
+        };
+
+        let mut datasets = vec![
             Dataset::default()
                 .name("Tokens")
                 .marker(symbols::Marker::Braille)
@@ -516,16 +540,47 @@ impl AnalyticsTab {
                 .data(&session_data),
         ];
 
+        // Add forecast dataset if available
+        if !forecast_data.is_empty() {
+            let forecast_color = if data.forecast.confidence > 0.7 {
+                Color::LightGreen
+            } else if data.forecast.confidence > 0.4 {
+                Color::Yellow
+            } else {
+                Color::LightRed
+            };
+
+            datasets.push(
+                Dataset::default()
+                    .name(format!("Forecast ({:.0}% conf)", data.forecast.confidence * 100.0))
+                    .marker(symbols::Marker::Dot)
+                    .graph_type(GraphType::Line)
+                    .style(Style::default().fg(forecast_color))
+                    .data(&forecast_data),
+            );
+        }
+
+        // X-axis bounds: historical + 30 days forecast
+        let x_max = if !forecast_data.is_empty() {
+            data.trends.dates.len() as f64 + 30.0
+        } else {
+            data.trends.dates.len() as f64
+        };
+
         let x_labels = vec![
             Span::raw("0"),
             Span::raw(format!("{}", data.trends.dates.len() / 2)),
             Span::raw(format!("{}", data.trends.dates.len())),
+            Span::styled(
+                "+30d",
+                Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+            ),
         ];
 
         let y_labels = vec![
             Span::raw("0"),
-            Span::raw(Self::format_number((max_tokens / 2.0) as u64)),
-            Span::raw(Self::format_number(max_tokens as u64)),
+            Span::raw(Self::format_number((max_with_forecast / 2.0) as u64)),
+            Span::raw(Self::format_number(max_with_forecast as u64)),
         ];
 
         let chart = Chart::new(datasets)
@@ -535,14 +590,14 @@ impl AnalyticsTab {
                     .title("Days")
                     .style(Style::default().fg(Color::Gray))
                     .labels(x_labels)
-                    .bounds([0.0, data.trends.dates.len() as f64]),
+                    .bounds([0.0, x_max]),
             )
             .y_axis(
                 Axis::default()
                     .title("Tokens")
                     .style(Style::default().fg(Color::Gray))
                     .labels(y_labels)
-                    .bounds([0.0, max_tokens * 1.1]),
+                    .bounds([0.0, max_with_forecast * 1.1]),
             );
 
         frame.render_widget(chart, area);
