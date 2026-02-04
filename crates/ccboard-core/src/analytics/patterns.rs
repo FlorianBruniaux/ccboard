@@ -69,7 +69,7 @@ fn estimate_cost(session: &SessionMetadata) -> f64 {
 /// - Empty sessions: Returns UsagePatterns::empty()
 /// - Missing timestamps: Session skipped with warning
 /// - No duration data: avg_session_duration = 0
-pub fn detect_patterns(sessions: &[Arc<SessionMetadata>]) -> UsagePatterns {
+pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsagePatterns {
     use chrono::Local;
 
     if sessions.is_empty() {
@@ -83,10 +83,20 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>]) -> UsagePatterns {
     let mut model_tokens: HashMap<String, u64> = HashMap::new();
     let mut model_costs: HashMap<String, f64> = HashMap::new();
 
+    // Filter by period (same logic as compute_trends)
+    let now = Local::now();
+    let cutoff = now - chrono::Duration::days(days as i64);
+
     for session in sessions {
         // Hourly distribution
         if let Some(ts) = session.first_timestamp {
             let local_ts = ts.with_timezone(&Local);
+
+            // Filter by period
+            if local_ts < cutoff {
+                continue;
+            }
+
             hourly_counts[local_ts.hour() as usize] += 1;
             weekday_counts[local_ts.weekday().num_days_from_monday() as usize] += 1;
         }

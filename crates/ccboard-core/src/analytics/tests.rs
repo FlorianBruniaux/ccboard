@@ -165,7 +165,7 @@ fn test_forecast_confidence_reflects_variance() {
 #[test]
 fn test_patterns_peak_hours() {
     let sessions = generate_test_sessions(100, 7);
-    let patterns = detect_patterns(&sessions);
+    let patterns = detect_patterns(&sessions, 7);
 
     // With 100 sessions, should have some peak hours
     assert!(
@@ -176,7 +176,7 @@ fn test_patterns_peak_hours() {
 #[test]
 fn test_patterns_most_productive_day() {
     let sessions = generate_test_sessions(50, 7);
-    let patterns = detect_patterns(&sessions);
+    let patterns = detect_patterns(&sessions, 7);
 
     // Should have identified a most productive day
     assert!(patterns.most_productive_hour < 24);
@@ -185,7 +185,7 @@ fn test_patterns_most_productive_day() {
 #[test]
 fn test_patterns_model_distribution_sums_to_one() {
     let sessions = generate_test_sessions(30, 7);
-    let patterns = detect_patterns(&sessions);
+    let patterns = detect_patterns(&sessions, 7);
 
     if !patterns.model_distribution.is_empty() {
         let sum: f64 = patterns.model_distribution.values().sum();

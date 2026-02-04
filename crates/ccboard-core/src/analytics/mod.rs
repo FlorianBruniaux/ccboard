@@ -96,7 +96,7 @@ impl AnalyticsData {
     pub fn compute(sessions: &[Arc<SessionMetadata>], period: Period) -> Self {
         let trends = compute_trends(sessions, period.days());
         let forecast = forecast_usage(&trends);
-        let patterns = detect_patterns(sessions);
+        let patterns = detect_patterns(sessions, period.days());
         let insights = generate_insights(&trends, &patterns, &forecast);
 
         Self {
@@ -119,7 +119,7 @@ impl AnalyticsData {
         Self {
             trends: compute_trends(sessions, period.days()),
             forecast: ForecastData::unavailable("Stats cache required for cost forecasting"),
-            patterns: detect_patterns(sessions),
+            patterns: detect_patterns(sessions, period.days()),
             insights: vec!["Limited insights: stats cache unavailable".to_string()],
             computed_at: Utc::now(),
             period,
