@@ -272,14 +272,35 @@ impl DashboardTab {
 
         // Sparkline with better style - expand data to fill width
         let max_val = padded_data.iter().max().copied().unwrap_or(1).max(1);
-        let width = inner_chunks[0].width as usize;
+
+        // Add max value label at top-right for Y-axis context (Task I.1 Option A)
+        let max_label = Paragraph::new(format!("↑ {}", Self::format_short(max_val)))
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Right);
+        let max_label_area = Rect {
+            x: inner_chunks[0].x,
+            y: inner_chunks[0].y,
+            width: inner_chunks[0].width,
+            height: 1,
+        };
+        frame.render_widget(max_label, max_label_area);
+
+        // Adjust sparkline area to account for max label
+        let sparkline_area = Rect {
+            x: inner_chunks[0].x,
+            y: inner_chunks[0].y + 1,
+            width: inner_chunks[0].width,
+            height: inner_chunks[0].height.saturating_sub(1),
+        };
+
+        let width = sparkline_area.width as usize;
         let expanded_data = Self::expand_sparkline_data(&padded_data, width);
         let sparkline = Sparkline::default()
             .data(&expanded_data)
             .max(max_val)
             .style(Style::default().fg(Color::Cyan))
             .bar_set(symbols::bar::NINE_LEVELS);
-        frame.render_widget(sparkline, inner_chunks[0]);
+        frame.render_widget(sparkline, sparkline_area);
 
         // Day labels and values
         let label_chunks = Layout::default()

@@ -374,8 +374,8 @@ mod tests {
 ## Success Criteria
 
 ### I.1: Échelle Y
-- ✅ Dashboard graph affiche "↑ MAX" en haut
-- ✅ Analytics graphs ont Y-axis avec 3 ticks (max, mid, 0)
+- ✅ Dashboard graph affiche "↑ MAX" en haut (COMPLETED - Option A implemented)
+- 🚧 Analytics graphs ont Y-axis avec 3 ticks (max, mid, 0) (PENDING - Option B)
 - ✅ Lisibilité améliorée (contexte quantitatif)
 
 ### I.2: Rules tracking
@@ -405,9 +405,9 @@ mod tests {
 
 ## Next Steps
 
-1. **Clarifier I.2** (rules tracking) avec utilisateur
-2. **Implémenter I.1 Option A** (Dashboard échelle) - 30min
-3. **Implémenter I.3** (Sessions live) - 2-3h
+1. ✅ **~~Implémenter I.1 Option A~~** (Dashboard échelle) - COMPLETED
+2. **Clarifier I.2** (rules tracking) avec utilisateur - BLOCKED (user input needed)
+3. **Implémenter I.3** (Sessions live) - 2-3h (can start now)
 4. **Polish I.1 Option B** (Analytics échelle) - 1h optionnel
 
-**Total estimated**: 3.5-5h (dépend de I.2 scope)
+**Remaining estimated**: 2-5h (dépend de I.2 scope + si Option B souhaité)

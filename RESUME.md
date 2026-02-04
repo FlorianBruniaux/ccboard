@@ -198,22 +198,23 @@ cargo clippy --all-targets
 
 ## 🎯 Prochaines Phases Possibles
 
-### Phase I: UI/UX Enhancements (3.5-5h) - **EN COURS**
+### Phase I: UI/UX Enhancements (2-5h restant) - **EN COURS**
 
 **Objectif**: Améliorer lisibilité graphiques + monitoring sessions live
 
 **Tasks** (voir `PLAN_PHASE_I.md`):
-1. **Échelle Y pour graphiques** (30min-2h)
-   - Option A: Label "↑ Max" en haut Dashboard (quick win)
-   - Option B: Axe Y complet Analytics tab avec 3 ticks
-2. **Suivi des rules** (TBD - clarification requise)
+1. **Échelle Y pour graphiques** ✅ PARTIEL (Option A complète, Option B optionnel)
+   - ✅ Option A: Label "↑ Max" en haut Dashboard (~20min)
+   - 🚧 Option B: Axe Y complet Analytics tab avec 3 ticks (optionnel)
+2. **Suivi des rules** 🚧 BLOQUÉ (clarification utilisateur requise)
    - Guidelines tracking? Session compliance? Project linting?
-3. **Sessions Claude live** (2-3h)
+3. **Sessions Claude live** ⏳ PRÊT (2-3h)
    - Détection processus actifs via `ps`/`tasklist`
    - Affichage PID, cwd, durée
    - Auto-refresh 2s, cross-platform
 
 **Priorité**: Haute (améliorations UX demandées)
+**Progression**: 33% (1/3 tasks complètes)
 
 ---
 
