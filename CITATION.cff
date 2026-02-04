@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use ccboard in your research, please cite it."
+type: software
+title: "ccboard: Unified TUI/Web Dashboard for Claude Code"
+abstract: "A unified TUI/Web dashboard for Claude Code management. Single 5.8MB Rust binary with 9 interactive tabs, SQLite cache (89x speedup), and real-time monitoring. Handles 10,000+ sessions, 157 tests, 0 clippy warnings."
+authors:
+  - family-names: "Bruniaux"
+    given-names: "Florian"
+    affiliation: "Independent Developer"
+version: "0.2.0"
+date-released: "2026-02-04"
+license: "MIT OR Apache-2.0"
+url: "https://github.com/FlorianBruniaux/ccboard"
+repository-code: "https://github.com/FlorianBruniaux/ccboard"
+keywords:
+  - claude-code
+  - rust
+  - tui
+  - monitoring
+  - dashboard
+  - ratatui
+  - axum
+  - sqlite
+  - analytics
+  - claude-ai
