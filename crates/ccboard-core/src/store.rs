@@ -690,6 +690,20 @@ impl DataStore {
     pub fn billing_blocks(&self) -> parking_lot::RwLockReadGuard<'_, BillingBlockManager> {
         self.billing_blocks.read()
     }
+
+    /// Calculate usage estimate based on billing blocks and subscription plan
+    pub fn usage_estimate(&self) -> crate::usage_estimator::UsageEstimate {
+        let settings = self.settings();
+        let plan = settings
+            .merged
+            .subscription_plan
+            .as_ref()
+            .map(|s| crate::usage_estimator::SubscriptionPlan::from_str(s))
+            .unwrap_or_default();
+
+        let billing_blocks = self.billing_blocks.read();
+        crate::usage_estimator::calculate_usage_estimate(&billing_blocks, plan)
+    }
 }
 
 #[cfg(test)]

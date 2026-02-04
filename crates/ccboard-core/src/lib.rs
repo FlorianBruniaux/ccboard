@@ -12,6 +12,7 @@ pub mod models;
 pub mod parsers;
 pub mod pricing;
 pub mod store;
+pub mod usage_estimator;
 pub mod watcher;
 
 pub use analytics::{
@@ -23,4 +24,5 @@ pub use event::{DataEvent, EventBus};
 pub use export::{export_billing_blocks_to_csv, export_sessions_to_csv, export_sessions_to_json};
 pub use live_monitor::{LiveSession, detect_live_sessions};
 pub use store::DataStore;
+pub use usage_estimator::{SubscriptionPlan, UsageEstimate, calculate_usage_estimate};
 pub use watcher::FileWatcher;

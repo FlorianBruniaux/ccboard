@@ -39,6 +39,10 @@ pub struct Settings {
     #[serde(default)]
     pub theme: Option<String>,
 
+    /// Subscription plan for budget estimation (pro, max5x, max20x)
+    #[serde(default)]
+    pub subscription_plan: Option<String>,
+
     /// Additional untyped fields
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
@@ -193,6 +197,9 @@ impl MergedConfig {
         }
         if source.theme.is_some() {
             target.theme = source.theme.clone();
+        }
+        if source.subscription_plan.is_some() {
+            target.subscription_plan = source.subscription_plan.clone();
         }
 
         // Permissions: deep merge

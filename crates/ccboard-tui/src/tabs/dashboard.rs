@@ -46,6 +46,7 @@ impl DashboardTab {
             constraints.push(Constraint::Length(3)); // Cache hint
         }
 
+        constraints.push(Constraint::Length(7)); // API Usage (Est.)
         constraints.push(Constraint::Min(12)); // Model gauges
 
         let chunks = Layout::default()
@@ -61,15 +62,18 @@ impl DashboardTab {
         self.render_activity(frame, chunks[1], stats);
 
         // Cache hint (if needed)
-        let hint_idx = if show_hint {
-            self.render_cache_hint(frame, chunks[2]);
-            3
-        } else {
-            2
-        };
+        let mut idx = 2;
+        if show_hint {
+            self.render_cache_hint(frame, chunks[idx]);
+            idx += 1;
+        }
+
+        // API Usage estimate
+        self.render_api_usage(frame, chunks[idx], store);
+        idx += 1;
 
         // Model distribution as gauges
-        self.render_model_gauges(frame, chunks[hint_idx], stats);
+        self.render_model_gauges(frame, chunks[idx], stats);
     }
 
     fn render_stats_row(
@@ -464,6 +468,96 @@ impl DashboardTab {
             );
 
         frame.render_widget(hint, area);
+    }
+
+    fn render_api_usage(&self, frame: &mut Frame, area: Rect, store: Option<&Arc<DataStore>>) {
+        let estimate = store.map(|s| s.usage_estimate());
+
+        let (plan_name, cost_today, cost_week, cost_month, budget, pct_month) = estimate
+            .as_ref()
+            .map(|est| {
+                (
+                    est.plan.display_name(),
+                    est.cost_today,
+                    est.cost_week,
+                    est.cost_month,
+                    est.budget_usd,
+                    est.percent_month(),
+                )
+            })
+            .unwrap_or(("Unknown Plan", 0.0, 0.0, 0.0, None, None));
+
+        // Create 3 lines: Today, Week, Month
+        let today_line = if let Some(budget) = budget {
+            format!(
+                "Today:      ${:>6.2} / ${:<6.0}  ({:>5.1}%)",
+                cost_today,
+                budget,
+                (cost_today / budget * 100.0).min(100.0)
+            )
+        } else {
+            format!("Today:      ${:>6.2}", cost_today)
+        };
+
+        let week_line = if let Some(budget) = budget {
+            format!(
+                "This week:  ${:>6.2} / ${:<6.0}  ({:>5.1}%)",
+                cost_week,
+                budget,
+                (cost_week / budget * 100.0).min(100.0)
+            )
+        } else {
+            format!("This week:  ${:>6.2}", cost_week)
+        };
+
+        let month_line = if let Some(budget) = budget {
+            let color = if pct_month.unwrap_or(0.0) > 80.0 {
+                Color::Red
+            } else if pct_month.unwrap_or(0.0) > 60.0 {
+                Color::Yellow
+            } else {
+                Color::Green
+            };
+            vec![
+                Span::raw("This month: "),
+                Span::styled(
+                    format!("${:>6.2}", cost_month),
+                    Style::default().fg(color).add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(format!(
+                    " / ${:<6.0}  ({:>5.1}%)",
+                    budget,
+                    pct_month.unwrap_or(0.0)
+                )),
+            ]
+        } else {
+            vec![Span::raw(format!("This month: ${:>6.2}", cost_month))]
+        };
+
+        let text = vec![
+            Line::from(today_line),
+            Line::from(week_line),
+            Line::from(month_line),
+        ];
+
+        let title = format!(" 💰 API Usage (Est.) - {} ", plan_name);
+
+        let block = Block::default()
+            .title(Span::styled(
+                title,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ))
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan));
+
+        let paragraph = Paragraph::new(text)
+            .block(block)
+            .alignment(Alignment::Left)
+            .style(Style::default().fg(Color::White));
+
+        frame.render_widget(paragraph, area);
     }
 
     fn format_model_name(name: &str) -> String {
