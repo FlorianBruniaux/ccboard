@@ -1,8 +1,8 @@
 # Résumé Projet ccboard - État Actuel
 
 **Date**: 2026-02-04
-**Dernier commit**: `10d36eb` - docs: mark Phase E (TUI Polish) as 100% complete
-**Version**: v0.2.0 (MVP Release + Optimisations + Polish)
+**Dernier commit**: `13ca6ee` - docs: add Phase I implementation plan (UI/UX enhancements)
+**Version**: v0.2.0 (MVP Release + Optimisations + Polish + Analytics)
 
 ---
 
@@ -20,9 +20,25 @@
 | **C** | Export & UI Features | 8h | 2026-02-03 | ✅ |
 | **D** | Arc Migration (Memory) | 3.5h | 2026-02-03 | ✅ |
 | **E** | TUI Polish & Status | 6h | 2026-02-04 | ✅ |
+| **H** | Advanced Analytics | 11h | 2026-02-04 | 🚧 90% |
 
-**Total développement**: ~37h structurées
-**Ligne de code ajoutée**: ~5000+ LOC
+**Total développement**: ~48h structurées (37h complètes + 11h en cours)
+**Ligne de code ajoutée**: ~6500+ LOC
+
+### 🔄 Améliorations Récentes (2026-02-04)
+
+**Pricing System Overhaul**:
+- ✅ Real model-based pricing (Opus: $15/$75, Sonnet: $3/$15, Haiku: $1/$5)
+- ✅ Token breakdown (input, output, cache_create, cache_read)
+- ✅ 3.6x error eliminated ($469 → $131 for 234M tokens example)
+- ✅ 13 pricing tests + all core tests passing
+- **Commit**: `ba1ba7c` - feat(pricing): implement real model-based pricing
+
+**Analytics Core** (Phase H - 90% complète):
+- ✅ Trends, Forecast, Patterns, Insights modules
+- ✅ 17 unit tests + performance benchmarks (438x-224,000x faster than targets)
+- ✅ DataStore integration + AnalyticsTab TUI (4 sub-views)
+- 🚧 Manual testing + polish remaining
 
 ---
 
@@ -182,6 +198,25 @@ cargo clippy --all-targets
 
 ## 🎯 Prochaines Phases Possibles
 
+### Phase I: UI/UX Enhancements (3.5-5h) - **EN COURS**
+
+**Objectif**: Améliorer lisibilité graphiques + monitoring sessions live
+
+**Tasks** (voir `PLAN_PHASE_I.md`):
+1. **Échelle Y pour graphiques** (30min-2h)
+   - Option A: Label "↑ Max" en haut Dashboard (quick win)
+   - Option B: Axe Y complet Analytics tab avec 3 ticks
+2. **Suivi des rules** (TBD - clarification requise)
+   - Guidelines tracking? Session compliance? Project linting?
+3. **Sessions Claude live** (2-3h)
+   - Détection processus actifs via `ps`/`tasklist`
+   - Affichage PID, cwd, durée
+   - Auto-refresh 2s, cross-platform
+
+**Priorité**: Haute (améliorations UX demandées)
+
+---
+
 ### Phase F: Web Interface Completion (12-16h)
 
 **Objectif**: Compléter Leptos frontend
@@ -212,18 +247,21 @@ cargo clippy --all-targets
 
 ---
 
-### Phase H: Advanced Analytics (8-12h)
+### Phase H: Advanced Analytics - Polish (2-3h restant)
 
-**Objectif**: Analytics avancées et insights
+**Statut**: 90% complète (9/12 tasks) - voir `PLAN_PHASE_H.md`
 
-**Tasks**:
-1. Trends analysis (session duration, token growth over time)
-2. Cost forecasting (predict monthly costs)
-3. Model usage patterns (which models when)
-4. Dashboard widgets (sparklines, heatmaps)
-5. Recommendations (optimize model usage, reduce costs)
+**Complété**:
+- ✅ Core analytics (trends, forecast, patterns, insights)
+- ✅ 17 unit tests + benchmarks (438x-58,000x faster than targets)
+- ✅ DataStore integration + AnalyticsTab TUI (4 sub-views)
 
-**Priorité**: Basse (nice-to-have)
+**Restant**:
+- 🚧 Manual testing avec vraies données (3500+ sessions)
+- 🚧 Final polish (chart readability, scroll behavior)
+- 🚧 Documentation + validation finale
+
+**Priorité**: Moyenne (fonctionnel, polish restant)
 
 ---
 
