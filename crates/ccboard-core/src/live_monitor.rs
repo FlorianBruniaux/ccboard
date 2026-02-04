@@ -236,14 +236,15 @@ fn get_tokens_for_session(working_directory: &Option<String>) -> Option<u64> {
     let cwd = working_directory.as_ref()?;
 
     // Encode path: /Users/foo/myproject → -Users-foo-myproject
-    let encoded = format!("-{}", cwd.replace('/', "-"));
+    // The leading '/' becomes '-' when replaced, so no need for format!("-{}")
+    let encoded = cwd.replace('/', "-");
 
     // Build sessions directory path
     let home = std::env::var("HOME").ok()?;
     let sessions_dir = std::path::Path::new(&home)
         .join(".claude")
         .join("projects")
-        .join(encoded);
+        .join(&encoded);
 
     if !sessions_dir.exists() {
         return None;
