@@ -93,8 +93,15 @@ pub struct TokenUsage {
 }
 
 impl TokenUsage {
+    /// Total tokens including cache reads and writes
+    ///
+    /// This is the sum of all token types:
+    /// - input_tokens: Regular input tokens (not cached)
+    /// - output_tokens: Generated tokens
+    /// - cache_read_tokens: Tokens read from cache (cache hits)
+    /// - cache_write_tokens: Tokens written to cache (cache creation)
     pub fn total(&self) -> u64 {
-        self.input_tokens + self.output_tokens
+        self.input_tokens + self.output_tokens + self.cache_read_tokens + self.cache_write_tokens
     }
 }
 

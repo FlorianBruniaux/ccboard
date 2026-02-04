@@ -90,8 +90,9 @@ pub fn export_billing_blocks_to_csv(manager: &BillingBlockManager, path: &Path) 
 /// use ccboard_core::models::SessionMetadata;
 /// use ccboard_core::export::export_sessions_to_csv;
 /// use std::path::Path;
+/// use std::sync::Arc;
 ///
-/// let sessions: Vec<SessionMetadata> = vec![]; // Load sessions
+/// let sessions: Vec<Arc<SessionMetadata>> = vec![]; // Load sessions
 /// let path = Path::new("sessions.csv");
 /// export_sessions_to_csv(&sessions, &path).unwrap();
 /// ```
@@ -174,8 +175,9 @@ pub fn export_sessions_to_csv(sessions: &[Arc<SessionMetadata>], path: &Path) ->
 /// use ccboard_core::models::SessionMetadata;
 /// use ccboard_core::export::export_sessions_to_json;
 /// use std::path::Path;
+/// use std::sync::Arc;
 ///
-/// let sessions: Vec<SessionMetadata> = vec![]; // Load sessions
+/// let sessions: Vec<Arc<SessionMetadata>> = vec![]; // Load sessions
 /// let path = Path::new("sessions.json");
 /// export_sessions_to_json(&sessions, &path).unwrap();
 /// ```

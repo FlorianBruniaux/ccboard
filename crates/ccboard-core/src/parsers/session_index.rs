@@ -569,7 +569,9 @@ mod tests {
         let meta = parser.scan_session(file.path()).await.unwrap();
 
         // Should accumulate all token types from both messages
-        // total = (100 + 50) + (200 + 75) = 150 + 275 = 425
-        assert_eq!(meta.total_tokens, 425);
+        // Message 1: input(100) + output(50) + cache_read(1000) + cache_write(500) = 1650
+        // Message 2: input(200) + output(75) = 275
+        // Total = 1650 + 275 = 1925
+        assert_eq!(meta.total_tokens, 1925);
     }
 }
