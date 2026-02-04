@@ -35,12 +35,13 @@ impl SubscriptionPlan {
 
     /// Get approximate monthly budget in USD
     ///
-    /// Note: These are estimates based on typical usage patterns.
-    /// Actual limits may vary based on Anthropic's current pricing.
+    /// Note: These are subscription costs, not spending limits.
+    /// Max plans have rate limits (requests/day), not fixed monthly budgets.
+    /// Use these values as reference points for cost estimation.
     pub fn monthly_budget_usd(self) -> Option<f64> {
         match self {
             Self::Pro => Some(20.0),
-            Self::Max5x => Some(100.0),
+            Self::Max5x => Some(50.0), // Updated from $100 to $50 (2025 pricing)
             Self::Max20x => Some(200.0),
             Self::Api => None, // Pay-as-you-go, no fixed limit
             Self::Unknown => None,
@@ -164,7 +165,7 @@ mod tests {
     #[test]
     fn test_monthly_budget() {
         assert_eq!(SubscriptionPlan::Pro.monthly_budget_usd(), Some(20.0));
-        assert_eq!(SubscriptionPlan::Max5x.monthly_budget_usd(), Some(100.0));
+        assert_eq!(SubscriptionPlan::Max5x.monthly_budget_usd(), Some(50.0));
         assert_eq!(SubscriptionPlan::Max20x.monthly_budget_usd(), Some(200.0));
         assert_eq!(SubscriptionPlan::Api.monthly_budget_usd(), None);
         assert_eq!(SubscriptionPlan::Unknown.monthly_budget_usd(), None);
@@ -177,12 +178,12 @@ mod tests {
             cost_week: 15.0,
             cost_month: 40.0,
             plan: SubscriptionPlan::Max5x,
-            budget_usd: Some(100.0),
+            budget_usd: Some(50.0),
         };
 
-        assert_eq!(estimate.percent_today(), Some(5.0));
-        assert_eq!(estimate.percent_week(), Some(15.0));
-        assert_eq!(estimate.percent_month(), Some(40.0));
+        assert_eq!(estimate.percent_today(), Some(10.0));
+        assert_eq!(estimate.percent_week(), Some(30.0));
+        assert_eq!(estimate.percent_month(), Some(80.0));
     }
 
     #[test]

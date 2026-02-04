@@ -68,9 +68,9 @@ impl SettingsParser {
         }
     }
 
-    /// Load and merge settings from all three levels
+    /// Load and merge settings from all four levels
     ///
-    /// Priority: local > project > global
+    /// Priority: project_local > project > global_local > global
     pub async fn load_merged(
         &self,
         claude_home: &Path,
@@ -83,6 +83,12 @@ impl SettingsParser {
             .parse_graceful(&global_path, "settings.global", report)
             .await;
 
+        // Global Local: ~/.claude/settings.local.json (NEW: not validated by Claude Code)
+        let global_local_path = claude_home.join("settings.local.json");
+        let global_local = self
+            .parse_graceful(&global_local_path, "settings.global_local", report)
+            .await;
+
         // Project: <project>/.claude/settings.json
         let project = if let Some(proj) = project_path {
             let project_path = proj.join(".claude").join("settings.json");
@@ -92,16 +98,17 @@ impl SettingsParser {
             None
         };
 
-        // Local: <project>/.claude/settings.local.json
-        let local = if let Some(proj) = project_path {
+        // Project Local: <project>/.claude/settings.local.json
+        let project_local = if let Some(proj) = project_path {
             let local_path = proj.join(".claude").join("settings.local.json");
-            self.parse_graceful(&local_path, "settings.local", report)
+            self.parse_graceful(&local_path, "settings.project_local", report)
                 .await
         } else {
             None
         };
 
-        if global.is_some() || project.is_some() || local.is_some() {
+        if global.is_some() || global_local.is_some() || project.is_some() || project_local.is_some()
+        {
             report.settings_loaded = true;
         }
 
@@ -118,7 +125,7 @@ impl SettingsParser {
             }
         }
 
-        MergedConfig::from_layers(global_with_hooks, project, local)
+        MergedConfig::from_layers(global_with_hooks, global_local, project, project_local)
     }
 
     /// Scan .sh files from hooks directories and inject into settings

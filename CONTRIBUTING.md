@@ -1,6 +1,29 @@
 # Contributing to ccboard
 
-Thank you for your interest in contributing to ccboard! This guide will help you get started with development, testing, and submitting contributions.
+**Welcome!** Whether you're fixing a typo or adding a new feature, every contribution helps make ccboard better for the Claude Code community.
+
+## Quick Links
+
+- [Report an Issue](../../issues/new)
+- [Start a Discussion](../../discussions)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+
+---
+
+## Ways to Contribute
+
+| Type | Examples | Effort |
+|------|----------|--------|
+| **Report** | Bugs, performance issues, broken links | 2-5 min |
+| **Improve** | Fix typos, clarify docs, improve error messages | 5-15 min |
+| **Add Features** | New tabs, parsers, analytics, export formats | 2-8 hours |
+| **Optimize** | Performance, cache strategies, memory usage | 1-4 hours |
+| **Test** | Write tests, improve coverage, benchmarks | 30-120 min |
+| **Share** | Workflows, success stories, blog posts | 5 min |
+
+**Not sure where to start?** Check [issues labeled `good first issue`](../../issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+
+---
 
 ## Table of Contents
 
@@ -17,7 +40,7 @@ Thank you for your interest in contributing to ccboard! This guide will help you
 
 ## Code of Conduct
 
-We are committed to providing a welcoming and inclusive environment. Please be respectful and constructive in all interactions.
+This project adheres to the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to [florian.bruniaux@gmail.com](mailto:florian.bruniaux@gmail.com).
 
 ---
 
@@ -512,11 +535,59 @@ docs(readme): add 13 production screenshots
 
 ---
 
+---
+
+## Quality Checklist
+
+Before submitting:
+
+- [ ] Code compiles without warnings (`cargo build`)
+- [ ] All tests pass (`cargo test --all`)
+- [ ] Clippy passes with 0 warnings (`cargo clippy --all-targets`)
+- [ ] Code formatted (`cargo fmt --all`)
+- [ ] Documentation updated if API changed
+- [ ] CHANGELOG.md entry added for user-facing changes
+
+---
+
+## Windows Contributions (Especially Welcome!)
+
+The maintainer works on macOS. If you're a Windows user:
+
+- Test Windows-specific code paths
+- Verify path handling (backslashes vs forward slashes)
+- Report Windows-specific issues
+- Test cross-platform compatibility
+
+**Your contributions are especially valuable!**
+
+---
+
+## What We Don't Accept
+
+- Marketing language or promotional content
+- Unverified or speculative performance claims
+- Large architectural changes without prior discussion (open an issue first)
+- Breaking changes to public APIs without consensus
+- Code that fails CI checks
+
+---
+
+## Recognition
+
+Contributors are recognized through:
+
+- **Git history** — Your commits are permanently attributed
+- **GitHub contributors** — Visible on repository page
+- **CHANGELOG.md** — Significant contributions highlighted in releases
+
+---
+
 ## Questions?
 
-- **Bugs**: [Open an issue](https://github.com/FlorianBruniaux/ccboard/issues/new)
-- **Features**: [Start a discussion](https://github.com/FlorianBruniaux/ccboard/discussions)
-- **Security**: See [SECURITY.md](SECURITY.md)
+- **General questions**: [GitHub Discussions](../../discussions)
+- **Bug reports**: [Issues](../../issues/new)
+- **Security issues**: [florian.bruniaux@gmail.com](mailto:florian.bruniaux@gmail.com) (private)
 
 ---
 
