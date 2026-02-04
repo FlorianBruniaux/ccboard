@@ -17,6 +17,7 @@ pub enum Tab {
     Costs,
     History,
     Mcp,
+    Analytics,
 }
 
 impl Tab {
@@ -30,6 +31,7 @@ impl Tab {
             Tab::Costs,
             Tab::History,
             Tab::Mcp,
+            Tab::Analytics,
         ]
     }
 
@@ -43,6 +45,7 @@ impl Tab {
             Tab::Costs => 5,
             Tab::History => 6,
             Tab::Mcp => 7,
+            Tab::Analytics => 8,
         }
     }
 
@@ -56,6 +59,7 @@ impl Tab {
             5 => Tab::Costs,
             6 => Tab::History,
             7 => Tab::Mcp,
+            8 => Tab::Analytics,
             _ => Tab::Dashboard,
         }
     }
@@ -70,6 +74,7 @@ impl Tab {
             Tab::Costs => "Costs",
             Tab::History => "History",
             Tab::Mcp => "MCP",
+            Tab::Analytics => "Analytics",
         }
     }
 
@@ -83,6 +88,7 @@ impl Tab {
             Tab::Costs => '6',
             Tab::History => '7',
             Tab::Mcp => '8',
+            Tab::Analytics => '9',
         }
     }
 
@@ -96,6 +102,7 @@ impl Tab {
             Tab::Costs => "💰",
             Tab::History => "⏱",
             Tab::Mcp => "◈",
+            Tab::Analytics => "📊",
         }
     }
 }
@@ -295,7 +302,8 @@ impl App {
                 DataEvent::StatsUpdated
                 | DataEvent::SessionCreated(_)
                 | DataEvent::SessionUpdated(_)
-                | DataEvent::ConfigChanged(_) => {
+                | DataEvent::ConfigChanged(_)
+                | DataEvent::AnalyticsUpdated => {
                     self.needs_refresh = true;
                 }
                 DataEvent::WatcherError(msg) => {

@@ -284,6 +284,7 @@ impl DebounceState {
                 format!("session:{}", id)
             }
             DataEvent::ConfigChanged(scope) => format!("config:{:?}", scope),
+            DataEvent::AnalyticsUpdated => "analytics".to_string(),
             DataEvent::LoadCompleted => "load".to_string(),
             DataEvent::WatcherError(_) => "error".to_string(),
         }

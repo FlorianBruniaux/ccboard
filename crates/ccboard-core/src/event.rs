@@ -15,6 +15,8 @@ pub enum DataEvent {
     SessionUpdated(String),
     /// Configuration changed
     ConfigChanged(ConfigScope),
+    /// Analytics data was computed and cached
+    AnalyticsUpdated,
     /// Initial load completed
     LoadCompleted,
     /// Watcher encountered an error

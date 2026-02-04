@@ -3,7 +3,8 @@
 use crate::app::{App, Tab};
 use crate::components::{Breadcrumb, Breadcrumbs};
 use crate::tabs::{
-    AgentsTab, ConfigTab, CostsTab, DashboardTab, HistoryTab, HooksTab, McpTab, SessionsTab,
+    AgentsTab, AnalyticsTab, ConfigTab, CostsTab, DashboardTab, HistoryTab, HooksTab, McpTab,
+    SessionsTab,
 };
 use ccboard_core::DegradedState;
 use ratatui::{
@@ -24,6 +25,7 @@ pub struct Ui {
     costs: CostsTab,
     history: HistoryTab,
     mcp: McpTab,
+    analytics: AnalyticsTab,
     breadcrumbs: Breadcrumbs,
 }
 
@@ -44,6 +46,7 @@ impl Ui {
             costs: CostsTab::new(),
             history: HistoryTab::new(),
             mcp: McpTab::new(),
+            analytics: AnalyticsTab::new(),
             breadcrumbs: Breadcrumbs::new(),
         }
     }
@@ -96,6 +99,28 @@ impl Ui {
             Tab::Mcp => {
                 let mcp_config = app.store.mcp_config();
                 self.mcp.handle_key(key, mcp_config.as_ref());
+            }
+            Tab::Analytics => {
+                use ccboard_core::analytics::Period;
+                use crossterm::event::KeyCode;
+                match key {
+                    KeyCode::F(1) => self.analytics.set_period(Period::last_7d()),
+                    KeyCode::F(2) => self.analytics.set_period(Period::last_30d()),
+                    KeyCode::F(3) => self.analytics.set_period(Period::last_90d()),
+                    KeyCode::F(4) => self.analytics.set_period(Period::available()),
+                    KeyCode::Tab => self.analytics.next_view(),
+                    KeyCode::BackTab => self.analytics.prev_view(),
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        let max_items = app
+                            .store
+                            .analytics()
+                            .map(|a| a.insights.len())
+                            .unwrap_or(0);
+                        self.analytics.scroll_down(max_items);
+                    }
+                    KeyCode::Char('k') | KeyCode::Up => self.analytics.scroll_up(),
+                    _ => {}
+                }
             }
         }
     }
@@ -366,6 +391,11 @@ impl Ui {
                 let mcp_config = app.store.mcp_config();
                 self.mcp.render(frame, area, mcp_config.as_ref());
             }
+            Tab::Analytics => {
+                let analytics = app.store.analytics();
+                self.analytics
+                    .render(frame, area, analytics.as_ref(), Some(&app.store));
+            }
         }
     }
 
@@ -388,6 +418,7 @@ impl Ui {
                 Tab::Costs => "Tab/←→/h/l switch views",
                 Tab::History => "/ search │ gg/G/Home/End jump │ c clear │ x export",
                 Tab::Mcp => "←→ focus │ ↑↓ select │ e edit │ o reveal │ r refresh",
+                Tab::Analytics => "F1-F4 period │ Tab switch views │ j/k scroll",
             };
 
             Line::from(vec![
@@ -435,6 +466,9 @@ impl Ui {
             }
             Tab::Mcp => {
                 path.push(Breadcrumb::new("MCP").with_level(1));
+            }
+            Tab::Analytics => {
+                path.push(Breadcrumb::new("Analytics").with_level(1));
             }
         }
 

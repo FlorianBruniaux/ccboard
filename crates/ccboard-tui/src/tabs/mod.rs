@@ -1,6 +1,7 @@
 //! TUI tab implementations
 
 pub mod agents;
+pub mod analytics;
 pub mod config;
 pub mod costs;
 pub mod dashboard;
@@ -10,6 +11,7 @@ pub mod mcp;
 pub mod sessions;
 
 pub use agents::AgentsTab;
+pub use analytics::AnalyticsTab;
 pub use config::ConfigTab;
 pub use costs::CostsTab;
 pub use dashboard::DashboardTab;

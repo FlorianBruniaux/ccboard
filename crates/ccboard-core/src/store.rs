@@ -3,6 +3,7 @@
 //! Uses DashMap for sessions (per-entry locking) and parking_lot::RwLock
 //! for stats/settings (better fairness than std::sync::RwLock).
 
+use crate::analytics::{AnalyticsData, Period};
 use crate::cache::MetadataCache;
 use crate::error::{DegradedState, LoadReport};
 use crate::event::{ConfigScope, DataEvent, EventBus};
@@ -83,6 +84,9 @@ pub struct DataStore {
     /// Billing blocks (5h usage tracking)
     billing_blocks: RwLock<BillingBlockManager>,
 
+    /// Analytics data cache (invalidated on stats/sessions update)
+    analytics_cache: RwLock<Option<AnalyticsData>>,
+
     /// Session metadata (high contention with many entries)
     /// Arc<SessionMetadata> for cheap cloning (8 bytes vs ~400 bytes)
     sessions: DashMap<String, Arc<SessionMetadata>>,
@@ -138,6 +142,7 @@ impl DataStore {
             rules: RwLock::new(Rules::default()),
             invocation_stats: RwLock::new(InvocationStats::new()),
             billing_blocks: RwLock::new(BillingBlockManager::new()),
+            analytics_cache: RwLock::new(None),
             sessions: DashMap::new(),
             session_content_cache,
             event_bus: EventBus::default_capacity(),
@@ -399,6 +404,56 @@ impl DataStore {
         self.sessions.get(id).map(|r| Arc::clone(r.value()))
     }
 
+    /// Get analytics data for a period (cached)
+    ///
+    /// Returns cached analytics if available, otherwise None.
+    /// Call `compute_analytics()` to compute and cache.
+    pub fn analytics(&self) -> Option<AnalyticsData> {
+        self.analytics_cache.read().clone()
+    }
+
+    /// Compute and cache analytics data for a period
+    ///
+    /// This is a CPU-intensive operation (trends, forecasting, patterns).
+    /// For 1000+ sessions, this may take 100-300ms, so it's offloaded
+    /// to a blocking task.
+    ///
+    /// Cache is invalidated on stats reload or session updates (EventBus pattern).
+    pub async fn compute_analytics(&self, period: Period) {
+        let sessions: Vec<_> = self.sessions.iter().map(|r| Arc::clone(r.value())).collect();
+
+        debug!(
+            session_count = sessions.len(),
+            period = ?period,
+            "Computing analytics"
+        );
+
+        // Offload to blocking task for CPU-intensive computation
+        let analytics = tokio::task::spawn_blocking(move || {
+            AnalyticsData::compute(&sessions, period)
+        })
+        .await;
+
+        match analytics {
+            Ok(data) => {
+                let mut guard = self.analytics_cache.write();
+                *guard = Some(data);
+                self.event_bus.publish(DataEvent::AnalyticsUpdated);
+                debug!("Analytics computed and cached");
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to compute analytics (task panicked)");
+            }
+        }
+    }
+
+    /// Invalidate analytics cache (called on data changes)
+    fn invalidate_analytics_cache(&self) {
+        let mut guard = self.analytics_cache.write();
+        *guard = None;
+        debug!("Analytics cache invalidated");
+    }
+
     /// Get all session IDs
     pub fn session_ids(&self) -> Vec<String> {
         self.sessions.iter().map(|r| r.key().clone()).collect()
@@ -454,6 +509,7 @@ impl DataStore {
         if let Some(stats) = parser.parse_graceful(&stats_path, &mut report).await {
             let mut guard = self.stats.write();
             *guard = Some(stats);
+            self.invalidate_analytics_cache();
             self.event_bus.publish(DataEvent::StatsUpdated);
             debug!("Stats reloaded");
         }
@@ -490,6 +546,7 @@ impl DataStore {
                 let is_new = !self.sessions.contains_key(&id);
 
                 self.sessions.insert(id.clone(), Arc::new(meta));
+                self.invalidate_analytics_cache();
 
                 if is_new {
                     self.event_bus.publish(DataEvent::SessionCreated(id));
@@ -656,5 +713,54 @@ mod tests {
 
         let event = rx.recv().await.unwrap();
         assert!(matches!(event, DataEvent::StatsUpdated));
+    }
+
+    #[tokio::test]
+    async fn test_analytics_cache_and_invalidation() {
+        use crate::models::session::SessionMetadata;
+        use chrono::Utc;
+
+        let dir = tempdir().unwrap();
+        let store = DataStore::with_defaults(dir.path().to_path_buf(), None);
+
+        // Add test sessions
+        let now = Utc::now();
+        for i in 0..10 {
+            let session = SessionMetadata {
+                id: format!("test-{}", i),
+                file_path: std::path::PathBuf::from(format!("/test-{}.jsonl", i)),
+                project_path: "/test".to_string(),
+                first_timestamp: Some(now - chrono::Duration::days(i)),
+                last_timestamp: Some(now),
+                message_count: 10,
+                total_tokens: 1000 * (i as u64 + 1),
+                models_used: vec!["sonnet".to_string()],
+                file_size_bytes: 1024,
+                first_user_message: None,
+                has_subagents: false,
+                duration_seconds: Some(1800),
+            };
+            store.sessions.insert(session.id.clone(), Arc::new(session));
+        }
+
+        // Initially no analytics
+        assert!(store.analytics().is_none());
+
+        // Compute analytics
+        store.compute_analytics(Period::last_7d()).await;
+
+        // Analytics should be cached
+        let analytics1 = store.analytics().expect("Analytics should be cached");
+        assert!(!analytics1.trends.is_empty());
+        assert_eq!(analytics1.period, Period::last_7d());
+
+        // Invalidate by reloading stats
+        store.invalidate_analytics_cache();
+        assert!(store.analytics().is_none(), "Cache should be invalidated");
+
+        // Re-compute with different period
+        store.compute_analytics(Period::last_30d()).await;
+        let analytics2 = store.analytics().expect("Analytics should be re-cached");
+        assert_eq!(analytics2.period, Period::last_30d());
     }
 }

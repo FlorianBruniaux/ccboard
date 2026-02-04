@@ -262,6 +262,24 @@ impl HelpModal {
                     Span::raw("Refresh server status"),
                 ]));
             }
+            Tab::Analytics => {
+                lines.push(Line::from(vec![
+                    Span::styled("  F1-F4       ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Select period (7d/30d/90d/All)"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  Tab         ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Switch between sub-views"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Scroll insights list"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  r           ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Recompute analytics"),
+                ]));
+            }
         }
 
         lines.push(Line::from(""));
