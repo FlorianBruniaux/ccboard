@@ -295,15 +295,28 @@ impl SessionsTab {
         frame: &mut Frame,
         area: Rect,
         sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
+        live_sessions: &[ccboard_core::LiveSession],
     ) {
         // Update project cache
         self.projects = sessions_by_project.keys().cloned().collect();
         self.projects.sort();
 
-        // Layout: [search bar (always visible), content]
+        // Layout: [search bar (always visible), live sessions (if any), content]
+        let live_height = if live_sessions.is_empty() {
+            0
+        } else {
+            (live_sessions.len() as u16).min(5) + 2 // +2 for borders
+        };
+
+        let mut constraints = vec![Constraint::Length(3)]; // search bar
+        if live_height > 0 {
+            constraints.push(Constraint::Length(live_height)); // live sessions
+        }
+        constraints.push(Constraint::Min(0)); // content
+
         let main_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Min(0)])
+            .constraints(constraints)
             .split(area);
 
         // Render search bar (always visible)
@@ -343,7 +356,16 @@ impl SessionsTab {
         );
 
         frame.render_widget(search_input, main_chunks[0]);
-        let content_area = main_chunks[1];
+
+        // Render live sessions if any
+        let content_chunk_idx = if live_height > 0 {
+            self.render_live_sessions(frame, main_chunks[1], live_sessions);
+            2
+        } else {
+            1
+        };
+
+        let content_area = main_chunks[content_chunk_idx];
 
         // Main layout: projects tree | session list | detail (if open)
         let constraints = if self.show_detail {
@@ -421,6 +443,63 @@ impl SessionsTab {
 
         // Render refresh notification if present
         self.render_refresh_notification(frame, area);
+    }
+
+    fn render_live_sessions(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        live_sessions: &[ccboard_core::LiveSession],
+    ) {
+        use chrono::Local;
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Green))
+            .title(Span::styled(
+                format!(" ⚡ Live Sessions ({}) ", live_sessions.len()),
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        if live_sessions.is_empty() {
+            return;
+        }
+
+        let items: Vec<ListItem> = live_sessions
+            .iter()
+            .map(|s| {
+                let now = Local::now();
+                let duration = now.signed_duration_since(s.start_time);
+                let hours = duration.num_hours();
+                let minutes = duration.num_minutes() % 60;
+
+                let duration_str = if hours > 0 {
+                    format!("{}h{}m", hours, minutes)
+                } else {
+                    format!("{}m", minutes)
+                };
+
+                let cwd_display = s
+                    .working_directory
+                    .as_ref()
+                    .and_then(|p| std::path::Path::new(p).file_name())
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown");
+
+                let label = format!(
+                    "🟢 PID {} • {} • {} ago",
+                    s.pid, cwd_display, duration_str
+                );
+
+                ListItem::new(label).style(Style::default().fg(Color::Green))
+            })
+            .collect();
+
+        let list = List::new(items);
+        frame.render_widget(list, inner);
     }
 
     fn render_projects(&mut self, frame: &mut Frame, area: Rect) {

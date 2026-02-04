@@ -7,6 +7,7 @@ pub mod cache;
 pub mod error;
 pub mod event;
 pub mod export;
+pub mod live_monitor;
 pub mod models;
 pub mod parsers;
 pub mod pricing;
@@ -20,5 +21,6 @@ pub use analytics::{
 pub use error::{CoreError, DegradedState, LoadReport};
 pub use event::{DataEvent, EventBus};
 pub use export::{export_billing_blocks_to_csv, export_sessions_to_csv, export_sessions_to_json};
+pub use live_monitor::{LiveSession, detect_live_sessions};
 pub use store::DataStore;
 pub use watcher::FileWatcher;

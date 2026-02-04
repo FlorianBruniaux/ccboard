@@ -393,6 +393,14 @@ impl DataStore {
         self.invocation_stats.read().clone()
     }
 
+    /// Get live Claude Code sessions (running processes)
+    ///
+    /// Detects active Claude processes on the system and returns metadata.
+    /// Returns empty vector if detection fails or no processes are running.
+    pub fn live_sessions(&self) -> Vec<crate::live_monitor::LiveSession> {
+        crate::live_monitor::detect_live_sessions().unwrap_or_default()
+    }
+
     /// Get session count
     pub fn session_count(&self) -> usize {
         self.sessions.len()

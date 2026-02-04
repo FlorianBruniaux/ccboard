@@ -198,7 +198,7 @@ cargo clippy --all-targets
 
 ## 🎯 Prochaines Phases Possibles
 
-### Phase I: UI/UX Enhancements (2-5h restant) - **EN COURS**
+### Phase I: UI/UX Enhancements (1-3h restant polish) - **EN COURS**
 
 **Objectif**: Améliorer lisibilité graphiques + monitoring sessions live
 
@@ -208,13 +208,14 @@ cargo clippy --all-targets
    - 🚧 Option B: Axe Y complet Analytics tab avec 3 ticks (optionnel)
 2. **Suivi des rules** 🚧 BLOQUÉ (clarification utilisateur requise)
    - Guidelines tracking? Session compliance? Project linting?
-3. **Sessions Claude live** ⏳ PRÊT (2-3h)
-   - Détection processus actifs via `ps`/`tasklist`
-   - Affichage PID, cwd, durée
-   - Auto-refresh 2s, cross-platform
+3. **Sessions Claude live** ✅ COMPLÉTÉ (~90%, auto-refresh optionnel)
+   - ✅ Détection processus actifs via `ps`/`tasklist` (281 LOC)
+   - ✅ Affichage PID, cwd, durée dans panel vert "⚡ Live Sessions"
+   - ✅ Cross-platform (Unix + Windows, tests partiels)
+   - 🚧 Auto-refresh 2s (différé, Ctrl+R fonctionne)
 
 **Priorité**: Haute (améliorations UX demandées)
-**Progression**: 33% (1/3 tasks complètes)
+**Progression**: 67% (2/3 tasks complètes, polish restant)
 
 ---
 

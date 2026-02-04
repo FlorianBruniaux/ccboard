@@ -383,11 +383,11 @@ mod tests {
 - ✅ Implementation si pertinent
 
 ### I.3: Sessions live
-- ✅ Détecte processus `claude` actifs (ps/tasklist)
-- ✅ Affiche PID, cwd, durée
-- ✅ Auto-refresh 2s quand tab actif
-- ✅ Cross-platform (Linux, macOS, Windows)
-- ✅ Graceful si aucune session live
+- ✅ Détecte processus `claude` actifs (ps/tasklist) - COMPLETED
+- ✅ Affiche PID, cwd, durée - COMPLETED
+- 🚧 Auto-refresh 2s quand tab actif - DEFERRED (manual refresh works)
+- ✅ Cross-platform (Linux, macOS, Windows) - COMPLETED (code, partial testing)
+- ✅ Graceful si aucune session live - COMPLETED
 
 ---
 
@@ -406,8 +406,9 @@ mod tests {
 ## Next Steps
 
 1. ✅ **~~Implémenter I.1 Option A~~** (Dashboard échelle) - COMPLETED
-2. **Clarifier I.2** (rules tracking) avec utilisateur - BLOCKED (user input needed)
-3. **Implémenter I.3** (Sessions live) - 2-3h (can start now)
+2. ✅ **~~Implémenter I.3~~** (Sessions live) - COMPLETED (~90%, auto-refresh deferred)
+3. **Clarifier I.2** (rules tracking) avec utilisateur - BLOCKED (user input needed)
 4. **Polish I.1 Option B** (Analytics échelle) - 1h optionnel
+5. **Polish I.3** (auto-refresh 2s) - 1-2h optionnel
 
-**Remaining estimated**: 2-5h (dépend de I.2 scope + si Option B souhaité)
+**Remaining estimated**: 1-3h (dépend de I.2 scope + polish souhaité)
