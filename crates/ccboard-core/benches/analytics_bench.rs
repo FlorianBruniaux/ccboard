@@ -6,10 +6,12 @@
 //! - detect_patterns(1000 sessions) → <30ms
 //! - generate_insights() → <10ms
 
-use ccboard_core::analytics::{compute_trends, detect_patterns, forecast_usage, generate_insights, Period, AnalyticsData};
+use ccboard_core::analytics::{
+    AnalyticsData, Period, compute_trends, detect_patterns, forecast_usage, generate_insights,
+};
 use ccboard_core::models::session::SessionMetadata;
 use chrono::Utc;
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use std::sync::Arc;
 
 /// Generate test sessions for benchmarking
@@ -65,15 +67,11 @@ fn forecast_benchmark(c: &mut Criterion) {
     for days in [7, 30, 90] {
         let sessions = generate_test_sessions(days * 3, days);
         let trends = compute_trends(&sessions, days);
-        group.bench_with_input(
-            BenchmarkId::new("days", days),
-            &trends,
-            |b, trends| {
-                b.iter(|| {
-                    black_box(forecast_usage(trends));
-                });
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("days", days), &trends, |b, trends| {
+            b.iter(|| {
+                black_box(forecast_usage(trends));
+            });
+        });
     }
 
     group.finish();

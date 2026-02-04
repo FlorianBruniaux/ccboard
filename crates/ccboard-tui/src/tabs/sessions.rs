@@ -2,8 +2,6 @@
 
 use crate::components::highlight_matches;
 use ccboard_core::models::SessionMetadata;
-use std::sync::Arc;
-use std::time::Instant;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
@@ -15,6 +13,8 @@ use ratatui::{
     },
 };
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Instant;
 
 /// Sessions tab state
 pub struct SessionsTab {
@@ -161,7 +161,10 @@ impl SessionsTab {
                                 if let Err(e) = clipboard.set_text(&session.id) {
                                     self.error_message = Some(format!("Failed to copy: {}", e));
                                 } else {
-                                    self.refresh_message = Some(format!("✓ Copied: {}", &session.id[..8.min(session.id.len())]));
+                                    self.refresh_message = Some(format!(
+                                        "✓ Copied: {}",
+                                        &session.id[..8.min(session.id.len())]
+                                    ));
                                 }
                             }
                             Err(e) => {
@@ -470,7 +473,12 @@ impl SessionsTab {
         frame.render_stateful_widget(list, area, &mut self.project_state);
     }
 
-    fn render_sessions(&mut self, frame: &mut Frame, area: Rect, sessions: &[Arc<SessionMetadata>]) {
+    fn render_sessions(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        sessions: &[Arc<SessionMetadata>],
+    ) {
         let is_focused = self.focus == 1;
         let border_color = if is_focused {
             Color::Cyan
@@ -484,11 +492,17 @@ impl SessionsTab {
         let display_count = total_count.min(MAX_DISPLAY);
 
         let title_text = if self.search_filter.is_empty() && total_count > MAX_DISPLAY {
-            format!(" Sessions (showing {} / {}) • {} ", display_count, total_count, time_ago)
+            format!(
+                " Sessions (showing {} / {}) • {} ",
+                display_count, total_count, time_ago
+            )
         } else if self.search_filter.is_empty() {
             format!(" Sessions ({}) • {} ", total_count, time_ago)
         } else if total_count > MAX_DISPLAY {
-            format!(" Sessions (showing {} / {} results) • {} ", display_count, total_count, time_ago)
+            format!(
+                " Sessions (showing {} / {} results) • {} ",
+                display_count, total_count, time_ago
+            )
         } else {
             format!(" Sessions ({} results) • {} ", total_count, time_ago)
         };
@@ -506,7 +520,10 @@ impl SessionsTab {
                 // No sessions in selected project
                 vec![
                     Line::from(""),
-                    Line::from(Span::styled("📂 No sessions found", Style::default().fg(Color::Yellow))),
+                    Line::from(Span::styled(
+                        "📂 No sessions found",
+                        Style::default().fg(Color::Yellow),
+                    )),
                     Line::from(""),
                     Line::from(Span::styled(
                         "No Claude Code sessions in this project",
@@ -531,17 +548,17 @@ impl SessionsTab {
                 // Search returned no results
                 vec![
                     Line::from(""),
-                    Line::from(Span::styled("🔍 No matching sessions", Style::default().fg(Color::Yellow))),
+                    Line::from(Span::styled(
+                        "🔍 No matching sessions",
+                        Style::default().fg(Color::Yellow),
+                    )),
                     Line::from(""),
                     Line::from(Span::styled(
                         format!("No sessions match: \"{}\"", self.search_filter),
                         Style::default().fg(Color::DarkGray),
                     )),
                     Line::from(""),
-                    Line::from(Span::styled(
-                        "💡 Try:",
-                        Style::default().fg(Color::Cyan),
-                    )),
+                    Line::from(Span::styled("💡 Try:", Style::default().fg(Color::Cyan))),
                     Line::from(Span::styled(
                         "   • Shorter query or different project",
                         Style::default().fg(Color::DarkGray),

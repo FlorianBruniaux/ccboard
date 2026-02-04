@@ -8,18 +8,18 @@ use std::sync::Arc;
 
 use crate::models::session::SessionMetadata;
 
-pub mod trends;
 pub mod forecasting;
-pub mod patterns;
 pub mod insights;
+pub mod patterns;
+pub mod trends;
 
 #[cfg(test)]
 mod tests;
 
-pub use trends::{TrendsData, compute_trends};
 pub use forecasting::{ForecastData, TrendDirection, forecast_usage};
-pub use patterns::{UsagePatterns, detect_patterns};
 pub use insights::generate_insights;
+pub use patterns::{UsagePatterns, detect_patterns};
+pub use trends::{TrendsData, compute_trends};
 
 /// Period selection for analytics computation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

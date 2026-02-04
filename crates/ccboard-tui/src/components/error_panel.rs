@@ -23,7 +23,10 @@ pub fn render_error_panel(frame: &mut Frame, area: Rect, errors: &[LoadError], t
 
         let empty = Paragraph::new(vec![
             Line::from(""),
-            Line::from(Span::styled("✓ All data loaded successfully", Style::default().fg(Color::Green))),
+            Line::from(Span::styled(
+                "✓ All data loaded successfully",
+                Style::default().fg(Color::Green),
+            )),
         ])
         .block(block);
 

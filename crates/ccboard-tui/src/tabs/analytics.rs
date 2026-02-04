@@ -9,8 +9,8 @@ use ratatui::{
     symbols,
     text::{Line, Span},
     widgets::{
-        Axis, BarChart, Block, Borders, Chart, Dataset, GraphType, List, ListItem,
-        Paragraph, Sparkline,
+        Axis, BarChart, Block, Borders, Chart, Dataset, GraphType, List, ListItem, Paragraph,
+        Sparkline,
     },
 };
 use std::sync::Arc;
@@ -125,6 +125,13 @@ impl AnalyticsTab {
         analytics: Option<&AnalyticsData>,
         store: Option<&Arc<DataStore>>,
     ) {
+        use tracing::debug;
+
+        debug!(
+            has_analytics = analytics.is_some(),
+            "AnalyticsTab::render() called"
+        );
+
         // Main layout: header + content
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -137,13 +144,22 @@ impl AnalyticsTab {
         self.render_header(frame, chunks[0], analytics, store);
 
         match analytics {
-            Some(data) => match self.current_view {
-                AnalyticsView::Overview => self.render_overview(frame, chunks[1], data),
-                AnalyticsView::Trends => self.render_trends(frame, chunks[1], data),
-                AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data),
-                AnalyticsView::Insights => self.render_insights(frame, chunks[1], data),
-            },
-            None => self.render_loading(frame, chunks[1]),
+            Some(data) => {
+                debug!(
+                    insights_count = data.insights.len(),
+                    "Rendering analytics data"
+                );
+                match self.current_view {
+                    AnalyticsView::Overview => self.render_overview(frame, chunks[1], data),
+                    AnalyticsView::Trends => self.render_trends(frame, chunks[1], data),
+                    AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data),
+                    AnalyticsView::Insights => self.render_insights(frame, chunks[1], data),
+                }
+            }
+            None => {
+                debug!("No analytics data available, showing loading");
+                self.render_loading(frame, chunks[1])
+            }
         }
     }
 
@@ -200,10 +216,7 @@ impl AnalyticsTab {
                 } else {
                     Style::default().fg(Color::DarkGray)
                 };
-                vec![
-                    Span::styled(view.name(), style),
-                    Span::raw(" | "),
-                ]
+                vec![Span::styled(view.name(), style), Span::raw(" | ")]
             })
             .collect();
 
@@ -337,9 +350,7 @@ impl AnalyticsTab {
             .border_style(Style::default().fg(color))
             .title(Span::styled(
                 title,
-                Style::default()
-                    .fg(color)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
             ));
 
         let text = vec![
@@ -350,10 +361,7 @@ impl AnalyticsTab {
                     .fg(Color::White)
                     .add_modifier(Modifier::BOLD),
             )),
-            Line::from(Span::styled(
-                subtitle,
-                Style::default().fg(Color::DarkGray),
-            )),
+            Line::from(Span::styled(subtitle, Style::default().fg(Color::DarkGray))),
         ];
 
         let para = Paragraph::new(text)

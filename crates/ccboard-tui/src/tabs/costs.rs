@@ -459,7 +459,10 @@ impl CostsTab {
     }
 
     fn render_by_model(&mut self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
-        let title_text = format!(" Cost by Model • Sort: {} (press 's') ", self.sort_mode.label());
+        let title_text = format!(
+            " Cost by Model • Sort: {} (press 's') ",
+            self.sort_mode.label()
+        );
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray))
@@ -727,7 +730,10 @@ impl CostsTab {
         if all_blocks.is_empty() {
             let empty_msg = vec![
                 Line::from(""),
-                Line::from(Span::styled("📊 No cost data available", Style::default().fg(Color::Yellow))),
+                Line::from(Span::styled(
+                    "📊 No cost data available",
+                    Style::default().fg(Color::Yellow),
+                )),
                 Line::from(""),
                 Line::from(Span::styled(
                     "No sessions with timestamps found",

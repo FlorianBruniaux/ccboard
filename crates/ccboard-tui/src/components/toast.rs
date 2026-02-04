@@ -112,16 +112,12 @@ impl ToastManager {
 
         // Stack toasts from bottom up (max 5 visible)
         let max_visible = 5;
-        let visible_toasts: Vec<_> = self
-            .toasts
-            .iter()
-            .rev()
-            .take(max_visible)
-            .rev()
-            .collect();
+        let visible_toasts: Vec<_> = self.toasts.iter().rev().take(max_visible).rev().collect();
 
         let toast_height: u16 = 3;
-        let mut y_offset = area.height.saturating_sub((visible_toasts.len() as u16 * toast_height) + 2);
+        let mut y_offset = area
+            .height
+            .saturating_sub((visible_toasts.len() as u16 * toast_height) + 2);
 
         for toast in visible_toasts {
             let toast_width = (toast.message.len() + 6).min(area.width as usize) as u16;

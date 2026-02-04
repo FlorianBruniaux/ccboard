@@ -118,8 +118,8 @@ impl ConfirmDialog {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(3),      // Message
-                Constraint::Length(3),   // Buttons
+                Constraint::Min(3),    // Message
+                Constraint::Length(3), // Buttons
             ])
             .split(inner);
 
@@ -141,30 +141,52 @@ impl ConfirmDialog {
         // Buttons
         let button_lines = vec![
             Line::from(vec![
-                Span::styled("[Y] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-                Span::styled("Yes", Style::default().fg(if matches!(self.default_option, ConfirmResult::Yes) {
-                    Color::Green
-                } else {
-                    Color::White
-                })),
+                Span::styled(
+                    "[Y] ",
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "Yes",
+                    Style::default().fg(if matches!(self.default_option, ConfirmResult::Yes) {
+                        Color::Green
+                    } else {
+                        Color::White
+                    }),
+                ),
                 Span::styled("  ", Style::default()),
-                Span::styled("[N] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-                Span::styled("No", Style::default().fg(if matches!(self.default_option, ConfirmResult::No) {
-                    Color::Red
-                } else {
-                    Color::White
-                })),
+                Span::styled(
+                    "[N] ",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    "No",
+                    Style::default().fg(if matches!(self.default_option, ConfirmResult::No) {
+                        Color::Red
+                    } else {
+                        Color::White
+                    }),
+                ),
                 Span::styled("  ", Style::default()),
-                Span::styled("[Esc] ", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    "[Esc] ",
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::styled("Cancel", Style::default().fg(Color::DarkGray)),
             ]),
             Line::from(""),
             Line::from(Span::styled(
-                format!("(Enter = {})", match self.default_option {
-                    ConfirmResult::Yes => "Yes",
-                    ConfirmResult::No => "No",
-                    ConfirmResult::Cancel => "Cancel",
-                }),
+                format!(
+                    "(Enter = {})",
+                    match self.default_option {
+                        ConfirmResult::Yes => "Yes",
+                        ConfirmResult::No => "No",
+                        ConfirmResult::Cancel => "Cancel",
+                    }
+                ),
                 Style::default().fg(Color::DarkGray),
             )),
         ];

@@ -409,7 +409,12 @@ impl DataStore {
     /// Returns cached analytics if available, otherwise None.
     /// Call `compute_analytics()` to compute and cache.
     pub fn analytics(&self) -> Option<AnalyticsData> {
-        self.analytics_cache.read().clone()
+        let analytics = self.analytics_cache.read().clone();
+        debug!(
+            has_analytics = analytics.is_some(),
+            "analytics() getter called"
+        );
+        analytics
     }
 
     /// Compute and cache analytics data for a period
@@ -420,26 +425,32 @@ impl DataStore {
     ///
     /// Cache is invalidated on stats reload or session updates (EventBus pattern).
     pub async fn compute_analytics(&self, period: Period) {
-        let sessions: Vec<_> = self.sessions.iter().map(|r| Arc::clone(r.value())).collect();
+        let sessions: Vec<_> = self
+            .sessions
+            .iter()
+            .map(|r| Arc::clone(r.value()))
+            .collect();
 
-        debug!(
+        info!(
             session_count = sessions.len(),
             period = ?period,
-            "Computing analytics"
+            "compute_analytics() ENTRY"
         );
 
         // Offload to blocking task for CPU-intensive computation
-        let analytics = tokio::task::spawn_blocking(move || {
-            AnalyticsData::compute(&sessions, period)
-        })
-        .await;
+        let analytics =
+            tokio::task::spawn_blocking(move || AnalyticsData::compute(&sessions, period)).await;
 
         match analytics {
             Ok(data) => {
+                info!(
+                    insights_count = data.insights.len(),
+                    "compute_analytics() computed data"
+                );
                 let mut guard = self.analytics_cache.write();
                 *guard = Some(data);
                 self.event_bus.publish(DataEvent::AnalyticsUpdated);
-                debug!("Analytics computed and cached");
+                info!("compute_analytics() EXIT - cached and event published");
             }
             Err(e) => {
                 warn!(error = %e, "Failed to compute analytics (task panicked)");
@@ -448,6 +459,10 @@ impl DataStore {
     }
 
     /// Invalidate analytics cache (called on data changes)
+    ///
+    /// Note: Currently unused to prevent aggressive invalidation.
+    /// Kept for future use if smart invalidation is needed.
+    #[allow(dead_code)]
     fn invalidate_analytics_cache(&self) {
         let mut guard = self.analytics_cache.write();
         *guard = None;
@@ -467,7 +482,9 @@ impl DataStore {
 
     /// Get sessions grouped by project
     /// Returns Arc<SessionMetadata> for cheap cloning
-    pub fn sessions_by_project(&self) -> std::collections::HashMap<String, Vec<Arc<SessionMetadata>>> {
+    pub fn sessions_by_project(
+        &self,
+    ) -> std::collections::HashMap<String, Vec<Arc<SessionMetadata>>> {
         let mut by_project = std::collections::HashMap::new();
 
         for entry in self.sessions.iter() {
@@ -489,7 +506,11 @@ impl DataStore {
     /// Get recent sessions (sorted by last timestamp, newest first)
     /// Returns Arc<SessionMetadata> for cheap cloning
     pub fn recent_sessions(&self, limit: usize) -> Vec<Arc<SessionMetadata>> {
-        let mut sessions: Vec<_> = self.sessions.iter().map(|r| Arc::clone(r.value())).collect();
+        let mut sessions: Vec<_> = self
+            .sessions
+            .iter()
+            .map(|r| Arc::clone(r.value()))
+            .collect();
         sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
         sessions.truncate(limit);
         sessions
@@ -509,7 +530,9 @@ impl DataStore {
         if let Some(stats) = parser.parse_graceful(&stats_path, &mut report).await {
             let mut guard = self.stats.write();
             *guard = Some(stats);
-            self.invalidate_analytics_cache();
+
+            // Don't invalidate analytics - it will auto-recompute if needed
+            // Instead, just publish the event so UI can decide whether to recompute
             self.event_bus.publish(DataEvent::StatsUpdated);
             debug!("Stats reloaded");
         }
@@ -546,7 +569,10 @@ impl DataStore {
                 let is_new = !self.sessions.contains_key(&id);
 
                 self.sessions.insert(id.clone(), Arc::new(meta));
-                self.invalidate_analytics_cache();
+
+                // Don't invalidate analytics on every session update - too aggressive
+                // Analytics will be recomputed on demand or periodically
+                // Only invalidate on significant changes (detected by UI)
 
                 if is_new {
                     self.event_bus.publish(DataEvent::SessionCreated(id));

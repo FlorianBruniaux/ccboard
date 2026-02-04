@@ -183,7 +183,11 @@ impl App {
 
     /// Handle keyboard input
     /// Returns true if the key was handled as a global key
-    pub fn handle_key(&mut self, key: crossterm::event::KeyCode, modifiers: crossterm::event::KeyModifiers) -> bool {
+    pub fn handle_key(
+        &mut self,
+        key: crossterm::event::KeyCode,
+        modifiers: crossterm::event::KeyModifiers,
+    ) -> bool {
         use crate::components::command_palette::CommandAction;
         use crossterm::event::{KeyCode, KeyModifiers};
 
@@ -277,22 +281,26 @@ impl App {
 
     /// Add success toast notification
     pub fn success_toast(&mut self, message: impl Into<String>) {
-        self.toast_manager.push(crate::components::Toast::success(message));
+        self.toast_manager
+            .push(crate::components::Toast::success(message));
     }
 
     /// Add error toast notification
     pub fn error_toast(&mut self, message: impl Into<String>) {
-        self.toast_manager.push(crate::components::Toast::error(message));
+        self.toast_manager
+            .push(crate::components::Toast::error(message));
     }
 
     /// Add warning toast notification
     pub fn warning_toast(&mut self, message: impl Into<String>) {
-        self.toast_manager.push(crate::components::Toast::warning(message));
+        self.toast_manager
+            .push(crate::components::Toast::warning(message));
     }
 
     /// Add info toast notification
     pub fn info_toast(&mut self, message: impl Into<String>) {
-        self.toast_manager.push(crate::components::Toast::info(message));
+        self.toast_manager
+            .push(crate::components::Toast::info(message));
     }
 
     /// Check for data events (non-blocking)

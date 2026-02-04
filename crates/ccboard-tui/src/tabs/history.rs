@@ -3,7 +3,6 @@
 use crate::components::highlight_matches;
 use ccboard_core::models::{SessionMetadata, StatsCache};
 use chrono::Local;
-use std::sync::Arc;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -14,6 +13,7 @@ use ratatui::{
         ScrollbarState, Sparkline,
     },
 };
+use std::sync::Arc;
 
 /// History tab state
 pub struct HistoryTab {
@@ -65,7 +65,11 @@ impl HistoryTab {
     }
 
     /// Handle key input
-    pub fn handle_key(&mut self, key: crossterm::event::KeyCode, sessions: &[Arc<SessionMetadata>]) {
+    pub fn handle_key(
+        &mut self,
+        key: crossterm::event::KeyCode,
+        sessions: &[Arc<SessionMetadata>],
+    ) {
         use crossterm::event::KeyCode;
 
         if self.search_focused {
@@ -458,7 +462,10 @@ impl HistoryTab {
             let empty_lines = if self.search_query.is_empty() {
                 vec![
                     Line::from(""),
-                    Line::from(Span::styled("📂 No sessions found", Style::default().fg(Color::Yellow))),
+                    Line::from(Span::styled(
+                        "📂 No sessions found",
+                        Style::default().fg(Color::Yellow),
+                    )),
                     Line::from(""),
                     Line::from(Span::styled(
                         "No Claude Code sessions detected across all projects",
@@ -482,17 +489,17 @@ impl HistoryTab {
             } else {
                 vec![
                     Line::from(""),
-                    Line::from(Span::styled("🔍 No matching sessions", Style::default().fg(Color::Yellow))),
+                    Line::from(Span::styled(
+                        "🔍 No matching sessions",
+                        Style::default().fg(Color::Yellow),
+                    )),
                     Line::from(""),
                     Line::from(Span::styled(
                         format!("No results for: \"{}\"", self.search_query),
                         Style::default().fg(Color::DarkGray),
                     )),
                     Line::from(""),
-                    Line::from(Span::styled(
-                        "💡 Try:",
-                        Style::default().fg(Color::Cyan),
-                    )),
+                    Line::from(Span::styled("💡 Try:", Style::default().fg(Color::Cyan))),
                     Line::from(Span::styled(
                         "   • Shorter query (single word)",
                         Style::default().fg(Color::DarkGray),

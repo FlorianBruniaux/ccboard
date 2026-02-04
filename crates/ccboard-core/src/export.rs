@@ -192,8 +192,8 @@ pub fn export_sessions_to_json(sessions: &[Arc<SessionMetadata>], path: &Path) -
     let sessions_ref: Vec<&SessionMetadata> = sessions.iter().map(|s| s.as_ref()).collect();
 
     // Serialize to JSON (pretty print)
-    let json =
-        serde_json::to_string_pretty(&sessions_ref).context("Failed to serialize sessions to JSON")?;
+    let json = serde_json::to_string_pretty(&sessions_ref)
+        .context("Failed to serialize sessions to JSON")?;
 
     // Write to file
     std::fs::write(path, json)
@@ -344,8 +344,18 @@ mod tests {
     #[test]
     fn test_export_sessions_csv_with_data() {
         let sessions = vec![
-            Arc::new(create_test_session("abc123", "/Users/test/project1", 25, 15000)),
-            Arc::new(create_test_session("def456", "/Users/test/project2", 10, 5000)),
+            Arc::new(create_test_session(
+                "abc123",
+                "/Users/test/project1",
+                25,
+                15000,
+            )),
+            Arc::new(create_test_session(
+                "def456",
+                "/Users/test/project2",
+                10,
+                5000,
+            )),
         ];
 
         let temp_dir = TempDir::new().unwrap();

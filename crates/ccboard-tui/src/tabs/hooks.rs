@@ -613,7 +613,10 @@ impl HooksTab {
                 }
                 '"' | '\'' if in_string && ch == string_char => {
                     current_word.push(ch);
-                    spans.push(Span::styled(current_word.clone(), Style::default().fg(Color::Green)));
+                    spans.push(Span::styled(
+                        current_word.clone(),
+                        Style::default().fg(Color::Green),
+                    ));
                     current_word.clear();
                     in_string = false;
                 }
@@ -626,13 +629,20 @@ impl HooksTab {
                     current_word.push(ch);
                     // Capture variable name
                     while let Some(&next_ch) = chars.peek() {
-                        if next_ch.is_alphanumeric() || next_ch == '_' || next_ch == '{' || next_ch == '}' {
+                        if next_ch.is_alphanumeric()
+                            || next_ch == '_'
+                            || next_ch == '{'
+                            || next_ch == '}'
+                        {
                             current_word.push(chars.next().unwrap());
                         } else {
                             break;
                         }
                     }
-                    spans.push(Span::styled(current_word.clone(), Style::default().fg(Color::Cyan)));
+                    spans.push(Span::styled(
+                        current_word.clone(),
+                        Style::default().fg(Color::Cyan),
+                    ));
                     current_word.clear();
                 }
                 // Regular characters
@@ -645,15 +655,23 @@ impl HooksTab {
         // Flush remaining
         if !current_word.is_empty() {
             if in_string {
-                spans.push(Span::styled(current_word, Style::default().fg(Color::Green)));
+                spans.push(Span::styled(
+                    current_word,
+                    Style::default().fg(Color::Green),
+                ));
             } else {
                 // Check if it's a common bash keyword
-                let keywords = ["if", "then", "else", "elif", "fi", "for", "while", "do", "done",
-                               "case", "esac", "function", "return", "exit", "echo", "export"];
+                let keywords = [
+                    "if", "then", "else", "elif", "fi", "for", "while", "do", "done", "case",
+                    "esac", "function", "return", "exit", "echo", "export",
+                ];
                 let first_word = current_word.split_whitespace().next().unwrap_or("");
 
                 if keywords.contains(&first_word) {
-                    spans.push(Span::styled(current_word, Style::default().fg(Color::Yellow)));
+                    spans.push(Span::styled(
+                        current_word,
+                        Style::default().fg(Color::Yellow),
+                    ));
                 } else {
                     spans.push(Span::raw(current_word));
                 }
@@ -860,10 +878,7 @@ impl HooksTab {
             .lines()
             .map(|line| {
                 if line.starts_with('✓') || line.starts_with('✗') {
-                    Line::from(Span::styled(
-                        line,
-                        Style::default().fg(border_color).bold(),
-                    ))
+                    Line::from(Span::styled(line, Style::default().fg(border_color).bold()))
                 } else {
                     Line::from(Span::styled(line, Style::default().fg(Color::White)))
                 }

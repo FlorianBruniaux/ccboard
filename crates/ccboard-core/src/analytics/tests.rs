@@ -97,7 +97,10 @@ fn test_forecast_insufficient_data() {
     let trends = compute_trends(&sessions, 30);
     let forecast = forecast_usage(&trends);
 
-    assert!(forecast.unavailable_reason.is_some(), "Should be unavailable");
+    assert!(
+        forecast.unavailable_reason.is_some(),
+        "Should be unavailable"
+    );
     assert_eq!(forecast.confidence, 0.0);
 }
 
@@ -161,7 +164,9 @@ fn test_patterns_peak_hours() {
     let patterns = detect_patterns(&sessions);
 
     // With 100 sessions, should have some peak hours
-    assert!(!patterns.peak_hours.is_empty() || patterns.hourly_distribution.iter().sum::<usize>() > 0);
+    assert!(
+        !patterns.peak_hours.is_empty() || patterns.hourly_distribution.iter().sum::<usize>() > 0
+    );
 }
 
 #[test]
@@ -200,7 +205,10 @@ fn test_full_analytics_pipeline() {
     let data = AnalyticsData::compute(&sessions, period);
 
     assert!(!data.trends.is_empty(), "Trends should not be empty");
-    assert!(data.forecast.confidence >= 0.0, "Forecast should have confidence");
+    assert!(
+        data.forecast.confidence >= 0.0,
+        "Forecast should have confidence"
+    );
     assert!(
         !data.patterns.model_distribution.is_empty(),
         "Patterns should have model distribution"

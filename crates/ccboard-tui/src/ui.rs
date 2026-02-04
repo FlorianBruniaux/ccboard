@@ -135,11 +135,8 @@ impl Ui {
                     KeyCode::Tab => self.analytics.next_view(),
                     KeyCode::BackTab => self.analytics.prev_view(),
                     KeyCode::Char('j') | KeyCode::Down => {
-                        let max_items = app
-                            .store
-                            .analytics()
-                            .map(|a| a.insights.len())
-                            .unwrap_or(0);
+                        let max_items =
+                            app.store.analytics().map(|a| a.insights.len()).unwrap_or(0);
                         self.analytics.scroll_down(max_items);
                     }
                     KeyCode::Char('k') | KeyCode::Up => self.analytics.scroll_up(),
@@ -424,7 +421,12 @@ impl Ui {
                 self.mcp.render(frame, area, mcp_config.as_ref());
             }
             Tab::Analytics => {
+                use tracing::debug;
                 let analytics = app.store.analytics();
+                debug!(
+                    has_analytics = analytics.is_some(),
+                    "ui.rs: Rendering Analytics tab"
+                );
                 self.analytics
                     .render(frame, area, analytics.as_ref(), Some(&app.store));
             }

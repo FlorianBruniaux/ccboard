@@ -13,8 +13,8 @@ pub mod store;
 pub mod watcher;
 
 pub use analytics::{
-    AnalyticsData, ForecastData, Period, TrendDirection, TrendsData, UsagePatterns,
-    compute_trends, detect_patterns, forecast_usage, generate_insights,
+    AnalyticsData, ForecastData, Period, TrendDirection, TrendsData, UsagePatterns, compute_trends,
+    detect_patterns, forecast_usage, generate_insights,
 };
 pub use error::{CoreError, DegradedState, LoadReport};
 pub use event::{DataEvent, EventBus};

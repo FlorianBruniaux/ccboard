@@ -176,10 +176,7 @@ impl LoadError {
             ),
             CoreError::DirectoryNotFound { path } => (
                 format!("Directory not found: {}", path.display()),
-                Some(format!(
-                    "Create directory: mkdir -p {}",
-                    path.display()
-                )),
+                Some(format!("Create directory: mkdir -p {}", path.display())),
             ),
             CoreError::JsonParse { path, message, .. } => (
                 format!("Invalid JSON in {}: {}", path.display(), message),
@@ -196,7 +193,11 @@ impl LoadError {
                     path.display(),
                     message
                 ),
-                Some(format!("Inspect line: sed -n '{}p' {}", line_number, path.display())),
+                Some(format!(
+                    "Inspect line: sed -n '{}p' {}",
+                    line_number,
+                    path.display()
+                )),
             ),
             CoreError::ClaudeHomeNotFound => (
                 "Claude home directory not found".to_string(),
