@@ -52,6 +52,7 @@ dashmap = "6"
 
 # Core - Caching
 moka = { version = "0.12", features = ["future"] }
+once_cell = "1"
 
 # TUI
 ratatui = "0.30"

@@ -9,6 +9,7 @@ pub mod event;
 pub mod export;
 pub mod models;
 pub mod parsers;
+pub mod pricing;
 pub mod store;
 pub mod watcher;
 

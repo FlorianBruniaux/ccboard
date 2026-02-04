@@ -14,6 +14,8 @@
 //! Cache Version History:
 //! - v1: Initial version (pre-TokenUsage fix)
 //! - v2: Fixed TokenUsage::total() to include cache_read_tokens + cache_write_tokens
+//! - v3: Added token breakdown fields (input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens)
+//!       to SessionMetadata + real pricing calculation
 
 use crate::models::SessionMetadata;
 use anyhow::{Context, Result};
@@ -31,7 +33,7 @@ use tracing::{debug, warn};
 /// - Parsing logic modified (e.g., token accumulation)
 ///
 /// This triggers automatic cache invalidation on startup, preventing stale data bugs.
-const CACHE_VERSION: i32 = 2;
+const CACHE_VERSION: i32 = 3;
 
 /// SQLite-based metadata cache (thread-safe)
 pub struct MetadataCache {

@@ -77,9 +77,15 @@ pub struct BillingBlockUsage {
 }
 
 impl BillingBlockUsage {
-    /// Total tokens (input + output + cache creation)
+    /// Total tokens (input + output + cache creation + cache read)
+    ///
+    /// IMPORTANT: This must match ccusage behavior which includes ALL token types.
+    /// Previously missed cache_read_tokens, causing discrepancies with ccusage totals.
     pub fn total_tokens(&self) -> u64 {
-        self.input_tokens + self.output_tokens + self.cache_creation_tokens
+        self.input_tokens
+            + self.output_tokens
+            + self.cache_creation_tokens
+            + self.cache_read_tokens
     }
 
     /// Add usage from another block

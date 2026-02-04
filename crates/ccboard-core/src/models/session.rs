@@ -154,6 +154,12 @@ pub struct SessionMetadata {
     /// Total tokens (from summary)
     pub total_tokens: u64,
 
+    /// Token breakdown for precise pricing
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_creation_tokens: u64,
+    pub cache_read_tokens: u64,
+
     /// Models used in this session
     pub models_used: Vec<String>,
 
@@ -189,6 +195,10 @@ impl SessionMetadata {
             last_timestamp: None,
             message_count: 0,
             total_tokens: 0,
+            input_tokens: 0,
+            output_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
             models_used: Vec::new(),
             file_size_bytes,
             first_user_message: None,

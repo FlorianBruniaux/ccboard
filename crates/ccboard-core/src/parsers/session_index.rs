@@ -226,6 +226,10 @@ impl SessionIndexParser {
         let mut last_timestamp = None;
         let mut message_count = 0u64;
         let mut total_tokens = 0u64;
+        let mut input_tokens = 0u64;
+        let mut output_tokens = 0u64;
+        let mut cache_creation_tokens = 0u64;
+        let mut cache_read_tokens = 0u64;
 
         while let Some(line_result) = lines.next_line().await.map_err(|e| CoreError::FileRead {
             path: path.to_path_buf(),
@@ -336,6 +340,10 @@ impl SessionIndexParser {
 
                 if let Some(usage) = usage_opt {
                     total_tokens += usage.total();
+                    input_tokens += usage.input_tokens;
+                    output_tokens += usage.output_tokens;
+                    cache_creation_tokens += usage.cache_write_tokens;
+                    cache_read_tokens += usage.cache_read_tokens;
                 }
             }
 
@@ -361,6 +369,12 @@ impl SessionIndexParser {
         if metadata.total_tokens == 0 {
             metadata.total_tokens = total_tokens;
         }
+
+        // Apply token breakdown (always use counted values, summary doesn't have these)
+        metadata.input_tokens = input_tokens;
+        metadata.output_tokens = output_tokens;
+        metadata.cache_creation_tokens = cache_creation_tokens;
+        metadata.cache_read_tokens = cache_read_tokens;
 
         Ok(metadata)
     }

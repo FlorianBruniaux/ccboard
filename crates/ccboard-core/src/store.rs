@@ -620,9 +620,9 @@ impl DataStore {
     /// Compute billing blocks from all sessions
     ///
     /// This scans all sessions with timestamps and aggregates usage into 5-hour billing blocks.
-    /// Should be called after initial load or when sessions are updated.
+    /// Uses real model pricing based on token breakdown for accurate cost calculation.
     pub async fn compute_billing_blocks(&self) {
-        debug!("Computing billing blocks from sessions");
+        debug!("Computing billing blocks from sessions with real pricing");
 
         let mut manager = BillingBlockManager::new();
         let mut sessions_with_timestamps = 0;
@@ -639,21 +639,29 @@ impl DataStore {
 
             sessions_with_timestamps += 1;
 
-            // Estimate cost based on total tokens (simplified pricing)
-            // TODO: Use actual pricing model based on model name
-            // Rough estimate: $0.002 per 1K tokens (average)
-            let estimated_cost = (metadata.total_tokens as f64 / 1000.0) * 0.002;
+            // Get model for this session (use first model, or "unknown")
+            let model = metadata
+                .models_used
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or("unknown");
 
-            // For now, we don't have detailed token breakdown in metadata
-            // So we'll use total_tokens for input_tokens and 0 for others
-            // This will be improved when we add full session parsing
+            // Calculate real cost using pricing table
+            let cost = crate::pricing::calculate_cost(
+                model,
+                metadata.input_tokens,
+                metadata.output_tokens,
+                metadata.cache_creation_tokens,
+                metadata.cache_read_tokens,
+            );
+
             manager.add_usage(
                 timestamp,
-                metadata.total_tokens, // input_tokens (simplified)
-                0,                     // output_tokens (TODO: from session parsing)
-                0,                     // cache_creation_tokens (TODO: from session parsing)
-                0,                     // cache_read_tokens (TODO: from session parsing)
-                estimated_cost,
+                metadata.input_tokens,
+                metadata.output_tokens,
+                metadata.cache_creation_tokens,
+                metadata.cache_read_tokens,
+                cost,
             );
         }
 
@@ -661,7 +669,7 @@ impl DataStore {
             sessions_with_timestamps,
             sessions_without_timestamps,
             blocks = manager.get_all_blocks().len(),
-            "Billing blocks computed"
+            "Billing blocks computed with real pricing"
         );
 
         let mut guard = self.billing_blocks.write();
@@ -752,6 +760,7 @@ mod tests {
         // Add test sessions
         let now = Utc::now();
         for i in 0..10 {
+            let total_tokens = 1000 * (i as u64 + 1);
             let session = SessionMetadata {
                 id: format!("test-{}", i),
                 file_path: std::path::PathBuf::from(format!("/test-{}.jsonl", i)),
@@ -759,7 +768,11 @@ mod tests {
                 first_timestamp: Some(now - chrono::Duration::days(i)),
                 last_timestamp: Some(now),
                 message_count: 10,
-                total_tokens: 1000 * (i as u64 + 1),
+                total_tokens,
+                input_tokens: total_tokens / 2,
+                output_tokens: total_tokens / 3,
+                cache_creation_tokens: total_tokens / 10,
+                cache_read_tokens: total_tokens - (total_tokens / 2 + total_tokens / 3 + total_tokens / 10),
                 models_used: vec!["sonnet".to_string()],
                 file_size_bytes: 1024,
                 first_user_message: None,
