@@ -1099,3 +1099,229 @@ Si Phase D réussit, considérer:
    - Complexe: plusieurs jours de travail
 
 **Recommandation**: Tester en production, recueillir feedback utilisateur avant Phase E
+
+---
+
+## ✅ Phase E: TUI Polish & Status Messages (COMPLÈTE)
+
+**Durée réelle**: 6h (vs 6-8h estimées)
+**Date**: 2026-02-04
+**Objectif**: Finaliser le TUI avec polish UI/UX, error handling, keyboard shortcuts, performance, status messages
+
+### Résultats
+
+**6 sections complétées** (8 commits):
+
+#### E.1: Quick Wins (30min) - `04f365f`
+- ✅ Empty states avec guidance actionnable (Sessions, History, Costs)
+- ✅ Spacing et alignment améliorés
+
+#### E.2: Hooks Tab (1.5h) - `40bc04e`
+- ✅ Badges visuels (async, ⏱timeout, env:N)
+- ✅ Syntax highlighting bash (comments, strings, variables, keywords)
+- ✅ Test hook avec 't' → exécution + popup résultat
+- ✅ Support cwd + env vars lors de l'exécution
+
+#### E.3: Error Handling (1h) - `47ac983`
+- ✅ LoadError avec champ suggestion: Option<String>
+- ✅ Factory from_core_error() avec 6 suggestions contextuelles
+- ✅ Composant error_panel color-coded (✗🔴 fatal, ⚠🟡 error, ⓘ🔵 warning)
+- ✅ Empty state positif : "✓ All data loaded successfully"
+
+#### E.4: Navigation (1h) - `580c3e8`, `99dc3c3`
+- ✅ Global: Ctrl+R (reload + status), Ctrl+Q (quit sans confirm)
+- ✅ Sessions: 'y' copy ID to clipboard (arboard)
+- ✅ Costs: 's' sort toggle (6 modes: Cost ↓/↑, Tokens ↓/↑, Name A-Z/Z-A)
+
+#### E.5: Performance (1h) - `a5992c3`
+- ✅ Display limit: 500 items max (Sessions + History)
+- ✅ Pagination hints: "showing 500 / 1234"
+- ✅ Memory clear: F5/Ctrl+R → invalidate Moka cache
+- ✅ Scrollbar reflects display_count
+
+#### E.6: Status Messages (1h) - `b4f332d`
+- ✅ Toast system: Success/Warning/Error/Info (ToastManager)
+- ✅ Stack 5 max, auto-dismiss 3s
+- ✅ ConfirmDialog: Y/N/Esc, default highlighted
+- ✅ Helper methods: app.success_toast(), error_toast(), etc.
+
+### Fichiers
+
+**Nouveaux composants**:
+```
+crates/ccboard-tui/src/components/toast.rs           (+165 LOC)
+crates/ccboard-tui/src/components/confirm_dialog.rs  (+175 LOC)
+crates/ccboard-tui/src/components/error_panel.rs     (+146 LOC)
+```
+
+**Modifications**:
+```
+crates/ccboard-core/src/error.rs                     (+62 LOC)
+crates/ccboard-core/src/store.rs                     (+6 LOC)
+crates/ccboard-tui/src/tabs/hooks.rs                 (+281 LOC)
+crates/ccboard-tui/src/tabs/sessions.rs              (+40 LOC)
+crates/ccboard-tui/src/tabs/history.rs               (+44 LOC)
+crates/ccboard-tui/src/tabs/costs.rs                 (+109 LOC)
+crates/ccboard-tui/src/app.rs                        (+54 LOC)
+crates/ccboard-tui/src/ui.rs                         (+6 LOC)
+crates/ccboard-tui/src/components/mod.rs             (+4 LOC)
+```
+
+### Tests
+
+- ✅ 114 unit tests passing
+- ✅ 0 clippy warnings
+- ✅ All toast types functional
+- ✅ ConfirmDialog keyboard navigation working
+- ✅ Performance: max 500 ListItem allocations
+
+### Commits
+
+1. `04f365f` - feat(tui): enhance vim-style navigation shortcuts
+2. `40bc04e` - feat(tui): enhance Hooks tab with badges, syntax highlighting, testing
+3. `22ca1f0` - docs: update PLAN_TUI_POLISH.md with completed tasks
+4. `47ac983` - feat(error): add actionable error suggestions and visual error panel
+5. `580c3e8` - feat(tui): add vim-style navigation shortcuts
+6. `99dc3c3` - feat(tui): complete navigation shortcuts (Ctrl+R/Q, copy ID, sort)
+7. `a5992c3` - perf(tui): optimize large lists and memory usage
+8. `b4f332d` - feat(tui): add toast notifications and confirmation dialog system
+9. `10d36eb` - docs: mark Phase E (TUI Polish) as 100% complete
+
+### Architecture Ajoutée
+
+**Toast System**:
+- ToastType enum (4 types avec colors + icons)
+- Toast struct (message, type, timestamp, duration)
+- ToastManager (stack, auto-dismiss, max 5 visible)
+- Render overlay from bottom up
+
+**Confirmation Dialog**:
+- ConfirmResult enum (Yes/No/Cancel)
+- Keyboard shortcuts: Y/N/Esc, Enter=default
+- Visual: default option highlighted (green/red)
+
+**Error Panel**:
+- Color-coded by severity
+- Actionable suggestions (6 contextes)
+- Graceful degradation
+
+### Impact
+
+**UX**:
+- Toast notifications → feedback immédiat
+- Error handling → suggestions actionables
+- Navigation → shortcuts vim-style
+- Performance → listes >500 items optimisées
+
+**Code Quality**:
+- 0 clippy warnings
+- Composants réutilisables (toast, confirm, error_panel)
+- Architecture clean (overlay system)
+
+**Docs**:
+- `archive/phase-c-d-e/PLAN_TUI_POLISH.md` (complet, 8K)
+
+### Status
+
+✅ **PHASE E COMPLETE** (2026-02-04)
+
+**Next**: Phase F (Web Interface) ou Phase G (MCP Tools) selon priorités
+
+---
+
+## 🎯 État Actuel du Projet
+
+**Dernière mise à jour**: 2026-02-04
+**Dernier commit**: `10d36eb` - docs: mark Phase E (TUI Polish) as 100% complete
+
+### Phases Complétées
+
+| Phase | Description | Durée | Status |
+|-------|-------------|-------|--------|
+| **0** | Profiling & Baseline | 4h | ✅ Complete |
+| **1** | Security Hardening | 4h | ✅ Complete |
+| **2** | SQLite Metadata Cache | 4h | ✅ Complete |
+| **3** | UI Integration | 3h | ✅ Complete |
+| **A** | Polish & Release | 4.5h | ✅ Complete |
+| **C** | Export & UI Features | 8h | ✅ Complete |
+| **D** | Arc Migration | 3.5h | ✅ Complete |
+| **E** | TUI Polish | 6h | ✅ Complete |
+
+**Total**: ~37h de développement structuré
+
+### Achievements Cumulés
+
+**Performance**:
+- 🚀 Startup: 20.08s → <2s (10x faster) via SQLite cache
+- 🚀 Memory: 50x reduction per clone (Arc migration)
+- 🚀 Display: 500 items limit pour listes >1000
+
+**Features**:
+- ✅ TUI complet (8 tabs fonctionnels)
+- ✅ Export CSV/JSON (History + Billing blocks)
+- ✅ Toast notifications system
+- ✅ Error handling avec suggestions
+- ✅ MCP tools display
+- ✅ Vim-style navigation
+- ✅ Live refresh indicators
+
+**Quality**:
+- ✅ 114 unit tests passing
+- ✅ 0 clippy warnings
+- ✅ Security hardened (path validation, input limits, credential masking)
+- ✅ Graceful degradation (partial data display)
+
+**Documentation**:
+- ✅ README.md complet avec 13 screenshots
+- ✅ CONTRIBUTING.md
+- ✅ CROSS_PLATFORM.md
+- ✅ CI/CD workflows (3 OS)
+- ✅ Archived planning docs (phase-c-d-e/)
+
+### Prochaines Phases Disponibles
+
+1. **Phase F: Web Interface Completion** (estimé: 12-16h)
+   - Compléter Leptos frontend
+   - SSE live updates
+   - Shared DataStore TUI/Web
+   - Routes complètes (/sessions, /costs, etc.)
+
+2. **Phase G: MCP Tools Display** (estimé: 16-20h)
+   - JSON-RPC client pour MCP servers
+   - Tools discovery et display
+   - Input forms pour tool execution
+   - Résultats formatting
+
+3. **Phase H: Advanced Analytics** (estimé: 8-12h)
+   - Trends analysis (session duration, token growth)
+   - Cost forecasting
+   - Model usage patterns
+   - Dashboard widgets
+
+**Recommandation**: 
+- Phase F si priorité Web
+- Phase G si priorité MCP tooling
+- Ou: recueillir feedback utilisateur sur TUI actuel avant continuer
+
+---
+
+## 📞 Références Rapides
+
+**Code**:
+- Architecture: `CLAUDE.md` (project guidelines)
+- Standards: `CONTRIBUTING.md`
+- Changelog: `CHANGELOG.md` (phases 0-E)
+
+**Docs archivées**:
+- Phases C/D/E planning: `archive/phase-c-d-e/`
+
+**Tests**:
+```bash
+cargo build --all          # Build (6 crates)
+cargo test --all           # Tests (114 passing)
+cargo clippy --all-targets # Linting (0 warnings)
+cargo run                  # TUI mode
+cargo run -- web           # Web mode
+```
+
+Bon courage pour la suite ! 🚀
