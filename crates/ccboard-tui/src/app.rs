@@ -1,6 +1,6 @@
 //! TUI Application state and event loop
 
-use crate::components::{CommandPalette, HelpModal, Spinner};
+use crate::components::{CommandPalette, ConfirmDialog, HelpModal, Spinner, ToastManager};
 use ccboard_core::{DataEvent, DataStore};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -134,6 +134,12 @@ pub struct App {
 
     /// Loading spinner
     pub spinner: Spinner,
+
+    /// Toast notification manager
+    pub toast_manager: ToastManager,
+
+    /// Confirmation dialog (for future destructive actions)
+    pub confirm_dialog: ConfirmDialog,
 }
 
 impl App {
@@ -152,6 +158,8 @@ impl App {
             is_loading: true,
             loading_message: Some("Loading sessions...".to_string()),
             spinner: Spinner::new(),
+            toast_manager: ToastManager::new(),
+            confirm_dialog: ConfirmDialog::new("Confirm", "Are you sure?"),
         }
     }
 
@@ -223,7 +231,7 @@ impl App {
                 // Ctrl+R: force reload + clear cache
                 self.needs_refresh = true;
                 self.store.clear_session_content_cache();
-                self.status_message = Some("♻ Reloading data...".to_string());
+                self.info_toast("♻ Reloading data...");
                 true
             }
             KeyCode::F(5) => {
@@ -258,6 +266,26 @@ impl App {
     fn prev_tab(&mut self) {
         let idx = self.active_tab.index();
         self.active_tab = Tab::from_index((idx + Tab::all().len() - 1) % Tab::all().len());
+    }
+
+    /// Add success toast notification
+    pub fn success_toast(&mut self, message: impl Into<String>) {
+        self.toast_manager.push(crate::components::Toast::success(message));
+    }
+
+    /// Add error toast notification
+    pub fn error_toast(&mut self, message: impl Into<String>) {
+        self.toast_manager.push(crate::components::Toast::error(message));
+    }
+
+    /// Add warning toast notification
+    pub fn warning_toast(&mut self, message: impl Into<String>) {
+        self.toast_manager.push(crate::components::Toast::warning(message));
+    }
+
+    /// Add info toast notification
+    pub fn info_toast(&mut self, message: impl Into<String>) {
+        self.toast_manager.push(crate::components::Toast::info(message));
     }
 
     /// Check for data events (non-blocking)

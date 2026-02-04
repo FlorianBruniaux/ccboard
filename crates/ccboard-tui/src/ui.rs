@@ -138,6 +138,12 @@ impl Ui {
 
         // Render help modal (overlay on top of command palette)
         app.help_modal.render(frame, size, app.active_tab);
+
+        // Render toast notifications (overlay on top)
+        app.toast_manager.render(frame, size);
+
+        // Render confirmation dialog (overlay on top of toasts)
+        app.confirm_dialog.render(frame, size);
     }
 
     fn render_loading_screen(&mut self, frame: &mut Frame, area: Rect, app: &mut App) {
