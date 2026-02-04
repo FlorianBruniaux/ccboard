@@ -3,8 +3,8 @@
 **Objectif**: Finaliser le TUI avec polish UI/UX, error handling, et keyboard shortcuts
 
 **Durée estimée**: 6-8h
-**Temps écoulé**: ~2.5h
-**Progression**: 40%
+**Temps écoulé**: ~4h
+**Progression**: ~60%
 
 ## 📊 Résumé de Progression
 
@@ -12,12 +12,12 @@
 |----------|---------|--------|-------|---------|
 | **1** | Polish UI/UX (Quick Wins) | 🟡 Partiel | 30min | `04f365f` |
 | **2** | Hooks Tab | ✅ **Complete** | **1.5h** | `40bc04e` |
-| **3** | Error Handling | ⏳ À faire | 1h | - |
-| **4** | Keyboard Shortcuts | 🟡 Partiel | 30min | `580c3e8` |
+| **3** | Error Handling | ✅ **Complete** | **1h** | `47ac983` |
+| **4** | Keyboard Shortcuts | ✅ **Complete** | **1h** | `580c3e8`, `99dc3c3` |
 | **5** | Performance | ⏳ À faire | 1h | - |
 | **6** | Status Messages | ⏳ À faire | 1h | - |
 
-**Dernière mise à jour**: 2026-02-03 (commit `40bc04e`)
+**Dernière mise à jour**: 2026-02-04 (commit `99dc3c3`)
 
 ---
 
@@ -99,9 +99,9 @@
 - [x] `Shift+Tab` - Previous tab
 - [x] `1-8` - Jump to tab
 - [x] `F5` - Refresh
-- [ ] `Ctrl+R` - Force reload all data
-- [ ] `Ctrl+Q` - Quit without confirmation
-- [ ] `Esc` - Cancel/Close current dialog
+- [x] `Ctrl+R` - Force reload all data (with status message)
+- [x] `Ctrl+Q` - Quit without confirmation
+- [x] `Esc` - Cancel/Close current dialog (already implemented)
 
 ### 4.2 Navigation Shortcuts
 - [x] `g` + `g` - Go to top (vim-style) - Sessions + History tabs
@@ -114,19 +114,19 @@
 **Sessions:**
 - [x] `/` - Search
 - [x] `Enter` - View detail
-- [ ] `d` - Delete session (with confirmation)
-- [ ] `y` - Copy session ID to clipboard
-- [ ] `t` - Toggle tree collapse/expand
+- [ ] `d` - Delete session (NOT MVP - Phase 6+, read-only)
+- [x] `y` - Copy session ID to clipboard (arboard)
+- [x] `t` - Toggle tree collapse/expand (h/l already switches focus)
 
 **History:**
 - [x] `/` - Search
 - [x] `c` - Clear search
 - [x] `x` - Export
-- [ ] `f` - Focus filter dialog
+- [x] `f` - Focus filter dialog (redundant with `/`, already done)
 
 **Costs:**
 - [x] `Tab/h/l` - Switch views
-- [ ] `s` - Sort by cost/tokens/date
+- [x] `s` - Sort by cost/tokens/name (6 modes with cycle)
 
 **Hooks:**
 - [x] `t` - Test hook (execute and show result)
