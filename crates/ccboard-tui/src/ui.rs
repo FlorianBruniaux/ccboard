@@ -386,12 +386,12 @@ impl Ui {
             }
             Tab::Sessions => {
                 let sessions_by_project = app.store.sessions_by_project();
-                let live_sessions = app.store.live_sessions();
+                let live_sessions = app.live_sessions(); // Use cached live sessions
                 // Count total sessions for refresh tracking
                 let session_count: usize = sessions_by_project.values().map(|v| v.len()).sum();
                 self.sessions.mark_refreshed(session_count);
                 self.sessions
-                    .render(frame, area, &sessions_by_project, &live_sessions);
+                    .render(frame, area, &sessions_by_project, live_sessions);
             }
             Tab::Config => {
                 let config = app.store.settings();

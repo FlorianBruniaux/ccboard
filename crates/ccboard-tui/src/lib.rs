@@ -119,6 +119,9 @@ where
         // Check for data events
         app.poll_events();
 
+        // Refresh live sessions if on Sessions tab (every 2s)
+        app.refresh_live_sessions_if_needed();
+
         // Draw UI (will show loading screen or normal UI based on is_loading)
         terminal.draw(|f| ui.render(f, app))?;
 

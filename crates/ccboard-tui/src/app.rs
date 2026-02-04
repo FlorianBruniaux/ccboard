@@ -147,6 +147,12 @@ pub struct App {
 
     /// Confirmation dialog (for future destructive actions)
     pub confirm_dialog: ConfirmDialog,
+
+    /// Cached live sessions (refreshed every 2s)
+    pub live_sessions_cache: Vec<ccboard_core::LiveSession>,
+
+    /// Last time live sessions were refreshed
+    pub last_live_refresh: std::time::Instant,
 }
 
 impl App {
@@ -167,6 +173,8 @@ impl App {
             spinner: Spinner::new(),
             toast_manager: ToastManager::new(),
             confirm_dialog: ConfirmDialog::new("Confirm", "Are you sure?"),
+            live_sessions_cache: Vec::new(),
+            last_live_refresh: std::time::Instant::now(),
         }
     }
 
@@ -322,5 +330,25 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Refresh live sessions cache if needed (every 2 seconds when on Sessions tab)
+    pub fn refresh_live_sessions_if_needed(&mut self) {
+        // Only refresh if on Sessions tab
+        if self.active_tab != Tab::Sessions {
+            return;
+        }
+
+        // Check if 2 seconds have elapsed since last refresh
+        let now = std::time::Instant::now();
+        if now.duration_since(self.last_live_refresh).as_secs() >= 2 {
+            self.live_sessions_cache = self.store.live_sessions();
+            self.last_live_refresh = now;
+        }
+    }
+
+    /// Get cached live sessions
+    pub fn live_sessions(&self) -> &[ccboard_core::LiveSession] {
+        &self.live_sessions_cache
     }
 }
