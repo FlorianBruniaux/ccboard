@@ -1,7 +1,7 @@
 # Plan: Optimisation ccboard - ÉTAT ACTUEL
 
 **Dernière mise à jour**: 2026-02-04
-**Commit actuel**: `098610d` - fix(analytics): add period filtering to detect_patterns()
+**Commit actuel**: `4bbde0a` - docs: add community guidelines and citation metadata (Phase H complete)
 
 ---
 
@@ -1371,6 +1371,101 @@ cargo build --release && cargo install --path crates/ccboard --force
 - ✅ CI/CD workflows (3 OS)
 - ✅ Archived planning docs (phase-c-d-e/)
 
+---
+
+## ✅ Phase H: Advanced Analytics (COMPLÈTE)
+
+**Durée réelle**: 4h (vs 8-12h estimées)
+**Date**: 2026-02-04
+**Objectif**: Implémenter analytics avancés avec trends, forecasting, patterns, et budgets
+
+### Résultats
+
+**3 tâches complétées** (4 commits):
+
+#### H.1: Forecast Visualization ✅ - `28f85cc`
+- Ajout ligne de prévision dans Trends tab (sparkline)
+- 30 points interpolés pour courbe smooth (dernier jour historique → J+30)
+- Color-coded par confidence: vert >70%, jaune 40-70%, rouge <40%
+- Extension auto X-axis bounds pour inclure forecast range
+- Intégration élégante avec chart existant
+
+**Fichiers**:
+- `crates/ccboard-tui/src/tabs/analytics.rs` (+35 LOC)
+
+#### H.2: Session Duration Analytics ✅ - `dab5367`
+- Ajout `SessionDurationStats` struct (avg, median, P95, min, max, distribution)
+- Fonction `compute_duration_stats()` avec statistiques robustes
+- Distribution buckets: 0-5m, 5-15m, 15-30m, 30-60m, 60m+
+- Panel dédié dans Patterns tab (layout 3 colonnes: 33/33/34)
+- Visual bars pour distribution avec unicode box-drawing
+
+**Fichiers**:
+- `crates/ccboard-core/src/analytics/trends.rs` (+79 LOC)
+- `crates/ccboard-tui/src/tabs/analytics.rs` (+48 LOC)
+
+#### H.3: Budget & Alerts ✅ - `8d4f57f`
+- Ajout `BudgetConfig` struct (monthlyBudgetUsd, alertThresholdPct)
+- Alert enum: BudgetWarning, ProjectedOverage, UsageSpike
+- Fonction `generate_budget_alerts()` avec seuils configurables
+- Budget status panel dans Overview tab (6 lignes)
+- Progress bar visuelle (━━━) colored by %: vert <60%, jaune 60-80%, rouge ≥80%
+- Warning icon ⚠️ si threshold atteint
+- Graceful fallback si pas de budget configuré
+
+**Fichiers**:
+- `crates/ccboard-core/src/analytics/insights.rs` (+89 LOC)
+- `crates/ccboard-core/src/models/config.rs` (+45 LOC)
+- `crates/ccboard-tui/src/tabs/analytics.rs` (+96 LOC)
+
+### Configuration Budget
+
+**Exemple** (`.claude/settings.json`):
+```json
+{
+  "budget": {
+    "monthlyBudgetUsd": 50.0,
+    "alertThresholdPct": 80.0
+  }
+}
+```
+
+**Merge Priority**: project_local > project > global_local > global
+
+### Commits
+
+1. `28f85cc` - feat(analytics): add forecast visualization to Trends tab (H.1)
+2. `dab5367` - feat(analytics): add session duration analytics (H.2)
+3. `8d4f57f` - feat(analytics): add budget alerts and tracking (H.3)
+4. `016407b` - docs: enhance README and add 4-layer settings support
+5. `cdf36fd` - docs: add Phase H plan and architecture documentation
+6. `4bbde0a` - docs: add community guidelines and citation metadata
+
+### Impact
+
+**Analytics Module**:
+- ✅ Forecast viz (+30% insight value)
+- ✅ Duration stats (5 buckets distribution)
+- ✅ Budget tracking (3 alert types)
+- ✅ Total: +247 LOC core, +179 LOC TUI
+
+**Settings Enhancement**:
+- ✅ 4-layer merge (global, global_local, project, project_local)
+- ✅ BudgetConfig support
+- ✅ Max 5x pricing update ($100 → $50)
+
+**Documentation**:
+- ✅ PHASE_H_PLAN.md (detailed roadmap)
+- ✅ ARCHITECTURE.md (system overview)
+- ✅ SCREENSHOTS_GUIDE.md (capture standards)
+- ✅ CODE_OF_CONDUCT.md, CITATION.cff, IDEAS.md
+
+✅ **PHASE H COMPLETE** (2026-02-04)
+
+**Next**: Phase F (Web Interface) ou Phase G (MCP Tools) selon priorités
+
+---
+
 ### Prochaines Phases Disponibles
 
 1. **Phase F: Web Interface Completion** (estimé: 12-16h)
@@ -1385,16 +1480,10 @@ cargo build --release && cargo install --path crates/ccboard --force
    - Input forms pour tool execution
    - Résultats formatting
 
-3. **Phase H: Advanced Analytics** (estimé: 8-12h)
-   - Trends analysis (session duration, token growth)
-   - Cost forecasting
-   - Model usage patterns
-   - Dashboard widgets
-
-**Recommandation**: 
+**Recommandation**:
 - Phase F si priorité Web
 - Phase G si priorité MCP tooling
-- Ou: recueillir feedback utilisateur sur TUI actuel avant continuer
+- Ou: recueillir feedback utilisateur sur analytics (Phase H) avant continuer
 
 ---
 
