@@ -271,22 +271,33 @@ fn get_tokens_for_session(working_directory: &Option<String>) -> Option<u64> {
     let mut total_tokens = 0u64;
 
     for line in std::io::BufRead::lines(reader) {
-        let line = line.ok()?;
+        // Skip lines that fail to read (don't fail the entire function)
+        let Ok(line) = line else { continue };
+
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-            if let Some(usage) = json.get("usage") {
-                // Sum all token types
-                if let Some(input) = usage.get("input_tokens").and_then(|v| v.as_u64()) {
-                    total_tokens += input;
-                }
-                if let Some(output) = usage.get("output_tokens").and_then(|v| v.as_u64()) {
-                    total_tokens += output;
-                }
-                if let Some(cache_write) = usage.get("cache_write_tokens").and_then(|v| v.as_u64())
-                {
-                    total_tokens += cache_write;
-                }
-                if let Some(cache_read) = usage.get("cache_read_tokens").and_then(|v| v.as_u64()) {
-                    total_tokens += cache_read;
+            // Usage is nested in .message.usage, not at root level
+            if let Some(message) = json.get("message") {
+                if let Some(usage) = message.get("usage") {
+                    // Sum all token types
+                    if let Some(input) = usage.get("input_tokens").and_then(|v| v.as_u64()) {
+                        total_tokens += input;
+                    }
+                    if let Some(output) = usage.get("output_tokens").and_then(|v| v.as_u64()) {
+                        total_tokens += output;
+                    }
+                    // Note: Field names differ from stats-cache.json:
+                    // - cache_creation_input_tokens (not cache_write_tokens)
+                    // - cache_read_input_tokens (not cache_read_tokens)
+                    if let Some(cache_write) =
+                        usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64())
+                    {
+                        total_tokens += cache_write;
+                    }
+                    if let Some(cache_read) =
+                        usage.get("cache_read_input_tokens").and_then(|v| v.as_u64())
+                    {
+                        total_tokens += cache_read;
+                    }
                 }
             }
         }
