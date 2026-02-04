@@ -168,9 +168,9 @@ impl App {
 
     /// Handle keyboard input
     /// Returns true if the key was handled as a global key
-    pub fn handle_key(&mut self, key: crossterm::event::KeyCode) -> bool {
+    pub fn handle_key(&mut self, key: crossterm::event::KeyCode, modifiers: crossterm::event::KeyModifiers) -> bool {
         use crate::components::command_palette::CommandAction;
-        use crossterm::event::KeyCode;
+        use crossterm::event::{KeyCode, KeyModifiers};
 
         // If command palette is visible, handle keys there first
         if self.command_palette.is_visible() {
@@ -210,8 +210,19 @@ impl App {
                 self.command_palette.show();
                 true
             }
-            KeyCode::Char('q') => {
+            KeyCode::Char('q') if !modifiers.contains(KeyModifiers::CONTROL) => {
                 self.should_quit = true;
+                true
+            }
+            KeyCode::Char('q') if modifiers.contains(KeyModifiers::CONTROL) => {
+                // Ctrl+Q: quit without confirmation
+                self.should_quit = true;
+                true
+            }
+            KeyCode::Char('r') if modifiers.contains(KeyModifiers::CONTROL) => {
+                // Ctrl+R: force reload
+                self.needs_refresh = true;
+                self.status_message = Some("♻ Reloading data...".to_string());
                 true
             }
             KeyCode::F(5) => {

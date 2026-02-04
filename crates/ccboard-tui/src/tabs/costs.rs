@@ -55,12 +55,49 @@ impl ModelPricing {
     }
 }
 
+/// Sort mode for cost data
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SortMode {
+    CostDesc,
+    CostAsc,
+    TokensDesc,
+    TokensAsc,
+    NameAsc,
+    NameDesc,
+}
+
+impl SortMode {
+    fn next(&self) -> Self {
+        match self {
+            Self::CostDesc => Self::CostAsc,
+            Self::CostAsc => Self::TokensDesc,
+            Self::TokensDesc => Self::TokensAsc,
+            Self::TokensAsc => Self::NameAsc,
+            Self::NameAsc => Self::NameDesc,
+            Self::NameDesc => Self::CostDesc,
+        }
+    }
+
+    fn label(&self) -> &'static str {
+        match self {
+            Self::CostDesc => "Cost ↓",
+            Self::CostAsc => "Cost ↑",
+            Self::TokensDesc => "Tokens ↓",
+            Self::TokensAsc => "Tokens ↑",
+            Self::NameAsc => "Name A-Z",
+            Self::NameDesc => "Name Z-A",
+        }
+    }
+}
+
 /// Costs tab state
 pub struct CostsTab {
     /// Selected model index
     model_state: ListState,
     /// View mode (0=Overview, 1=By Model, 2=Daily)
     view_mode: usize,
+    /// Sort mode
+    sort_mode: SortMode,
 }
 
 impl Default for CostsTab {
@@ -77,6 +114,7 @@ impl CostsTab {
         Self {
             model_state,
             view_mode: 0,
+            sort_mode: SortMode::CostDesc,
         }
     }
 
@@ -98,6 +136,10 @@ impl CostsTab {
             KeyCode::Down | KeyCode::Char('j') => {
                 let current = self.model_state.selected().unwrap_or(0);
                 self.model_state.select(Some(current + 1));
+            }
+            KeyCode::Char('s') => {
+                // Toggle sort mode
+                self.sort_mode = self.sort_mode.next();
             }
             _ => {}
         }
@@ -380,7 +422,7 @@ impl CostsTab {
             })
             .collect();
 
-        model_costs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        self.sort_models(&mut model_costs);
 
         let rows: Vec<Row> = model_costs
             .iter()
@@ -417,11 +459,12 @@ impl CostsTab {
     }
 
     fn render_by_model(&mut self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+        let title_text = format!(" Cost by Model • Sort: {} (press 's') ", self.sort_mode.label());
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray))
             .title(Span::styled(
-                " Cost by Model ",
+                title_text,
                 Style::default().fg(Color::White).bold(),
             ));
 
@@ -451,7 +494,7 @@ impl CostsTab {
             })
             .collect();
 
-        model_data.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        self.sort_models_detailed(&mut model_data);
 
         // Clamp selection
         if let Some(sel) = self.model_state.selected() {
@@ -571,6 +614,66 @@ impl CostsTab {
             format!("{:.1}K", n as f64 / 1_000.0)
         } else {
             n.to_string()
+        }
+    }
+
+    /// Sort model costs according to current sort mode (simple format: name, cost, input_tokens, output_tokens)
+    fn sort_models(&self, models: &mut [(String, f64, u64, u64)]) {
+        match self.sort_mode {
+            SortMode::CostDesc => {
+                models.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            }
+            SortMode::CostAsc => {
+                models.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            }
+            SortMode::TokensDesc => {
+                models.sort_by(|a, b| {
+                    let a_total = a.2 + a.3;
+                    let b_total = b.2 + b.3;
+                    b_total.cmp(&a_total)
+                });
+            }
+            SortMode::TokensAsc => {
+                models.sort_by(|a, b| {
+                    let a_total = a.2 + a.3;
+                    let b_total = b.2 + b.3;
+                    a_total.cmp(&b_total)
+                });
+            }
+            SortMode::NameAsc => {
+                models.sort_by(|a, b| a.0.cmp(&b.0));
+            }
+            SortMode::NameDesc => {
+                models.sort_by(|a, b| b.0.cmp(&a.0));
+            }
+        }
+    }
+
+    /// Sort model costs with detailed breakdown (name, total, input_cost, output_cost, cache_cost)
+    fn sort_models_detailed(&self, models: &mut [(String, f64, f64, f64, f64)]) {
+        match self.sort_mode {
+            SortMode::CostDesc => {
+                models.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            }
+            SortMode::CostAsc => {
+                models.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            }
+            SortMode::TokensDesc | SortMode::TokensAsc => {
+                // For detailed view, sort by total cost (already computed)
+                models.sort_by(|a, b| {
+                    if matches!(self.sort_mode, SortMode::TokensDesc) {
+                        b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+                    } else {
+                        a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                });
+            }
+            SortMode::NameAsc => {
+                models.sort_by(|a, b| a.0.cmp(&b.0));
+            }
+            SortMode::NameDesc => {
+                models.sort_by(|a, b| b.0.cmp(&a.0));
+            }
         }
     }
 

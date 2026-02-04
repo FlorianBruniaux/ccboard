@@ -122,7 +122,7 @@ where
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     // First check for global keys
-                    let handled = app.handle_key(key.code);
+                    let handled = app.handle_key(key.code, key.modifiers);
 
                     // If not a global key and not loading, pass to active tab
                     if !handled && !app.is_loading {

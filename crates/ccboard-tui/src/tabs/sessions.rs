@@ -152,6 +152,25 @@ impl SessionsTab {
                     }
                 }
             }
+            KeyCode::Char('y') => {
+                // Copy session ID to clipboard
+                if self.focus == 1 {
+                    if let Some(session) = self.get_selected_session(_sessions_by_project) {
+                        match arboard::Clipboard::new() {
+                            Ok(mut clipboard) => {
+                                if let Err(e) = clipboard.set_text(&session.id) {
+                                    self.error_message = Some(format!("Failed to copy: {}", e));
+                                } else {
+                                    self.refresh_message = Some(format!("✓ Copied: {}", &session.id[..8.min(session.id.len())]));
+                                }
+                            }
+                            Err(e) => {
+                                self.error_message = Some(format!("Clipboard unavailable: {}", e));
+                            }
+                        }
+                    }
+                }
+            }
             KeyCode::Esc => {
                 if self.error_message.is_some() {
                     self.error_message = None;
