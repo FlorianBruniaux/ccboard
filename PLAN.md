@@ -1,7 +1,7 @@
 # Plan: Optimisation ccboard - ÉTAT ACTUEL
 
-**Dernière mise à jour**: 2026-02-03
-**Commit actuel**: `9e560e3` - feat(perf): Arc Migration Phase D.1-D.2 (PHASE D COMPLETE - 50x memory reduction)
+**Dernière mise à jour**: 2026-02-04
+**Commit actuel**: `098610d` - fix(analytics): add period filtering to detect_patterns()
 
 ---
 
@@ -1229,10 +1229,102 @@ crates/ccboard-tui/src/components/mod.rs             (+4 LOC)
 
 ---
 
+## 🐛 Bugfixes Post-Release (2026-02-04)
+
+**Durée**: 2h
+**Contexte**: Bugs découverts lors de l'utilisation réelle après Phase E
+
+### Bug #1: Live Sessions Token Display ✅
+
+**Symptôme**: Tous les processus Claude live affichaient "Tokens: ?" au lieu des valeurs réelles
+
+**Root Cause**: Path encoding incorrect ajoutant un double-dash
+```rust
+// ❌ AVANT (BUG)
+let encoded = format!("-{}", cwd.replace('/', "-"));
+// CWD: /Users/foo/project → --Users-foo-project (DOUBLE DASH)
+
+// ✅ APRÈS (FIX)
+let encoded = cwd.replace('/', "-");
+// CWD: /Users/foo/project → -Users-foo-project (SINGLE DASH)
+```
+
+**Résultat**:
+- Sessions dir: `~/.claude/projects/--Users...` (NOT FOUND) → `~/.claude/projects/-Users...` (FOUND)
+- 9.6M tokens correctement parsés et affichés
+
+**Fichier**: `crates/ccboard-core/src/live_monitor.rs:239`
+**Commit**: `a0288cc` - fix(live-monitor): fix path encoding causing double-dash prefix
+
+### Bug #2: Analytics Period Filters (Patterns Tab) ✅
+
+**Symptôme**: F1/F2/F3/F4 ne filtraient pas dans l'onglet Patterns (mais marchaient dans Overview/Trends)
+
+**Root Cause**: `detect_patterns()` ne prenait pas de paramètre `days` et traitait toutes les sessions
+```rust
+// ❌ AVANT
+pub fn detect_patterns(sessions: &[Arc<SessionMetadata>]) -> UsagePatterns {
+    for session in sessions {  // Traite TOUTES les sessions
+        ...
+    }
+}
+
+// ✅ APRÈS
+pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsagePatterns {
+    let cutoff = now - chrono::Duration::days(days as i64);
+    for session in sessions {
+        if local_ts < cutoff { continue; }  // Filtre par période
+        ...
+    }
+}
+```
+
+**Impact**:
+- Overview ✅ (filtres marchaient via compute_trends)
+- Trends ✅ (filtres marchaient via compute_trends)
+- **Patterns ❌ (filtres ignorés)** → **FIXÉ**
+- Insights ⚠️ (partiellement affecté) → **FIXÉ**
+
+**Fichiers**:
+- `crates/ccboard-core/src/analytics/patterns.rs` (+11 LOC)
+- `crates/ccboard-core/src/analytics/mod.rs` (+2 LOC)
+- `crates/ccboard-core/src/analytics/tests.rs` (+3 LOC)
+
+**Commit**: `098610d` - fix(analytics): add period filtering to detect_patterns()
+
+### Tests de Validation
+
+```bash
+# Bug #1: Token parsing
+cargo test -p ccboard-core test_get_tokens_for_ccboard_session
+# ✅ Tokens: Some(9664844)
+
+# Bug #2: Period filtering
+cargo test -p ccboard-core test_patterns_peak_hours
+cargo test -p ccboard-core test_patterns_most_productive_day
+# ✅ 3/3 tests passed
+
+# Build & install
+cargo build --release && cargo install --path crates/ccboard --force
+# ✅ MD5: 0acf9e760e14ec1d7e78feac41d16f66
+```
+
+### User Impact
+
+**Avant**:
+- ❌ Live Sessions: "Tokens: ?" (inutilisable)
+- ❌ Analytics Patterns: Affiche toutes les sessions (filtres ignorés)
+
+**Après**:
+- ✅ Live Sessions: "Tokens: 9.6M" (valeurs réelles)
+- ✅ Analytics Patterns: F1-F4 filtrent correctement
+
+---
+
 ## 🎯 État Actuel du Projet
 
 **Dernière mise à jour**: 2026-02-04
-**Dernier commit**: `10d36eb` - docs: mark Phase E (TUI Polish) as 100% complete
+**Dernier commit**: `098610d` - fix(analytics): add period filtering to detect_patterns()
 
 ### Phases Complétées
 
@@ -1246,8 +1338,9 @@ crates/ccboard-tui/src/components/mod.rs             (+4 LOC)
 | **C** | Export & UI Features | 8h | ✅ Complete |
 | **D** | Arc Migration | 3.5h | ✅ Complete |
 | **E** | TUI Polish | 6h | ✅ Complete |
+| **Bugfixes** | Post-Release Fixes | 2h | ✅ Complete |
 
-**Total**: ~37h de développement structuré
+**Total**: ~39h de développement structuré
 
 ### Achievements Cumulés
 
