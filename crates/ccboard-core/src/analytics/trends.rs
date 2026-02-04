@@ -8,6 +8,37 @@ use std::sync::Arc;
 
 use crate::models::session::SessionMetadata;
 
+/// Session duration statistics
+#[derive(Debug, Clone)]
+pub struct SessionDurationStats {
+    /// Average duration in seconds
+    pub avg_duration_secs: f64,
+    /// Median duration in seconds
+    pub median_duration_secs: f64,
+    /// 95th percentile duration in seconds
+    pub p95_duration_secs: f64,
+    /// Shortest session in seconds
+    pub shortest_session_secs: u64,
+    /// Longest session in seconds
+    pub longest_session_secs: u64,
+    /// Distribution buckets (0-5m, 5-15m, 15-30m, 30-60m, 60m+)
+    pub distribution: [usize; 5],
+}
+
+impl SessionDurationStats {
+    /// Empty placeholder (no sessions with duration data)
+    pub fn empty() -> Self {
+        Self {
+            avg_duration_secs: 0.0,
+            median_duration_secs: 0.0,
+            p95_duration_secs: 0.0,
+            shortest_session_secs: 0,
+            longest_session_secs: 0,
+            distribution: [0; 5],
+        }
+    }
+}
+
 /// Time series trends data
 #[derive(Debug, Clone)]
 pub struct TrendsData {
@@ -25,6 +56,8 @@ pub struct TrendsData {
     pub weekday_distribution: [usize; 7],
     /// Model usage over time (aligned with dates)
     pub model_usage_over_time: HashMap<String, Vec<usize>>,
+    /// Session duration statistics
+    pub duration_stats: SessionDurationStats,
 }
 
 impl TrendsData {
@@ -48,6 +81,7 @@ impl TrendsData {
             hourly_distribution: [0; 24],
             weekday_distribution: [0; 7],
             model_usage_over_time: HashMap::new(),
+            duration_stats: SessionDurationStats::empty(),
         }
     }
 }
@@ -84,6 +118,7 @@ pub fn compute_trends(sessions: &[Arc<SessionMetadata>], days: usize) -> TrendsD
     let mut hourly_counts = [0usize; 24];
     let mut weekday_counts = [0usize; 7];
     let mut model_usage: HashMap<String, BTreeMap<String, usize>> = HashMap::new();
+    let mut durations_secs: Vec<u64> = Vec::new();
 
     let now = Local::now();
     let cutoff = now - chrono::Duration::days(days as i64);
@@ -125,6 +160,13 @@ pub fn compute_trends(sessions: &[Arc<SessionMetadata>], days: usize) -> TrendsD
                 .and_modify(|count| *count += 1)
                 .or_insert(1);
         }
+
+        // Session duration
+        if let (Some(start), Some(end)) = (session.first_timestamp, session.last_timestamp) {
+            if let Ok(duration) = (end - start).num_seconds().try_into() {
+                durations_secs.push(duration);
+            }
+        }
     }
 
     // Extract sorted dates + values
@@ -145,6 +187,9 @@ pub fn compute_trends(sessions: &[Arc<SessionMetadata>], days: usize) -> TrendsD
         })
         .collect();
 
+    // Compute session duration statistics
+    let duration_stats = compute_duration_stats(&durations_secs);
+
     TrendsData {
         dates,
         daily_tokens,
@@ -153,5 +198,58 @@ pub fn compute_trends(sessions: &[Arc<SessionMetadata>], days: usize) -> TrendsD
         hourly_distribution: hourly_counts,
         weekday_distribution: weekday_counts,
         model_usage_over_time,
+        duration_stats,
+    }
+}
+
+/// Compute session duration statistics
+fn compute_duration_stats(durations: &[u64]) -> SessionDurationStats {
+    if durations.is_empty() {
+        return SessionDurationStats::empty();
+    }
+
+    let mut sorted = durations.to_vec();
+    sorted.sort_unstable();
+
+    let shortest = sorted[0];
+    let longest = sorted[sorted.len() - 1];
+
+    // Average
+    let sum: u64 = sorted.iter().sum();
+    let avg = sum as f64 / sorted.len() as f64;
+
+    // Median
+    let median = if sorted.len() % 2 == 0 {
+        let mid = sorted.len() / 2;
+        (sorted[mid - 1] + sorted[mid]) as f64 / 2.0
+    } else {
+        sorted[sorted.len() / 2] as f64
+    };
+
+    // P95 (95th percentile)
+    let p95_idx = ((sorted.len() as f64) * 0.95).ceil() as usize - 1;
+    let p95 = sorted.get(p95_idx).copied().unwrap_or(longest) as f64;
+
+    // Distribution buckets: 0-5m, 5-15m, 15-30m, 30-60m, 60m+
+    let mut distribution = [0usize; 5];
+    for &duration in durations {
+        let minutes = duration / 60;
+        let bucket = match minutes {
+            0..=4 => 0,      // 0-5m
+            5..=14 => 1,     // 5-15m
+            15..=29 => 2,    // 15-30m
+            30..=59 => 3,    // 30-60m
+            _ => 4,          // 60m+
+        };
+        distribution[bucket] += 1;
+    }
+
+    SessionDurationStats {
+        avg_duration_secs: avg,
+        median_duration_secs: median,
+        p95_duration_secs: p95,
+        shortest_session_secs: shortest,
+        longest_session_secs: longest,
+        distribution,
     }
 }

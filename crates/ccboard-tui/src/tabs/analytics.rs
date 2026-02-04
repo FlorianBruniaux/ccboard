@@ -608,7 +608,11 @@ impl AnalyticsTab {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints([
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(34),
+            ])
             .split(area);
 
         // Hourly distribution
@@ -616,6 +620,9 @@ impl AnalyticsTab {
 
         // Model distribution
         self.render_model_distribution(frame, chunks[1], data);
+
+        // Session duration stats
+        self.render_duration_stats(frame, chunks[2], data);
     }
 
     /// Render hourly distribution bar chart
@@ -676,6 +683,97 @@ impl AnalyticsTab {
             .value_style(Style::default().fg(Color::White).bg(Color::Green));
 
         frame.render_widget(barchart, area);
+    }
+
+    /// Render session duration statistics
+    fn render_duration_stats(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+        let stats = &data.trends.duration_stats;
+
+        // Format duration as minutes/seconds
+        let format_duration = |secs: f64| {
+            let mins = (secs / 60.0).floor() as u64;
+            let secs = (secs % 60.0) as u64;
+            if mins > 0 {
+                format!("{}m {:02}s", mins, secs)
+            } else {
+                format!("{}s", secs)
+            }
+        };
+
+        let text = vec![
+            Line::from(vec![
+                Span::styled("Avg: ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format_duration(stats.avg_duration_secs),
+                    Style::default().fg(Color::Cyan).bold(),
+                ),
+                Span::styled("  (median: ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format_duration(stats.median_duration_secs),
+                    Style::default().fg(Color::Cyan),
+                ),
+                Span::styled(")", Style::default().fg(Color::Gray)),
+            ]),
+            Line::from(vec![
+                Span::styled("P95: ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format_duration(stats.p95_duration_secs),
+                    Style::default().fg(Color::Yellow).bold(),
+                ),
+                Span::styled("  (95% sessions < this)", Style::default().fg(Color::DarkGray)),
+            ]),
+            Line::from(vec![
+                Span::styled("Range: ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format_duration(stats.shortest_session_secs as f64),
+                    Style::default().fg(Color::Green),
+                ),
+                Span::styled(" → ", Style::default().fg(Color::Gray)),
+                Span::styled(
+                    format_duration(stats.longest_session_secs as f64),
+                    Style::default().fg(Color::Red),
+                ),
+            ]),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "Distribution:",
+                Style::default().fg(Color::Gray).bold(),
+            )]),
+        ];
+
+        // Distribution bars
+        let total: usize = stats.distribution.iter().sum();
+        let mut distrib_lines = vec![];
+        let labels = ["0-5m", "5-15m", "15-30m", "30-60m", "60m+"];
+        for (i, &count) in stats.distribution.iter().enumerate() {
+            if total > 0 {
+                let pct = (count as f64 / total as f64 * 100.0) as usize;
+                let bar_len = (pct / 5).min(20); // Max 20 chars
+                let bar = "█".repeat(bar_len);
+                distrib_lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("{:6}", labels[i]),
+                        Style::default().fg(Color::Gray),
+                    ),
+                    Span::raw(" "),
+                    Span::styled(bar, Style::default().fg(Color::Cyan)),
+                    Span::raw(" "),
+                    Span::styled(format!("{}%", pct), Style::default().fg(Color::White)),
+                ]));
+            }
+        }
+
+        let all_lines = [text, distrib_lines].concat();
+
+        let paragraph = Paragraph::new(all_lines)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Session Duration Statistics"),
+            )
+            .alignment(Alignment::Left);
+
+        frame.render_widget(paragraph, area);
     }
 
     /// Render insights sub-view (scrollable list)
