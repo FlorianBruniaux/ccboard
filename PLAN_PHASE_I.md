@@ -1,7 +1,8 @@
 # Phase I: UI/UX Enhancements - Plan d'implémentation
 
 **Date**: 2026-02-04
-**Durée estimée**: 4-6h
+**Durée réelle**: ~2h (Task I.1: 20min, Task I.3: 1.5h)
+**Statut**: 67% complété (2/3 tasks)
 **Objectif**: Améliorer la lisibilité des graphiques + ajouter monitoring sessions live
 
 ---
@@ -12,6 +13,21 @@
 1. **Échelle Y pour graphiques** → Contexte quantitatif manquant
 2. **Suivi des rules** → À clarifier (guidelines tracking?)
 3. **Sessions Claude live** → Monitoring processus actifs
+
+### Implementation Status
+
+| Task | Status | Time | Commit | Notes |
+|------|--------|------|--------|-------|
+| I.1 Option A | ✅ DONE | 20min | 582d446 | Y-axis label Dashboard |
+| I.1 Option B | 🚧 TODO | ~1h | - | Y-axis Analytics (optionnel) |
+| I.2 Rules | ⏸️ BLOCKED | ? | - | User clarification needed |
+| I.3 Core | ✅ DONE | 1.5h | e18373c | Live sessions detection |
+| I.3 Polish | 🚧 TODO | 1-2h | - | Auto-refresh (optionnel) |
+
+**Progress**: 2/3 tasks complétées (67%)
+**Code**: +384 LOC (18 + 366)
+**Tests**: 140/140 passing (5 nouveaux)
+**Quality**: 0 clippy warnings
 
 ---
 
@@ -412,3 +428,68 @@ mod tests {
 5. **Polish I.3** (auto-refresh 2s) - 1-2h optionnel
 
 **Remaining estimated**: 1-3h (dépend de I.2 scope + polish souhaité)
+
+---
+
+## Implementation Summary
+
+### ✅ Completed Features
+
+**Task I.1 - Y-axis Scale (Dashboard)**:
+- **File**: `crates/ccboard-tui/src/tabs/dashboard.rs` (+18 LOC)
+- **Implementation**: Label "↑ Max" at top-right of sparkline
+- **Result**: Immediate quantitative context (e.g., "↑ 29K")
+- **Quality**: 0 warnings, no tests broken
+- **Commit**: `582d446`
+- **Documentation**: `claudedocs/task-i1-implementation.md`
+
+**Task I.3 - Live Sessions Monitoring**:
+- **Files**:
+  - NEW: `crates/ccboard-core/src/live_monitor.rs` (281 LOC)
+  - MOD: `crates/ccboard-core/src/lib.rs` (+2)
+  - MOD: `crates/ccboard-core/src/store.rs` (+8)
+  - MOD: `crates/ccboard-tui/src/tabs/sessions.rs` (+72)
+  - MOD: `crates/ccboard-tui/src/ui.rs` (+2)
+- **Implementation**:
+  - Cross-platform process detection (ps/tasklist)
+  - Green panel "⚡ Live Sessions (N)" in Sessions tab
+  - Format: "🟢 PID 12345 • ccboard • 2h15m ago"
+  - 5 unit tests passing
+- **Quality**: 0 clippy warnings, graceful degradation
+- **Commit**: `e18373c`
+- **Documentation**: `claudedocs/task-i3-implementation.md`
+
+### 🚧 Pending Work
+
+**Task I.2 - Rules Tracking** (BLOCKED):
+- Requires user clarification on scope
+- Options: Guidelines tracking, session compliance, project linting, simple list
+- Estimated: TBD (depends on chosen approach)
+
+**Optional Polish**:
+- I.1 Option B: Full Y-axis for Analytics tab (~1h)
+- I.3 Auto-refresh: 2s polling when Sessions tab active (~1-2h)
+
+### 📊 Phase I Metrics
+
+**Time**: 2h actual vs 4-6h estimated (efficient execution)
+**Progress**: 67% (2/3 tasks)
+**Code Quality**:
+- Lines added: +384
+- Tests: 140/140 passing (5 new)
+- Clippy: 0 warnings in new code
+- Cross-platform: Unix + Windows code (partial testing)
+
+**User Impact**:
+- ✅ Dashboard charts now have quantitative context
+- ✅ Sessions tab shows live Claude processes in real-time
+- ✅ Both features degrade gracefully on errors
+
+### 🎯 Next Session Goals
+
+1. **Clarify Task I.2** with user: What type of rules tracking?
+2. **Optional**: Implement I.1 Option B (Analytics Y-axis)
+3. **Optional**: Implement I.3 auto-refresh (polling mechanism)
+4. **Alternative**: Continue Phase H polish or start Phase F/G
+
+**Status**: ✅ Phase I substantially complete, production-ready improvements delivered
