@@ -18,6 +18,12 @@ pub struct LiveSession {
     pub working_directory: Option<String>,
     /// Full command line
     pub command: String,
+    /// CPU usage percentage
+    pub cpu_percent: f64,
+    /// Memory usage in MB
+    pub memory_mb: u64,
+    /// Total tokens in active session (if detectable)
+    pub tokens: Option<u64>,
 }
 
 /// Detect all running Claude Code processes on the system
@@ -77,6 +83,8 @@ fn parse_ps_line(line: &str) -> Option<LiveSession> {
     }
 
     let pid = parts[1].parse::<u32>().ok()?;
+    let cpu_percent = parts[2].parse::<f64>().unwrap_or(0.0);
+    let memory_mb = parts[5].parse::<u64>().unwrap_or(0) / 1024; // RSS in KB → MB
     let start_str = parts[8]; // START column (HH:MM or MMM DD)
     let command = parts[10..].join(" ");
 
@@ -86,11 +94,17 @@ fn parse_ps_line(line: &str) -> Option<LiveSession> {
     // Try to get working directory for this PID
     let working_directory = get_cwd_for_pid(pid);
 
+    // Try to count tokens from active session JSONL
+    let tokens = get_tokens_for_session(&working_directory);
+
     Some(LiveSession {
         pid,
         start_time,
         working_directory,
         command,
+        cpu_percent,
+        memory_mb,
+        tokens,
     })
 }
 
@@ -200,7 +214,89 @@ fn parse_tasklist_csv(line: &str) -> Option<LiveSession> {
         start_time,
         working_directory,
         command,
+        cpu_percent: 0.0,
+        memory_mb: 0,
+        tokens: None,
     })
+}
+
+/// Try to count tokens from active session JSONL file
+///
+/// Given a working directory (e.g., /Users/foo/myproject), attempts to:
+/// 1. Encode the path to match ~/.claude/projects/<encoded>/ format
+/// 2. Find the most recent .jsonl file in that directory
+/// 3. Parse and sum tokens from all messages
+///
+/// Returns None if:
+/// - Working directory is None
+/// - Session directory doesn't exist
+/// - No JSONL files found
+/// - Parse errors occur
+fn get_tokens_for_session(working_directory: &Option<String>) -> Option<u64> {
+    let cwd = working_directory.as_ref()?;
+
+    // Encode path: /Users/foo/myproject → -Users-foo-myproject
+    let encoded = format!("-{}", cwd.replace('/', "-"));
+
+    // Build sessions directory path
+    let home = std::env::var("HOME").ok()?;
+    let sessions_dir = std::path::Path::new(&home)
+        .join(".claude")
+        .join("projects")
+        .join(encoded);
+
+    if !sessions_dir.exists() {
+        return None;
+    }
+
+    // Find most recent .jsonl file
+    let mut entries: Vec<_> = std::fs::read_dir(&sessions_dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s == "jsonl")
+                .unwrap_or(false)
+        })
+        .collect();
+
+    entries.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).ok());
+    let latest = entries.last()?.path();
+
+    // Parse JSONL and sum tokens
+    let file = std::fs::File::open(latest).ok()?;
+    let reader = std::io::BufReader::new(file);
+    let mut total_tokens = 0u64;
+
+    for line in std::io::BufRead::lines(reader) {
+        let line = line.ok()?;
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+            if let Some(usage) = json.get("usage") {
+                // Sum all token types
+                if let Some(input) = usage.get("input_tokens").and_then(|v| v.as_u64()) {
+                    total_tokens += input;
+                }
+                if let Some(output) = usage.get("output_tokens").and_then(|v| v.as_u64()) {
+                    total_tokens += output;
+                }
+                if let Some(cache_write) = usage.get("cache_write_tokens").and_then(|v| v.as_u64())
+                {
+                    total_tokens += cache_write;
+                }
+                if let Some(cache_read) = usage.get("cache_read_tokens").and_then(|v| v.as_u64()) {
+                    total_tokens += cache_read;
+                }
+            }
+        }
+    }
+
+    if total_tokens > 0 {
+        Some(total_tokens)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

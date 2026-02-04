@@ -305,7 +305,8 @@ impl SessionsTab {
         let live_height = if live_sessions.is_empty() {
             0
         } else {
-            (live_sessions.len() as u16).min(5) + 2 // +2 for borders
+            // 2 lines per session (main + metrics), max 5 sessions, +2 for borders
+            (live_sessions.len() as u16 * 2).min(10) + 2
         };
 
         let mut constraints = vec![Constraint::Length(3)]; // search bar
@@ -489,17 +490,41 @@ impl SessionsTab {
                     .and_then(|n| n.to_str())
                     .unwrap_or("unknown");
 
-                let label = format!(
+                // Line 1: Process info
+                let line1 = format!(
                     "🟢 PID {} • {} • {} ago",
                     s.pid, cwd_display, duration_str
                 );
 
-                ListItem::new(label).style(Style::default().fg(Color::Green))
+                // Line 2: Performance metrics
+                let tokens_str = s.tokens.map_or("?".to_string(), |t| Self::format_short(t));
+                let line2 = format!(
+                    "   ├─ CPU: {:>5.1}% • RAM: {:>4}MB • Tokens: {:>6}",
+                    s.cpu_percent, s.memory_mb, tokens_str
+                );
+
+                ListItem::new(vec![
+                    Line::from(line1).style(Style::default().fg(Color::Green)),
+                    Line::from(line2).style(Style::default().fg(Color::DarkGray)),
+                ])
             })
             .collect();
 
         let list = List::new(items);
         frame.render_widget(list, inner);
+    }
+
+    /// Format large numbers with K/M/B suffixes
+    fn format_short(n: u64) -> String {
+        if n >= 1_000_000_000 {
+            format!("{}B", n / 1_000_000_000)
+        } else if n >= 1_000_000 {
+            format!("{}M", n / 1_000_000)
+        } else if n >= 1_000 {
+            format!("{}K", n / 1_000)
+        } else {
+            n.to_string()
+        }
     }
 
     fn render_projects(&mut self, frame: &mut Frame, area: Rect) {
