@@ -53,7 +53,11 @@
 - **Costs**: Token analytics with estimated costs by model/period
 - **History**: Full-text search across sessions with temporal patterns
 - **MCP**: Server management with status detection
-- **Analytics**: Trends, forecasting, patterns, and insights (4 sub-views)
+- **Analytics**: Advanced analytics with 4 sub-views
+  - **Overview**: Monthly budget tracking with visual alerts (⚠️ warnings at threshold)
+  - **Trends**: Time series charts with 30-day forecasting (confidence-based coloring)
+  - **Patterns**: Usage patterns, peak hours, model distribution, session duration stats
+  - **Insights**: Actionable recommendations for cost optimization
 
 🚀 **Performance First**
 - **89x faster startup** (20s → 224ms) with SQLite metadata cache
@@ -92,13 +96,14 @@
 ccboard is the **only actively-maintained Rust TUI** that combines:
 
 1. **Unified Dashboard**: 9 tabs in a single interface (Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP, Analytics)
-2. **Config Management**: 3-level merge viewer (default → global → project → local) with visual diff
+2. **Config Management**: 4-level merge viewer (default → global → global_local → project → project_local) with visual diff
 3. **Hooks Tooling**: Syntax highlighting, test mode, env vars support
 4. **Agents Browser**: Frontmatter parsing, invocation stats, 3 sub-tabs (Agents/Commands/Skills)
 5. **MCP Tooling**: Process detection, status monitoring, env masking, server descriptions
 6. **Performance**: SQLite metadata cache (89x speedup), Arc migration (50x memory reduction)
-7. **Export**: CSV/JSON for sessions, billing blocks, history
-8. **Cross-Platform**: Single 5.8MB binary (macOS, Linux, Windows), no runtime deps
+7. **Advanced Analytics**: 30-day forecasting with confidence scoring, budget alerts with visual progress bars, session duration statistics (avg/median/P95), usage pattern detection
+8. **Export**: CSV/JSON for sessions, billing blocks, history
+9. **Cross-Platform**: Single 5.8MB binary (macOS, Linux, Windows), no runtime deps
 
 **No other tool combines all of these** in a single actively-maintained Rust TUI.
 
@@ -123,6 +128,7 @@ ccboard vs other Claude Code monitoring tools (verified 2026-02-04):
 | **SQLite Cache (89x speedup)** | ✅ | ❌ | ❌ | ❌ | ❌ |
 | **Export CSV/JSON** | ✅ | ❌ | ✅ JSON | ❌ | ❌ |
 | **Live File Watcher** | ✅ | ❌ | ❌ | ⚠️ Poll 3s | ❌ |
+| **Advanced Analytics (Forecast, Budget)** | ✅ 4 views | ❌ | ❌ | ⚠️ Basic | ❌ |
 | **Single Binary (no runtime)** | ✅ 5.8MB | ❌ npm | ❌ npm | ❌ pip | ❌ pip |
 | | | | | | |
 | **P90 Predictions** | ❌ | ❌ | ❌ | ✅ | ❌ |
@@ -136,6 +142,7 @@ ccboard vs other Claude Code monitoring tools (verified 2026-02-04):
 - Agents/Commands/Skills browser with invocation stats
 - MCP process detection (cross-platform)
 - SQLite metadata cache (89x faster startup)
+- **Advanced Analytics**: 30-day forecasting, budget alerts, session duration stats, usage patterns
 - Dual TUI + Web single binary
 
 **References**:
@@ -224,11 +231,12 @@ Choose your path based on your goal:
    - Export CSV for accounting
 
 4. **Analytics trends** (Tab 9)
-   - 7-day forecasting
-   - Peak hours detection
-   - Actionable insights
+   - **Overview**: Monthly budget tracking with visual progress bars and alerts
+   - **Trends**: Time series charts with 30-day forecasting (confidence-coded)
+   - **Patterns**: Peak hours, model distribution, session duration statistics
+   - **Insights**: Actionable cost optimization recommendations
 
-**Next**: Export data with Tab 7 (History).
+**Next**: Configure budget alerts in `.claude/settings.json` or export data with Tab 7 (History).
 
 </details>
 
@@ -423,6 +431,65 @@ ccboard displays estimated API costs in the Dashboard with plan-based budget tra
 - 🔴 **Red**: > 80% of monthly budget
 
 **Note**: This is a **local estimation** calculated from your billing blocks, not real-time API data. For actual limits, use `:usage` in Claude Code or the Anthropic dashboard.
+
+### Budget Alerts & Tracking
+
+Configure custom monthly budgets with automatic alerts in the **Analytics tab** (Tab 9 → Overview). Get visual warnings when approaching your spending limit.
+
+**Add to `~/.claude/settings.json`** (global) **or** `.claude/settings.json` (per-project):
+
+```json
+{
+  "budget": {
+    "monthlyBudgetUsd": 50.0,
+    "alertThresholdPct": 80.0
+  }
+}
+```
+
+**Configuration:**
+
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `monthlyBudgetUsd` | number | Your monthly spending limit in USD | Required |
+| `alertThresholdPct` | number | Alert threshold percentage (0-100) | `80.0` |
+
+**Analytics Overview display:**
+
+```
+┌─ Budget Status ─────────────────────────────┐
+│ Monthly Est: $42.50                         │
+│ Budget:      $50.00  ━━━━━━━━━━━━━━━━  85% │
+│ Remaining:   $7.50 (15%)                    │
+│                                              │
+│ ⚠️  WARNING: Approaching budget limit (85%) │
+│ 💡 TIP: Projected overage: $5.20 if trend…  │
+└──────────────────────────────────────────────┘
+```
+
+**Visual indicators:**
+
+- 🟢 **Green bar**: < 60% of budget (safe zone)
+- 🟡 **Yellow bar**: 60-80% of budget (caution)
+- 🔴 **Red bar + ⚠️**: ≥ 80% of budget (warning)
+
+**Alert types:**
+
+1. **Budget Warning**: Current cost approaching threshold
+2. **Projected Overage**: Forecast predicts budget exceeded if trend continues
+3. **Usage Spike**: Daily tokens > 2x average (anomaly detection)
+
+**4-level priority** (higher overrides lower):
+1. `~/.claude/settings.json` (global)
+2. `~/.claude/settings.local.json` (global, not committed to git)
+3. `.claude/settings.json` (project, committed)
+4. `.claude/settings.local.json` (project, developer-specific)
+
+**Example workflows:**
+
+- **Solo developer**: Set global budget in `~/.claude/settings.json`
+- **Team project**: Set team budget in `.claude/settings.json` (committed), override personally in `.claude/settings.local.json`
+- **Multiple projects**: Different budgets per project in each `.claude/settings.json`
 
 ---
 
