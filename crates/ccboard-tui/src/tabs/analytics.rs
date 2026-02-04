@@ -387,18 +387,62 @@ impl AnalyticsTab {
     /// Render token sparkline
     fn render_token_sparkline(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
         let sparkline_data: Vec<u64> = data.trends.daily_tokens.to_vec();
+        let max_val = sparkline_data.iter().max().copied().unwrap_or(1);
 
+        // Outer block with title and borders
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title("Token Usage Over Time");
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        // Layout: [Y-axis labels (8 chars), Sparkline]
+        let chart_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(8),  // Y-axis labels
+                Constraint::Min(20),    // Chart
+            ])
+            .split(inner);
+
+        // Y-axis labels (3 ticks: max, mid, 0)
+        let max_label = Self::format_short(max_val);
+        let mid_label = Self::format_short(max_val / 2);
+
+        // Calculate vertical spacing to align with sparkline height
+        let available_height = chart_layout[0].height as usize;
+        let spacing = if available_height >= 3 {
+            (available_height - 1) / 2  // Distribute remaining space
+        } else {
+            0
+        };
+
+        let mut y_labels = vec![max_label];
+        for _ in 0..spacing {
+            y_labels.push(String::new());
+        }
+        if available_height >= 2 {
+            y_labels.push(mid_label);
+        }
+        for _ in 0..spacing {
+            y_labels.push(String::new());
+        }
+        if available_height >= 3 {
+            y_labels.push("0".to_string());
+        }
+
+        let y_axis_widget = Paragraph::new(y_labels.join("\n"))
+            .alignment(ratatui::layout::Alignment::Right)
+            .style(Style::default().fg(Color::DarkGray));
+        frame.render_widget(y_axis_widget, chart_layout[0]);
+
+        // Sparkline in remaining area
         let sparkline = Sparkline::default()
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("Token Usage Over Time"),
-            )
             .data(&sparkline_data)
             .style(Style::default().fg(Color::Cyan))
-            .max(sparkline_data.iter().max().copied().unwrap_or(1));
+            .max(max_val);
 
-        frame.render_widget(sparkline, area);
+        frame.render_widget(sparkline, chart_layout[1]);
     }
 
     /// Render insights preview (top 3)
@@ -627,5 +671,18 @@ impl AnalyticsTab {
             .style(Style::default().fg(Color::White));
 
         frame.render_widget(list, area);
+    }
+
+    /// Format large numbers with K/M/B suffixes
+    fn format_short(n: u64) -> String {
+        if n >= 1_000_000_000 {
+            format!("{}B", n / 1_000_000_000)
+        } else if n >= 1_000_000 {
+            format!("{}M", n / 1_000_000)
+        } else if n >= 1_000 {
+            format!("{}K", n / 1_000)
+        } else {
+            n.to_string()
+        }
     }
 }
