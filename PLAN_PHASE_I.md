@@ -22,11 +22,13 @@
 | I.1 Option B | 🚧 TODO | ~1h | - | Y-axis Analytics (optionnel) |
 | I.2 Rules | ⏸️ BLOCKED | ? | - | User clarification needed |
 | I.3 Core | ✅ DONE | 1.5h | e18373c | Live sessions detection |
-| I.3 Polish | 🚧 TODO | 1-2h | - | Auto-refresh (optionnel) |
+| I.3 Enhanced | 🔄 IN PROGRESS | ~1h | - | CPU/RAM/Tokens monitoring |
+| I.3 Auto-refresh | 🚧 TODO | 1-2h | - | 2s polling (optionnel) |
+| **Bonus: Token fmt** | ✅ DONE | 10min | 3535f88 | K/M/B in Billing Blocks |
 
-**Progress**: 2/3 tasks complétées (67%)
-**Code**: +384 LOC (18 + 366)
-**Tests**: 140/140 passing (5 nouveaux)
+**Progress**: 3/4 tasks complétées (75% + bonus)
+**Code**: +398 LOC (384 + 14 token fmt)
+**Tests**: 140/140 passing
 **Quality**: 0 clippy warnings
 
 ---
@@ -493,3 +495,43 @@ mod tests {
 4. **Alternative**: Continue Phase H polish or start Phase F/G
 
 **Status**: ✅ Phase I substantially complete, production-ready improvements delivered
+
+---
+
+## Task I.3 Enhanced: CPU/RAM/Tokens Monitoring (~1h)
+
+### Objectif
+
+Enrichir l'affichage des live sessions avec métriques de performance en temps réel.
+
+### Données à afficher
+
+**1. CPU & Mémoire** (via ps):
+- Colonne %CPU (ps aux col 3)
+- Colonne %MEM ou RSS (ps aux col 4/6)
+- Format: "CPU: 15.2% • RAM: 250MB"
+
+**2. Tokens en live** (via JSONL):
+- Identifier fichier session actif via cwd
+- Parser et sommer tokens
+- Format: "Tokens: 145K"
+
+### Layout proposé
+
+```
+┌─ ⚡ Live Sessions (2) ─────────────────────────────┐
+│ 🟢 PID 12345 • ccboard • 2h15m ago                │
+│    ├─ CPU: 15.2% • RAM: 250MB • Tokens: 145K     │
+│ 🟢 PID 25250 • florian-portfolio • 45m ago        │
+│    ├─ CPU: 8.5% • RAM: 180MB • Tokens: 23K       │
+└────────────────────────────────────────────────────┘
+```
+
+### Implémentation
+
+**Phase 1**: Enrichir parse_ps_line() pour extraire CPU/MEM
+**Phase 2**: Ajouter champs à LiveSession struct
+**Phase 3**: Modifier render_live_sessions() pour layout 2 lignes
+**Phase 4**: (Optionnel) Essayer d'identifier JSONL et compter tokens
+
+**Estimation**: 45min (CPU/RAM) + 15min (tokens tentative) = 1h
