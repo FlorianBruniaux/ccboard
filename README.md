@@ -14,8 +14,8 @@
 ## Features
 
 ✨ **8 Interactive Tabs**
-- **Dashboard**: Overview stats, model usage, MCP servers, 7-day activity
-- **Sessions**: Browse all sessions with search and detail view
+- **Dashboard**: Overview stats, model usage, MCP servers, 7-day activity, **API usage estimation** with plan-based budgets
+- **Sessions**: Browse all sessions with search, live Claude processes with CPU/RAM/Tokens, and detail view
 - **Config**: Cascading configuration editor (global/project/local)
 - **Hooks**: Event-based hook management with file editing
 - **Agents**: Browse agents, commands, and skills
@@ -178,6 +178,48 @@ Models:
   claude-sonnet-4.5: 9.8M tokens (in: 6.5M, out: 2.3M)
   claude-opus-4: 1.2M tokens (in: 800K, out: 400K)
 ```
+
+---
+
+## Configuration
+
+### API Usage Estimation
+
+ccboard displays estimated API costs in the Dashboard with plan-based budget tracking. Configure your subscription plan to see accurate percentages and budget limits.
+
+**Add to `~/.claude/settings.json`** (global) **or** `.claude/settings.json` (per-project):
+
+```json
+{
+  "subscriptionPlan": "max20x"
+}
+```
+
+**Available plans:**
+
+| Plan | Monthly Budget | Config Value |
+|------|----------------|--------------|
+| Claude Pro | ~$20/month | `"pro"` |
+| Claude Max 5x | ~$100/month | `"max5x"` |
+| Claude Max 20x | ~$200/month | `"max20x"` |
+| API (Pay-as-you-go) | No limit | `"api"` |
+
+**Dashboard display:**
+
+```
+┌─ 💰 API Usage (Est.) - Claude Max 20x ─┐
+│ Today:      $ 2.45 / $200.00  (  1.2%)│
+│ This week:  $ 8.12 / $200.00  (  4.1%)│
+│ This month: $78.40 / $200.00  ( 39.2%)│
+└──────────────────────────────────────────┘
+```
+
+**Color coding:**
+- 🟢 **Green**: < 60% of monthly budget
+- 🟡 **Yellow**: 60-80% of monthly budget
+- 🔴 **Red**: > 80% of monthly budget
+
+**Note**: This is a **local estimation** calculated from your billing blocks, not real-time API data. For actual limits, use `:usage` in Claude Code or the Anthropic dashboard.
 
 ---
 
