@@ -17,9 +17,9 @@ pub mod trends;
 mod tests;
 
 pub use forecasting::{ForecastData, TrendDirection, forecast_usage};
-pub use insights::generate_insights;
+pub use insights::{Alert, generate_budget_alerts, generate_insights};
 pub use patterns::{UsagePatterns, detect_patterns};
-pub use trends::{TrendsData, compute_trends};
+pub use trends::{TrendsData, SessionDurationStats, compute_trends};
 
 /// Period selection for analytics computation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

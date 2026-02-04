@@ -6,6 +6,29 @@ use super::forecasting::{ForecastData, TrendDirection};
 use super::patterns::UsagePatterns;
 use super::trends::TrendsData;
 
+/// Alert types for budget and anomaly detection
+#[derive(Debug, Clone)]
+pub enum Alert {
+    /// Budget warning (current cost approaching budget)
+    BudgetWarning {
+        current: f64,
+        budget: f64,
+        pct: f64,
+    },
+    /// Usage spike (day with tokens > 2x average)
+    UsageSpike {
+        day: String,
+        tokens: u64,
+        avg: u64,
+    },
+    /// Projected budget overage
+    ProjectedOverage {
+        forecast: f64,
+        budget: f64,
+        overage: f64,
+    },
+}
+
 /// Generate actionable insights
 ///
 /// Uses rule-based thresholds to identify optimization opportunities:
@@ -106,4 +129,70 @@ pub fn generate_insights(
     }
 
     insights
+}
+
+/// Generate budget and anomaly alerts
+///
+/// Detects:
+/// - Budget warnings (current cost > threshold%)
+/// - Projected overages (forecast > budget)
+/// - Usage spikes (daily tokens > 2x average)
+///
+/// # Arguments
+/// - `trends`: Time series data for spike detection
+/// - `forecast`: Forecast data for budget projections
+/// - `monthly_budget`: Optional monthly budget in USD
+/// - `alert_threshold_pct`: Alert threshold (default 80%)
+pub fn generate_budget_alerts(
+    trends: &TrendsData,
+    forecast: &ForecastData,
+    monthly_budget: Option<f64>,
+    alert_threshold_pct: f64,
+) -> Vec<Alert> {
+    let mut alerts = Vec::new();
+
+    if let Some(budget) = monthly_budget {
+        // 1. Current budget warning
+        let current_cost = forecast.monthly_cost_estimate;
+        let pct = (current_cost / budget * 100.0).min(100.0);
+
+        if pct >= alert_threshold_pct {
+            alerts.push(Alert::BudgetWarning {
+                current: current_cost,
+                budget,
+                pct,
+            });
+        }
+
+        // 2. Projected overage
+        if forecast.unavailable_reason.is_none() {
+            let projected = forecast.next_30_days_cost;
+            if projected > budget {
+                alerts.push(Alert::ProjectedOverage {
+                    forecast: projected,
+                    budget,
+                    overage: projected - budget,
+                });
+            }
+        }
+    }
+
+    // 3. Usage spikes (tokens > 2x average)
+    if !trends.daily_tokens.is_empty() {
+        let avg_tokens: u64 = trends.daily_tokens.iter().sum::<u64>() / trends.daily_tokens.len() as u64;
+
+        for (i, &tokens) in trends.daily_tokens.iter().enumerate() {
+            if tokens > avg_tokens * 2 {
+                if let Some(day) = trends.dates.get(i) {
+                    alerts.push(Alert::UsageSpike {
+                        day: day.clone(),
+                        tokens,
+                        avg: avg_tokens,
+                    });
+                }
+            }
+        }
+    }
+
+    alerts
 }

@@ -43,9 +43,29 @@ pub struct Settings {
     #[serde(default)]
     pub subscription_plan: Option<String>,
 
+    /// Budget configuration
+    #[serde(default)]
+    pub budget: Option<BudgetConfig>,
+
     /// Additional untyped fields
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
+}
+
+/// Budget configuration for cost tracking and alerts
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetConfig {
+    /// Monthly budget in USD
+    pub monthly_budget_usd: f64,
+
+    /// Alert threshold percentage (0-100), defaults to 80%
+    #[serde(default = "default_alert_threshold")]
+    pub alert_threshold_pct: f64,
+}
+
+fn default_alert_threshold() -> f64 {
+    80.0
 }
 
 impl Settings {
@@ -155,8 +175,9 @@ impl MergedConfig {
     /// Priority: local > project > global
     pub fn from_layers(
         global: Option<Settings>,
+        global_local: Option<Settings>,
         project: Option<Settings>,
-        local: Option<Settings>,
+        project_local: Option<Settings>,
     ) -> Self {
         let mut merged = Settings::default();
 
@@ -165,20 +186,34 @@ impl MergedConfig {
             Self::merge_into(&mut merged, g);
         }
 
-        // Then project
+        // Then global local (overrides global)
+        if let Some(ref gl) = global_local {
+            Self::merge_into(&mut merged, gl);
+        }
+
+        // Then project (overrides global layers)
         if let Some(ref p) = project {
             Self::merge_into(&mut merged, p);
         }
 
-        // Finally local (highest priority)
-        if let Some(ref l) = local {
-            Self::merge_into(&mut merged, l);
+        // Finally project local (highest priority)
+        if let Some(ref pl) = project_local {
+            Self::merge_into(&mut merged, pl);
         }
 
+        // Store sources for debugging (merge global_local into global for compatibility)
+        let global_combined = if global.is_some() && global_local.is_some() {
+            let mut g = global.clone().unwrap();
+            Self::merge_into(&mut g, &global_local.unwrap());
+            Some(g)
+        } else {
+            global.or(global_local)
+        };
+
         Self {
-            global,
+            global: global_combined,
             project,
-            local,
+            local: project_local, // Rename semantics: local now means project_local
             merged,
         }
     }
@@ -300,7 +335,7 @@ mod tests {
             ..Default::default()
         };
 
-        let merged = MergedConfig::from_layers(Some(global), Some(project), None);
+        let merged = MergedConfig::from_layers(Some(global), None, Some(project), None);
         assert_eq!(merged.merged.model, Some("sonnet".to_string()));
     }
 
@@ -323,7 +358,7 @@ mod tests {
             ..Default::default()
         };
 
-        let merged = MergedConfig::from_layers(Some(global), Some(project), None);
+        let merged = MergedConfig::from_layers(Some(global), None, Some(project), None);
         let env = merged.merged.env.unwrap();
 
         assert_eq!(env.get("A"), Some(&"1".to_string()));
@@ -349,7 +384,7 @@ mod tests {
             ..Default::default()
         };
 
-        let merged = MergedConfig::from_layers(Some(global), Some(project), None);
+        let merged = MergedConfig::from_layers(Some(global), None, Some(project), None);
         let perms = merged.merged.permissions.unwrap();
 
         let allow = perms.allow.unwrap();

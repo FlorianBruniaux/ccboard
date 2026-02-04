@@ -150,7 +150,7 @@ impl AnalyticsTab {
                     "Rendering analytics data"
                 );
                 match self.current_view {
-                    AnalyticsView::Overview => self.render_overview(frame, chunks[1], data),
+                    AnalyticsView::Overview => self.render_overview(frame, chunks[1], data, store),
                     AnalyticsView::Trends => self.render_trends(frame, chunks[1], data),
                     AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data),
                     AnalyticsView::Insights => self.render_insights(frame, chunks[1], data),
@@ -249,25 +249,31 @@ impl AnalyticsTab {
     }
 
     /// Render overview sub-view
-    fn render_overview(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_overview(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, store: Option<&Arc<DataStore>>) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([
-                Constraint::Length(7), // Summary cards
-                Constraint::Length(9), // Token sparkline
-                Constraint::Min(8),    // Top insights
+                Constraint::Length(7),  // Summary cards
+                Constraint::Length(6),  // Budget status
+                Constraint::Length(9),  // Token sparkline
+                Constraint::Min(8),     // Top insights
             ])
             .split(area);
 
         // Summary cards
         self.render_summary_cards(frame, chunks[0], data);
 
+        // Budget status (if configured)
+        if let Some(store) = store {
+            self.render_budget_status(frame, chunks[1], data, store);
+        }
+
         // Token sparkline
-        self.render_token_sparkline(frame, chunks[1], data);
+        self.render_token_sparkline(frame, chunks[2], data);
 
         // Top insights preview
-        self.render_insights_preview(frame, chunks[2], data);
+        self.render_insights_preview(frame, chunks[3], data);
     }
 
     /// Render summary cards
@@ -333,6 +339,105 @@ impl AnalyticsTab {
             confidence_color,
             "forecast",
         );
+    }
+
+    /// Render budget status with alerts
+    fn render_budget_status(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, store: &Arc<DataStore>) {
+        use ccboard_core::analytics::generate_budget_alerts;
+
+        let settings = store.settings();
+        let budget_config = settings.merged.budget.as_ref();
+
+        if let Some(config) = budget_config {
+            let alerts = generate_budget_alerts(
+                &data.trends,
+                &data.forecast,
+                Some(config.monthly_budget_usd),
+                config.alert_threshold_pct,
+            );
+
+            let current_cost = data.forecast.monthly_cost_estimate;
+            let budget = config.monthly_budget_usd;
+            let pct = (current_cost / budget * 100.0).min(100.0);
+            let remaining = (budget - current_cost).max(0.0);
+
+            // Progress bar
+            let bar_len = (pct / 5.0) as usize; // 20 chars max
+            let bar = "━".repeat(bar_len.min(20));
+
+            // Color based on percentage
+            let (bar_color, status_icon) = if pct >= config.alert_threshold_pct {
+                (Color::Red, "⚠️ ")
+            } else if pct >= 60.0 {
+                (Color::Yellow, "")
+            } else {
+                (Color::Green, "")
+            };
+
+            let mut lines = vec![
+                Line::from(vec![
+                    Span::styled("Monthly Est: ", Style::default().fg(Color::Gray)),
+                    Span::styled(format!("${:.2}", current_cost), Style::default().fg(Color::Cyan).bold()),
+                ]),
+                Line::from(vec![
+                    Span::styled("Budget:      ", Style::default().fg(Color::Gray)),
+                    Span::styled(format!("${:.2}", budget), Style::default().fg(Color::White)),
+                    Span::raw(" "),
+                    Span::styled(bar, Style::default().fg(bar_color)),
+                    Span::raw(" "),
+                    Span::styled(format!("{:.0}%", pct), Style::default().fg(bar_color).bold()),
+                ]),
+                Line::from(vec![
+                    Span::styled("Remaining:   ", Style::default().fg(Color::Gray)),
+                    Span::styled(format!("${:.2} ({:.0}%)", remaining, 100.0 - pct), Style::default().fg(Color::White)),
+                ]),
+            ];
+
+            // Add alerts
+            for alert in &alerts {
+                use ccboard_core::analytics::Alert;
+                match alert {
+                    Alert::BudgetWarning { pct, .. } => {
+                        lines.push(Line::from(vec![
+                            Span::raw(""),
+                        ]));
+                        lines.push(Line::from(vec![
+                            Span::styled(format!("{}WARNING: Approaching budget limit ({:.0}%)", status_icon, pct), Style::default().fg(Color::Red).bold()),
+                        ]));
+                    }
+                    Alert::ProjectedOverage { overage, .. } => {
+                        lines.push(Line::from(vec![
+                            Span::styled(format!("💡 TIP: Projected overage: ${:.2} if trend continues", overage), Style::default().fg(Color::Yellow)),
+                        ]));
+                    }
+                    _ => {}
+                }
+            }
+
+            let paragraph = Paragraph::new(lines)
+                .block(Block::default().borders(Borders::ALL).title("Budget Status"))
+                .alignment(Alignment::Left);
+
+            frame.render_widget(paragraph, area);
+        } else {
+            // No budget configured
+            let text = vec![
+                Line::from(Span::styled(
+                    "No budget configured",
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Line::from(Span::styled(
+                    "Add \"budget\": {\"monthlyBudgetUsd\": 50} to settings.json",
+                    Style::default().fg(Color::DarkGray).italic(),
+                )),
+            ];
+
+            let paragraph = Paragraph::new(text)
+                .block(Block::default().borders(Borders::ALL).title("Budget Status"))
+                .alignment(Alignment::Center);
+
+            frame.render_widget(paragraph, area);
+        }
     }
 
     /// Render stat card (reused from dashboard)
