@@ -132,8 +132,8 @@ impl Ui {
                             store.compute_analytics(Period::available()).await;
                         });
                     }
-                    KeyCode::Tab => self.analytics.next_view(),
-                    KeyCode::BackTab => self.analytics.prev_view(),
+                    KeyCode::Right | KeyCode::Char('l') => self.analytics.next_view(),
+                    KeyCode::Left | KeyCode::Char('h') => self.analytics.prev_view(),
                     KeyCode::Char('j') | KeyCode::Down => {
                         let max_items =
                             app.store.analytics().map(|a| a.insights.len()).unwrap_or(0);
@@ -452,7 +452,7 @@ impl Ui {
                 Tab::Costs => "Tab/←→/h/l switch views",
                 Tab::History => "/ search │ gg/G/Home/End jump │ c clear │ x export",
                 Tab::Mcp => "←→ focus │ ↑↓ select │ e edit │ o reveal │ r refresh",
-                Tab::Analytics => "F1-F4 period │ Tab switch views │ j/k scroll",
+                Tab::Analytics => "F1-F4 period │ ←→/h/l switch views │ j/k scroll │ r refresh",
             };
 
             Line::from(vec![

@@ -268,7 +268,7 @@ impl HelpModal {
                     Span::raw("Select period (7d/30d/90d/All)"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  Tab         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  ←→ or h/l   ", Style::default().fg(Color::Cyan)),
                     Span::raw("Switch between sub-views"),
                 ]));
                 lines.push(Line::from(vec![
