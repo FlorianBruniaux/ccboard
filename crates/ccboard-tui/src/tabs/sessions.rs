@@ -391,7 +391,7 @@ impl SessionsTab {
                             .iter()
                             .any(|m: &String| m.to_lowercase().contains(&query_lower))
                 })
-                .map(|s| Arc::clone(s))
+                .map(Arc::clone)
                 .collect()
         };
 
@@ -479,10 +479,18 @@ impl SessionsTab {
         };
 
         let time_ago = self.format_time_ago();
-        let title_text = if self.search_filter.is_empty() {
-            format!(" Sessions ({}) • {} ", sessions.len(), time_ago)
+        const MAX_DISPLAY: usize = 500;
+        let total_count = sessions.len();
+        let display_count = total_count.min(MAX_DISPLAY);
+
+        let title_text = if self.search_filter.is_empty() && total_count > MAX_DISPLAY {
+            format!(" Sessions (showing {} / {}) • {} ", display_count, total_count, time_ago)
+        } else if self.search_filter.is_empty() {
+            format!(" Sessions ({}) • {} ", total_count, time_ago)
+        } else if total_count > MAX_DISPLAY {
+            format!(" Sessions (showing {} / {} results) • {} ", display_count, total_count, time_ago)
         } else {
-            format!(" Sessions ({} results) • {} ", sessions.len(), time_ago)
+            format!(" Sessions ({} results) • {} ", total_count, time_ago)
         };
 
         let block = Block::default()
@@ -552,7 +560,10 @@ impl SessionsTab {
             return;
         }
 
-        let items: Vec<ListItem> = sessions
+        // Limit display to first MAX_DISPLAY items for performance
+        let displayed_sessions = &sessions[..display_count];
+
+        let items: Vec<ListItem> = displayed_sessions
             .iter()
             .enumerate()
             .map(|(i, session)| {

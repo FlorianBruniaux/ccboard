@@ -221,7 +221,7 @@ impl HistoryTab {
                             .iter()
                             .any(|m| m.to_lowercase().contains(&query_lower))
                 })
-                .map(|s| Arc::clone(s))
+                .map(Arc::clone)
                 .collect();
         }
 
@@ -436,11 +436,21 @@ impl HistoryTab {
     }
 
     fn render_results(&mut self, frame: &mut Frame, area: Rect) {
+        const MAX_DISPLAY: usize = 500;
+        let total_count = self.filtered_sessions.len();
+        let display_count = total_count.min(MAX_DISPLAY);
+
+        let title_text = if total_count > MAX_DISPLAY {
+            format!(" History (showing {} / {}) ", display_count, total_count)
+        } else {
+            " History ".to_string()
+        };
+
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::DarkGray))
             .title(Span::styled(
-                " History ",
+                title_text,
                 Style::default().fg(Color::White).bold(),
             ));
 
@@ -506,14 +516,15 @@ impl HistoryTab {
 
         // Clamp selection
         if let Some(sel) = self.results_state.selected() {
-            if sel >= self.filtered_sessions.len() {
-                self.results_state
-                    .select(Some(self.filtered_sessions.len() - 1));
+            if sel >= display_count {
+                self.results_state.select(Some(display_count - 1));
             }
         }
 
-        let items: Vec<ListItem> = self
-            .filtered_sessions
+        // Limit display to first MAX_DISPLAY items for performance
+        let displayed_sessions = &self.filtered_sessions[..display_count];
+
+        let items: Vec<ListItem> = displayed_sessions
             .iter()
             .enumerate()
             .map(|(i, session)| {
@@ -587,13 +598,12 @@ impl HistoryTab {
         let list = List::new(items).block(block);
         frame.render_stateful_widget(list, area, &mut self.results_state);
 
-        // Scrollbar for long result lists
-        let result_count = self.filtered_sessions.len();
-        if result_count > (area.height as usize - 2) {
+        // Scrollbar for long result lists (use display_count, not total)
+        if display_count > (area.height as usize - 2) {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(None)
                 .end_symbol(None);
-            let mut scrollbar_state = ScrollbarState::new(result_count)
+            let mut scrollbar_state = ScrollbarState::new(display_count)
                 .position(self.results_state.selected().unwrap_or(0));
             frame.render_stateful_widget(
                 scrollbar,

@@ -404,6 +404,12 @@ impl DataStore {
         self.sessions.iter().map(|r| r.key().clone()).collect()
     }
 
+    /// Clear session content cache (for memory optimization on F5)
+    pub fn clear_session_content_cache(&self) {
+        self.session_content_cache.invalidate_all();
+        debug!("Session content cache cleared");
+    }
+
     /// Get sessions grouped by project
     /// Returns Arc<SessionMetadata> for cheap cloning
     pub fn sessions_by_project(&self) -> std::collections::HashMap<String, Vec<Arc<SessionMetadata>>> {

@@ -220,14 +220,17 @@ impl App {
                 true
             }
             KeyCode::Char('r') if modifiers.contains(KeyModifiers::CONTROL) => {
-                // Ctrl+R: force reload
+                // Ctrl+R: force reload + clear cache
                 self.needs_refresh = true;
+                self.store.clear_session_content_cache();
                 self.status_message = Some("♻ Reloading data...".to_string());
                 true
             }
             KeyCode::F(5) => {
                 // F5 for refresh (was 'r', but 'r' conflicts with search input)
                 self.needs_refresh = true;
+                // Clear session content cache for memory optimization
+                self.store.clear_session_content_cache();
                 true
             }
             KeyCode::Tab => {
