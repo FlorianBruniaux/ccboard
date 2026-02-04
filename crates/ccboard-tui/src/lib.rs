@@ -58,6 +58,11 @@ pub async fn run(
         // Compute billing blocks
         store_clone.compute_billing_blocks().await;
 
+        // Compute analytics (default 30-day period)
+        store_clone
+            .compute_analytics(ccboard_core::analytics::Period::last_30d())
+            .await;
+
         // Signal completion
         let _ = load_tx.send((report, store_clone.invocation_stats()));
     });

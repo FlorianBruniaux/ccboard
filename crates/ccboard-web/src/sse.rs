@@ -27,6 +27,7 @@ pub fn create_sse_stream(
                 DataEvent::ConfigChanged(scope) => {
                     ("config_changed", format!(r#"{{"scope":"{:?}"}}"#, scope))
                 }
+                DataEvent::AnalyticsUpdated => ("analytics_updated", "{}".to_string()),
                 DataEvent::LoadCompleted => ("load_completed", "{}".to_string()),
                 DataEvent::WatcherError(msg) => {
                     ("watcher_error", format!(r#"{{"message":"{}"}}"#, msg))

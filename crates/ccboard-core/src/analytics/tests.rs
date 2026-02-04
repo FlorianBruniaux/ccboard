@@ -216,8 +216,8 @@ fn test_full_analytics_pipeline() {
 fn test_analytics_with_missing_timestamps() {
     let mut sessions = generate_test_sessions(10, 5);
     // Remove timestamps from half the sessions
-    for i in 0..5 {
-        Arc::get_mut(&mut sessions[i]).unwrap().first_timestamp = None;
+    for session in sessions.iter_mut().take(5) {
+        Arc::get_mut(session).unwrap().first_timestamp = None;
     }
 
     let trends = compute_trends(&sessions, 30);

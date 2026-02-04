@@ -104,10 +104,34 @@ impl Ui {
                 use ccboard_core::analytics::Period;
                 use crossterm::event::KeyCode;
                 match key {
-                    KeyCode::F(1) => self.analytics.set_period(Period::last_7d()),
-                    KeyCode::F(2) => self.analytics.set_period(Period::last_30d()),
-                    KeyCode::F(3) => self.analytics.set_period(Period::last_90d()),
-                    KeyCode::F(4) => self.analytics.set_period(Period::available()),
+                    KeyCode::F(1) => {
+                        self.analytics.set_period(Period::last_7d());
+                        let store = app.store.clone();
+                        tokio::spawn(async move {
+                            store.compute_analytics(Period::last_7d()).await;
+                        });
+                    }
+                    KeyCode::F(2) => {
+                        self.analytics.set_period(Period::last_30d());
+                        let store = app.store.clone();
+                        tokio::spawn(async move {
+                            store.compute_analytics(Period::last_30d()).await;
+                        });
+                    }
+                    KeyCode::F(3) => {
+                        self.analytics.set_period(Period::last_90d());
+                        let store = app.store.clone();
+                        tokio::spawn(async move {
+                            store.compute_analytics(Period::last_90d()).await;
+                        });
+                    }
+                    KeyCode::F(4) => {
+                        self.analytics.set_period(Period::available());
+                        let store = app.store.clone();
+                        tokio::spawn(async move {
+                            store.compute_analytics(Period::available()).await;
+                        });
+                    }
                     KeyCode::Tab => self.analytics.next_view(),
                     KeyCode::BackTab => self.analytics.prev_view(),
                     KeyCode::Char('j') | KeyCode::Down => {
@@ -119,6 +143,14 @@ impl Ui {
                         self.analytics.scroll_down(max_items);
                     }
                     KeyCode::Char('k') | KeyCode::Up => self.analytics.scroll_up(),
+                    KeyCode::Char('r') => {
+                        // Recompute analytics with current period (async operation)
+                        let store = app.store.clone();
+                        let period = self.analytics.period();
+                        tokio::spawn(async move {
+                            store.compute_analytics(period).await;
+                        });
+                    }
                     _ => {}
                 }
             }

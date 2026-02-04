@@ -66,6 +66,12 @@ pub struct AnalyticsTab {
     scroll_offset: usize,
 }
 
+impl Default for AnalyticsTab {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AnalyticsTab {
     pub fn new() -> Self {
         Self {
@@ -372,7 +378,7 @@ impl AnalyticsTab {
 
     /// Render token sparkline
     fn render_token_sparkline(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
-        let sparkline_data: Vec<u64> = data.trends.daily_tokens.iter().copied().collect();
+        let sparkline_data: Vec<u64> = data.trends.daily_tokens.to_vec();
 
         let sparkline = Sparkline::default()
             .block(
@@ -508,7 +514,7 @@ impl AnalyticsTab {
     /// Render hourly distribution bar chart
     fn render_hourly_distribution(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
         // Group hours into 6 blocks (4-hour chunks)
-        let mut hour_blocks = vec![0; 6];
+        let mut hour_blocks = [0; 6];
         for (hour, count) in data.patterns.hourly_distribution.iter().enumerate() {
             let block_idx = hour / 4;
             hour_blocks[block_idx] += count;
