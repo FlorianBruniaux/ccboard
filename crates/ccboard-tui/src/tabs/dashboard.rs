@@ -30,6 +30,7 @@ impl DashboardTab {
         stats: Option<&StatsCache>,
         mcp_config: Option<&McpConfig>,
         store: Option<&Arc<DataStore>>,
+        scheme: ccboard_core::models::config::ColorScheme,
     ) {
         // Check if we should show cache hint
         let show_hint = stats
@@ -56,7 +57,7 @@ impl DashboardTab {
             .split(area);
 
         // Stats cards (6 columns now)
-        self.render_stats_row(frame, chunks[0], stats, mcp_config, store);
+        self.render_stats_row(frame, chunks[0], stats, mcp_config, store, scheme);
 
         // Activity sparkline
         self.render_activity(frame, chunks[1], stats);
@@ -83,6 +84,7 @@ impl DashboardTab {
         stats: Option<&StatsCache>,
         mcp_config: Option<&McpConfig>,
         store: Option<&Arc<DataStore>>,
+        scheme: ccboard_core::models::config::ColorScheme,
     ) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -130,7 +132,7 @@ impl DashboardTab {
                     format!("{:.1}%", pct)
                 };
 
-                (display, color_theme.to_color())
+                (display, color_theme.to_color(scheme))
             })
             .unwrap_or_else(|| ("—".into(), Color::DarkGray));
 
@@ -441,22 +443,17 @@ impl DashboardTab {
     }
 
     fn render_cache_hint(&self, frame: &mut Frame, area: Rect) {
-        let hint_text = vec![
-            Line::from(vec![
-                Span::styled("💡 ", Style::default().fg(Color::Yellow)),
-                Span::styled(
-                    "Stats look wrong? Run ",
-                    Style::default().fg(Color::Yellow),
-                ),
-                Span::styled(
-                    "ccboard clear-cache",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" to rebuild metadata.", Style::default().fg(Color::Yellow)),
-            ]),
-        ];
+        let hint_text = vec![Line::from(vec![
+            Span::styled("💡 ", Style::default().fg(Color::Yellow)),
+            Span::styled("Stats look wrong? Run ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                "ccboard clear-cache",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" to rebuild metadata.", Style::default().fg(Color::Yellow)),
+        ])];
 
         let hint = Paragraph::new(hint_text)
             .alignment(Alignment::Center)

@@ -41,9 +41,9 @@ impl AgentType {
 
     fn icon(&self) -> &'static str {
         match self {
-            AgentType::Agent => "◉",
-            AgentType::Command => "▶",
-            AgentType::Skill => "★",
+            AgentType::Agent => "🤖",   // Robot - AI agents
+            AgentType::Command => "⚡", // Lightning - quick commands
+            AgentType::Skill => "✨",   // Sparkles - capabilities
         }
     }
 
@@ -93,6 +93,21 @@ impl AgentsTab {
             skills: Vec::new(),
             show_detail: false,
             error_message: None,
+        }
+    }
+
+    /// Get current sub-tab index
+    pub fn current_sub_tab(&self) -> usize {
+        self.sub_tab
+    }
+
+    /// Get current sub-tab label
+    pub fn current_sub_tab_label(&self) -> &'static str {
+        match self.sub_tab {
+            0 => "Agents",
+            1 => "Commands",
+            2 => "Skills",
+            _ => "Unknown",
         }
     }
 
@@ -347,11 +362,16 @@ impl AgentsTab {
     }
 
     /// Render the agents tab
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
-        // Layout: sub-tabs header | content
+    pub fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        scheme: ccboard_core::models::config::ColorScheme,
+    ) {
+        // Layout: sub-tabs header (2 lines with padding) | content
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Min(0)])
+            .constraints([Constraint::Length(4), Constraint::Min(0)])
             .split(area);
 
         // Render sub-tabs

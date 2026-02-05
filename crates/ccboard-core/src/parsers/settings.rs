@@ -107,7 +107,10 @@ impl SettingsParser {
             None
         };
 
-        if global.is_some() || global_local.is_some() || project.is_some() || project_local.is_some()
+        if global.is_some()
+            || global_local.is_some()
+            || project.is_some()
+            || project_local.is_some()
         {
             report.settings_loaded = true;
         }

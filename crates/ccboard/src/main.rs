@@ -73,18 +73,29 @@ async fn main() -> Result<()> {
         .or_else(|| dirs::home_dir().map(|h: PathBuf| h.join(".claude")))
         .context("Could not determine Claude home directory")?;
 
+    // Auto-detect project: if no --project specified, try current directory
+    let project = cli.project.or_else(|| {
+        let current_dir = std::env::current_dir().ok()?;
+        // Check if current directory has a .claude/ subdirectory
+        if current_dir.join(".claude").exists() {
+            Some(current_dir)
+        } else {
+            None
+        }
+    });
+
     match cli.mode.unwrap_or(Mode::Tui) {
         Mode::Tui => {
-            run_tui(claude_home, cli.project).await?;
+            run_tui(claude_home, project).await?;
         }
         Mode::Web { port } => {
-            run_web(claude_home, cli.project, port).await?;
+            run_web(claude_home, project, port).await?;
         }
         Mode::Both { port } => {
-            run_both(claude_home, cli.project, port).await?;
+            run_both(claude_home, project, port).await?;
         }
         Mode::Stats => {
-            run_stats(claude_home, cli.project).await?;
+            run_stats(claude_home, project).await?;
         }
         Mode::ClearCache => {
             run_clear_cache(claude_home).await?;

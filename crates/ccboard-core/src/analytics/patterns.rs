@@ -31,6 +31,11 @@ pub struct UsagePatterns {
     pub hourly_distribution: [usize; 24],
     /// Weekday distribution (sessions per weekday, 0-6)
     pub weekday_distribution: [usize; 7],
+    /// Activity heatmap: [weekday][hour] = session count
+    /// weekday: 0-6 (Mon-Sun), hour: 0-23
+    pub activity_heatmap: [[usize; 24]; 7],
+    /// Tool usage statistics: tool name -> call count
+    pub tool_usage: HashMap<String, usize>,
 }
 
 impl UsagePatterns {
@@ -46,6 +51,8 @@ impl UsagePatterns {
             peak_hours: Vec::new(),
             hourly_distribution: [0; 24],
             weekday_distribution: [0; 7],
+            activity_heatmap: [[0; 24]; 7],
+            tool_usage: HashMap::new(),
         }
     }
 }
@@ -78,6 +85,8 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
 
     let mut hourly_counts = [0usize; 24];
     let mut weekday_counts = [0usize; 7];
+    let mut activity_heatmap = [[0usize; 24]; 7];
+    let mut tool_usage: HashMap<String, usize> = HashMap::new();
     let mut total_duration = Duration::from_secs(0);
     let mut duration_count = 0usize;
     let mut model_tokens: HashMap<String, u64> = HashMap::new();
@@ -88,7 +97,7 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
     let cutoff = now - chrono::Duration::days(days as i64);
 
     for session in sessions {
-        // Hourly distribution
+        // Hourly distribution & heatmap
         if let Some(ts) = session.first_timestamp {
             let local_ts = ts.with_timezone(&Local);
 
@@ -97,8 +106,19 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
                 continue;
             }
 
-            hourly_counts[local_ts.hour() as usize] += 1;
-            weekday_counts[local_ts.weekday().num_days_from_monday() as usize] += 1;
+            let hour = local_ts.hour() as usize;
+            let weekday = local_ts.weekday().num_days_from_monday() as usize;
+
+            hourly_counts[hour] += 1;
+            weekday_counts[weekday] += 1;
+            activity_heatmap[weekday][hour] += 1;
+        }
+
+        // Tool usage stats - TODO: Extract from session JSONL content
+        // For now, we'll use model names as a proxy for "tools"
+        // This could be enhanced later to parse actual tool_calls from JSONL
+        for model in &session.models_used {
+            *tool_usage.entry(model.clone()).or_default() += 1;
         }
 
         // Session duration
@@ -110,11 +130,21 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
         }
 
         // Model distribution (tokens + cost)
-        for model in &session.models_used {
-            *model_tokens.entry(model.clone()).or_default() += session.total_tokens;
-
+        // Divide tokens equally among models used in this session
+        if session.models_used.is_empty() {
+            // No model info: attribute to "unknown"
+            *model_tokens.entry("unknown".to_string()).or_default() += session.total_tokens;
+            *model_costs.entry("unknown".to_string()).or_default() += estimate_cost(session);
+        } else {
+            let models_count = session.models_used.len() as u64;
+            let tokens_per_model = session.total_tokens / models_count;
             let cost = estimate_cost(session);
-            *model_costs.entry(model.clone()).or_default() += cost;
+            let cost_per_model = cost / models_count as f64;
+
+            for model in &session.models_used {
+                *model_tokens.entry(model.clone()).or_default() += tokens_per_model;
+                *model_costs.entry(model.clone()).or_default() += cost_per_model;
+            }
         }
     }
 
@@ -190,5 +220,7 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
         peak_hours,
         hourly_distribution: hourly_counts,
         weekday_distribution: weekday_counts,
+        activity_heatmap,
+        tool_usage,
     }
 }

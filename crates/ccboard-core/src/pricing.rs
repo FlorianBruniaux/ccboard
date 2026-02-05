@@ -23,8 +23,8 @@
 //! assert_eq!(cost, 33.75);
 //! ```
 
-use std::collections::HashMap;
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 /// Pricing structure for a Claude model
 ///

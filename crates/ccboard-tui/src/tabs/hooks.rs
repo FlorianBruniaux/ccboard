@@ -290,7 +290,13 @@ impl HooksTab {
     }
 
     /// Render the hooks tab
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, settings: &Settings) {
+    pub fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        settings: &Settings,
+        scheme: ccboard_core::models::config::ColorScheme,
+    ) {
         let hooks = settings.hooks.as_ref();
 
         // Update event names cache

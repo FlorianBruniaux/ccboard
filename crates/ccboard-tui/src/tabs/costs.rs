@@ -94,7 +94,7 @@ impl SortMode {
 pub struct CostsTab {
     /// Selected model index
     model_state: ListState,
-    /// View mode (0=Overview, 1=By Model, 2=Daily)
+    /// View mode (0=Overview, 1=By Model, 2=Daily, 3=Billing Blocks, 4=Leaderboard)
     view_mode: usize,
     /// Sort mode
     sort_mode: SortMode,
@@ -124,10 +124,10 @@ impl CostsTab {
 
         match key {
             KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
-                self.view_mode = (self.view_mode + 1) % 4;
+                self.view_mode = (self.view_mode + 1) % 5;
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                self.view_mode = (self.view_mode + 3) % 4; // +3 instead of -1 for wrapping
+                self.view_mode = (self.view_mode + 4) % 5; // +4 instead of -1 for wrapping
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 let current = self.model_state.selected().unwrap_or(0);
@@ -152,6 +152,8 @@ impl CostsTab {
         area: Rect,
         stats: Option<&StatsCache>,
         billing_blocks: Option<&BillingBlockManager>,
+        scheme: ccboard_core::models::config::ColorScheme,
+        store: Option<&ccboard_core::store::DataStore>,
     ) {
         // Main layout
         let chunks = Layout::default()
@@ -171,6 +173,7 @@ impl CostsTab {
             1 => self.render_by_model(frame, chunks[1], stats),
             2 => self.render_daily(frame, chunks[1], stats),
             3 => self.render_billing_blocks(frame, chunks[1], billing_blocks),
+            4 => self.render_leaderboard(frame, chunks[1], store),
             _ => {}
         }
     }
@@ -181,6 +184,7 @@ impl CostsTab {
             "2. By Model",
             "3. Daily",
             "4. Billing Blocks",
+            "5. Leaderboard",
         ];
 
         let block = Block::default()
@@ -192,7 +196,7 @@ impl CostsTab {
 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Ratio(1, 4); 4])
+            .constraints(vec![Constraint::Ratio(1, 5); 5])
             .split(inner);
 
         for (i, (tab, chunk)) in tabs.iter().zip(chunks.iter()).enumerate() {
@@ -850,5 +854,258 @@ impl CostsTab {
         } else {
             n.to_string()
         }
+    }
+
+    fn render_leaderboard(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        store: Option<&ccboard_core::store::DataStore>,
+    ) {
+        let Some(store) = store else {
+            let no_data = Paragraph::new("No data available for leaderboard")
+                .block(
+                    Block::default()
+                        .title("Token Leaderboard")
+                        .borders(Borders::ALL),
+                )
+                .style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(no_data, area);
+            return;
+        };
+
+        // Main layout: 3 sections (sessions, models, days)
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(34),
+            ])
+            .split(area);
+
+        // Section 1: Top 10 Sessions by tokens
+        self.render_top_sessions(frame, chunks[0], store);
+
+        // Section 2: Top 10 Models by tokens
+        self.render_top_models(frame, chunks[1], store);
+
+        // Section 3: Top 10 Days by tokens
+        self.render_top_days(frame, chunks[2], store);
+    }
+
+    fn render_top_sessions(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        store: &ccboard_core::store::DataStore,
+    ) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(Span::styled(
+                " Top 10 Sessions by Tokens ",
+                Style::default().fg(Color::White).bold(),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let top_sessions = store.top_sessions_by_tokens(10);
+
+        if top_sessions.is_empty() {
+            let empty =
+                Paragraph::new("No sessions available").style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(empty, inner);
+            return;
+        }
+
+        let rows: Vec<Row> = top_sessions
+            .iter()
+            .enumerate()
+            .map(|(i, session)| {
+                let medal = match i {
+                    0 => "🥇",
+                    1 => "🥈",
+                    2 => "🥉",
+                    _ => "  ",
+                };
+
+                let session_name = session
+                    .first_user_message
+                    .as_ref()
+                    .map(|s| {
+                        let truncated = if s.len() > 40 {
+                            format!("{}...", &s[..37])
+                        } else {
+                            s.clone()
+                        };
+                        truncated
+                    })
+                    .unwrap_or_else(|| session.id[..session.id.len().min(20)].to_string());
+
+                Row::new(vec![
+                    medal.to_string(),
+                    format!("{}", i + 1),
+                    session_name,
+                    Self::format_tokens(session.total_tokens),
+                ])
+            })
+            .collect();
+
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Length(3),  // Medal
+                Constraint::Length(4),  // Rank
+                Constraint::Min(30),    // Session name
+                Constraint::Length(12), // Tokens
+            ],
+        )
+        .header(
+            Row::new(vec!["", "#", "Session", "Tokens"]).style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        )
+        .column_spacing(1);
+
+        frame.render_widget(table, inner);
+    }
+
+    fn render_top_models(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        store: &ccboard_core::store::DataStore,
+    ) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(Span::styled(
+                " Top 10 Models by Tokens ",
+                Style::default().fg(Color::White).bold(),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let top_models = store.top_models_by_tokens();
+
+        if top_models.is_empty() {
+            let empty = Paragraph::new("No model data available")
+                .style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(empty, inner);
+            return;
+        }
+
+        let rows: Vec<Row> = top_models
+            .iter()
+            .enumerate()
+            .map(|(i, (model, tokens))| {
+                let medal = match i {
+                    0 => "🥇",
+                    1 => "🥈",
+                    2 => "🥉",
+                    _ => "  ",
+                };
+
+                Row::new(vec![
+                    medal.to_string(),
+                    format!("{}", i + 1),
+                    Self::format_model_name(model),
+                    Self::format_tokens(*tokens),
+                ])
+            })
+            .collect();
+
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Length(3),  // Medal
+                Constraint::Length(4),  // Rank
+                Constraint::Min(20),    // Model name
+                Constraint::Length(12), // Tokens
+            ],
+        )
+        .header(
+            Row::new(vec!["", "#", "Model", "Tokens"]).style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        )
+        .column_spacing(1);
+
+        frame.render_widget(table, inner);
+    }
+
+    fn render_top_days(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        store: &ccboard_core::store::DataStore,
+    ) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(Span::styled(
+                " Top 10 Days by Tokens ",
+                Style::default().fg(Color::White).bold(),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let top_days = store.top_days_by_tokens();
+
+        if top_days.is_empty() {
+            let empty = Paragraph::new("No daily data available")
+                .style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(empty, inner);
+            return;
+        }
+
+        let rows: Vec<Row> = top_days
+            .iter()
+            .enumerate()
+            .map(|(i, (date, tokens))| {
+                let medal = match i {
+                    0 => "🥇",
+                    1 => "🥈",
+                    2 => "🥉",
+                    _ => "  ",
+                };
+
+                Row::new(vec![
+                    medal.to_string(),
+                    format!("{}", i + 1),
+                    date.clone(),
+                    Self::format_tokens(*tokens),
+                ])
+            })
+            .collect();
+
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Length(3),  // Medal
+                Constraint::Length(4),  // Rank
+                Constraint::Length(12), // Date
+                Constraint::Length(12), // Tokens
+            ],
+        )
+        .header(
+            Row::new(vec!["", "#", "Date", "Tokens"]).style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        )
+        .column_spacing(1);
+
+        frame.render_widget(table, inner);
     }
 }

@@ -8,6 +8,7 @@
 //! - 🔵 Cyan: Selected, Focus, Interactive
 //! - 🟣 Magenta: High value, Important
 
+use ccboard_core::models::config::ColorScheme;
 use ratatui::style::Color;
 
 /// Status color palette following k9s/lazygit conventions
@@ -28,15 +29,25 @@ pub enum StatusColor {
 }
 
 impl StatusColor {
-    /// Convert to Ratatui Color
-    pub fn to_color(self) -> Color {
-        match self {
-            StatusColor::Success => Color::Green,
-            StatusColor::Error => Color::Red,
-            StatusColor::Warning => Color::Yellow,
-            StatusColor::Neutral => Color::DarkGray,
-            StatusColor::Focus => Color::Cyan,
-            StatusColor::Important => Color::Magenta,
+    /// Convert to Ratatui Color based on color scheme
+    pub fn to_color(self, scheme: ColorScheme) -> Color {
+        match scheme {
+            ColorScheme::Dark => match self {
+                StatusColor::Success => Color::Green,
+                StatusColor::Error => Color::Red,
+                StatusColor::Warning => Color::Yellow,
+                StatusColor::Neutral => Color::DarkGray,
+                StatusColor::Focus => Color::Cyan,
+                StatusColor::Important => Color::Magenta,
+            },
+            ColorScheme::Light => match self {
+                StatusColor::Success => Color::Rgb(0, 128, 0), // Dark green
+                StatusColor::Error => Color::Rgb(200, 0, 0),   // Dark red
+                StatusColor::Warning => Color::Rgb(180, 120, 0), // Dark yellow/orange
+                StatusColor::Neutral => Color::Gray,
+                StatusColor::Focus => Color::Rgb(0, 128, 128), // Dark cyan
+                StatusColor::Important => Color::Rgb(128, 0, 128), // Dark magenta
+            },
         }
     }
 }
@@ -49,11 +60,11 @@ pub enum ServerStatusColor {
 }
 
 impl ServerStatusColor {
-    pub fn to_color(self) -> Color {
+    pub fn to_color(self, scheme: ColorScheme) -> Color {
         match self {
-            ServerStatusColor::Running => StatusColor::Success.to_color(),
-            ServerStatusColor::Stopped => StatusColor::Error.to_color(),
-            ServerStatusColor::Unknown => StatusColor::Neutral.to_color(),
+            ServerStatusColor::Running => StatusColor::Success.to_color(scheme),
+            ServerStatusColor::Stopped => StatusColor::Error.to_color(scheme),
+            ServerStatusColor::Unknown => StatusColor::Neutral.to_color(scheme),
         }
     }
 
@@ -74,11 +85,11 @@ pub enum SessionStatusColor {
 }
 
 impl SessionStatusColor {
-    pub fn to_color(self) -> Color {
+    pub fn to_color(self, scheme: ColorScheme) -> Color {
         match self {
-            SessionStatusColor::Active => StatusColor::Focus.to_color(),
-            SessionStatusColor::Completed => StatusColor::Success.to_color(),
-            SessionStatusColor::Error => StatusColor::Error.to_color(),
+            SessionStatusColor::Active => StatusColor::Focus.to_color(scheme),
+            SessionStatusColor::Completed => StatusColor::Success.to_color(scheme),
+            SessionStatusColor::Error => StatusColor::Error.to_color(scheme),
         }
     }
 
@@ -99,11 +110,11 @@ pub enum HookEventColor {
 }
 
 impl HookEventColor {
-    pub fn to_color(self) -> Color {
+    pub fn to_color(self, scheme: ColorScheme) -> Color {
         match self {
-            HookEventColor::PreToolUse => StatusColor::Focus.to_color(),
-            HookEventColor::UserPromptSubmit => StatusColor::Success.to_color(),
-            HookEventColor::Other => StatusColor::Neutral.to_color(),
+            HookEventColor::PreToolUse => StatusColor::Focus.to_color(scheme),
+            HookEventColor::UserPromptSubmit => StatusColor::Success.to_color(scheme),
+            HookEventColor::Other => StatusColor::Neutral.to_color(scheme),
         }
     }
 }
@@ -129,11 +140,11 @@ impl CostLevelColor {
         }
     }
 
-    pub fn to_color(self) -> Color {
+    pub fn to_color(self, scheme: ColorScheme) -> Color {
         match self {
-            CostLevelColor::Low => StatusColor::Success.to_color(),
-            CostLevelColor::Medium => StatusColor::Warning.to_color(),
-            CostLevelColor::High => StatusColor::Error.to_color(),
+            CostLevelColor::Low => StatusColor::Success.to_color(scheme),
+            CostLevelColor::Medium => StatusColor::Warning.to_color(scheme),
+            CostLevelColor::High => StatusColor::Error.to_color(scheme),
         }
     }
 }
@@ -159,11 +170,11 @@ impl UsageIntensityColor {
         }
     }
 
-    pub fn to_color(self) -> Color {
+    pub fn to_color(self, scheme: ColorScheme) -> Color {
         match self {
-            UsageIntensityColor::Low => StatusColor::Success.to_color(),
-            UsageIntensityColor::Medium => StatusColor::Warning.to_color(),
-            UsageIntensityColor::High => StatusColor::Important.to_color(),
+            UsageIntensityColor::Low => StatusColor::Success.to_color(scheme),
+            UsageIntensityColor::Medium => StatusColor::Warning.to_color(scheme),
+            UsageIntensityColor::High => StatusColor::Important.to_color(scheme),
         }
     }
 }
@@ -189,11 +200,11 @@ impl ContextSaturationColor {
         }
     }
 
-    pub fn to_color(self) -> Color {
+    pub fn to_color(self, scheme: ColorScheme) -> Color {
         match self {
-            ContextSaturationColor::Safe => StatusColor::Success.to_color(), // Green
-            ContextSaturationColor::Warning => StatusColor::Warning.to_color(), // Yellow
-            ContextSaturationColor::Critical => StatusColor::Error.to_color(), // Red
+            ContextSaturationColor::Safe => StatusColor::Success.to_color(scheme), // Green
+            ContextSaturationColor::Warning => StatusColor::Warning.to_color(scheme), // Yellow
+            ContextSaturationColor::Critical => StatusColor::Error.to_color(scheme), // Red
         }
     }
 
@@ -228,11 +239,11 @@ impl StalenessColor {
         }
     }
 
-    pub fn to_color(self) -> Color {
+    pub fn to_color(self, scheme: ColorScheme) -> Color {
         match self {
-            StalenessColor::Fresh => StatusColor::Success.to_color(),
-            StalenessColor::Aging => StatusColor::Warning.to_color(),
-            StalenessColor::Stale => StatusColor::Error.to_color(),
+            StalenessColor::Fresh => StatusColor::Success.to_color(scheme),
+            StalenessColor::Aging => StatusColor::Warning.to_color(scheme),
+            StalenessColor::Stale => StatusColor::Error.to_color(scheme),
         }
     }
 }
@@ -242,18 +253,50 @@ pub struct FocusStyle;
 
 impl FocusStyle {
     /// Border color for focused pane
-    pub fn focused_border() -> Color {
-        StatusColor::Focus.to_color()
+    pub fn focused_border(scheme: ColorScheme) -> Color {
+        StatusColor::Focus.to_color(scheme)
     }
 
     /// Border color for unfocused pane
-    pub fn unfocused_border() -> Color {
-        StatusColor::Neutral.to_color()
+    pub fn unfocused_border(scheme: ColorScheme) -> Color {
+        StatusColor::Neutral.to_color(scheme)
     }
 
     /// Background for focused item
-    pub fn focused_bg() -> Color {
-        Color::DarkGray
+    pub fn focused_bg(scheme: ColorScheme) -> Color {
+        match scheme {
+            ColorScheme::Dark => Color::DarkGray,
+            ColorScheme::Light => Color::Rgb(220, 220, 220), // Light gray
+        }
+    }
+}
+
+/// Base color helpers for backgrounds and foregrounds
+pub struct BaseColors;
+
+impl BaseColors {
+    /// Primary background color
+    pub fn bg(scheme: ColorScheme) -> Color {
+        match scheme {
+            ColorScheme::Dark => Color::Black,
+            ColorScheme::Light => Color::White,
+        }
+    }
+
+    /// Primary foreground/text color
+    pub fn fg(scheme: ColorScheme) -> Color {
+        match scheme {
+            ColorScheme::Dark => Color::White,
+            ColorScheme::Light => Color::Black,
+        }
+    }
+
+    /// Muted/secondary text color
+    pub fn muted(scheme: ColorScheme) -> Color {
+        match scheme {
+            ColorScheme::Dark => Color::DarkGray,
+            ColorScheme::Light => Color::Gray,
+        }
     }
 }
 

@@ -294,7 +294,11 @@ mod token_tests {
 
         let result: Result<TokenUsage, _> = serde_json::from_str(json);
 
-        assert!(result.is_ok(), "Deserialization MUST succeed for real Claude format. Error: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Deserialization MUST succeed for real Claude format. Error: {:?}",
+            result.err()
+        );
 
         let usage = result.unwrap();
         assert_eq!(usage.input_tokens, 10);

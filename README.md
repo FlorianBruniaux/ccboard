@@ -56,7 +56,7 @@
 - **Analytics**: Advanced analytics with 4 sub-views
   - **Overview**: Monthly budget tracking with visual alerts (⚠️ warnings at threshold)
   - **Trends**: Time series charts with 30-day forecasting (confidence-based coloring)
-  - **Patterns**: Usage patterns, peak hours, model distribution, session duration stats
+  - **Patterns**: Activity heatmap (7 days × 24h, GitHub-style), Most Used Tools bar chart, model distribution, session duration stats
   - **Insights**: Actionable recommendations for cost optimization
 
 🚀 **Performance First**
@@ -622,7 +622,7 @@ Startup performance improvements from profiling and optimization (Phases 0-3):
 - Concurrent directory scanning with tokio::spawn
 - Lazy session content loading (metadata-only scan)
 
-For detailed architecture documentation, see [PLAN.md](PLAN.md).
+For detailed architecture documentation, see [PLAN.md](claudedocs/PLAN.md).
 
 ---
 
@@ -756,7 +756,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - Write operations (session editing, config updates)
 - 100K+ sessions scalability testing
 
-For detailed roadmap, see [PLAN.md](PLAN.md).
+For detailed roadmap, see [PLAN.md](claudedocs/PLAN.md).
 
 ---
 
@@ -790,7 +790,7 @@ This project was developed following Test-Driven Development (TDD) principles wi
 - **Issues**: https://github.com/FlorianBruniaux/ccboard/issues
 - **Releases**: https://github.com/FlorianBruniaux/ccboard/releases
 - **Crates.io**: https://crates.io/crates/ccboard (coming soon)
-- **Documentation**: [PLAN.md](PLAN.md) | [CHANGELOG.md](CHANGELOG.md)
+- **Documentation**: [PLAN.md](claudedocs/PLAN.md) | [CHANGELOG.md](CHANGELOG.md)
 
 ---
 

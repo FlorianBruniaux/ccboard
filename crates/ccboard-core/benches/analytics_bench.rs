@@ -30,6 +30,10 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
                 last_timestamp: Some(ts + chrono::Duration::minutes(30)),
                 message_count: 10,
                 total_tokens: 1000 + (i as u64 * 100),
+                input_tokens: 500 + (i as u64 * 50),
+                output_tokens: 500 + (i as u64 * 50),
+                cache_creation_tokens: 0,
+                cache_read_tokens: 0,
                 models_used: vec!["sonnet".to_string()],
                 file_size_bytes: 1024 * (i as u64 + 1),
                 first_user_message: None,
@@ -88,7 +92,7 @@ fn patterns_benchmark(c: &mut Criterion) {
             &sessions,
             |b, sessions| {
                 b.iter(|| {
-                    black_box(detect_patterns(sessions));
+                    black_box(detect_patterns(sessions, 30));
                 });
             },
         );
@@ -101,7 +105,7 @@ fn patterns_benchmark(c: &mut Criterion) {
 fn insights_benchmark(c: &mut Criterion) {
     let sessions = generate_test_sessions(1000, 30);
     let trends = compute_trends(&sessions, 30);
-    let patterns = detect_patterns(&sessions);
+    let patterns = detect_patterns(&sessions, 30);
     let forecast = forecast_usage(&trends);
 
     c.bench_function("generate_insights", |b| {

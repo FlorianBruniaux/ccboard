@@ -10,17 +10,9 @@ use super::trends::TrendsData;
 #[derive(Debug, Clone)]
 pub enum Alert {
     /// Budget warning (current cost approaching budget)
-    BudgetWarning {
-        current: f64,
-        budget: f64,
-        pct: f64,
-    },
+    BudgetWarning { current: f64, budget: f64, pct: f64 },
     /// Usage spike (day with tokens > 2x average)
-    UsageSpike {
-        day: String,
-        tokens: u64,
-        avg: u64,
-    },
+    UsageSpike { day: String, tokens: u64, avg: u64 },
     /// Projected budget overage
     ProjectedOverage {
         forecast: f64,
@@ -179,7 +171,8 @@ pub fn generate_budget_alerts(
 
     // 3. Usage spikes (tokens > 2x average)
     if !trends.daily_tokens.is_empty() {
-        let avg_tokens: u64 = trends.daily_tokens.iter().sum::<u64>() / trends.daily_tokens.len() as u64;
+        let avg_tokens: u64 =
+            trends.daily_tokens.iter().sum::<u64>() / trends.daily_tokens.len() as u64;
 
         for (i, &tokens) in trends.daily_tokens.iter().enumerate() {
             if tokens > avg_tokens * 2 {

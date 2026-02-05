@@ -1,0 +1,6 @@
+{
+  "budget": {
+    "monthlyBudgetUsd": 50.0,
+    "alertThresholdPct": 80.0
+  }
+}

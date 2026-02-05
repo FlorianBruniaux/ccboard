@@ -1,7 +1,7 @@
 # ccboard Architecture
 
 **Version**: 0.2.0
-**Last Updated**: 2026-02-04
+**Last Updated**: 2026-02-05
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
@@ -823,7 +823,7 @@ When making architectural changes:
 
 ## References
 
-- [PLAN.md](PLAN.md) - Development phases and post-mortems
+- [PLAN.md](claudedocs/PLAN.md) - Development phases and post-mortems
 - [CLAUDE.md](CLAUDE.md) - Project instructions and constraints
 - [README.md](README.md) - User-facing documentation
 - [Ratatui Book](https://ratatui.rs/)

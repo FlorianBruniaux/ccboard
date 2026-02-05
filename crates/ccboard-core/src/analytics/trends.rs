@@ -235,11 +235,11 @@ fn compute_duration_stats(durations: &[u64]) -> SessionDurationStats {
     for &duration in durations {
         let minutes = duration / 60;
         let bucket = match minutes {
-            0..=4 => 0,      // 0-5m
-            5..=14 => 1,     // 5-15m
-            15..=29 => 2,    // 15-30m
-            30..=59 => 3,    // 30-60m
-            _ => 4,          // 60m+
+            0..=4 => 0,   // 0-5m
+            5..=14 => 1,  // 5-15m
+            15..=29 => 2, // 15-30m
+            30..=59 => 3, // 30-60m
+            _ => 4,       // 60m+
         };
         distribution[bucket] += 1;
     }

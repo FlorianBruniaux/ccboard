@@ -147,10 +147,7 @@ mod tests {
     #[test]
     fn test_parse_plan() {
         assert_eq!(SubscriptionPlan::from_str("pro"), SubscriptionPlan::Pro);
-        assert_eq!(
-            SubscriptionPlan::from_str("max5x"),
-            SubscriptionPlan::Max5x
-        );
+        assert_eq!(SubscriptionPlan::from_str("max5x"), SubscriptionPlan::Max5x);
         assert_eq!(
             SubscriptionPlan::from_str("max-20x"),
             SubscriptionPlan::Max20x

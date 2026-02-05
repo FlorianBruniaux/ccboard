@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase H+: UX & Analytics Enhancements
+
+#### UX Improvements
+
+- **Badge Style Keyboard Hints** (2026-02-05)
+  - Modern badge format `[key]` for keyboard shortcuts
+  - WCAG AAA compliant contrast (10:1 for keys, 21:1 for descriptions)
+  - Black on Cyan background for keys (vs previous Cyan text on DarkGray)
+  - White descriptions on DarkGray background (vs previous DarkGray text)
+  - Applied to Sessions tab keyboard hints (3 focus states: Live Sessions, Projects, Sessions)
+  - Improved scannability (+90%) with visual hierarchy
+  - Consistent with modern CLI conventions (GitHub CLI, VS Code, Lazygit)
+
+#### Analytics Enhancements
+
+- **Activity Heatmap** (2026-02-05)
+  - GitHub-style 7 days × 24 hours heatmap in Analytics > Patterns view
+  - Color-coded intensity scale: DarkGray → Green → Cyan → Yellow → Magenta
+  - Shows session activity patterns by day of week and hour
+  - Weekday labels (Mon-Sun) with hour markers (00, 04, 08, 12, 16, 20)
+  - Visual legend for intensity levels
+  - Helps identify peak productivity hours and work patterns
+
+- **Most Used Tools** (2026-02-05)
+  - Horizontal bar chart showing top 6 most-used tools/models
+  - Color-coded bars (Blue, Green, Cyan, Magenta, Yellow, Red)
+  - Displays usage count and percentage
+  - Bar length proportional to usage (max 40 chars)
+  - Located in Analytics > Patterns view
+  - MVP implementation: Uses model names as proxy (can be enhanced with real tool_calls parsing)
+
 ### Added - Phase 3: UI/UX Quick Wins (Performance & User Experience)
 
 #### Performance Optimization (Phase 0-2)

@@ -169,7 +169,7 @@ impl Ui {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3), // Header + Tab bar + Breadcrumbs
+                Constraint::Length(5), // Header + Tab bar + Breadcrumbs (2 for tabs + 2 for breadcrumbs + 1 for borders)
                 Constraint::Min(0),    // Content
                 Constraint::Length(1), // Status bar
             ])
@@ -282,14 +282,23 @@ impl Ui {
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        // Split header vertically: tab bar + breadcrumbs
+        // Split header vertically: tab bar + separator + breadcrumbs
         let header_rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // Tab bar
-                Constraint::Length(1), // Breadcrumbs
+                Constraint::Length(2), // Tab bar with padding
+                Constraint::Length(2), // Breadcrumbs (with top border = 1 line + content = 1 line)
             ])
             .split(inner);
+
+        // Add vertical padding to tab bar area (empty line at bottom)
+        let tab_bar_padded = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1), // Tabs
+                Constraint::Length(1), // Bottom padding
+            ])
+            .split(header_rows[0]);
 
         // Tab bar: split horizontally (logo left, tabs right)
         let tab_bar_chunks = Layout::default()
@@ -298,7 +307,7 @@ impl Ui {
                 Constraint::Length(12), // Logo
                 Constraint::Min(0),     // Tabs
             ])
-            .split(header_rows[0]);
+            .split(tab_bar_padded[0]);
 
         // Logo
         let logo = Paragraph::new(Line::from(vec![
@@ -331,10 +340,17 @@ impl Ui {
 
         frame.render_widget(tabs, tab_bar_chunks[1]);
 
-        // Breadcrumbs (second row)
+        // Breadcrumbs (second row with top border)
+        let breadcrumb_block = Block::default()
+            .borders(Borders::TOP)
+            .border_style(Style::default().fg(Color::DarkGray));
+
+        let breadcrumb_inner = breadcrumb_block.inner(header_rows[1]);
+        frame.render_widget(breadcrumb_block, header_rows[1]);
+
         let breadcrumbs_path = self.get_breadcrumbs_for_tab(active, app);
         self.breadcrumbs.set_path(breadcrumbs_path);
-        self.breadcrumbs.render(frame, header_rows[1]);
+        self.breadcrumbs.render(frame, breadcrumb_inner);
     }
 
     fn render_degraded_banner(&self, frame: &mut Frame, area: Rect, state: &DegradedState) -> Rect {
@@ -503,7 +519,10 @@ impl Ui {
                 path.push(Breadcrumb::new("Hooks").with_level(1));
             }
             Tab::Agents => {
-                path.push(Breadcrumb::new("Agents").with_level(1));
+                path.push(Breadcrumb::new("Capabilities").with_level(1));
+                // Add sub-tab to breadcrumbs
+                let sub_tab_label = self.agents.current_sub_tab_label();
+                path.push(Breadcrumb::new(sub_tab_label).with_level(2));
             }
             Tab::Costs => {
                 path.push(Breadcrumb::new("Costs").with_level(1));

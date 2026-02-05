@@ -37,6 +37,10 @@ pub struct HistoryTab {
     export_message: Option<String>,
     /// Vim-style: waiting for second 'g' press
     pending_gg: bool,
+    /// Current position in search history (None = not navigating history)
+    history_index: Option<usize>,
+    /// Temporary buffer for current input while navigating history
+    history_buffer: String,
 }
 
 impl Default for HistoryTab {
@@ -61,6 +65,8 @@ impl HistoryTab {
             show_export_dialog: false,
             export_message: None,
             pending_gg: false,
+            history_index: None,
+            history_buffer: String::new(),
         }
     }
 
@@ -69,20 +75,85 @@ impl HistoryTab {
         &mut self,
         key: crossterm::event::KeyCode,
         sessions: &[Arc<SessionMetadata>],
+        search_history: &mut std::collections::VecDeque<String>,
     ) {
         use crossterm::event::KeyCode;
 
         if self.search_focused {
             match key {
                 KeyCode::Char(c) => {
+                    // Reset history navigation when typing
+                    self.history_index = None;
                     self.search_query.push(c);
                     self.update_filter(sessions);
                 }
                 KeyCode::Backspace => {
+                    // Reset history navigation when editing
+                    self.history_index = None;
                     self.search_query.pop();
                     self.update_filter(sessions);
                 }
-                KeyCode::Enter | KeyCode::Esc => {
+                KeyCode::Up => {
+                    // Navigate backwards through history (newer to older)
+                    if !search_history.is_empty() {
+                        match self.history_index {
+                            None => {
+                                // First time pressing Up: save current input and go to newest entry
+                                self.history_buffer = self.search_query.clone();
+                                self.history_index = Some(0);
+                                self.search_query = search_history[0].clone();
+                            }
+                            Some(idx) => {
+                                // Move to older entry if available
+                                if idx + 1 < search_history.len() {
+                                    self.history_index = Some(idx + 1);
+                                    self.search_query = search_history[idx + 1].clone();
+                                }
+                            }
+                        }
+                        self.update_filter(sessions);
+                    }
+                }
+                KeyCode::Down => {
+                    // Navigate forwards through history (older to newer)
+                    if let Some(idx) = self.history_index {
+                        if idx > 0 {
+                            // Move to newer entry
+                            self.history_index = Some(idx - 1);
+                            self.search_query = search_history[idx - 1].clone();
+                        } else {
+                            // Reached the newest entry, restore original input
+                            self.history_index = None;
+                            self.search_query = self.history_buffer.clone();
+                        }
+                        self.update_filter(sessions);
+                    }
+                }
+                KeyCode::Enter => {
+                    // Add to history if non-empty and not a duplicate of the last entry
+                    if !self.search_query.is_empty() {
+                        let should_add = search_history
+                            .front()
+                            .map(|last| last != &self.search_query)
+                            .unwrap_or(true);
+
+                        if should_add {
+                            search_history.push_front(self.search_query.clone());
+                            // Keep only last 50 searches
+                            if search_history.len() > 50 {
+                                search_history.pop_back();
+                            }
+                        }
+                    }
+                    // Reset history navigation
+                    self.history_index = None;
+                    self.history_buffer.clear();
+                    self.search_focused = false;
+                }
+                KeyCode::Esc => {
+                    // Reset history navigation on exit
+                    self.history_index = None;
+                    self.history_buffer.clear();
                     self.search_focused = false;
                 }
                 _ => {}
@@ -300,6 +371,7 @@ impl HistoryTab {
         area: Rect,
         sessions: &[Arc<SessionMetadata>],
         stats: Option<&StatsCache>,
+        scheme: ccboard_core::models::config::ColorScheme,
     ) {
         // Ensure filtered sessions are initialized
         if self.filtered_sessions.is_empty() && !sessions.is_empty() && self.search_query.is_empty()

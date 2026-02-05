@@ -314,8 +314,11 @@ impl SessionIndexParser {
                                 serde_json::Value::String(s) => s.clone(),
                                 serde_json::Value::Array(blocks) => {
                                     // Extract text from content blocks
-                                    blocks.iter()
-                                        .filter_map(|block| block.get("text").and_then(|t| t.as_str()))
+                                    blocks
+                                        .iter()
+                                        .filter_map(|block| {
+                                            block.get("text").and_then(|t| t.as_str())
+                                        })
                                         .collect::<Vec<_>>()
                                         .join(" ")
                                 }

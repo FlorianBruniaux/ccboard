@@ -230,14 +230,17 @@ impl DataStore {
         debug!("Settings loaded and merged");
     }
 
-    /// Load MCP server configuration
+    /// Load MCP server configuration (global + project-level)
     async fn load_mcp_config(&self, report: &mut LoadReport) {
-        match McpConfig::load(&self.claude_home) {
+        match McpConfig::load_merged(&self.claude_home, self.project_path.as_deref()) {
             Ok(Some(config)) => {
                 let server_count = config.servers.len();
                 let mut guard = self.mcp_config.write();
                 *guard = Some(config);
-                debug!(server_count, "MCP config loaded successfully");
+                debug!(
+                    server_count,
+                    "MCP config loaded successfully (global + project)"
+                );
             }
             Ok(None) => {
                 debug!("No MCP config found (optional)");
@@ -524,6 +527,58 @@ impl DataStore {
         sessions
     }
 
+    /// Get top sessions by total tokens (sorted descending)
+    /// Returns Arc<SessionMetadata> for cheap cloning
+    pub fn top_sessions_by_tokens(&self, limit: usize) -> Vec<Arc<SessionMetadata>> {
+        let mut sessions: Vec<_> = self
+            .sessions
+            .iter()
+            .map(|r| Arc::clone(r.value()))
+            .collect();
+        sessions.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
+        sessions.truncate(limit);
+        sessions
+    }
+
+    /// Get top models by total tokens (aggregated, sorted descending)
+    /// Returns (model_name, total_tokens) pairs
+    pub fn top_models_by_tokens(&self) -> Vec<(String, u64)> {
+        let mut model_totals = std::collections::HashMap::new();
+
+        // Aggregate tokens per model across all sessions
+        for session in self.sessions.iter() {
+            for model in &session.value().models_used {
+                *model_totals.entry(model.clone()).or_insert(0) += session.value().total_tokens;
+            }
+        }
+
+        // Convert to vec and sort
+        let mut results: Vec<_> = model_totals.into_iter().collect();
+        results.sort_by(|a, b| b.1.cmp(&a.1));
+        results.truncate(10); // Top 10
+        results
+    }
+
+    /// Get top days by total tokens (aggregated, sorted descending)
+    /// Returns (date_string, total_tokens) pairs
+    pub fn top_days_by_tokens(&self) -> Vec<(String, u64)> {
+        let mut day_totals = std::collections::HashMap::new();
+
+        // Aggregate tokens per day across all sessions
+        for session in self.sessions.iter() {
+            if let Some(timestamp) = &session.value().first_timestamp {
+                let date = timestamp.format("%Y-%m-%d").to_string();
+                *day_totals.entry(date).or_insert(0) += session.value().total_tokens;
+            }
+        }
+
+        // Convert to vec and sort
+        let mut results: Vec<_> = day_totals.into_iter().collect();
+        results.sort_by(|a, b| b.1.cmp(&a.1));
+        results.truncate(10); // Top 10
+        results
+    }
+
     // ===================
     // Update methods (called by watcher)
     // ===================
@@ -794,7 +849,8 @@ mod tests {
                 input_tokens: total_tokens / 2,
                 output_tokens: total_tokens / 3,
                 cache_creation_tokens: total_tokens / 10,
-                cache_read_tokens: total_tokens - (total_tokens / 2 + total_tokens / 3 + total_tokens / 10),
+                cache_read_tokens: total_tokens
+                    - (total_tokens / 2 + total_tokens / 3 + total_tokens / 10),
                 models_used: vec!["sonnet".to_string()],
                 file_size_bytes: 1024,
                 first_user_message: None,
@@ -823,5 +879,71 @@ mod tests {
         store.compute_analytics(Period::last_30d()).await;
         let analytics2 = store.analytics().expect("Analytics should be re-cached");
         assert_eq!(analytics2.period, Period::last_30d());
+    }
+
+    #[tokio::test]
+    async fn test_leaderboard_methods() {
+        use crate::models::session::SessionMetadata;
+        use chrono::Utc;
+
+        let dir = tempdir().unwrap();
+        let store = DataStore::with_defaults(dir.path().to_path_buf(), None);
+
+        let now = Utc::now();
+
+        // Add sessions with varying tokens
+        let test_data = vec![
+            ("session-1", 5000u64, "opus", 0),
+            ("session-2", 3000u64, "sonnet", 1),
+            ("session-3", 8000u64, "haiku", 0),
+            ("session-4", 2000u64, "sonnet", 2),
+            ("session-5", 10000u64, "opus", 0),
+        ];
+
+        for (id, tokens, model, days_ago) in test_data {
+            let session = SessionMetadata {
+                id: id.to_string(),
+                file_path: std::path::PathBuf::from(format!("/{}.jsonl", id)),
+                project_path: "/test".to_string(),
+                first_timestamp: Some(now - chrono::Duration::days(days_ago)),
+                last_timestamp: Some(now),
+                message_count: 10,
+                total_tokens: tokens,
+                input_tokens: tokens / 2,
+                output_tokens: tokens / 2,
+                cache_creation_tokens: 0,
+                cache_read_tokens: 0,
+                models_used: vec![model.to_string()],
+                file_size_bytes: 1024,
+                first_user_message: None,
+                has_subagents: false,
+                duration_seconds: Some(1800),
+            };
+            store.sessions.insert(session.id.clone(), Arc::new(session));
+        }
+
+        // Test top_sessions_by_tokens
+        let top_sessions = store.top_sessions_by_tokens(3);
+        assert_eq!(top_sessions.len(), 3);
+        assert_eq!(top_sessions[0].id, "session-5"); // 10000 tokens
+        assert_eq!(top_sessions[1].id, "session-3"); // 8000 tokens
+        assert_eq!(top_sessions[2].id, "session-1"); // 5000 tokens
+
+        // Test top_models_by_tokens
+        let top_models = store.top_models_by_tokens();
+        assert!(!top_models.is_empty());
+        // opus: 15000 (5000+10000), sonnet: 5000 (3000+2000), haiku: 8000
+        assert_eq!(top_models[0].0, "opus");
+        assert_eq!(top_models[0].1, 15000);
+        assert_eq!(top_models[1].0, "haiku");
+        assert_eq!(top_models[1].1, 8000);
+
+        // Test top_days_by_tokens
+        let top_days = store.top_days_by_tokens();
+        assert!(!top_days.is_empty());
+        // Day 0 (today): 5000+8000+10000 = 23000
+        let today = now.format("%Y-%m-%d").to_string();
+        assert_eq!(top_days[0].0, today);
+        assert_eq!(top_days[0].1, 23000);
     }
 }

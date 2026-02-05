@@ -197,6 +197,55 @@ fn test_patterns_model_distribution_sums_to_one() {
     }
 }
 
+#[test]
+fn test_patterns_multi_model_session_no_double_count() {
+    // Test fix for double-counting bug when session uses multiple models
+    let now = Utc::now();
+    let sessions = vec![Arc::new(SessionMetadata {
+        id: "multi-model".to_string(),
+        file_path: std::path::PathBuf::from("/test/multi.jsonl"),
+        project_path: "/test".to_string(),
+        first_timestamp: Some(now),
+        last_timestamp: Some(now + chrono::Duration::minutes(30)),
+        message_count: 10,
+        total_tokens: 1000, // 1000 tokens split between 2 models
+        input_tokens: 600,
+        output_tokens: 400,
+        cache_creation_tokens: 0,
+        cache_read_tokens: 0,
+        models_used: vec!["sonnet".to_string(), "haiku".to_string()], // 2 models
+        file_size_bytes: 1024,
+        first_user_message: None,
+        has_subagents: false,
+        duration_seconds: Some(1800),
+    })];
+
+    let patterns = detect_patterns(&sessions, 7);
+
+    // Each model should get 500 tokens (1000 / 2)
+    let sonnet_pct = patterns.model_distribution.get("sonnet").unwrap_or(&0.0);
+    let haiku_pct = patterns.model_distribution.get("haiku").unwrap_or(&0.0);
+
+    assert!(
+        (*sonnet_pct - 0.5).abs() < 0.01,
+        "Sonnet should have ~50%, got {}",
+        sonnet_pct
+    );
+    assert!(
+        (*haiku_pct - 0.5).abs() < 0.01,
+        "Haiku should have ~50%, got {}",
+        haiku_pct
+    );
+
+    // Total should be exactly 1.0
+    let sum: f64 = patterns.model_distribution.values().sum();
+    assert!(
+        (sum - 1.0).abs() < 0.001,
+        "Total distribution should be ~1.0, got {}",
+        sum
+    );
+}
+
 // ============================================================================
 // Integration Test (1 test)
 // ============================================================================

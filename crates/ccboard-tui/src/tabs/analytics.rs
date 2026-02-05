@@ -124,6 +124,7 @@ impl AnalyticsTab {
         area: Rect,
         analytics: Option<&AnalyticsData>,
         store: Option<&Arc<DataStore>>,
+        scheme: ccboard_core::models::config::ColorScheme,
     ) {
         use tracing::debug;
 
@@ -249,15 +250,21 @@ impl AnalyticsTab {
     }
 
     /// Render overview sub-view
-    fn render_overview(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, store: Option<&Arc<DataStore>>) {
+    fn render_overview(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        data: &AnalyticsData,
+        store: Option<&Arc<DataStore>>,
+    ) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([
-                Constraint::Length(7),  // Summary cards
-                Constraint::Length(6),  // Budget status
-                Constraint::Length(9),  // Token sparkline
-                Constraint::Min(8),     // Top insights
+                Constraint::Length(7), // Summary cards
+                Constraint::Length(6), // Budget status
+                Constraint::Length(9), // Token sparkline
+                Constraint::Min(8),    // Top insights
             ])
             .split(area);
 
@@ -342,7 +349,13 @@ impl AnalyticsTab {
     }
 
     /// Render budget status with alerts
-    fn render_budget_status(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, store: &Arc<DataStore>) {
+    fn render_budget_status(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        data: &AnalyticsData,
+        store: &Arc<DataStore>,
+    ) {
         use ccboard_core::analytics::generate_budget_alerts;
 
         let settings = store.settings();
@@ -377,7 +390,10 @@ impl AnalyticsTab {
             let mut lines = vec![
                 Line::from(vec![
                     Span::styled("Monthly Est: ", Style::default().fg(Color::Gray)),
-                    Span::styled(format!("${:.2}", current_cost), Style::default().fg(Color::Cyan).bold()),
+                    Span::styled(
+                        format!("${:.2}", current_cost),
+                        Style::default().fg(Color::Cyan).bold(),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("Budget:      ", Style::default().fg(Color::Gray)),
@@ -385,11 +401,17 @@ impl AnalyticsTab {
                     Span::raw(" "),
                     Span::styled(bar, Style::default().fg(bar_color)),
                     Span::raw(" "),
-                    Span::styled(format!("{:.0}%", pct), Style::default().fg(bar_color).bold()),
+                    Span::styled(
+                        format!("{:.0}%", pct),
+                        Style::default().fg(bar_color).bold(),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("Remaining:   ", Style::default().fg(Color::Gray)),
-                    Span::styled(format!("${:.2} ({:.0}%)", remaining, 100.0 - pct), Style::default().fg(Color::White)),
+                    Span::styled(
+                        format!("${:.2} ({:.0}%)", remaining, 100.0 - pct),
+                        Style::default().fg(Color::White),
+                    ),
                 ]),
             ];
 
@@ -398,24 +420,34 @@ impl AnalyticsTab {
                 use ccboard_core::analytics::Alert;
                 match alert {
                     Alert::BudgetWarning { pct, .. } => {
-                        lines.push(Line::from(vec![
-                            Span::raw(""),
-                        ]));
-                        lines.push(Line::from(vec![
-                            Span::styled(format!("{}WARNING: Approaching budget limit ({:.0}%)", status_icon, pct), Style::default().fg(Color::Red).bold()),
-                        ]));
+                        lines.push(Line::from(vec![Span::raw("")]));
+                        lines.push(Line::from(vec![Span::styled(
+                            format!(
+                                "{}WARNING: Approaching budget limit ({:.0}%)",
+                                status_icon, pct
+                            ),
+                            Style::default().fg(Color::Red).bold(),
+                        )]));
                     }
                     Alert::ProjectedOverage { overage, .. } => {
-                        lines.push(Line::from(vec![
-                            Span::styled(format!("💡 TIP: Projected overage: ${:.2} if trend continues", overage), Style::default().fg(Color::Yellow)),
-                        ]));
+                        lines.push(Line::from(vec![Span::styled(
+                            format!(
+                                "💡 TIP: Projected overage: ${:.2} if trend continues",
+                                overage
+                            ),
+                            Style::default().fg(Color::Yellow),
+                        )]));
                     }
                     _ => {}
                 }
             }
 
             let paragraph = Paragraph::new(lines)
-                .block(Block::default().borders(Borders::ALL).title("Budget Status"))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Budget Status"),
+                )
                 .alignment(Alignment::Left);
 
             frame.render_widget(paragraph, area);
@@ -433,7 +465,11 @@ impl AnalyticsTab {
             ];
 
             let paragraph = Paragraph::new(text)
-                .block(Block::default().borders(Borders::ALL).title("Budget Status"))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Budget Status"),
+                )
                 .alignment(Alignment::Center);
 
             frame.render_widget(paragraph, area);
@@ -505,8 +541,8 @@ impl AnalyticsTab {
         let chart_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(8),  // Y-axis labels
-                Constraint::Min(20),    // Chart
+                Constraint::Length(8), // Y-axis labels
+                Constraint::Min(20),   // Chart
             ])
             .split(inner);
 
@@ -517,7 +553,7 @@ impl AnalyticsTab {
         // Calculate vertical spacing to align with sparkline height
         let available_height = chart_layout[0].height as usize;
         let spacing = if available_height >= 3 {
-            (available_height - 1) / 2  // Distribute remaining space
+            (available_height - 1) / 2 // Distribute remaining space
         } else {
             0
         };
@@ -605,7 +641,8 @@ impl AnalyticsTab {
             .collect();
 
         // Forecast line (from last historical point to 30 days ahead)
-        let forecast_data = if data.forecast.unavailable_reason.is_none() && !token_data.is_empty() {
+        let forecast_data = if data.forecast.unavailable_reason.is_none() && !token_data.is_empty()
+        {
             let last_day = token_data.len() as f64 - 1.0;
             let last_tokens = token_data.last().map(|p| p.1).unwrap_or(0.0);
             let forecast_end_tokens = data.forecast.next_30_days_tokens as f64;
@@ -657,7 +694,10 @@ impl AnalyticsTab {
 
             datasets.push(
                 Dataset::default()
-                    .name(format!("Forecast ({:.0}% conf)", data.forecast.confidence * 100.0))
+                    .name(format!(
+                        "Forecast ({:.0}% conf)",
+                        data.forecast.confidence * 100.0
+                    ))
                     .marker(symbols::Marker::Dot)
                     .graph_type(GraphType::Line)
                     .style(Style::default().fg(forecast_color))
@@ -678,7 +718,9 @@ impl AnalyticsTab {
             Span::raw(format!("{}", data.trends.dates.len())),
             Span::styled(
                 "+30d",
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::ITALIC),
             ),
         ];
 
@@ -714,20 +756,201 @@ impl AnalyticsTab {
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
-                Constraint::Percentage(34),
+                Constraint::Length(12), // Activity Heatmap
+                Constraint::Length(12), // Most Used Tools
+                Constraint::Min(8),     // Remaining space for other widgets
             ])
             .split(area);
 
-        // Hourly distribution
-        self.render_hourly_distribution(frame, chunks[0], data);
+        // Activity Heatmap (GitHub-style)
+        self.render_activity_heatmap(frame, chunks[0], data);
 
-        // Model distribution
-        self.render_model_distribution(frame, chunks[1], data);
+        // Most Used Tools (horizontal bar chart)
+        self.render_most_used_tools(frame, chunks[1], data);
 
-        // Session duration stats
-        self.render_duration_stats(frame, chunks[2], data);
+        // Model distribution & duration stats (side by side)
+        let bottom_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(chunks[2]);
+
+        self.render_model_distribution(frame, bottom_chunks[0], data);
+        self.render_duration_stats(frame, bottom_chunks[1], data);
+    }
+
+    /// Render activity heatmap (GitHub-style 7 days x 24 hours)
+    fn render_activity_heatmap(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+        let heatmap = &data.patterns.activity_heatmap;
+
+        // Find max value for color scaling
+        let max_activity = heatmap
+            .iter()
+            .flat_map(|row| row.iter())
+            .max()
+            .copied()
+            .unwrap_or(1);
+
+        // Build heatmap lines: each day is a row
+        let weekday_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        let mut lines = vec![];
+
+        // Header: hour labels (every 4 hours)
+        let header = Line::from(vec![
+            Span::raw("    "),
+            Span::styled("00", Style::default().fg(Color::DarkGray)),
+            Span::raw("   "),
+            Span::styled("04", Style::default().fg(Color::DarkGray)),
+            Span::raw("   "),
+            Span::styled("08", Style::default().fg(Color::DarkGray)),
+            Span::raw("   "),
+            Span::styled("12", Style::default().fg(Color::DarkGray)),
+            Span::raw("   "),
+            Span::styled("16", Style::default().fg(Color::DarkGray)),
+            Span::raw("   "),
+            Span::styled("20", Style::default().fg(Color::DarkGray)),
+        ]);
+        lines.push(header);
+
+        // Heatmap rows (one per weekday)
+        for (day_idx, day_label) in weekday_labels.iter().enumerate() {
+            let mut row_spans = vec![Span::styled(
+                format!("{:<3} ", day_label),
+                Style::default().fg(Color::Gray),
+            )];
+
+            for hour in 0..24 {
+                let activity = heatmap[day_idx][hour];
+                let intensity = if max_activity > 0 {
+                    (activity as f64 / max_activity as f64 * 4.0) as u8
+                } else {
+                    0
+                };
+
+                // Color scale: None -> DarkGray -> Green -> Cyan -> Yellow
+                let color = match intensity {
+                    0 => Color::DarkGray,
+                    1 => Color::Green,
+                    2 => Color::Cyan,
+                    3 => Color::Yellow,
+                    _ => Color::Magenta,
+                };
+
+                row_spans.push(Span::styled("█", Style::default().fg(color)));
+            }
+
+            lines.push(Line::from(row_spans));
+        }
+
+        // Legend
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("█", Style::default().fg(Color::DarkGray)),
+            Span::raw(" Less  "),
+            Span::styled("█", Style::default().fg(Color::Green)),
+            Span::raw(" "),
+            Span::styled("█", Style::default().fg(Color::Cyan)),
+            Span::raw(" "),
+            Span::styled("█", Style::default().fg(Color::Yellow)),
+            Span::raw(" "),
+            Span::styled("█", Style::default().fg(Color::Magenta)),
+            Span::raw(" More"),
+        ]));
+
+        let paragraph = Paragraph::new(lines)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Activity Heatmap (Sessions by Day & Hour)"),
+            )
+            .alignment(Alignment::Left);
+
+        frame.render_widget(paragraph, area);
+    }
+
+    /// Render most used tools (horizontal bar chart)
+    fn render_most_used_tools(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+        // Sort tools by usage count (descending)
+        let mut tools: Vec<(&String, &usize)> = data.patterns.tool_usage.iter().collect();
+        tools.sort_by(|a, b| b.1.cmp(a.1));
+
+        // Take top 6 tools
+        let top_tools: Vec<(&str, usize)> = tools
+            .iter()
+            .take(6)
+            .map(|(name, count)| (name.as_str(), **count))
+            .collect();
+
+        if top_tools.is_empty() {
+            // No tool data available
+            let text = vec![Line::from(Span::styled(
+                "No tool usage data available",
+                Style::default().fg(Color::DarkGray),
+            ))];
+            let paragraph = Paragraph::new(text)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Most Used Tools"),
+                )
+                .alignment(Alignment::Center);
+            frame.render_widget(paragraph, area);
+            return;
+        }
+
+        // Calculate percentages
+        let total: usize = tools.iter().map(|(_, count)| **count).sum();
+        let max_count = top_tools.iter().map(|(_, count)| *count).max().unwrap_or(1);
+
+        let mut lines = vec![];
+        let colors = [
+            Color::Blue,
+            Color::Green,
+            Color::Cyan,
+            Color::Magenta,
+            Color::Yellow,
+            Color::Red,
+        ];
+
+        for (i, (tool_name, count)) in top_tools.iter().enumerate() {
+            let pct = if total > 0 {
+                *count as f64 / total as f64 * 100.0
+            } else {
+                0.0
+            };
+
+            // Bar length proportional to count (max 40 chars)
+            let bar_len = ((*count as f64 / max_count as f64) * 40.0) as usize;
+            let bar = "━".repeat(bar_len);
+
+            let color = colors[i % colors.len()];
+
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("{:<15}", tool_name),
+                    Style::default().fg(Color::White),
+                ),
+                Span::styled(bar, Style::default().fg(color)),
+                Span::raw(" "),
+                Span::styled(
+                    format!("{} ", count),
+                    Style::default().fg(color).bold(),
+                ),
+                Span::styled(
+                    format!("{:.1}%", pct),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]));
+        }
+
+        let paragraph = Paragraph::new(lines)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Most Used Tools"),
+            )
+            .alignment(Alignment::Left);
+
+        frame.render_widget(paragraph, area);
     }
 
     /// Render hourly distribution bar chart
@@ -825,7 +1048,10 @@ impl AnalyticsTab {
                     format_duration(stats.p95_duration_secs),
                     Style::default().fg(Color::Yellow).bold(),
                 ),
-                Span::styled("  (95% sessions < this)", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    "  (95% sessions < this)",
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]),
             Line::from(vec![
                 Span::styled("Range: ", Style::default().fg(Color::Gray)),
@@ -856,10 +1082,7 @@ impl AnalyticsTab {
                 let bar_len = (pct / 5).min(20); // Max 20 chars
                 let bar = "█".repeat(bar_len);
                 distrib_lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("{:6}", labels[i]),
-                        Style::default().fg(Color::Gray),
-                    ),
+                    Span::styled(format!("{:6}", labels[i]), Style::default().fg(Color::Gray)),
                     Span::raw(" "),
                     Span::styled(bar, Style::default().fg(Color::Cyan)),
                     Span::raw(" "),

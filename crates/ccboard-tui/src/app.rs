@@ -73,7 +73,7 @@ impl Tab {
             Tab::Sessions => "Sessions",
             Tab::Config => "Config",
             Tab::Hooks => "Hooks",
-            Tab::Agents => "Agents",
+            Tab::Agents => "Capabilities", // Changed from "Agents"
             Tab::Costs => "Costs",
             Tab::History => "History",
             Tab::Mcp => "MCP",
@@ -97,15 +97,15 @@ impl Tab {
 
     pub fn icon(&self) -> &'static str {
         match self {
-            Tab::Dashboard => "◆",
-            Tab::Sessions => "●",
-            Tab::Config => "⚙",
-            Tab::Hooks => "▣",
-            Tab::Agents => "◉",
+            Tab::Dashboard => "📊",
+            Tab::Sessions => "💬",
+            Tab::Config => "⚙️",
+            Tab::Hooks => "🪝",
+            Tab::Agents => "🤖",
             Tab::Costs => "💰",
-            Tab::History => "⏱",
-            Tab::Mcp => "◈",
-            Tab::Analytics => "📊",
+            Tab::History => "📜",
+            Tab::Mcp => "🔌",
+            Tab::Analytics => "📈",
         }
     }
 }

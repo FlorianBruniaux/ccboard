@@ -170,6 +170,7 @@ impl ConfigTab {
         config: &MergedConfig,
         mcp_config: Option<&McpConfig>,
         rules: &Rules,
+        scheme: ccboard_core::models::config::ColorScheme,
     ) {
         // Layout: [Help header (2 lines), Content columns]
         let main_chunks = Layout::default()
@@ -481,7 +482,7 @@ impl ConfigTab {
                     ))));
                 } else {
                     for (name, server) in &mcp.servers {
-                        let cmd_display = format!("{} {}", server.command, server.args.join(" "));
+                        let cmd_display = server.display_command();
                         // Truncate if too long (increased from 40 to 60)
                         let cmd_short: String = if cmd_display.len() > 60 {
                             cmd_display.chars().take(57).collect::<String>() + "..."
@@ -667,7 +668,7 @@ impl ConfigTab {
                     )));
 
                     // Full command
-                    let full_cmd = format!("{} {}", server.command, server.args.join(" "));
+                    let full_cmd = server.display_command();
                     lines.push(Line::from(vec![
                         Span::styled("  Command: ", Style::default().fg(Color::DarkGray)),
                         Span::styled(full_cmd, Style::default().fg(Color::White)),

@@ -49,13 +49,13 @@ enum ServerStatus {
 
 impl ServerStatus {
     /// Get display icon and color for this status (using unified theme)
-    fn icon(&self) -> (&'static str, Color) {
+    fn icon(&self, scheme: ccboard_core::models::config::ColorScheme) -> (&'static str, Color) {
         let color_status = match self {
             ServerStatus::Running(_) => ServerStatusColor::Running,
             ServerStatus::Stopped => ServerStatusColor::Stopped,
             ServerStatus::Unknown => ServerStatusColor::Unknown,
         };
-        (color_status.icon(), color_status.to_color())
+        (color_status.icon(), color_status.to_color(scheme))
     }
 
     /// Get status text for display
@@ -182,7 +182,13 @@ impl McpTab {
     }
 
     /// Render the MCP tab
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, mcp_config: Option<&McpConfig>) {
+    pub fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        mcp_config: Option<&McpConfig>,
+        scheme: ccboard_core::models::config::ColorScheme,
+    ) {
         // Dual-pane layout: 35% list | 65% details
         let chunks = Layout::default()
             .direction(ratatui::layout::Direction::Horizontal)
@@ -190,10 +196,10 @@ impl McpTab {
             .split(area);
 
         // Render server list
-        self.render_server_list(frame, chunks[0], mcp_config);
+        self.render_server_list(frame, chunks[0], mcp_config, scheme);
 
         // Render server detail
-        self.render_server_detail(frame, chunks[1], mcp_config);
+        self.render_server_detail(frame, chunks[1], mcp_config, scheme);
 
         // Render copy message if present (overlay)
         if self.copy_message.is_some() {
@@ -212,6 +218,7 @@ impl McpTab {
         frame: &mut Frame,
         area: Rect,
         mcp_config: Option<&McpConfig>,
+        scheme: ccboard_core::models::config::ColorScheme,
     ) {
         let is_focused = matches!(self.focus, Focus::List);
         let border_color = if is_focused {
@@ -271,9 +278,10 @@ impl McpTab {
                     .get(*name)
                     .cloned()
                     .unwrap_or(ServerStatus::Unknown);
-                let (icon, color) = status.icon();
+                let (icon, color) = status.icon(scheme);
 
-                let cmd_short = format!("{} {}", server.command, server.args.join(" "))
+                let cmd_short = server
+                    .display_command()
                     .chars()
                     .take(40)
                     .collect::<String>();
@@ -312,6 +320,7 @@ impl McpTab {
         frame: &mut Frame,
         area: Rect,
         mcp_config: Option<&McpConfig>,
+        scheme: ccboard_core::models::config::ColorScheme,
     ) {
         let is_focused = matches!(self.focus, Focus::Detail);
         let border_color = if is_focused {
@@ -366,7 +375,7 @@ impl McpTab {
         }
 
         // Status line
-        let (status_icon, status_color) = status.icon();
+        let (status_icon, status_color) = status.icon(scheme);
         let status_text = status.text();
         lines.push(Line::from(vec![
             Span::styled("Status: ", Style::default().fg(Color::Yellow).bold()),
@@ -378,19 +387,78 @@ impl McpTab {
         ]));
         lines.push(Line::from(""));
 
-        // Command
-        lines.push(Line::from(Span::styled(
-            "Command:",
-            Style::default().fg(Color::Yellow).bold(),
-        )));
-        lines.push(Line::from(Span::styled(
-            format!("  {}", server.command),
-            Style::default().fg(Color::White),
-        )));
-        lines.push(Line::from(""));
+        // Command or URL
+        if server.is_http() {
+            lines.push(Line::from(Span::styled(
+                "Type:",
+                Style::default().fg(Color::Yellow).bold(),
+            )));
+            lines.push(Line::from(Span::styled(
+                "  HTTP Server",
+                Style::default().fg(Color::Cyan),
+            )));
+            lines.push(Line::from(""));
 
-        // Arguments with syntax highlighting
-        if !server.args.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "URL:",
+                Style::default().fg(Color::Yellow).bold(),
+            )));
+            lines.push(Line::from(Span::styled(
+                format!("  {}", server.url.as_deref().unwrap_or("(unknown)")),
+                Style::default().fg(Color::White),
+            )));
+            lines.push(Line::from(""));
+
+            // Headers
+            if let Some(headers) = &server.headers {
+                if !headers.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        "Headers:",
+                        Style::default().fg(Color::Yellow).bold(),
+                    )));
+                    for (key, value) in headers {
+                        lines.push(Line::from(vec![
+                            Span::styled(
+                                format!("  {} = ", key),
+                                Style::default().fg(Color::Cyan).bold(),
+                            ),
+                            Span::styled(value.clone(), Style::default().fg(Color::White)),
+                        ]));
+                    }
+                    lines.push(Line::from(""));
+                }
+            }
+        } else {
+            lines.push(Line::from(Span::styled(
+                "Type:",
+                Style::default().fg(Color::Yellow).bold(),
+            )));
+            lines.push(Line::from(Span::styled(
+                "  Stdio Server",
+                Style::default().fg(Color::Cyan),
+            )));
+            lines.push(Line::from(""));
+
+            lines.push(Line::from(Span::styled(
+                "Command:",
+                Style::default().fg(Color::Yellow).bold(),
+            )));
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "  {}",
+                    if server.command.is_empty() {
+                        "(unknown)"
+                    } else {
+                        &server.command
+                    }
+                ),
+                Style::default().fg(Color::White),
+            )));
+            lines.push(Line::from(""));
+        }
+
+        // Arguments with syntax highlighting (only for stdio servers)
+        if !server.is_http() && !server.args.is_empty() {
             lines.push(Line::from(Span::styled(
                 "Arguments:",
                 Style::default().fg(Color::Yellow).bold(),
@@ -571,11 +639,7 @@ impl McpTab {
         };
 
         // Build full command string
-        let command = if server.args.is_empty() {
-            server.command.clone()
-        } else {
-            format!("{} {}", server.command, server.args.join(" "))
-        };
+        let command = server.display_command();
 
         // Copy to clipboard
         match arboard::Clipboard::new() {
@@ -735,7 +799,7 @@ impl McpTab {
     /// Detect known MCP server types and return description
     fn get_server_description(name: &str, server: &McpServer) -> Option<String> {
         // Check command/args for known servers
-        let cmd_str = format!("{} {}", server.command, server.args.join(" "));
+        let cmd_str = server.display_command();
 
         if name.contains("playwright") || cmd_str.contains("playwright") {
             Some("Browser automation and web testing server".to_string())
@@ -763,9 +827,19 @@ mod tests {
 
     #[test]
     fn test_status_icon() {
-        assert_eq!(ServerStatus::Running(123).icon(), ("●", Color::Green));
-        assert_eq!(ServerStatus::Stopped.icon(), ("○", Color::Red));
-        assert_eq!(ServerStatus::Unknown.icon(), ("?", Color::DarkGray));
+        use ccboard_core::models::config::ColorScheme;
+        assert_eq!(
+            ServerStatus::Running(123).icon(ColorScheme::Dark),
+            ("●", Color::Green)
+        );
+        assert_eq!(
+            ServerStatus::Stopped.icon(ColorScheme::Dark),
+            ("○", Color::Red)
+        );
+        assert_eq!(
+            ServerStatus::Unknown.icon(ColorScheme::Dark),
+            ("?", Color::DarkGray)
+        );
     }
 
     #[test]

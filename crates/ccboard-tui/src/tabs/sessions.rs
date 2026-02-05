@@ -22,7 +22,9 @@ pub struct SessionsTab {
     project_state: ListState,
     /// Session list state (selected session index)
     session_state: ListState,
-    /// Current focus: Projects (0) or Sessions (1)
+    /// Live sessions list state (for scrolling)
+    live_sessions_state: ListState,
+    /// Current focus: Live Sessions (0), Projects (1), or Sessions (2)
     focus: usize,
     /// Cached project list (sorted)
     projects: Vec<String>,
@@ -30,8 +32,10 @@ pub struct SessionsTab {
     search_filter: String,
     /// Search mode active
     search_active: bool,
-    /// Show detail popup
+    /// Show detail popup for historical sessions
     show_detail: bool,
+    /// Show detail popup for live sessions
+    show_live_detail: bool,
     /// Error message to display
     error_message: Option<String>,
     /// Last refresh timestamp
@@ -56,15 +60,19 @@ impl SessionsTab {
         project_state.select(Some(0));
         let mut session_state = ListState::default();
         session_state.select(Some(0));
+        let mut live_sessions_state = ListState::default();
+        live_sessions_state.select(Some(0));
 
         Self {
             project_state,
             session_state,
-            focus: 0,
+            live_sessions_state,
+            focus: 1, // Start with Projects focused (1), not Live Sessions (0)
             projects: Vec::new(),
             search_filter: String::new(),
             search_active: false,
             show_detail: false,
+            show_live_detail: false,
             error_message: None,
             last_refresh: Instant::now(),
             refresh_message: None,
@@ -103,37 +111,57 @@ impl SessionsTab {
         }
 
         match key {
+            KeyCode::Tab => {
+                // Cycle focus: Live Sessions (0) → Projects (1) → Sessions (2) → Live Sessions
+                self.focus = (self.focus + 1) % 3;
+            }
             KeyCode::Left | KeyCode::Char('h') => {
-                self.focus = 0;
+                // Move focus left: Live Sessions ← Projects ← Sessions
+                if self.focus == 0 {
+                    self.focus = 2;
+                } else {
+                    self.focus -= 1;
+                }
             }
             KeyCode::Right | KeyCode::Char('l') => {
-                self.focus = 1;
+                // Move focus right: Live Sessions → Projects → Sessions
+                self.focus = (self.focus + 1) % 3;
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                if self.focus == 0 {
-                    self.move_project_selection(-1);
-                    // Reset session selection when project changes
-                    self.session_state.select(Some(0));
-                } else {
-                    self.move_session_selection(-1);
+                match self.focus {
+                    0 => self.move_live_sessions_selection(-1),
+                    1 => {
+                        self.move_project_selection(-1);
+                        // Reset session selection when project changes
+                        self.session_state.select(Some(0));
+                    }
+                    2 => self.move_session_selection(-1),
+                    _ => {}
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                if self.focus == 0 {
-                    self.move_project_selection(1);
-                    self.session_state.select(Some(0));
-                } else {
-                    self.move_session_selection(1);
+                match self.focus {
+                    0 => self.move_live_sessions_selection(1),
+                    1 => {
+                        self.move_project_selection(1);
+                        self.session_state.select(Some(0));
+                    }
+                    2 => self.move_session_selection(1),
+                    _ => {}
                 }
             }
             KeyCode::Enter => {
-                if self.focus == 1 {
+                if self.focus == 0 {
+                    // Toggle live session detail
+                    self.show_live_detail = !self.show_live_detail;
+                } else if self.focus == 2 {
+                    // Toggle historical session detail
                     self.show_detail = !self.show_detail;
                 }
             }
             KeyCode::Char('e') => {
                 // Open selected session file in editor
-                if self.focus == 1 {
+                if self.focus == 2 {
                     if let Some(session) = self.get_selected_session(_sessions_by_project) {
                         if let Err(e) = crate::editor::open_in_editor(&session.file_path) {
                             self.error_message = Some(format!("Failed to open editor: {}", e));
@@ -143,7 +171,7 @@ impl SessionsTab {
             }
             KeyCode::Char('o') => {
                 // Reveal session file in file manager
-                if self.focus == 1 {
+                if self.focus == 2 {
                     if let Some(session) = self.get_selected_session(_sessions_by_project) {
                         if let Err(e) = crate::editor::reveal_in_file_manager(&session.file_path) {
                             self.error_message =
@@ -278,6 +306,12 @@ impl SessionsTab {
         self.session_state.select(Some(new_idx));
     }
 
+    fn move_live_sessions_selection(&mut self, delta: i32) {
+        let current = self.live_sessions_state.selected().unwrap_or(0) as i32;
+        let new_idx = (current + delta).max(0) as usize;
+        self.live_sessions_state.select(Some(new_idx));
+    }
+
     fn get_selected_session<'a>(
         &self,
         sessions_by_project: &'a HashMap<String, Vec<Arc<SessionMetadata>>>,
@@ -289,6 +323,30 @@ impl SessionsTab {
         sessions.get(session_idx)
     }
 
+    fn get_selected_live_session<'a>(
+        &self,
+        live_sessions: &'a [ccboard_core::LiveSession],
+    ) -> Option<&'a ccboard_core::LiveSession> {
+        let live_idx = self.live_sessions_state.selected()?;
+        live_sessions.get(live_idx)
+    }
+
+    fn find_session_by_id<'a>(
+        &self,
+        sessions_by_project: &'a HashMap<String, Vec<Arc<SessionMetadata>>>,
+        session_id: &str,
+    ) -> Option<&'a Arc<SessionMetadata>> {
+        // Search through all projects for matching session ID
+        for sessions in sessions_by_project.values() {
+            for session in sessions {
+                if session.id == session_id {
+                    return Some(session);
+                }
+            }
+        }
+        None
+    }
+
     /// Render the sessions tab
     pub fn render(
         &mut self,
@@ -296,6 +354,7 @@ impl SessionsTab {
         area: Rect,
         sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
         live_sessions: &[ccboard_core::LiveSession],
+        scheme: ccboard_core::models::config::ColorScheme,
     ) {
         // Update project cache
         self.projects = sessions_by_project.keys().cloned().collect();
@@ -305,8 +364,8 @@ impl SessionsTab {
         let live_height = if live_sessions.is_empty() {
             0
         } else {
-            // 2 lines per session (main + metrics), max 5 sessions, +2 for borders
-            (live_sessions.len() as u16 * 2).min(10) + 2
+            // Fixed height: 7 sessions visible (14 lines) + 2 for borders = 16 lines
+            16
         };
 
         let mut constraints = vec![Constraint::Length(3)]; // search bar
@@ -360,13 +419,30 @@ impl SessionsTab {
 
         // Render live sessions if any
         let content_chunk_idx = if live_height > 0 {
-            self.render_live_sessions(frame, main_chunks[1], live_sessions);
+            self.render_live_sessions(frame, main_chunks[1], live_sessions, self.focus == 0);
             2
         } else {
             1
         };
 
         let content_area = main_chunks[content_chunk_idx];
+
+        // If live session detail is open, show it full width
+        if self.show_live_detail {
+            // Try to get the selected live session and its metadata
+            if let Some(live_session) = self.get_selected_live_session(live_sessions) {
+                if let Some(session_id) = &live_session.session_id {
+                    if let Some(session_meta) = self.find_session_by_id(sessions_by_project, session_id) {
+                        self.render_live_detail(frame, content_area, live_session, Some(session_meta));
+                    } else {
+                        self.render_live_detail(frame, content_area, live_session, None);
+                    }
+                } else {
+                    self.render_live_detail(frame, content_area, live_session, None);
+                }
+            }
+            return;
+        }
 
         // Main layout: projects tree | session list | detail (if open)
         let constraints = if self.show_detail {
@@ -437,6 +513,9 @@ impl SessionsTab {
             self.render_detail(frame, chunks[2], selected_session);
         }
 
+        // Render keyboard hints at bottom
+        self.render_keyboard_hints(frame, area);
+
         // Render error popup if present
         if self.error_message.is_some() {
             self.render_error_popup(frame, area);
@@ -447,19 +526,36 @@ impl SessionsTab {
     }
 
     fn render_live_sessions(
-        &self,
+        &mut self,
         frame: &mut Frame,
         area: Rect,
         live_sessions: &[ccboard_core::LiveSession],
+        is_focused: bool,
     ) {
         use chrono::Local;
 
+        // Clamp selection to valid range
+        if let Some(sel) = self.live_sessions_state.selected() {
+            if sel >= live_sessions.len() && !live_sessions.is_empty() {
+                self.live_sessions_state
+                    .select(Some(live_sessions.len() - 1));
+            }
+        }
+
+        let border_color = if is_focused {
+            Color::Cyan
+        } else {
+            Color::Green
+        };
+
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Green))
+            .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 format!(" ⚡ Live Sessions ({}) ", live_sessions.len()),
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
             ));
 
         let inner = block.inner(area);
@@ -490,28 +586,60 @@ impl SessionsTab {
                     .and_then(|n| n.to_str())
                     .unwrap_or("unknown");
 
-                // Line 1: Process info
+                // Line 1: Process info + Session ID
+                let session_id_display = s
+                    .session_id
+                    .as_ref()
+                    .map(|id| format!(" [{}]", &id[..8.min(id.len())]))
+                    .unwrap_or_default();
+
                 let line1 = format!(
-                    "🟢 PID {} • {} • {} ago",
-                    s.pid, cwd_display, duration_str
+                    "🟢 PID {} • {} • {} ago{}",
+                    s.pid, cwd_display, duration_str, session_id_display
                 );
 
-                // Line 2: Performance metrics
+                // Line 2: Session name (if available)
+                let session_name_line = s.session_name.as_ref().map(|name| {
+                    Line::from(format!("   ├─ 📝 {}", name)).style(Style::default().fg(Color::Cyan))
+                });
+
+                // Line 3: Performance metrics (shortened to fit)
                 let tokens_str = s.tokens.map_or("?".to_string(), |t| Self::format_short(t));
-                let line2 = format!(
-                    "   ├─ CPU: {:>5.1}% • RAM: {:>4}MB • Tokens: {:>6}",
+                let metrics_line = format!(
+                    "   ├─ CPU:{:>4.1}% RAM:{:>4}MB Tok:{:>5}",
                     s.cpu_percent, s.memory_mb, tokens_str
                 );
 
-                ListItem::new(vec![
-                    Line::from(line1).style(Style::default().fg(Color::Green)),
-                    Line::from(line2).style(Style::default().fg(Color::DarkGray)),
-                ])
+                // Build lines vec conditionally
+                let mut lines = vec![Line::from(line1).style(Style::default().fg(Color::Green))];
+                if let Some(name_line) = session_name_line {
+                    lines.push(name_line);
+                }
+                lines.push(Line::from(metrics_line).style(Style::default().fg(Color::DarkGray)));
+
+                ListItem::new(lines)
             })
             .collect();
 
-        let list = List::new(items);
-        frame.render_widget(list, inner);
+        let list = List::new(items).highlight_style(
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD),
+        );
+
+        frame.render_stateful_widget(list, inner, &mut self.live_sessions_state);
+
+        // Render scrollbar
+        if live_sessions.len() > 10 {
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("↑"))
+                .end_symbol(Some("↓"));
+
+            let mut scrollbar_state = ScrollbarState::new(live_sessions.len())
+                .position(self.live_sessions_state.selected().unwrap_or(0));
+
+            frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
+        }
     }
 
     /// Format large numbers with K/M/B suffixes
@@ -528,7 +656,7 @@ impl SessionsTab {
     }
 
     fn render_projects(&mut self, frame: &mut Frame, area: Rect) {
-        let is_focused = self.focus == 0;
+        let is_focused = self.focus == 1; // Projects focus
         let border_color = if is_focused {
             Color::Cyan
         } else {
@@ -583,7 +711,7 @@ impl SessionsTab {
         area: Rect,
         sessions: &[Arc<SessionMetadata>],
     ) {
-        let is_focused = self.focus == 1;
+        let is_focused = self.focus == 2; // Sessions focus
         let border_color = if is_focused {
             Color::Cyan
         } else {
@@ -903,6 +1031,195 @@ impl SessionsTab {
         }
     }
 
+    fn render_live_detail(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        live_session: &ccboard_core::LiveSession,
+        session_meta: Option<&Arc<SessionMetadata>>,
+    ) {
+        use chrono::Local;
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Green))
+            .title(Span::styled(
+                " 🟢 Live Session Detail ",
+                Style::default().fg(Color::Green).bold(),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let now = Local::now();
+        let duration = now.signed_duration_since(live_session.start_time);
+        let hours = duration.num_hours();
+        let minutes = duration.num_minutes() % 60;
+        let duration_str = if hours > 0 {
+            format!("{}h {}m", hours, minutes)
+        } else {
+            format!("{} min", minutes)
+        };
+
+        let mut lines = vec![
+            Line::from(Span::styled(
+                "PROCESS INFORMATION",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("PID: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    live_session.pid.to_string(),
+                    Style::default().fg(Color::Cyan).bold(),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("Running: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(duration_str, Style::default().fg(Color::Green)),
+            ]),
+            Line::from(vec![
+                Span::styled("CPU: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("{:.1}%", live_session.cpu_percent),
+                    Style::default().fg(if live_session.cpu_percent > 50.0 {
+                        Color::Red
+                    } else if live_session.cpu_percent > 20.0 {
+                        Color::Yellow
+                    } else {
+                        Color::Green
+                    }),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("Memory: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    format!("{} MB", live_session.memory_mb),
+                    Style::default().fg(Color::Cyan),
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("Working Dir: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    live_session
+                        .working_directory
+                        .as_ref()
+                        .map(|s| s.as_str())
+                        .unwrap_or("unknown"),
+                    Style::default().fg(Color::Yellow),
+                ),
+            ]),
+            Line::from(""),
+        ];
+
+        // Add session metadata if available
+        if let Some(session) = session_meta {
+            lines.extend(vec![
+                Line::from(Span::styled(
+                    "SESSION INFORMATION",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("Session ID: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(&session.id[..8.min(session.id.len())], Style::default().fg(Color::White)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(&session.project_path, Style::default().fg(Color::Yellow)),
+                ]),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("Messages: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        session.message_count.to_string(),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                ]),
+                Line::from(vec![
+                    Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        Self::format_tokens(live_session.tokens.unwrap_or(session.total_tokens)),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                ]),
+                Line::from(vec![
+                    Span::styled("Models: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        if session.models_used.is_empty() {
+                            "unknown".to_string()
+                        } else {
+                            session.models_used.join(", ")
+                        },
+                        Style::default().fg(Color::Magenta),
+                    ),
+                ]),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "First message:",
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Line::from(Span::styled(
+                    session
+                        .first_user_message
+                        .as_ref()
+                        .map(|s| s.as_str())
+                        .unwrap_or("(no message)"),
+                    Style::default().fg(Color::White),
+                )),
+            ]);
+        } else if let Some(session_name) = &live_session.session_name {
+            lines.extend(vec![
+                Line::from(Span::styled(
+                    "SESSION INFORMATION",
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("Name: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(session_name, Style::default().fg(Color::White)),
+                ]),
+                Line::from(vec![
+                    Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        live_session
+                            .tokens
+                            .map(|t| Self::format_short(t))
+                            .unwrap_or_else(|| "?".to_string()),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                ]),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "(Full session details not available yet)",
+                    Style::default().fg(Color::DarkGray).italic(),
+                )),
+            ]);
+        } else {
+            lines.extend(vec![
+                Line::from(Span::styled(
+                    "Session metadata not available",
+                    Style::default().fg(Color::DarkGray).italic(),
+                )),
+            ]);
+        }
+
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Press Enter to close",
+            Style::default().fg(Color::DarkGray),
+        )));
+
+        let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: false });
+        frame.render_widget(paragraph, inner);
+    }
+
     fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
         // Center popup (40% width, 30% height)
         let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
@@ -981,6 +1298,94 @@ impl SessionsTab {
     }
 
     /// Render refresh notification overlay (bottom banner)
+    fn render_keyboard_hints(&self, frame: &mut Frame, area: Rect) {
+        // Calculate position at bottom of area
+        let hint_area = Rect {
+            x: area.x,
+            y: area.y + area.height.saturating_sub(1),
+            width: area.width,
+            height: 1,
+        };
+
+        let hints = match self.focus {
+            0 => {
+                // Live Sessions
+                vec![
+                    Span::raw(" ["),
+                    Span::styled("Tab", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("cycle focus", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled("↑↓ j/k", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("navigate", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled("Enter", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("detail", Style::default().fg(Color::White)),
+                ]
+            }
+            1 => {
+                // Projects
+                vec![
+                    Span::raw(" ["),
+                    Span::styled("Tab", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("cycle focus", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled("↑↓ j/k", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("navigate", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled("h/l", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("switch pane", Style::default().fg(Color::White)),
+                ]
+            }
+            2 => {
+                // Sessions
+                vec![
+                    Span::raw(" ["),
+                    Span::styled("Tab", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("cycle focus", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled("↑↓ j/k", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("navigate", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled("Enter", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("detail", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled("e", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("edit", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled("o", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::raw("] "),
+                    Span::styled("reveal", Style::default().fg(Color::White)),
+                ]
+            }
+            _ => vec![],
+        };
+
+        let hint_line = Line::from(hints);
+        let hint_paragraph = Paragraph::new(hint_line)
+            .style(Style::default().bg(Color::DarkGray))
+            .alignment(ratatui::layout::Alignment::Center);
+
+        frame.render_widget(hint_paragraph, hint_area);
+    }
+
     fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect) {
         let Some(msg) = &self.refresh_message else {
             return;

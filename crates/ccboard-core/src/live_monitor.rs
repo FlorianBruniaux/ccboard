@@ -24,6 +24,10 @@ pub struct LiveSession {
     pub memory_mb: u64,
     /// Total tokens in active session (if detectable)
     pub tokens: Option<u64>,
+    /// Session ID (from JSONL filename)
+    pub session_id: Option<String>,
+    /// Session name/title (from session_start event)
+    pub session_name: Option<String>,
 }
 
 /// Detect all running Claude Code processes on the system
@@ -94,8 +98,8 @@ fn parse_ps_line(line: &str) -> Option<LiveSession> {
     // Try to get working directory for this PID
     let working_directory = get_cwd_for_pid(pid);
 
-    // Try to count tokens from active session JSONL
-    let tokens = get_tokens_for_session(&working_directory);
+    // Try to extract session metadata (tokens, ID, name)
+    let session_metadata = get_session_metadata(&working_directory);
 
     Some(LiveSession {
         pid,
@@ -104,7 +108,11 @@ fn parse_ps_line(line: &str) -> Option<LiveSession> {
         command,
         cpu_percent,
         memory_mb,
-        tokens,
+        tokens: session_metadata.as_ref().and_then(|m| m.tokens),
+        session_id: session_metadata.as_ref().and_then(|m| m.session_id.clone()),
+        session_name: session_metadata
+            .as_ref()
+            .and_then(|m| m.session_name.clone()),
     })
 }
 
@@ -217,22 +225,31 @@ fn parse_tasklist_csv(line: &str) -> Option<LiveSession> {
         cpu_percent: 0.0,
         memory_mb: 0,
         tokens: None,
+        session_id: None,
+        session_name: None,
     })
 }
 
-/// Try to count tokens from active session JSONL file
+/// Session metadata extracted from active JSONL file
+struct LiveSessionMetadata {
+    tokens: Option<u64>,
+    session_id: Option<String>,
+    session_name: Option<String>,
+}
+
+/// Extract session metadata from active session JSONL file
 ///
 /// Given a working directory (e.g., /Users/foo/myproject), attempts to:
 /// 1. Encode the path to match ~/.claude/projects/<encoded>/ format
 /// 2. Find the most recent .jsonl file in that directory
-/// 3. Parse and sum tokens from all messages
+/// 3. Parse tokens, session ID, and session name
 ///
 /// Returns None if:
 /// - Working directory is None
 /// - Session directory doesn't exist
 /// - No JSONL files found
 /// - Parse errors occur
-fn get_tokens_for_session(working_directory: &Option<String>) -> Option<u64> {
+fn get_session_metadata(working_directory: &Option<String>) -> Option<LiveSessionMetadata> {
     let cwd = working_directory.as_ref()?;
 
     // Encode path: /Users/foo/myproject → -Users-foo-myproject
@@ -266,16 +283,32 @@ fn get_tokens_for_session(working_directory: &Option<String>) -> Option<u64> {
     entries.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).ok());
     let latest = entries.last()?.path();
 
-    // Parse JSONL and sum tokens
+    // Extract session ID from filename (e.g., "abc123.jsonl" -> "abc123")
+    let session_id = latest
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(String::from);
+
+    // Parse JSONL and sum tokens + extract session name
     let file = std::fs::File::open(latest).ok()?;
     let reader = std::io::BufReader::new(file);
     let mut total_tokens = 0u64;
+    let mut session_name: Option<String> = None;
 
     for line in std::io::BufRead::lines(reader) {
         // Skip lines that fail to read (don't fail the entire function)
         let Ok(line) = line else { continue };
 
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
+            // Extract session name from session_start event
+            if session_name.is_none() {
+                if let Some(event_type) = json.get("type").and_then(|v| v.as_str()) {
+                    if event_type == "session_start" {
+                        session_name = json.get("name").and_then(|v| v.as_str()).map(String::from);
+                    }
+                }
+            }
+
             // Usage is nested in .message.usage, not at root level
             if let Some(message) = json.get("message") {
                 if let Some(usage) = message.get("usage") {
@@ -289,13 +322,15 @@ fn get_tokens_for_session(working_directory: &Option<String>) -> Option<u64> {
                     // Note: Field names differ from stats-cache.json:
                     // - cache_creation_input_tokens (not cache_write_tokens)
                     // - cache_read_input_tokens (not cache_read_tokens)
-                    if let Some(cache_write) =
-                        usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64())
+                    if let Some(cache_write) = usage
+                        .get("cache_creation_input_tokens")
+                        .and_then(|v| v.as_u64())
                     {
                         total_tokens += cache_write;
                     }
-                    if let Some(cache_read) =
-                        usage.get("cache_read_input_tokens").and_then(|v| v.as_u64())
+                    if let Some(cache_read) = usage
+                        .get("cache_read_input_tokens")
+                        .and_then(|v| v.as_u64())
                     {
                         total_tokens += cache_read;
                     }
@@ -304,11 +339,15 @@ fn get_tokens_for_session(working_directory: &Option<String>) -> Option<u64> {
         }
     }
 
-    if total_tokens > 0 {
-        Some(total_tokens)
-    } else {
-        None
-    }
+    Some(LiveSessionMetadata {
+        tokens: if total_tokens > 0 {
+            Some(total_tokens)
+        } else {
+            None
+        },
+        session_id,
+        session_name,
+    })
 }
 
 #[cfg(test)]

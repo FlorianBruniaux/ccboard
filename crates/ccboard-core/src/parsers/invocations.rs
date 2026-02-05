@@ -83,8 +83,7 @@ impl InvocationParser {
                     // Content is now Value (can be String or Array)
                     if let Some(content_str) = content.as_str() {
                         self.extract_invocations(content_str, &mut stats);
-                    } else if let Some(content_array) = content.as_array()
-                    {
+                    } else if let Some(content_array) = content.as_array() {
                         for item in content_array {
                             if let Some(obj) = item.as_object() {
                                 // Check for Task tool
@@ -134,7 +133,8 @@ impl InvocationParser {
                             serde_json::Value::String(s) => s.as_str(),
                             serde_json::Value::Array(blocks) => {
                                 // For array, try to get first text block
-                                blocks.first()
+                                blocks
+                                    .first()
                                     .and_then(|block| block.get("text"))
                                     .and_then(|t| t.as_str())
                                     .unwrap_or("")
