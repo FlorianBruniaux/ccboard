@@ -474,7 +474,7 @@ impl Ui {
             // Tab-specific hints
             let hint = match app.active_tab {
                 Tab::Dashboard => "F5 refresh",
-                Tab::Sessions => "←→ nav │ / search │ gg/G/Home/End jump",
+                Tab::Sessions => "←→ nav │ / search │ r resume │ gg/G/Home/End jump",
                 Tab::Config => "←→ columns │ ↑↓ scroll │ e edit │ o reveal",
                 Tab::Hooks => "←→ nav │ ↑↓ select │ t test │ e edit │ o reveal",
                 Tab::Agents => "Tab switch │ Enter detail",

@@ -139,17 +139,15 @@ impl SessionsTab {
                     _ => {}
                 }
             }
-            KeyCode::Down | KeyCode::Char('j') => {
-                match self.focus {
-                    0 => self.move_live_sessions_selection(1),
-                    1 => {
-                        self.move_project_selection(1);
-                        self.session_state.select(Some(0));
-                    }
-                    2 => self.move_session_selection(1),
-                    _ => {}
+            KeyCode::Down | KeyCode::Char('j') => match self.focus {
+                0 => self.move_live_sessions_selection(1),
+                1 => {
+                    self.move_project_selection(1);
+                    self.session_state.select(Some(0));
                 }
-            }
+                2 => self.move_session_selection(1),
+                _ => {}
+            },
             KeyCode::Enter => {
                 if self.focus == 0 {
                     // Toggle live session detail
@@ -176,6 +174,18 @@ impl SessionsTab {
                         if let Err(e) = crate::editor::reveal_in_file_manager(&session.file_path) {
                             self.error_message =
                                 Some(format!("Failed to open file manager: {}", e));
+                        }
+                    }
+                }
+            }
+            KeyCode::Char('r') => {
+                // Resume session in Claude CLI
+                if self.focus == 2 {
+                    if let Some(session) = self.get_selected_session(_sessions_by_project) {
+                        if let Err(e) = crate::editor::resume_claude_session(&session.id) {
+                            self.error_message = Some(format!("Failed to resume session: {}", e));
+                        } else {
+                            self.refresh_message = Some("Session resumed".to_string());
                         }
                     }
                 }
@@ -432,8 +442,15 @@ impl SessionsTab {
             // Try to get the selected live session and its metadata
             if let Some(live_session) = self.get_selected_live_session(live_sessions) {
                 if let Some(session_id) = &live_session.session_id {
-                    if let Some(session_meta) = self.find_session_by_id(sessions_by_project, session_id) {
-                        self.render_live_detail(frame, content_area, live_session, Some(session_meta));
+                    if let Some(session_meta) =
+                        self.find_session_by_id(sessions_by_project, session_id)
+                    {
+                        self.render_live_detail(
+                            frame,
+                            content_area,
+                            live_session,
+                            Some(session_meta),
+                        );
                     } else {
                         self.render_live_detail(frame, content_area, live_session, None);
                     }
@@ -865,6 +882,19 @@ impl SessionsTab {
                     ),
                 ];
 
+                // Add branch if available
+                if let Some(ref branch) = session.branch {
+                    let branch_display = if branch.len() > 12 {
+                        format!("{}… ", &branch[..11])
+                    } else {
+                        format!("{} ", branch)
+                    };
+                    preview_spans.push(Span::styled(
+                        branch_display,
+                        Style::default().fg(Color::Magenta),
+                    ));
+                }
+
                 // Add highlighted preview if searching, otherwise plain preview
                 if !self.search_filter.is_empty() {
                     let highlighted = highlight_matches(&preview, &self.search_filter);
@@ -918,7 +948,7 @@ impl SessionsTab {
             return;
         };
 
-        let lines = vec![
+        let mut lines = vec![
             Line::from(vec![
                 Span::styled("ID: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(&session.id, Style::default().fg(Color::White)),
@@ -934,6 +964,17 @@ impl SessionsTab {
                 Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(&session.project_path, Style::default().fg(Color::Yellow)),
             ]),
+        ];
+
+        // Add branch if available
+        if let Some(ref branch) = session.branch {
+            lines.push(Line::from(vec![
+                Span::styled("Branch: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(branch, Style::default().fg(Color::Magenta)),
+            ]));
+        }
+
+        lines.extend(vec![
             Line::from(""),
             Line::from(vec![
                 Span::styled("Started: ", Style::default().fg(Color::DarkGray)),
@@ -1005,7 +1046,7 @@ impl SessionsTab {
                     .unwrap_or("No preview available"),
                 Style::default().fg(Color::White),
             )),
-        ];
+        ]);
 
         let detail = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(detail, inner);
@@ -1116,7 +1157,7 @@ impl SessionsTab {
 
         // Add session metadata if available
         if let Some(session) = session_meta {
-            lines.extend(vec![
+            let mut session_lines = vec![
                 Line::from(Span::styled(
                     "SESSION INFORMATION",
                     Style::default()
@@ -1126,12 +1167,26 @@ impl SessionsTab {
                 Line::from(""),
                 Line::from(vec![
                     Span::styled("Session ID: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(&session.id[..8.min(session.id.len())], Style::default().fg(Color::White)),
+                    Span::styled(
+                        &session.id[..8.min(session.id.len())],
+                        Style::default().fg(Color::White),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
                     Span::styled(&session.project_path, Style::default().fg(Color::Yellow)),
                 ]),
+            ];
+
+            // Add branch if available
+            if let Some(ref branch) = session.branch {
+                session_lines.push(Line::from(vec![
+                    Span::styled("Branch: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(branch, Style::default().fg(Color::Magenta)),
+                ]));
+            }
+
+            session_lines.extend(vec![
                 Line::from(""),
                 Line::from(vec![
                     Span::styled("Messages: ", Style::default().fg(Color::DarkGray)),
@@ -1172,6 +1227,8 @@ impl SessionsTab {
                     Style::default().fg(Color::White),
                 )),
             ]);
+
+            lines.extend(session_lines);
         } else if let Some(session_name) = &live_session.session_name {
             lines.extend(vec![
                 Line::from(Span::styled(
@@ -1202,12 +1259,10 @@ impl SessionsTab {
                 )),
             ]);
         } else {
-            lines.extend(vec![
-                Line::from(Span::styled(
-                    "Session metadata not available",
-                    Style::default().fg(Color::DarkGray).italic(),
-                )),
-            ]);
+            lines.extend(vec![Line::from(Span::styled(
+                "Session metadata not available",
+                Style::default().fg(Color::DarkGray).italic(),
+            ))]);
         }
 
         lines.push(Line::from(""));
@@ -1312,17 +1367,26 @@ impl SessionsTab {
                 // Live Sessions
                 vec![
                     Span::raw(" ["),
-                    Span::styled("Tab", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "Tab",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("cycle focus", Style::default().fg(Color::White)),
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
-                    Span::styled("↑↓ j/k", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "↑↓ j/k",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("navigate", Style::default().fg(Color::White)),
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
-                    Span::styled("Enter", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "Enter",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("detail", Style::default().fg(Color::White)),
                 ]
@@ -1331,17 +1395,26 @@ impl SessionsTab {
                 // Projects
                 vec![
                     Span::raw(" ["),
-                    Span::styled("Tab", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "Tab",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("cycle focus", Style::default().fg(Color::White)),
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
-                    Span::styled("↑↓ j/k", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "↑↓ j/k",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("navigate", Style::default().fg(Color::White)),
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
-                    Span::styled("h/l", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "h/l",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("switch pane", Style::default().fg(Color::White)),
                 ]
@@ -1350,29 +1423,52 @@ impl SessionsTab {
                 // Sessions
                 vec![
                     Span::raw(" ["),
-                    Span::styled("Tab", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "Tab",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("cycle focus", Style::default().fg(Color::White)),
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
-                    Span::styled("↑↓ j/k", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "↑↓ j/k",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("navigate", Style::default().fg(Color::White)),
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
-                    Span::styled("Enter", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "Enter",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("detail", Style::default().fg(Color::White)),
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
-                    Span::styled("e", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "e",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("edit", Style::default().fg(Color::White)),
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
-                    Span::styled("o", Style::default().fg(Color::Black).bg(Color::Cyan).bold()),
+                    Span::styled(
+                        "o",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
                     Span::raw("] "),
                     Span::styled("reveal", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled(
+                        "r",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
+                    Span::raw("] "),
+                    Span::styled("resume", Style::default().fg(Color::White)),
                 ]
             }
             _ => vec![],

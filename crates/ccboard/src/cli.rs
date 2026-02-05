@@ -14,7 +14,10 @@ use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum CliError {
-    NoResults { query: String, scanned: usize },
+    NoResults {
+        query: String,
+        scanned: usize,
+    },
     AmbiguousId {
         prefix: String,
         count: usize,
@@ -104,10 +107,7 @@ impl DateFilter {
         // Try parsing as date
         let date =
             chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").context("Invalid date format")?;
-        let datetime = date
-            .and_hms_opt(0, 0, 0)
-            .context("Invalid time")?
-            .and_utc();
+        let datetime = date.and_hms_opt(0, 0, 0).context("Invalid time")?.and_utc();
         Ok(DateFilter::Since(datetime))
     }
 
@@ -200,8 +200,7 @@ pub fn search_sessions(
             // Text search: ID, project path, first message
             s.id.to_lowercase().contains(&query_lower)
                 || s.project_path.to_lowercase().contains(&query_lower)
-                || s
-                    .first_user_message
+                || s.first_user_message
                     .as_ref()
                     .map(|m| m.to_lowercase().contains(&query_lower))
                     .unwrap_or(false)
@@ -265,14 +264,7 @@ pub fn format_session_table(sessions: &[Arc<SessionMetadata>], json: bool) -> St
             .unwrap_or_else(|| "".to_string());
 
         table.add_row(Row::from(vec![
-            id_short,
-            &project,
-            &branch,
-            &date,
-            &msgs,
-            &tokens,
-            &duration,
-            &preview,
+            id_short, &project, &branch, &date, &msgs, &tokens, &duration, &preview,
         ]));
     }
 
@@ -292,10 +284,7 @@ pub fn format_session_info(session: &SessionMetadata, json: bool) -> String {
         "Branch:           {}",
         session.branch.as_deref().unwrap_or("-")
     ));
-    lines.push(format!(
-        "File:             {}",
-        session.file_path.display()
-    ));
+    lines.push(format!("File:             {}", session.file_path.display()));
     lines.push(format!(
         "First timestamp:  {}",
         session
@@ -311,8 +300,14 @@ pub fn format_session_info(session: &SessionMetadata, json: bool) -> String {
             .unwrap_or_else(|| "-".to_string())
     ));
     lines.push(format!("Messages:         {}", session.message_count));
-    lines.push(format!("Total tokens:     {}", format_tokens(session.total_tokens)));
-    lines.push(format!("  Input:          {}", format_tokens(session.input_tokens)));
+    lines.push(format!(
+        "Total tokens:     {}",
+        format_tokens(session.total_tokens)
+    ));
+    lines.push(format!(
+        "  Input:          {}",
+        format_tokens(session.input_tokens)
+    ));
     lines.push(format!(
         "  Output:         {}",
         format_tokens(session.output_tokens)
@@ -334,10 +329,7 @@ pub fn format_session_info(session: &SessionMetadata, json: bool) -> String {
     lines.push(format!("Has subagents:    {}", session.has_subagents));
     lines.push(format!(
         "First message:    {}",
-        session
-            .first_user_message
-            .as_deref()
-            .unwrap_or("-")
+        session.first_user_message.as_deref().unwrap_or("-")
     ));
 
     lines.join("\n")

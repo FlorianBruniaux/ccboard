@@ -931,14 +931,8 @@ impl AnalyticsTab {
                 ),
                 Span::styled(bar, Style::default().fg(color)),
                 Span::raw(" "),
-                Span::styled(
-                    format!("{} ", count),
-                    Style::default().fg(color).bold(),
-                ),
-                Span::styled(
-                    format!("{:.1}%", pct),
-                    Style::default().fg(Color::DarkGray),
-                ),
+                Span::styled(format!("{} ", count), Style::default().fg(color).bold()),
+                Span::styled(format!("{:.1}%", pct), Style::default().fg(Color::DarkGray)),
             ]));
         }
 

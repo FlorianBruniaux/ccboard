@@ -447,11 +447,7 @@ async fn run_search(
     println!("{}", cli::format_session_table(&results, json));
 
     if !json {
-        eprintln!(
-            "\n{} results from {} sessions",
-            results.len(),
-            all.len()
-        );
+        eprintln!("\n{} results from {} sessions", results.len(), all.len());
     }
 
     Ok(())
@@ -507,7 +503,11 @@ async fn run_recent(
     println!("{}", cli::format_session_table(&results, json));
 
     if !json {
-        eprintln!("\nShowing {} of {} sessions", results.len(), report.sessions_scanned);
+        eprintln!(
+            "\nShowing {} of {} sessions",
+            results.len(),
+            report.sessions_scanned
+        );
     }
 
     Ok(())

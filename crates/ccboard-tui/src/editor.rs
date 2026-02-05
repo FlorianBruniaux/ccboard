@@ -103,6 +103,47 @@ pub fn reveal_in_file_manager(file_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Resumes a Claude session by spawning the Claude CLI with --resume flag.
+///
+/// This function temporarily exits the alternate screen and disables raw mode
+/// to allow Claude CLI to take over the terminal, then restores the TUI state
+/// after Claude exits.
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Claude CLI command fails to spawn
+/// - Terminal state cannot be restored
+pub fn resume_claude_session(session_id: &str) -> Result<()> {
+    // Exit alternate screen and disable raw mode
+    use crossterm::{
+        execute,
+        terminal::{LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    };
+    use std::io::stdout;
+
+    disable_raw_mode().context("Failed to disable raw mode")?;
+    execute!(stdout(), LeaveAlternateScreen).context("Failed to leave alternate screen")?;
+
+    // Spawn claude --resume (blocking)
+    let status = Command::new("claude")
+        .arg("--resume")
+        .arg(session_id)
+        .status()
+        .context("Failed to spawn claude command. Ensure 'claude' is in PATH.")?;
+
+    // Re-enter alternate screen and enable raw mode
+    use crossterm::terminal::EnterAlternateScreen;
+    execute!(stdout(), EnterAlternateScreen).context("Failed to enter alternate screen")?;
+    enable_raw_mode().context("Failed to enable raw mode")?;
+
+    if !status.success() {
+        anyhow::bail!("Claude exited with non-zero status: {:?}", status.code());
+    }
+
+    Ok(())
+}
+
 /// Gets the editor command to use, checking environment variables.
 fn get_editor_command() -> String {
     env::var("VISUAL")
