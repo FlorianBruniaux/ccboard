@@ -2,6 +2,7 @@
 
 use crate::components::highlight_matches;
 use ccboard_core::models::SessionMetadata;
+use chrono::{DateTime, Duration, Utc};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
@@ -15,6 +16,59 @@ use ratatui::{
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+
+/// Date filter for session list
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DateFilter {
+    All,
+    Last24h,
+    Last7d,
+    Last30d,
+}
+
+impl DateFilter {
+    /// Get the next filter in the cycle
+    fn next(&self) -> Self {
+        match self {
+            DateFilter::All => DateFilter::Last24h,
+            DateFilter::Last24h => DateFilter::Last7d,
+            DateFilter::Last7d => DateFilter::Last30d,
+            DateFilter::Last30d => DateFilter::All,
+        }
+    }
+
+    /// Get the cutoff datetime for filtering
+    fn cutoff(&self) -> Option<DateTime<Utc>> {
+        let now = Utc::now();
+        match self {
+            DateFilter::All => None,
+            DateFilter::Last24h => Some(now - Duration::hours(24)),
+            DateFilter::Last7d => Some(now - Duration::days(7)),
+            DateFilter::Last30d => Some(now - Duration::days(30)),
+        }
+    }
+
+    /// Check if a session matches this filter
+    fn matches(&self, session: &SessionMetadata) -> bool {
+        match self.cutoff() {
+            None => true,
+            Some(cutoff) => session
+                .first_timestamp
+                .map(|ts| ts >= cutoff)
+                .unwrap_or(false),
+        }
+    }
+
+    /// Get display string for UI
+    fn display(&self) -> &str {
+        match self {
+            DateFilter::All => "All",
+            DateFilter::Last24h => "24h",
+            DateFilter::Last7d => "7d",
+            DateFilter::Last30d => "30d",
+        }
+    }
+}
 
 /// Sessions tab state
 pub struct SessionsTab {
@@ -32,6 +86,10 @@ pub struct SessionsTab {
     search_filter: String,
     /// Search mode active
     search_active: bool,
+    /// Global search mode (all projects) vs local (current project)
+    search_global: bool,
+    /// Date filter for sessions
+    date_filter: DateFilter,
     /// Show detail popup for historical sessions
     show_detail: bool,
     /// Show detail popup for live sessions
@@ -71,6 +129,8 @@ impl SessionsTab {
             projects: Vec::new(),
             search_filter: String::new(),
             search_active: false,
+            search_global: false,
+            date_filter: DateFilter::All,
             show_detail: false,
             show_live_detail: false,
             error_message: None,
@@ -212,6 +272,16 @@ impl SessionsTab {
                     }
                 }
             }
+            KeyCode::Char('d') => {
+                // Cycle date filter
+                if self.focus == 2 {
+                    self.date_filter = self.date_filter.next();
+                    self.refresh_message =
+                        Some(format!("Date filter: {}", self.date_filter.display()));
+                    // Reset selection to top when filter changes
+                    self.session_state.select(Some(0));
+                }
+            }
             KeyCode::Esc => {
                 if self.error_message.is_some() {
                     self.error_message = None;
@@ -223,6 +293,12 @@ impl SessionsTab {
                 self.search_active = !self.search_active;
                 if !self.search_active {
                     self.search_filter.clear();
+                    self.search_global = false;
+                } else {
+                    // Set global search mode based on current focus
+                    // focus==1 (Projects) or focus==0 (Live) → global search
+                    // focus==2 (Sessions) → local search within selected project
+                    self.search_global = self.focus != 2;
                 }
             }
             KeyCode::PageUp => {
@@ -480,39 +556,58 @@ impl SessionsTab {
         // Render projects tree
         self.render_projects(frame, chunks[0]);
 
-        // Get sessions for selected project
+        // Get sessions for selected project or all projects (global search)
         let selected_project = self
             .project_state
             .selected()
             .and_then(|i| self.projects.get(i))
             .cloned();
 
-        let all_sessions = selected_project
-            .as_ref()
-            .and_then(|p| sessions_by_project.get(p))
-            .map(|v| v.as_slice())
-            .unwrap_or(&[]);
-
-        // Filter sessions based on search (Arc clone is cheap: 8 bytes)
-        let sessions: Vec<Arc<SessionMetadata>> = if self.search_filter.is_empty() {
-            all_sessions.to_vec()
+        // Collect sessions based on search mode
+        let all_sessions_vec: Vec<Arc<SessionMetadata>>;
+        let all_sessions: &[Arc<SessionMetadata>] = if self.search_global && self.search_active {
+            // Global search: collect all sessions from all projects
+            all_sessions_vec = sessions_by_project
+                .values()
+                .flat_map(|v| v.iter().map(Arc::clone))
+                .collect();
+            &all_sessions_vec
         } else {
-            let query_lower = self.search_filter.to_lowercase();
-            all_sessions
-                .iter()
-                .filter(|s| {
-                    s.id.to_lowercase().contains(&query_lower)
-                        || s.project_path.to_lowercase().contains(&query_lower)
-                        || s.first_user_message
-                            .as_ref()
-                            .is_some_and(|m| m.to_lowercase().contains(&query_lower))
-                        || s.models_used
-                            .iter()
-                            .any(|m: &String| m.to_lowercase().contains(&query_lower))
-                })
-                .map(Arc::clone)
-                .collect()
+            // Local search: sessions from selected project only
+            all_sessions_vec = selected_project
+                .as_ref()
+                .and_then(|p| sessions_by_project.get(p))
+                .map(|v| v.to_vec())
+                .unwrap_or_default();
+            &all_sessions_vec
         };
+
+        // Filter sessions based on search and date filter (Arc clone is cheap: 8 bytes)
+        let sessions: Vec<Arc<SessionMetadata>> = all_sessions
+            .iter()
+            .filter(|s| {
+                // Apply date filter
+                if !self.date_filter.matches(s) {
+                    return false;
+                }
+
+                // Apply search filter if active
+                if self.search_filter.is_empty() {
+                    return true;
+                }
+
+                let query_lower = self.search_filter.to_lowercase();
+                s.id.to_lowercase().contains(&query_lower)
+                    || s.project_path.to_lowercase().contains(&query_lower)
+                    || s.first_user_message
+                        .as_ref()
+                        .is_some_and(|m| m.to_lowercase().contains(&query_lower))
+                    || s.models_used
+                        .iter()
+                        .any(|m: &String| m.to_lowercase().contains(&query_lower))
+            })
+            .map(Arc::clone)
+            .collect();
 
         // Clamp session selection
         if let Some(sel) = self.session_state.selected() {
@@ -740,20 +835,38 @@ impl SessionsTab {
         let total_count = sessions.len();
         let display_count = total_count.min(MAX_DISPLAY);
 
+        // Build title with optional date filter and search mode indicators
+        let mut title_parts = vec!["Sessions".to_string()];
+
+        // Add search mode indicator
+        if self.search_global && self.search_active {
+            title_parts.push("(global)".to_string());
+        }
+
+        // Add date filter if not "All"
+        if self.date_filter != DateFilter::All {
+            title_parts.push(format!("({})", self.date_filter.display()));
+        }
+
+        let title_prefix = title_parts.join(" ");
+
         let title_text = if self.search_filter.is_empty() && total_count > MAX_DISPLAY {
             format!(
-                " Sessions (showing {} / {}) • {} ",
-                display_count, total_count, time_ago
+                " {} (showing {} / {}) • {} ",
+                title_prefix, display_count, total_count, time_ago
             )
         } else if self.search_filter.is_empty() {
-            format!(" Sessions ({}) • {} ", total_count, time_ago)
+            format!(" {} ({}) • {} ", title_prefix, total_count, time_ago)
         } else if total_count > MAX_DISPLAY {
             format!(
-                " Sessions (showing {} / {} results) • {} ",
-                display_count, total_count, time_ago
+                " {} (showing {} / {} results) • {} ",
+                title_prefix, display_count, total_count, time_ago
             )
         } else {
-            format!(" Sessions ({} results) • {} ", total_count, time_ago)
+            format!(
+                " {} ({} results) • {} ",
+                title_prefix, total_count, time_ago
+            )
         };
 
         let block = Block::default()
@@ -869,8 +982,21 @@ impl SessionsTab {
                 let msgs_str = format!("{}msg", session.message_count);
 
                 // Build preview spans with optional highlighting
-                let mut preview_spans = vec![
-                    Span::styled(format!(" {} ", if is_selected { "▶" } else { " " }), style),
+                let mut preview_spans = vec![Span::styled(
+                    format!(" {} ", if is_selected { "▶" } else { " " }),
+                    style,
+                )];
+
+                // Add project prefix if global search is active
+                if self.search_global && self.search_active {
+                    let project_short = Self::format_project_path(&session.project_path);
+                    preview_spans.push(Span::styled(
+                        format!("[{}] ", project_short),
+                        Style::default().fg(Color::Blue),
+                    ));
+                }
+
+                preview_spans.extend(vec![
                     Span::styled(format!("{} ", date_str), Style::default().fg(Color::Yellow)),
                     Span::styled(
                         format!("{:>6} ", tokens_str),
@@ -880,7 +1006,7 @@ impl SessionsTab {
                         format!("{:>5} ", msgs_str),
                         Style::default().fg(Color::Green),
                     ),
-                ];
+                ]);
 
                 // Add branch if available
                 if let Some(ref branch) = session.branch {
@@ -1469,6 +1595,14 @@ impl SessionsTab {
                     ),
                     Span::raw("] "),
                     Span::styled("resume", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled(
+                        "d",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
+                    Span::raw("] "),
+                    Span::styled("date filter", Style::default().fg(Color::White)),
                 ]
             }
             _ => vec![],
