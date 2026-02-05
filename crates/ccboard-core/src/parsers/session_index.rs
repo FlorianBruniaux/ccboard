@@ -109,19 +109,28 @@ impl SessionIndexParser {
     /// This function detects common worktree patterns and normalizes them
     /// to the parent repository path for better project grouping.
     fn normalize_worktree_path(path: &str) -> String {
+        // Normalize multiple slashes (from -- encoding) to single slash
+        // Example: /Users/.../app//worktrees → /Users/.../app/worktrees
+        let normalized = path.split('/').filter(|s| !s.is_empty()).collect::<Vec<_>>().join("/");
+        let normalized = if path.starts_with('/') {
+            format!("/{}", normalized)
+        } else {
+            normalized
+        };
+
         // Pattern 1: /path/to/repo/worktrees/branch → /path/to/repo
-        if let Some(idx) = path.find("/worktrees/") {
-            return path[..idx].to_string();
+        if let Some(idx) = normalized.find("/worktrees/") {
+            return normalized[..idx].to_string();
         }
 
         // Pattern 2: /path/to/repo/.worktrees/branch → /path/to/repo
-        if let Some(idx) = path.find("/.worktrees/") {
-            return path[..idx].to_string();
+        if let Some(idx) = normalized.find("/.worktrees/") {
+            return normalized[..idx].to_string();
         }
 
         // Pattern 3: /path/to/worktrees/repo-branch → /path/to (heuristic)
         // Only apply if path contains "worktrees" as a directory component
-        let components: Vec<&str> = path.split('/').collect();
+        let components: Vec<&str> = normalized.split('/').collect();
         if let Some(worktree_idx) = components.iter().position(|&c| c == "worktrees") {
             if worktree_idx > 0 {
                 // Return everything before "/worktrees"
@@ -129,8 +138,8 @@ impl SessionIndexParser {
             }
         }
 
-        // No worktree pattern detected, return as-is
-        path.to_string()
+        // No worktree pattern detected, return normalized path
+        normalized
     }
 
     /// Sanitize project path from encoded format
@@ -794,6 +803,25 @@ mod tests {
         assert_eq!(
             SessionIndexParser::normalize_worktree_path("/path/to/MethodeAristote/app"),
             "/path/to/MethodeAristote/app"
+        );
+    }
+
+    #[test]
+    fn test_normalize_worktree_path_double_slash() {
+        // Handle double slash from -- encoding: app//worktrees → app/worktrees
+        // Real case: -Users-...-app--worktrees-bugfixes → /Users/.../app//worktrees/bugfixes
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/Users/test/app//worktrees/feature-x"),
+            "/Users/test/app"
+        );
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/path/to/MethodeAristote/app//worktrees/bugfixes"),
+            "/path/to/MethodeAristote/app"
+        );
+        // Multiple consecutive slashes
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/Users///test///app//worktrees/fix"),
+            "/Users/test/app"
         );
     }
 }
