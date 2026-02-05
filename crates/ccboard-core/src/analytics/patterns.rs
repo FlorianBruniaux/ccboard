@@ -97,15 +97,21 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
     let cutoff = now - chrono::Duration::days(days as i64);
 
     for session in sessions {
+        // Apply period filter check
+        let passes_filter = if let Some(ts) = session.first_timestamp {
+            let local_ts = ts.with_timezone(&Local);
+            local_ts >= cutoff
+        } else {
+            false
+        };
+
+        if !passes_filter {
+            continue;
+        }
+
         // Hourly distribution & heatmap
         if let Some(ts) = session.first_timestamp {
             let local_ts = ts.with_timezone(&Local);
-
-            // Filter by period
-            if local_ts < cutoff {
-                continue;
-            }
-
             let hour = local_ts.hour() as usize;
             let weekday = local_ts.weekday().num_days_from_monday() as usize;
 
