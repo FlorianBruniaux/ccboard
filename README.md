@@ -715,7 +715,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap
 
-**Current Status**: 🎉 **PRODUCTION-READY** (v0.2.0)
+**Current Status**: 🎉 **PRODUCTION-READY** (v0.3.0)
 
 ### Completed Phases ✅
 

@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -72,9 +72,9 @@ open = "5"
 arboard = "3"
 
 # Internal crates
-ccboard-core = { version = "0.2.0", path = "crates/ccboard-core" }
-ccboard-tui = { version = "0.2.0", path = "crates/ccboard-tui" }
-ccboard-web = { version = "0.2.0", path = "crates/ccboard-web" }
+ccboard-core = { version = "0.3.0", path = "crates/ccboard-core" }
+ccboard-tui = { version = "0.3.0", path = "crates/ccboard-tui" }
+ccboard-web = { version = "0.3.0", path = "crates/ccboard-web" }
 
 [profile.release]
 lto = true

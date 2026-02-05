@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-05
+
 ### Added - Phase H+: UX & Analytics Enhancements
 
 #### UX Improvements
 
-- **Badge Style Keyboard Hints** (2026-02-05)
+- **Badge Style Keyboard Hints**
   - Modern badge format `[key]` for keyboard shortcuts
   - WCAG AAA compliant contrast (10:1 for keys, 21:1 for descriptions)
   - Black on Cyan background for keys (vs previous Cyan text on DarkGray)
@@ -22,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Analytics Enhancements
 
-- **Activity Heatmap** (2026-02-05)
+- **Activity Heatmap**
   - GitHub-style 7 days × 24 hours heatmap in Analytics > Patterns view
   - Color-coded intensity scale: DarkGray → Green → Cyan → Yellow → Magenta
   - Shows session activity patterns by day of week and hour
@@ -30,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Visual legend for intensity levels
   - Helps identify peak productivity hours and work patterns
 
-- **Most Used Tools** (2026-02-05)
+- **Most Used Tools**
   - Horizontal bar chart showing top 6 most-used tools/models
   - Color-coded bars (Blue, Green, Cyan, Magenta, Yellow, Red)
   - Displays usage count and percentage
