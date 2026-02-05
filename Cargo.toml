@@ -70,6 +70,7 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 clap = { version = "4", features = ["derive"] }
 open = "5"
 arboard = "3"
+comfy-table = "7"
 
 # Internal crates
 ccboard-core = { version = "0.3.0", path = "crates/ccboard-core" }

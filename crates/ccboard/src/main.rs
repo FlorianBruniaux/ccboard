@@ -1,5 +1,7 @@
 //! ccboard - Unified Claude Code Management Dashboard
 
+mod cli;
+
 use anyhow::{Context, Result};
 use ccboard_core::DataStore;
 use clap::{Parser, Subcommand};
@@ -62,6 +64,45 @@ enum Mode {
     Stats,
     /// Clear session metadata cache and exit
     ClearCache,
+    /// Search sessions by query
+    Search {
+        /// Query string (searches ID, project, message, branch)
+        query: String,
+        /// Date filter: 7d, 30d, 3m, 1y, YYYY-MM-DD
+        #[arg(long, short = 'd')]
+        since: Option<String>,
+        /// Max results
+        #[arg(long, short = 'n', default_value = "20")]
+        limit: usize,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show recent sessions
+    Recent {
+        /// Number of sessions
+        #[arg(default_value = "10")]
+        count: usize,
+        /// Date filter: 7d, 30d, 3m, 1y, YYYY-MM-DD
+        #[arg(long, short = 'd')]
+        since: Option<String>,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show detailed session info
+    Info {
+        /// Session ID or prefix (min 8 chars)
+        session_id: String,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Resume session in Claude CLI
+    Resume {
+        /// Session ID or prefix (min 8 chars)
+        session_id: String,
+    },
 }
 
 #[tokio::main]
@@ -99,6 +140,23 @@ async fn main() -> Result<()> {
         }
         Mode::ClearCache => {
             run_clear_cache(claude_home).await?;
+        }
+        Mode::Search {
+            query,
+            since,
+            limit,
+            json,
+        } => {
+            run_search(claude_home, project, query, since, limit, json).await?;
+        }
+        Mode::Recent { count, since, json } => {
+            run_recent(claude_home, project, count, since, json).await?;
+        }
+        Mode::Info { session_id, json } => {
+            run_info(claude_home, project, session_id, json).await?;
+        }
+        Mode::Resume { session_id } => {
+            run_resume(claude_home, project, session_id).await?;
         }
     }
 
@@ -339,5 +397,185 @@ fn format_number(n: u64) -> String {
         format!("{:.2}K", n as f64 / 1_000.0)
     } else {
         n.to_string()
+    }
+}
+
+// ============================================================================
+// CLI Command Handlers
+// ============================================================================
+
+async fn run_search(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    query: String,
+    since: Option<String>,
+    limit: usize,
+    json: bool,
+) -> Result<()> {
+    let store = DataStore::with_defaults(claude_home, project);
+
+    // Show progress
+    if !json {
+        eprint!("Scanning sessions... ");
+    }
+
+    let report = store.initial_load().await;
+
+    if !json && report.sessions_scanned > 0 {
+        eprintln!("✓ {} sessions", report.sessions_scanned);
+    }
+
+    // Parse date filter
+    let date_filter = if let Some(ref s) = since {
+        Some(cli::DateFilter::parse(s).context("Invalid date filter")?)
+    } else {
+        None
+    };
+
+    // Search
+    let all = store.recent_sessions(usize::MAX);
+    let results = cli::search_sessions(&all, &query, date_filter.as_ref(), limit);
+
+    if results.is_empty() {
+        return Err(cli::CliError::NoResults {
+            query,
+            scanned: all.len(),
+        }
+        .into());
+    }
+
+    println!("{}", cli::format_session_table(&results, json));
+
+    if !json {
+        eprintln!(
+            "\n{} results from {} sessions",
+            results.len(),
+            all.len()
+        );
+    }
+
+    Ok(())
+}
+
+async fn run_recent(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    count: usize,
+    since: Option<String>,
+    json: bool,
+) -> Result<()> {
+    let store = DataStore::with_defaults(claude_home, project);
+
+    if !json {
+        eprint!("Loading sessions... ");
+    }
+
+    let report = store.initial_load().await;
+
+    if !json && report.sessions_scanned > 0 {
+        eprintln!("✓ {} sessions", report.sessions_scanned);
+    }
+
+    // Parse date filter
+    let date_filter = if let Some(ref s) = since {
+        Some(cli::DateFilter::parse(s).context("Invalid date filter")?)
+    } else {
+        None
+    };
+
+    // Get recent sessions
+    let mut all = store.recent_sessions(usize::MAX);
+
+    // Apply date filter if specified
+    if let Some(filter) = date_filter {
+        all.retain(|s| {
+            s.first_timestamp
+                .map(|ts| filter.matches(&ts))
+                .unwrap_or(false)
+        });
+    }
+
+    let results: Vec<_> = all.into_iter().take(count).collect();
+
+    if results.is_empty() {
+        if !json {
+            println!("No sessions found.");
+        }
+        return Ok(());
+    }
+
+    println!("{}", cli::format_session_table(&results, json));
+
+    if !json {
+        eprintln!("\nShowing {} of {} sessions", results.len(), report.sessions_scanned);
+    }
+
+    Ok(())
+}
+
+async fn run_info(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    session_id: String,
+    json: bool,
+) -> Result<()> {
+    let store = DataStore::with_defaults(claude_home, project);
+
+    if !json {
+        eprint!("Loading sessions... ");
+    }
+
+    store.initial_load().await;
+
+    if !json {
+        eprintln!("✓");
+    }
+
+    let all = store.recent_sessions(usize::MAX);
+    let session = cli::find_by_id_or_prefix(&all, &session_id)?;
+
+    println!("{}", cli::format_session_info(&session, json));
+
+    Ok(())
+}
+
+async fn run_resume(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    session_id: String,
+) -> Result<()> {
+    let store = DataStore::with_defaults(claude_home, project);
+
+    eprint!("Loading sessions... ");
+    store.initial_load().await;
+    eprintln!("✓");
+
+    let all = store.recent_sessions(usize::MAX);
+    let session = cli::find_by_id_or_prefix(&all, &session_id)?;
+
+    eprintln!(
+        "Resuming session {} in {}",
+        &session.id[..8],
+        session.project_path
+    );
+
+    // Unix: use exec() to replace process (no need to wait)
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        let err = std::process::Command::new("claude")
+            .args(["--resume", &session.id])
+            .exec();
+        anyhow::bail!("Failed to exec claude: {}", err);
+    }
+
+    // Windows: spawn and exit with same code
+    #[cfg(not(unix))]
+    {
+        let status = std::process::Command::new("claude")
+            .args(["--resume", &session.id])
+            .status()
+            .context("Failed to spawn claude (is 'claude' in PATH?)")?;
+        std::process::exit(status.code().unwrap_or(1));
     }
 }

@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase I-CLI: Session Management Commands
+
+#### CLI Commands
+- **`search` command**: Search sessions by query string (ID, project, message, branch)
+  - `--since` filter: `7d`, `30d`, `3m`, `1y`, or `YYYY-MM-DD` format
+  - `--limit` option: max results (default: 20)
+  - `--json` flag: output as JSON for scripting
+  - Example: `ccboard search "implement auth" --since 7d --limit 5`
+- **`recent` command**: Show N most recent sessions
+  - `--since` date filter support
+  - `--json` flag for structured output
+  - Example: `ccboard recent 10 --json`
+- **`info` command**: Display detailed session metadata
+  - Supports full ID or 8+ char prefix matching
+  - Shows 17 fields: tokens breakdown, models, duration, branch, etc.
+  - `--json` flag for structured output
+  - Example: `ccboard info abc123de`
+- **`resume` command**: Resume session in Claude CLI
+  - Prefix matching (min 8 chars) for convenience
+  - Unix: `exec()` replacement for seamless transition
+  - Windows: spawn + exit with same status code
+  - Example: `ccboard resume 6c93a53e`
+
+#### Core Enhancements
+- **Branch extraction**: Added `branch` field to `SessionMetadata`
+  - Normalizes git branch names: strips `worktrees/` prefix, `(dirty)` suffix
+  - Handles detached HEAD: `HEAD (detached at abc123)` → `HEAD`
+  - Extracted from first `gitBranch` in session JSONL
+  - Cache version bumped to v4 (auto-invalidation)
+- **CLI module** (`crates/ccboard/src/cli.rs`):
+  - `DateFilter` parser: `7d`, `3m`, `1y`, `YYYY-MM-DD` formats
+  - `CliError` enum: `NoResults`, `AmbiguousId` with helpful messages
+  - `find_by_id_or_prefix()`: exact or prefix matching with collision detection
+  - `search_sessions()`: multi-field text search with date filtering
+  - `format_session_table()`: comfy-table human output or JSON
+  - `format_session_info()`: 17-field detailed view (human or JSON)
+  - Utilities: `format_tokens()`, `truncate()`, `shorten_project()`
+
+#### Developer Experience
+- **Reuses DataStore**: No new `CliStore` - same one-shot pattern as `run_stats()`
+- **Zero overhead**: Moka cache not allocated, EventBus has 0 subscribers in CLI mode
+- **SQLite cache**: Automatic 200ms warm vs 5s cold startup
+- **Unit tests**: 14 tests for DateFilter parsing, prefix matching, formatters
+- **Updated CLAUDE.md**: Added CLI examples to "Build & Run" section
+
 ## [0.3.0] - 2026-02-05
 
 ### Added - Phase H+: UX & Analytics Enhancements

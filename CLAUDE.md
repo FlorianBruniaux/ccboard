@@ -43,6 +43,14 @@ cargo run -- both --port 3333
 # Print stats and exit
 cargo run -- stats
 
+# Session management commands
+cargo run -- search "query" --limit 10          # Search sessions
+cargo run -- search "bug" --since 7d            # Search last 7 days
+cargo run -- recent 10                          # Show 10 most recent sessions
+cargo run -- recent 5 --json                    # JSON output
+cargo run -- info <session-id>                  # Show session details
+cargo run -- resume <session-id>                # Resume session in Claude CLI
+
 # Specify Claude home directory
 cargo run -- --claude-home ~/.claude --project /path/to/project
 ```

@@ -38,3 +38,8 @@ anyhow.workspace = true
 
 # File system
 dirs.workspace = true
+
+# CLI Utilities
+comfy-table = "7"
+serde_json.workspace = true
+chrono.workspace = true
