@@ -856,6 +856,7 @@ mod tests {
                 first_user_message: None,
                 has_subagents: false,
                 duration_seconds: Some(1800),
+                branch: None,
             };
             store.sessions.insert(session.id.clone(), Arc::new(session));
         }
@@ -918,6 +919,7 @@ mod tests {
                 first_user_message: None,
                 has_subagents: false,
                 duration_seconds: Some(1800),
+                branch: None,
             };
             store.sessions.insert(session.id.clone(), Arc::new(session));
         }

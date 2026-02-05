@@ -1,0 +1,308 @@
+version: "1.0.0"
+total_patterns: 23
+description: Machine-readable index of Gang of Four design patterns for TypeScript/JavaScript
+
+categories:
+  creational:
+    - singleton
+    - factory-method
+    - abstract-factory
+    - builder
+    - prototype
+  structural:
+    - adapter
+    - bridge
+    - composite
+    - decorator
+    - facade
+    - flyweight
+    - proxy
+  behavioral:
+    - chain-of-responsibility
+    - command
+    - iterator
+    - mediator
+    - memento
+    - observer
+    - state
+    - strategy
+    - template-method
+    - visitor
+    - interpreter
+
+pattern_metadata:
+  # Creational Patterns
+  singleton:
+    difficulty: 1
+    use_frequency: high
+    detection_confidence: 0.85
+    typical_files: ["*Manager.ts", "*Service.ts", "*Client.ts", "*Config.ts"]
+    primary_signals: ["private constructor", "static getInstance", "private static instance"]
+    anti_patterns: ["hard to test", "global state", "tight coupling"]
+    related: [dependency-injection]
+    stack_native:
+      react: "Context API"
+      angular: "Injectable services"
+      nestjs: "@Injectable() decorator"
+
+  factory-method:
+    difficulty: 2
+    use_frequency: high
+    detection_confidence: 0.75
+    typical_files: ["*Factory.ts", "*Creator.ts", "*Provider.ts"]
+    primary_signals: ["create* method", "returns interface/abstract class", "subclass decides instantiation"]
+    anti_patterns: ["simple factory confusion", "too many parameters"]
+    related: [abstract-factory, builder]
+
+  abstract-factory:
+    difficulty: 3
+    use_frequency: medium
+    detection_confidence: 0.70
+    typical_files: ["*Factory.ts", "*AbstractFactory.ts"]
+    primary_signals: ["multiple create* methods", "family of related objects", "interface for factory"]
+    anti_patterns: ["complexity overhead", "rigid product families"]
+    related: [factory-method, prototype]
+
+  builder:
+    difficulty: 2
+    use_frequency: high
+    detection_confidence: 0.80
+    typical_files: ["*Builder.ts"]
+    primary_signals: ["fluent interface", "method chaining", "build() method", "step-by-step construction"]
+    anti_patterns: ["incomplete builders", "mutable builders"]
+    related: [factory-method]
+    common_use_cases: ["query builders", "request builders", "complex configuration"]
+
+  prototype:
+    difficulty: 2
+    use_frequency: low
+    detection_confidence: 0.65
+    typical_files: ["*Prototype.ts"]
+    primary_signals: ["clone() method", "deep copy", "Object.create()"]
+    anti_patterns: ["shallow vs deep copy confusion", "circular references"]
+    related: [factory-method]
+
+  # Structural Patterns
+  adapter:
+    difficulty: 2
+    use_frequency: high
+    detection_confidence: 0.75
+    typical_files: ["*Adapter.ts", "*Wrapper.ts"]
+    primary_signals: ["wraps incompatible interface", "delegates to adaptee", "converts interface"]
+    anti_patterns: ["two-way adapters", "adapter chains"]
+    related: [bridge, decorator, proxy]
+    common_use_cases: ["third-party library integration", "legacy code integration"]
+
+  bridge:
+    difficulty: 3
+    use_frequency: low
+    detection_confidence: 0.60
+    typical_files: ["*Bridge.ts", "*Abstraction.ts", "*Implementation.ts"]
+    primary_signals: ["abstraction has implementation reference", "two hierarchies", "runtime binding"]
+    anti_patterns: ["over-engineering simple scenarios"]
+    related: [adapter, strategy]
+
+  composite:
+    difficulty: 2
+    use_frequency: medium
+    detection_confidence: 0.75
+    typical_files: ["*Component.ts", "*Composite.ts", "*Leaf.ts"]
+    primary_signals: ["tree structure", "uniform interface", "recursive composition", "children collection"]
+    anti_patterns: ["incorrect child management", "violating uniformity"]
+    related: [decorator, iterator]
+    common_use_cases: ["UI component trees", "file systems", "organization structures"]
+
+  decorator:
+    difficulty: 2
+    use_frequency: high
+    detection_confidence: 0.70
+    typical_files: ["*Decorator.ts", "*Wrapper.ts"]
+    primary_signals: ["wraps same interface", "adds behavior", "delegates to wrapped", "stackable"]
+    anti_patterns: ["decorator explosion", "order dependency"]
+    related: [adapter, composite, proxy]
+    stack_native:
+      react: "Higher-Order Components (HOC)"
+      angular: "Directives"
+      nestjs: "Interceptors"
+      typescript: "Decorators (@)"
+
+  facade:
+    difficulty: 1
+    use_frequency: high
+    detection_confidence: 0.80
+    typical_files: ["*Facade.ts", "*API.ts", "*Interface.ts"]
+    primary_signals: ["simple interface to complex subsystem", "delegates to multiple classes"]
+    anti_patterns: ["god facade", "leaky abstraction"]
+    related: [adapter, mediator]
+    common_use_cases: ["API clients", "library wrappers", "subsystem interfaces"]
+
+  flyweight:
+    difficulty: 3
+    use_frequency: low
+    detection_confidence: 0.65
+    typical_files: ["*Flyweight.ts", "*Factory.ts"]
+    primary_signals: ["shared state", "intrinsic vs extrinsic state", "large number of objects", "factory for sharing"]
+    anti_patterns: ["premature optimization", "incorrect state separation"]
+    related: [singleton, factory-method]
+
+  proxy:
+    difficulty: 2
+    use_frequency: medium
+    detection_confidence: 0.75
+    typical_files: ["*Proxy.ts"]
+    primary_signals: ["same interface as real subject", "controls access", "lazy initialization", "logging/caching"]
+    anti_patterns: ["proxy chains", "performance overhead"]
+    related: [adapter, decorator]
+    common_use_cases: ["lazy loading", "access control", "caching", "logging"]
+    stack_native:
+      javascript: "Proxy object"
+
+  # Behavioral Patterns
+  chain-of-responsibility:
+    difficulty: 2
+    use_frequency: medium
+    detection_confidence: 0.70
+    typical_files: ["*Handler.ts", "*Middleware.ts"]
+    primary_signals: ["handler interface", "next handler reference", "handles or passes", "linked list structure"]
+    anti_patterns: ["unhandled requests", "broken chains"]
+    related: [command, decorator]
+    stack_native:
+      express: "Middleware chain (app.use)"
+      nestjs: "Guards, Interceptors, Pipes"
+
+  command:
+    difficulty: 2
+    use_frequency: medium
+    detection_confidence: 0.75
+    typical_files: ["*Command.ts", "*Action.ts"]
+    primary_signals: ["execute() method", "encapsulates request", "receiver reference", "undo/redo support"]
+    anti_patterns: ["command explosion", "complex commands"]
+    related: [memento, chain-of-responsibility]
+    stack_native:
+      redux: "Action creators"
+      vuex: "Mutations"
+
+  iterator:
+    difficulty: 2
+    use_frequency: medium
+    detection_confidence: 0.80
+    typical_files: ["*Iterator.ts"]
+    primary_signals: ["next() method", "hasNext()/done", "current element access", "sequential traversal"]
+    anti_patterns: ["modification during iteration"]
+    related: [composite, visitor]
+    stack_native:
+      javascript: "Iterators and generators (Symbol.iterator)"
+      typescript: "Iterable<T> interface"
+
+  mediator:
+    difficulty: 3
+    use_frequency: medium
+    detection_confidence: 0.65
+    typical_files: ["*Mediator.ts", "*Controller.ts"]
+    primary_signals: ["centralized communication", "colleagues reference mediator", "loose coupling"]
+    anti_patterns: ["god mediator", "tight coupling to mediator"]
+    related: [facade, observer]
+    stack_native:
+      react: "Context API"
+      angular: "Services with dependency injection"
+
+  memento:
+    difficulty: 3
+    use_frequency: low
+    detection_confidence: 0.60
+    typical_files: ["*Memento.ts", "*Snapshot.ts", "*Caretaker.ts"]
+    primary_signals: ["save state", "restore state", "encapsulated snapshot", "caretaker manages history"]
+    anti_patterns: ["large state snapshots", "exposing internals"]
+    related: [command]
+    common_use_cases: ["undo/redo", "transaction rollback", "state history"]
+
+  observer:
+    difficulty: 2
+    use_frequency: very-high
+    detection_confidence: 0.85
+    typical_files: ["*Observer.ts", "*Subject.ts", "*Publisher.ts", "*Subscriber.ts"]
+    primary_signals: ["subscribe/unsubscribe", "notify/emit", "observers list", "one-to-many dependency"]
+    anti_patterns: ["memory leaks", "notification storms", "observer order dependency"]
+    related: [mediator, singleton]
+    stack_native:
+      javascript: "EventEmitter, EventTarget"
+      react: "useState, useEffect, Context"
+      angular: "RxJS Observables"
+      rxjs: "Subject, BehaviorSubject, ReplaySubject"
+      vue: "ref(), reactive(), watch()"
+
+  state:
+    difficulty: 2
+    use_frequency: medium
+    detection_confidence: 0.70
+    typical_files: ["*State.ts", "*Context.ts"]
+    primary_signals: ["state interface", "context holds state", "state transitions", "behavior varies by state"]
+    anti_patterns: ["state explosion", "complex transitions"]
+    related: [strategy, flyweight]
+    stack_native:
+      react: "useState, useReducer"
+      redux: "Reducers"
+      xstate: "State machines"
+
+  strategy:
+    difficulty: 1
+    use_frequency: high
+    detection_confidence: 0.80
+    typical_files: ["*Strategy.ts", "*Policy.ts"]
+    primary_signals: ["strategy interface", "context has strategy reference", "interchangeable algorithms"]
+    anti_patterns: ["strategy explosion", "client awareness of strategies"]
+    related: [state, bridge, template-method]
+    stack_native:
+      react: "Custom hooks"
+      vue: "Composables"
+
+  template-method:
+    difficulty: 2
+    use_frequency: medium
+    detection_confidence: 0.75
+    typical_files: ["*Template.ts", "*Abstract*.ts"]
+    primary_signals: ["abstract class", "template method", "primitive operations", "hook methods"]
+    anti_patterns: ["too many hooks", "subclass override complexity"]
+    related: [strategy, factory-method]
+
+  visitor:
+    difficulty: 4
+    use_frequency: low
+    detection_confidence: 0.60
+    typical_files: ["*Visitor.ts"]
+    primary_signals: ["visit* methods", "double dispatch", "element accepts visitor", "operations on object structure"]
+    anti_patterns: ["adding new element types", "circular dependencies"]
+    related: [composite, iterator]
+
+  interpreter:
+    difficulty: 4
+    use_frequency: very-low
+    detection_confidence: 0.55
+    typical_files: ["*Interpreter.ts", "*Expression.ts"]
+    primary_signals: ["grammar rules", "interpret() method", "abstract syntax tree", "terminal/non-terminal expressions"]
+    anti_patterns: ["complex grammars", "performance issues"]
+    related: [composite, visitor]
+    common_use_cases: ["DSLs", "query languages", "expression evaluators"]
+
+# Detection difficulty levels
+difficulty_levels:
+  1: "Easy - Clear structural markers and naming conventions"
+  2: "Medium - Requires pattern knowledge to distinguish from similar patterns"
+  3: "Hard - Subtle structural differences, context-dependent"
+  4: "Very Hard - Requires deep analysis of intent and relationships"
+
+# Usage frequency in modern codebases
+frequency_levels:
+  very-high: "Ubiquitous in modern frameworks"
+  high: "Common in most projects"
+  medium: "Occasional use, specific scenarios"
+  low: "Rare, specialized use cases"
+  very-low: "Academic or niche applications"
+
+# Confidence score interpretation
+confidence_interpretation:
+  0.85-1.0: "High confidence - Multiple strong signals, unlikely false positive"
+  0.70-0.84: "Medium-high - Clear signals, some ambiguity possible"
+  0.55-0.69: "Medium - Requires manual validation"
+  0.40-0.54: "Low - Weak signals, high false positive risk"
+  0.0-0.39: "Very low - Naming convention only, not reliable"

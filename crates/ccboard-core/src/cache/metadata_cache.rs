@@ -33,7 +33,13 @@ use tracing::{debug, warn};
 /// - Parsing logic modified (e.g., token accumulation)
 ///
 /// This triggers automatic cache invalidation on startup, preventing stale data bugs.
-const CACHE_VERSION: i32 = 3;
+///
+/// Version History:
+/// - v1: Initial version
+/// - v2: Fixed TokenUsage::total() calculation
+/// - v3: Added token breakdown fields
+/// - v4: Added branch field to SessionMetadata
+const CACHE_VERSION: i32 = 4;
 
 /// SQLite-based metadata cache (thread-safe)
 pub struct MetadataCache {

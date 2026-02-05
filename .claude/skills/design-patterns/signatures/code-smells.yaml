@@ -1,0 +1,478 @@
+version: "1.0.0"
+description: Mapping from code smells to applicable design patterns with detection rules and rationale
+
+# Code Smell Categories
+categories:
+  - bloaters           # Code that has grown too large
+  - oo_abusers         # Misuse of object-oriented principles
+  - change_preventers  # Changes require modifications in many places
+  - dispensables       # Pointless code that should be removed
+  - couplers           # Excessive coupling between classes
+
+# Code Smells with Pattern Suggestions
+code_smells:
+  switch_on_type:
+    category: oo_abusers
+    description: "Switch statement (or if-else chain) discriminating on object type or kind"
+    severity: medium
+
+    detection:
+      patterns:
+        - "switch\\s*\\([^)]*\\.type\\)"
+        - "switch\\s*\\([^)]*\\.kind\\)"
+        - "if\\s*\\([^)]*instanceof\\s+\\w+\\).*else\\s+if\\s*\\([^)]*instanceof"
+      context: "Function or method with >3 cases"
+
+    suggested_patterns:
+      - pattern: strategy
+        priority: high
+        rationale: "Replace conditional logic with strategy objects"
+        example: |
+          // Before (smell)
+          switch (paymentType) {
+            case 'credit': return processCreditCard();
+            case 'paypal': return processPaypal();
+            case 'crypto': return processCrypto();
+          }
+
+          // After (Strategy)
+          const strategy = strategies[paymentType];
+          return strategy.process();
+
+      - pattern: factory-method
+        priority: medium
+        rationale: "If creating objects based on type"
+        example: |
+          // Before (smell)
+          switch (type) {
+            case 'A': return new ProductA();
+            case 'B': return new ProductB();
+          }
+
+          // After (Factory)
+          return ProductFactory.create(type);
+
+  long_parameter_list:
+    category: bloaters
+    description: "Function/constructor with more than 4 parameters"
+    severity: medium
+
+    detection:
+      patterns:
+        - "function\\s+\\w+\\s*\\([^)]{100,}\\)"  # Heuristic: >100 chars
+        - "constructor\\s*\\([^)]{80,}\\)"
+      context: "Count commas in parameter list"
+
+    suggested_patterns:
+      - pattern: builder
+        priority: high
+        rationale: "Fluent interface for step-by-step construction"
+        example: |
+          // Before (smell)
+          new House(walls, doors, windows, roof, garage, pool, garden);
+
+          // After (Builder)
+          new HouseBuilder()
+            .setWalls(walls)
+            .setDoors(doors)
+            .build();
+
+      - pattern: parameter-object
+        priority: medium
+        rationale: "Group related parameters into object"
+        example: |
+          // Before (smell)
+          function createUser(name, email, age, address, phone, role) { }
+
+          // After (Parameter Object)
+          function createUser(userData: UserData) { }
+
+  global_state_access:
+    category: couplers
+    description: "Scattered access to global variables or singletons"
+    severity: high
+
+    detection:
+      patterns:
+        - "window\\.[A-Z]\\w+"
+        - "global\\.[A-Z]\\w+"
+        - "\\w+\\.getInstance\\(\\)"
+      context: "Outside of configuration/initialization files"
+
+    suggested_patterns:
+      - pattern: dependency-injection
+        priority: high
+        rationale: "Inject dependencies instead of global access"
+        example: |
+          // Before (smell)
+          const config = Config.getInstance();
+
+          // After (DI)
+          class Service {
+            constructor(private config: Config) {}
+          }
+
+      - pattern: singleton
+        priority: low
+        rationale: "If truly global state is needed (use sparingly)"
+        note: "Consider framework-native alternatives (React Context, Angular Services)"
+
+  duplicated_conditionals_on_state:
+    category: change_preventers
+    description: "Same state checks scattered across methods"
+    severity: medium
+
+    detection:
+      patterns:
+        - "if\\s*\\([^)]*\\.state\\s*===\\s*['\"]\\w+['\"]\\).*if\\s*\\([^)]*\\.state\\s*===\\s*['\"]\\w+['\"]\\)"
+        - "switch\\s*\\([^)]*\\.status\\)"
+      context: "Multiple methods with identical state checks"
+
+    suggested_patterns:
+      - pattern: state
+        priority: high
+        rationale: "Encapsulate state-dependent behavior in state classes"
+        example: |
+          // Before (smell)
+          if (order.status === 'draft') { /* ... */ }
+          else if (order.status === 'submitted') { /* ... */ }
+
+          // After (State pattern)
+          order.state.process(); // Behavior varies by state object
+
+  scattered_notification_logic:
+    category: change_preventers
+    description: "Manual notification loops in multiple places"
+    severity: medium
+
+    detection:
+      patterns:
+        - "listeners\\.forEach\\(\\s*\\w+\\s*=>\\s*\\w+\\.\\w+\\(\\)"
+        - "for\\s*\\([^)]*observers[^)]*\\).*\\.update\\("
+      context: "Multiple locations with similar notification code"
+
+    suggested_patterns:
+      - pattern: observer
+        priority: high
+        rationale: "Centralize subscription and notification mechanism"
+        example: |
+          // Before (smell)
+          for (const listener of this.listeners) {
+            listener.notify(data);
+          }
+
+          // After (Observer)
+          this.subject.notify(data); // Handles all observers
+
+      - pattern: event-emitter
+        priority: medium
+        rationale: "Use built-in EventEmitter (Node.js) or EventTarget"
+        stack_native:
+          javascript: "EventTarget, EventEmitter"
+          rxjs: "Subject, BehaviorSubject"
+
+  complex_object_creation:
+    category: bloaters
+    description: "Object construction requires many steps or conditional logic"
+    severity: medium
+
+    detection:
+      patterns:
+        - "new\\s+\\w+\\([^)]{80,}\\)"  # Long constructor call
+        - "const\\s+\\w+\\s*=\\s*new\\s+\\w+\\(\\);[^}]{50,}\\w+\\.set\\w+"
+      context: "Construction spans multiple lines with setters"
+
+    suggested_patterns:
+      - pattern: builder
+        priority: high
+        rationale: "Step-by-step construction with fluent interface"
+
+      - pattern: factory-method
+        priority: medium
+        rationale: "Encapsulate creation logic"
+
+      - pattern: abstract-factory
+        priority: low
+        rationale: "If creating families of related objects"
+
+  tight_coupling_to_concrete_classes:
+    category: couplers
+    description: "Direct instantiation of concrete classes throughout codebase"
+    severity: medium
+
+    detection:
+      patterns:
+        - "new\\s+Concrete\\w+\\("
+        - "new\\s+\\w+Impl\\("
+      context: "Multiple files instantiating same concrete classes"
+
+    suggested_patterns:
+      - pattern: factory-method
+        priority: high
+        rationale: "Depend on interfaces, not concrete classes"
+
+      - pattern: dependency-injection
+        priority: high
+        rationale: "Inject dependencies instead of creating them"
+
+      - pattern: adapter
+        priority: medium
+        rationale: "If integrating incompatible third-party code"
+
+  repetitive_interface_conversions:
+    category: dispensables
+    description: "Manual conversion between incompatible interfaces"
+    severity: low
+
+    detection:
+      patterns:
+        - "\\{\\s*\\w+:\\s*\\w+\\.\\w+,.*\\w+:\\s*\\w+\\.\\w+"  # Object mapping
+      context: "Same mapping logic repeated in multiple places"
+
+    suggested_patterns:
+      - pattern: adapter
+        priority: high
+        rationale: "Single adapter class for interface conversion"
+
+  deep_nesting_for_feature_addition:
+    category: change_preventers
+    description: "Adding features requires modifying deeply nested code"
+    severity: medium
+
+    detection:
+      patterns:
+        - "class\\s+\\w+\\s+extends\\s+\\w+\\s+extends\\s+\\w+"  # Multi-level inheritance
+      context: "Inheritance hierarchy >3 levels deep"
+
+    suggested_patterns:
+      - pattern: decorator
+        priority: high
+        rationale: "Compose behavior dynamically instead of deep inheritance"
+
+      - pattern: strategy
+        priority: medium
+        rationale: "If behavior variants are swapped at runtime"
+
+  large_class_many_responsibilities:
+    category: bloaters
+    description: "Class has too many responsibilities (God Object)"
+    severity: high
+
+    detection:
+      patterns:
+        - "class\\s+\\w+\\s*\\{"
+      context: "Class >300 lines or >20 methods"
+
+    suggested_patterns:
+      - pattern: facade
+        priority: high
+        rationale: "If class coordinates multiple subsystems"
+
+      - pattern: strategy
+        priority: medium
+        rationale: "Extract varying behavior into strategies"
+
+      - pattern: extract-class
+        priority: high
+        rationale: "Split into multiple focused classes"
+
+  complex_conditional_logic:
+    category: bloaters
+    description: "Deeply nested conditionals or complex boolean expressions"
+    severity: medium
+
+    detection:
+      patterns:
+        - "if\\s*\\([^)]*&&[^)]*&&[^)]*\\)"  # Multiple conditions
+        - "if\\s*\\(.*if\\s*\\(.*if\\s*\\("  # Nested ifs
+      context: "Cyclomatic complexity >10"
+
+    suggested_patterns:
+      - pattern: strategy
+        priority: high
+        rationale: "Replace conditional with strategy object"
+
+      - pattern: state
+        priority: medium
+        rationale: "If conditionals check object state"
+
+      - pattern: chain-of-responsibility
+        priority: low
+        rationale: "If processing steps can be chained"
+
+  data_clumps:
+    category: bloaters
+    description: "Same group of parameters appears together frequently"
+    severity: low
+
+    detection:
+      patterns:
+        - "function\\s+\\w+\\([^)]*userId[^)]*userName[^)]*userEmail[^)]*\\)"
+      context: "Same 3+ parameters in multiple functions"
+
+    suggested_patterns:
+      - pattern: parameter-object
+        priority: high
+        rationale: "Group related parameters into object"
+
+      - pattern: builder
+        priority: medium
+        rationale: "If object construction is complex"
+
+  manual_resource_management:
+    category: change_preventers
+    description: "Manual open/close, connect/disconnect, etc."
+    severity: medium
+
+    detection:
+      patterns:
+        - "open\\([^)]*\\);.*close\\("
+        - "connect\\([^)]*\\);.*disconnect\\("
+      context: "Scattered resource management logic"
+
+    suggested_patterns:
+      - pattern: template-method
+        priority: high
+        rationale: "Template ensures proper initialization/cleanup"
+
+      - pattern: proxy
+        priority: medium
+        rationale: "Proxy manages resource lifecycle"
+
+  feature_envy:
+    category: couplers
+    description: "Method uses more features of another class than its own"
+    severity: medium
+
+    detection:
+      patterns:
+        - "this\\.(\\w+\\.){3,}"  # Multiple chained accesses
+      context: "Method heavily accesses another object's data"
+
+    suggested_patterns:
+      - pattern: extract-method
+        priority: high
+        rationale: "Move method to the class it envies"
+
+      - pattern: visitor
+        priority: low
+        rationale: "If operation needs to be external"
+
+  shotgun_surgery:
+    category: change_preventers
+    description: "Single change requires modifying many classes"
+    severity: high
+
+    detection:
+      manual: true
+      context: "Feature addition requires >5 file changes"
+
+    suggested_patterns:
+      - pattern: facade
+        priority: high
+        rationale: "Centralize interface to subsystem"
+
+      - pattern: mediator
+        priority: medium
+        rationale: "Centralize communication between objects"
+
+      - pattern: observer
+        priority: medium
+        rationale: "Decouple event sources from handlers"
+
+  parallel_inheritance_hierarchies:
+    category: change_preventers
+    description: "Adding subclass to one hierarchy requires adding to another"
+    severity: medium
+
+    detection:
+      manual: true
+      context: "Two inheritance trees grow together"
+
+    suggested_patterns:
+      - pattern: bridge
+        priority: high
+        rationale: "Separate abstraction from implementation"
+
+  refused_bequest:
+    category: oo_abusers
+    description: "Subclass doesn't use inherited methods"
+    severity: low
+
+    detection:
+      manual: true
+      context: "Subclass throws errors or leaves methods empty"
+
+    suggested_patterns:
+      - pattern: composition-over-inheritance
+        priority: high
+        rationale: "Use composition instead of inheritance"
+
+      - pattern: strategy
+        priority: medium
+        rationale: "Delegate to strategy object"
+
+# Detection Priority Rules
+detection_rules:
+  priority_high:
+    - "Affects >5 files"
+    - "Security implications"
+    - "Performance bottleneck"
+    - "Blocks new features"
+
+  priority_medium:
+    - "Affects 2-5 files"
+    - "Moderate complexity increase"
+    - "Makes testing harder"
+
+  priority_low:
+    - "Affects 1 file"
+    - "Minor code quality issue"
+    - "Cosmetic improvement"
+
+# Refactoring Impact Assessment
+impact_assessment:
+  effort:
+    low: "< 2 hours, single file"
+    medium: "2-8 hours, multiple files"
+    high: "> 8 hours, architectural change"
+
+  risk:
+    low: "Localized change, comprehensive tests exist"
+    medium: "Multiple components affected, partial test coverage"
+    high: "Core functionality, limited tests"
+
+  benefit:
+    low: "Minor code quality improvement"
+    medium: "Improved maintainability, easier testing"
+    high: "Significant complexity reduction, enables new features"
+
+# Stack-Specific Smell Detection
+stack_specific_smells:
+  react:
+    - smell: "Class components with complex lifecycle methods"
+      pattern: hooks
+      note: "Migrate to functional components with hooks"
+
+    - smell: "Props drilling >3 levels"
+      pattern: context
+      note: "Use Context API for shared state"
+
+  angular:
+    - smell: "Manual subscription management"
+      pattern: async-pipe
+      note: "Use async pipe in templates"
+
+    - smell: "Services with getInstance()"
+      pattern: dependency-injection
+      note: "Use Angular DI with @Injectable()"
+
+  nestjs:
+    - smell: "Manual middleware chaining"
+      pattern: guards-interceptors
+      note: "Use NestJS Guards/Interceptors"
+
+  express:
+    - smell: "Nested callback chains"
+      pattern: async-await
+      note: "Use async/await or Promises"

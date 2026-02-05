@@ -230,6 +230,7 @@ impl SessionIndexParser {
         let mut output_tokens = 0u64;
         let mut cache_creation_tokens = 0u64;
         let mut cache_read_tokens = 0u64;
+        let mut branch: Option<String> = None;
 
         while let Some(line_result) = lines.next_line().await.map_err(|e| CoreError::FileRead {
             path: path.to_path_buf(),
@@ -300,6 +301,13 @@ impl SessionIndexParser {
             // Track subagents
             if session_line.parent_session_id.is_some() {
                 metadata.has_subagents = true;
+            }
+
+            // Extract git branch (first occurrence wins)
+            if branch.is_none() {
+                if let Some(ref git_branch) = session_line.git_branch {
+                    branch = Some(normalize_branch(git_branch));
+                }
             }
 
             // Count user messages and extract first preview
@@ -379,6 +387,9 @@ impl SessionIndexParser {
         metadata.cache_creation_tokens = cache_creation_tokens;
         metadata.cache_read_tokens = cache_read_tokens;
 
+        // Apply branch
+        metadata.branch = branch;
+
         Ok(metadata)
     }
 
@@ -397,7 +408,37 @@ impl SessionIndexParser {
             metadata.models_used = models.to_vec();
         }
     }
+}
 
+/// Normalize git branch name
+///
+/// Handles common variations:
+/// - Strips `worktrees/` prefix (e.g., "worktrees/feature-x" → "feature-x")
+/// - Strips ` (dirty)` suffix (e.g., "main (dirty)" → "main")
+/// - Trims whitespace
+/// - Handles detached HEAD states (e.g., "HEAD (detached at abc123)" → "HEAD")
+fn normalize_branch(raw: &str) -> String {
+    let mut normalized = raw.trim();
+
+    // Strip worktrees/ prefix
+    if let Some(stripped) = normalized.strip_prefix("worktrees/") {
+        normalized = stripped;
+    }
+
+    // Strip (dirty) suffix
+    if let Some(stripped) = normalized.strip_suffix(" (dirty)") {
+        normalized = stripped;
+    }
+
+    // Handle detached HEAD: "HEAD (detached at abc123)" → "HEAD"
+    if normalized.starts_with("HEAD (detached") {
+        normalized = "HEAD";
+    }
+
+    normalized.to_string()
+}
+
+impl SessionIndexParser {
     /// Scan session with graceful degradation
     pub async fn scan_session_graceful(
         &self,
@@ -483,6 +524,42 @@ mod tests {
     use tempfile::{NamedTempFile, tempdir};
 
     #[test]
+    fn test_normalize_branch_plain() {
+        assert_eq!(normalize_branch("main"), "main");
+        assert_eq!(normalize_branch("feature/auth"), "feature/auth");
+    }
+
+    #[test]
+    fn test_normalize_branch_worktree_prefix() {
+        assert_eq!(normalize_branch("worktrees/feature-x"), "feature-x");
+        assert_eq!(normalize_branch("worktrees/main"), "main");
+    }
+
+    #[test]
+    fn test_normalize_branch_dirty_suffix() {
+        assert_eq!(normalize_branch("main (dirty)"), "main");
+        assert_eq!(normalize_branch("feature/ui (dirty)"), "feature/ui");
+    }
+
+    #[test]
+    fn test_normalize_branch_detached_head() {
+        assert_eq!(normalize_branch("HEAD (detached at abc123)"), "HEAD");
+        assert_eq!(normalize_branch("HEAD (detached at 1a2b3c4)"), "HEAD");
+    }
+
+    #[test]
+    fn test_normalize_branch_combined() {
+        assert_eq!(normalize_branch("worktrees/feature (dirty)"), "feature");
+        assert_eq!(normalize_branch("  main (dirty)  "), "main");
+    }
+
+    #[test]
+    fn test_normalize_branch_whitespace() {
+        assert_eq!(normalize_branch("  main  "), "main");
+        assert_eq!(normalize_branch("\tmain\n"), "main");
+    }
+
+    #[test]
     fn test_extract_project_path() {
         let parser = SessionIndexParser::new();
 
@@ -528,6 +605,31 @@ mod tests {
             meta.models_used
                 .contains(&"claude-sonnet-4-20250514".to_string())
         );
+    }
+
+    #[tokio::test]
+    async fn test_scan_session_with_branch() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(
+            file,
+            r#"{{"type": "user", "sessionId": "test-branch", "gitBranch": "worktrees/feature-cli (dirty)", "message": {{"content": "Test"}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            file,
+            r#"{{"type": "assistant", "model": "claude-sonnet-4-20250514", "usage": {{"input_tokens": 10, "output_tokens": 5}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            file,
+            r#"{{"type": "summary", "summary": {{"totalTokens": 15, "messageCount": 2}}}}"#
+        )
+        .unwrap();
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(file.path()).await.unwrap();
+
+        assert_eq!(meta.branch, Some("feature-cli".to_string()));
     }
 
     #[tokio::test]

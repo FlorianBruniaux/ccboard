@@ -31,6 +31,7 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
                 first_user_message: None,
                 has_subagents: false,
                 duration_seconds: Some(1800),
+                branch: None,
             })
         })
         .collect()
@@ -218,6 +219,7 @@ fn test_patterns_multi_model_session_no_double_count() {
         first_user_message: None,
         has_subagents: false,
         duration_seconds: Some(1800),
+        branch: None,
     })];
 
     let patterns = detect_patterns(&sessions, 7);

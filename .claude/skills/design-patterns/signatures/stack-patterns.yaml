@@ -1,0 +1,582 @@
+version: "1.0.0"
+description: Stack detection rules and pattern adaptations for framework-native idioms
+
+# Stack Detection Rules
+stack_detection:
+  sources:
+    - file: "package.json"
+      check: "dependencies + devDependencies"
+      priority: 1
+    - file: "tsconfig.json"
+      check: "compilerOptions, paths, lib"
+      priority: 2
+    - files: ["angular.json", "next.config.*", "nest-cli.json", "vite.config.*", "nuxt.config.*"]
+      check: "presence"
+      priority: 1
+    - pattern: "*.jsx, *.tsx, *.vue, *.svelte"
+      check: "file extensions"
+      priority: 3
+
+  confidence_scoring:
+    high: "Primary framework found in package.json + config file present"
+    medium: "Framework in package.json OR config file present"
+    low: "Only file extensions or indirect evidence"
+
+# Supported Stacks
+stacks:
+  react:
+    detection:
+      package_json:
+        required: ["react"]
+        optional: ["react-dom", "next", "@types/react"]
+      files:
+        optional: ["next.config.js", "next.config.ts", "vite.config.ts"]
+      extensions: [".jsx", ".tsx"]
+
+    version_detection:
+      hooks_era: ">=16.8.0"  # useState, useEffect introduced
+      concurrent: ">=18.0.0"  # Concurrent features
+
+    native_patterns:
+      singleton:
+        replacement: "Context API + Provider"
+        example: |
+          // Instead of Singleton
+          const MyContext = createContext<ContextValue>(defaultValue);
+          export const MyProvider = ({ children }) => (
+            <MyContext.Provider value={value}>{children}</MyContext.Provider>
+          );
+        rationale: "Context provides dependency injection without global state"
+        confidence: 0.95
+
+      observer:
+        replacement: "useState + useEffect"
+        example: |
+          const [value, setValue] = useState(initial);
+          useEffect(() => {
+            // React auto-notifies subscribers
+          }, [value]);
+        rationale: "React's reactivity system is built-in observer pattern"
+        confidence: 0.98
+
+      strategy:
+        replacement: "Custom hooks"
+        example: |
+          const usePaymentStrategy = (type: PaymentType) => {
+            const strategies = {
+              credit: useCreditPayment(),
+              paypal: usePaypalPayment(),
+            };
+            return strategies[type];
+          };
+        rationale: "Hooks encapsulate behavior and are composable"
+        confidence: 0.90
+
+      decorator:
+        replacement: "Higher-Order Components (HOC)"
+        example: |
+          const withAuth = <P extends object>(Component: React.ComponentType<P>) => {
+            return (props: P) => {
+              const { user } = useAuth();
+              if (!user) return <Redirect to="/login" />;
+              return <Component {...props} />;
+            };
+          };
+        rationale: "HOCs wrap components to add behavior"
+        confidence: 0.85
+
+      mediator:
+        replacement: "Context API"
+        example: |
+          // Centralized state management
+          const AppContext = createContext<AppState>(initialState);
+          // Components communicate through context
+        rationale: "Context mediates communication between components"
+        confidence: 0.80
+
+    recommendations:
+      - "Prefer hooks over class-based patterns"
+      - "Use Context for shared state, not Singleton"
+      - "Leverage built-in reactivity instead of manual observer"
+      - "Consider React Query/SWR for data fetching patterns"
+
+  angular:
+    detection:
+      package_json:
+        required: ["@angular/core"]
+        optional: ["@angular/common", "@angular/platform-browser"]
+      files:
+        required: ["angular.json"]
+      extensions: [".ts"]
+
+    version_detection:
+      standalone: ">=14.0.0"  # Standalone components
+      signals: ">=16.0.0"     # Signals API
+
+    native_patterns:
+      singleton:
+        replacement: "@Injectable() services"
+        example: |
+          @Injectable({ providedIn: 'root' })
+          export class ConfigService {
+            // Automatically singleton via DI
+          }
+        rationale: "Angular's DI container manages singleton lifecycle"
+        confidence: 0.98
+
+      observer:
+        replacement: "RxJS Observables"
+        example: |
+          import { BehaviorSubject } from 'rxjs';
+          private data$ = new BehaviorSubject<Data>(initial);
+          getData() { return this.data$.asObservable(); }
+        rationale: "RxJS is Angular's standard reactive programming library"
+        confidence: 0.98
+
+      decorator:
+        replacement: "Directives and Pipes"
+        example: |
+          @Directive({ selector: '[appHighlight]' })
+          export class HighlightDirective {
+            // Adds behavior to DOM elements
+          }
+        rationale: "Angular decorators are first-class pattern"
+        confidence: 0.95
+
+      facade:
+        replacement: "Service with injected dependencies"
+        example: |
+          @Injectable()
+          export class UserFacade {
+            constructor(
+              private userService: UserService,
+              private authService: AuthService,
+              private profileService: ProfileService
+            ) {}
+          }
+        rationale: "Services naturally encapsulate subsystems"
+        confidence: 0.90
+
+    recommendations:
+      - "Use DI instead of manual singleton patterns"
+      - "Leverage RxJS for all reactive patterns"
+      - "Use Angular decorators (@Component, @Directive, @Pipe)"
+      - "Services should be injected, not manually instantiated"
+
+  nestjs:
+    detection:
+      package_json:
+        required: ["@nestjs/core"]
+        optional: ["@nestjs/common", "@nestjs/platform-express"]
+      files:
+        required: ["nest-cli.json"]
+      extensions: [".ts"]
+
+    native_patterns:
+      singleton:
+        replacement: "@Injectable() with default scope"
+        example: |
+          @Injectable() // Default scope is SINGLETON
+          export class AppService {}
+        rationale: "NestJS DI uses singleton scope by default"
+        confidence: 0.98
+
+      chain-of-responsibility:
+        replacement: "Guards, Interceptors, Pipes, Middleware"
+        example: |
+          @Injectable()
+          export class AuthGuard implements CanActivate {
+            canActivate(context: ExecutionContext): boolean {
+              // Guard chain
+            }
+          }
+        rationale: "NestJS request pipeline is built-in chain pattern"
+        confidence: 0.95
+
+      decorator:
+        replacement: "Interceptors"
+        example: |
+          @Injectable()
+          export class LoggingInterceptor implements NestInterceptor {
+            intercept(context: ExecutionContext, next: CallHandler) {
+              // Wraps request handling
+            }
+          }
+        rationale: "Interceptors add behavior to route handlers"
+        confidence: 0.95
+
+      facade:
+        replacement: "Modules"
+        example: |
+          @Module({
+            providers: [ServiceA, ServiceB],
+            exports: [FacadeService]
+          })
+          export class FeatureModule {}
+        rationale: "Modules encapsulate and export simplified interfaces"
+        confidence: 0.85
+
+      factory:
+        replacement: "useFactory provider"
+        example: |
+          {
+            provide: 'CONFIG',
+            useFactory: (env: EnvService) => createConfig(env),
+            inject: [EnvService]
+          }
+        rationale: "DI supports factory pattern natively"
+        confidence: 0.90
+
+    recommendations:
+      - "Use built-in DI, never manual singleton"
+      - "Leverage Guards/Interceptors/Pipes for cross-cutting concerns"
+      - "Modules should export facades to subsystems"
+      - "Use dynamic modules for configurable features"
+
+  vue:
+    detection:
+      package_json:
+        required: ["vue"]
+        version: ">=3.0.0"
+      files:
+        optional: ["vite.config.ts", "nuxt.config.ts"]
+      extensions: [".vue"]
+
+    version_detection:
+      composition_api: ">=3.0.0"  # Composition API default
+      script_setup: ">=3.2.0"     # <script setup> sugar
+
+    native_patterns:
+      singleton:
+        replacement: "Provide/Inject"
+        example: |
+          // Root component
+          provide('config', reactive({ theme: 'dark' }));
+          // Child component
+          const config = inject('config');
+        rationale: "Provide/Inject offers dependency injection"
+        confidence: 0.90
+
+      observer:
+        replacement: "ref() and reactive()"
+        example: |
+          const count = ref(0);
+          watch(count, (newVal) => {
+            // Automatically notified on change
+          });
+        rationale: "Vue 3's reactivity is built-in observer"
+        confidence: 0.98
+
+      strategy:
+        replacement: "Composables"
+        example: |
+          export function usePayment(type: PaymentType) {
+            const strategies = {
+              credit: useCreditPayment,
+              paypal: usePaypalPayment,
+            };
+            return strategies[type]();
+          }
+        rationale: "Composables encapsulate reusable logic"
+        confidence: 0.90
+
+      mediator:
+        replacement: "Pinia stores or global state"
+        example: |
+          export const useAppStore = defineStore('app', {
+            state: () => ({ /* ... */ }),
+            actions: { /* ... */ }
+          });
+        rationale: "Pinia centralizes state management"
+        confidence: 0.85
+
+    recommendations:
+      - "Use Composition API for all new code"
+      - "Leverage ref()/reactive() instead of manual observer"
+      - "Use composables for strategy-like patterns"
+      - "Pinia for global state, provide/inject for DI"
+
+  express:
+    detection:
+      package_json:
+        required: ["express"]
+      extensions: [".js", ".ts"]
+
+    native_patterns:
+      chain-of-responsibility:
+        replacement: "Middleware (app.use)"
+        example: |
+          app.use(authMiddleware);
+          app.use(loggingMiddleware);
+          app.use(errorMiddleware);
+        rationale: "Express middleware is chain of responsibility"
+        confidence: 0.98
+
+      facade:
+        replacement: "Router"
+        example: |
+          const userRouter = express.Router();
+          userRouter.get('/', getUsers);
+          userRouter.post('/', createUser);
+          app.use('/users', userRouter);
+        rationale: "Routers group related endpoints"
+        confidence: 0.85
+
+      template-method:
+        replacement: "Route handlers with middleware"
+        example: |
+          app.get('/users',
+            validateRequest,    // Step 1
+            checkAuth,         // Step 2
+            loadUser,          // Step 3
+            (req, res) => {}   // Final step
+          );
+        rationale: "Middleware chain defines template"
+        confidence: 0.75
+
+    recommendations:
+      - "Use middleware for cross-cutting concerns"
+      - "Routers should group related functionality"
+      - "Error handling middleware should be last"
+      - "Avoid manual chain implementations"
+
+  rxjs:
+    detection:
+      package_json:
+        required: ["rxjs"]
+      extensions: [".ts", ".js"]
+
+    native_patterns:
+      observer:
+        replacement: "Subject, BehaviorSubject, ReplaySubject"
+        example: |
+          const subject = new BehaviorSubject<number>(0);
+          subject.subscribe(value => console.log(value));
+          subject.next(1); // Notifies subscribers
+        rationale: "RxJS is the observer pattern library"
+        confidence: 1.0
+
+      strategy:
+        replacement: "RxJS operators"
+        example: |
+          observable.pipe(
+            map(x => x * 2),
+            filter(x => x > 10),
+            debounceTime(300)
+          );
+        rationale: "Operators are composable strategies"
+        confidence: 0.90
+
+      decorator:
+        replacement: "pipe() operator"
+        example: |
+          source$.pipe(
+            tap(x => console.log(x)),  // Add logging
+            catchError(handleError)    // Add error handling
+          );
+        rationale: "pipe() chains operators that decorate behavior"
+        confidence: 0.85
+
+      chain-of-responsibility:
+        replacement: "mergeMap, concatMap, switchMap"
+        example: |
+          requests$.pipe(
+            mergeMap(req => processRequest(req)),
+            catchError((err, caught) => caught) // Pass to next
+          );
+        rationale: "Operators chain processing steps"
+        confidence: 0.75
+
+    recommendations:
+      - "Use Subject variants, not custom observer classes"
+      - "Compose operators instead of manual logic"
+      - "shareReplay() for caching/memoization"
+      - "Avoid manual subscription management, use async pipe (Angular)"
+
+  redux:
+    detection:
+      package_json:
+        required_any: ["redux", "@reduxjs/toolkit", "zustand", "jotai", "recoil"]
+      extensions: [".ts", ".js", ".tsx", ".jsx"]
+
+    native_patterns:
+      singleton:
+        replacement: "Store"
+        example: |
+          // Redux
+          const store = createStore(rootReducer);
+          // Zustand
+          export const useStore = create((set) => ({ /* ... */ }));
+        rationale: "Store is managed singleton"
+        confidence: 0.98
+
+      command:
+        replacement: "Actions and Action Creators"
+        example: |
+          // Redux action
+          const incrementAction = { type: 'INCREMENT', payload: 1 };
+          // Redux Toolkit
+          const increment = createAction<number>('counter/increment');
+        rationale: "Actions encapsulate state changes"
+        confidence: 0.95
+
+      observer:
+        replacement: "Store subscriptions"
+        example: |
+          // Redux
+          store.subscribe(() => console.log(store.getState()));
+          // Zustand (React)
+          const count = useStore(state => state.count);
+        rationale: "Store notifies subscribers on state change"
+        confidence: 0.95
+
+      state:
+        replacement: "Reducers"
+        example: |
+          const reducer = (state, action) => {
+            switch (action.type) {
+              case 'INCREMENT': return { count: state.count + 1 };
+              // Different states handled by action type
+            }
+          };
+        rationale: "Reducers implement state-dependent behavior"
+        confidence: 0.85
+
+      memento:
+        replacement: "Time-travel debugging / Redux DevTools"
+        example: |
+          // Redux DevTools captures state snapshots
+          // Can jump to any previous state
+        rationale: "Store history enables memento pattern"
+        confidence: 0.80
+
+    recommendations:
+      - "Use Redux Toolkit for modern Redux (reduces boilerplate)"
+      - "Consider Zustand for simpler state management"
+      - "Actions should be serializable (for time-travel)"
+      - "Selectors should use reselect for memoization"
+
+  orm:
+    detection:
+      package_json:
+        required_any: ["prisma", "@prisma/client", "typeorm", "@mikro-orm/core", "sequelize"]
+      files:
+        optional: ["prisma/schema.prisma", "ormconfig.json"]
+      extensions: [".ts"]
+
+    native_patterns:
+      repository:
+        replacement: "Prisma Client / TypeORM Repository"
+        example: |
+          // Prisma
+          const users = await prisma.user.findMany();
+          // TypeORM
+          const userRepo = dataSource.getRepository(User);
+          const users = await userRepo.find();
+        rationale: "ORMs provide repository pattern out-of-box"
+        confidence: 0.95
+
+      facade:
+        replacement: "ORM Client"
+        example: |
+          // Prisma facades complex SQL
+          await prisma.user.create({
+            data: { name: 'Alice', posts: { create: [{ title: 'Hello' }] } }
+          });
+        rationale: "ORM simplifies database operations"
+        confidence: 0.90
+
+      builder:
+        replacement: "Query Builder"
+        example: |
+          // Prisma
+          prisma.user.findMany({ where: { age: { gte: 18 } }, orderBy: { name: 'asc' } });
+          // TypeORM Query Builder
+          userRepo.createQueryBuilder('user')
+            .where('user.age >= :age', { age: 18 })
+            .orderBy('user.name', 'ASC')
+            .getMany();
+        rationale: "Fluent interface for complex queries"
+        confidence: 0.90
+
+      unit-of-work:
+        replacement: "Transactions"
+        example: |
+          await prisma.$transaction([
+            prisma.user.create({ data: userData }),
+            prisma.post.create({ data: postData })
+          ]);
+        rationale: "Transactions implement unit of work"
+        confidence: 0.85
+
+      lazy-loading:
+        replacement: "Include/relations"
+        example: |
+          const user = await prisma.user.findUnique({
+            where: { id: 1 },
+            include: { posts: true } // Explicit eager loading
+          });
+        rationale: "ORMs control loading strategy"
+        confidence: 0.80
+
+    recommendations:
+      - "Use ORM repositories, not custom implementations"
+      - "Leverage query builders for complex queries"
+      - "Understand N+1 problem, use includes wisely"
+      - "Transactions for multi-model operations"
+
+# Adaptation Rules
+adaptation_rules:
+  - condition: "pattern exists natively in stack"
+    action: "suggest_native"
+    priority: "high"
+    message: "Use stack-native implementation instead of custom pattern"
+
+  - condition: "custom implementation found AND native exists"
+    action: "refactor_to_native"
+    priority: "high"
+    message: "Refactor custom implementation to use stack-native idiom"
+
+  - condition: "pattern missing AND native exists"
+    action: "suggest_native_with_example"
+    priority: "medium"
+    message: "Implement using stack-native features"
+
+  - condition: "pattern missing AND no native equivalent"
+    action: "suggest_custom_implementation"
+    priority: "low"
+    message: "Implement custom TypeScript pattern following best practices"
+
+  - condition: "anti-pattern detected"
+    action: "warn_and_suggest_alternative"
+    priority: "critical"
+    message: "Current implementation has known issues, see alternative"
+
+# Common Stack Combinations
+stack_combinations:
+  react_full:
+    primary: "react"
+    common_secondary: ["redux", "react-query", "zustand"]
+    pattern_notes: "React Query/SWR replaces many manual patterns for data fetching"
+
+  angular_full:
+    primary: "angular"
+    common_secondary: ["rxjs", "ngrx"]
+    pattern_notes: "RxJS is integral, NgRx adds Redux-like state management"
+
+  nestjs_full:
+    primary: "nestjs"
+    common_secondary: ["typeorm", "prisma"]
+    pattern_notes: "NestJS provides most patterns, ORM adds repository layer"
+
+  vue_full:
+    primary: "vue"
+    common_secondary: ["pinia", "vueuse"]
+    pattern_notes: "Pinia for state, VueUse provides composable utilities"
+
+# Priority for suggestions
+suggestion_priority:
+  critical: "Anti-pattern or security issue"
+  high: "Native stack alternative available, significant improvement"
+  medium: "Pattern missing, would improve code quality"
+  low: "Optional improvement, minimal impact"

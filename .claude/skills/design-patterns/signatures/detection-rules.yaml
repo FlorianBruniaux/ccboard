@@ -1,0 +1,769 @@
+version: "1.0.0"
+description: Detection rules and heuristics for identifying design patterns in TypeScript/JavaScript code
+
+# Detection Strategy:
+# 1. Glob Phase: Find candidate files by naming convention
+# 2. Grep Phase: Search for primary and secondary signals
+# 3. Read Phase: Validate structure and relationships
+# 4. Confidence Scoring: Aggregate signal strengths
+
+# Creational Patterns
+creational:
+  singleton:
+    naming_conventions:
+      - "*Singleton*.ts"
+      - "*Manager.ts"
+      - "*Service.ts"
+      - "*Client.ts"
+      - "*Config.ts"
+      - "*Instance.ts"
+
+    primary_signals:
+      - pattern: "private\\s+constructor"
+        weight: 0.4
+        description: "Private constructor prevents direct instantiation"
+
+      - pattern: "static\\s+getInstance\\s*\\("
+        weight: 0.35
+        description: "Static getInstance method is canonical singleton signature"
+
+      - pattern: "private\\s+static\\s+\\w+:\\s*\\w+"
+        weight: 0.25
+        description: "Private static instance field"
+
+    secondary_signals:
+      - pattern: "if\\s*\\(!\\w+\\.instance\\)"
+        weight: 0.15
+        description: "Lazy initialization check"
+
+      - pattern: "return\\s+\\w+\\.instance"
+        weight: 0.10
+        description: "Returns singleton instance"
+
+    typescript_specific:
+      - pattern: "private\\s+static\\s+instance\\?:\\s*\\w+"
+        description: "TypeScript optional instance field"
+
+      - pattern: "public\\s+static\\s+getInstance\\(\\):\\s*\\w+"
+        description: "Explicit return type annotation"
+
+    anti_patterns:
+      - pattern: "new\\s+\\w+\\(\\).*getInstance"
+        description: "Creating new instance inside getInstance (wrong)"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  factory-method:
+    naming_conventions:
+      - "*Factory.ts"
+      - "*Creator.ts"
+      - "*Provider.ts"
+      - "*Builder.ts"
+
+    primary_signals:
+      - pattern: "create\\w+\\s*\\([^)]*\\):\\s*\\w+"
+        weight: 0.35
+        description: "create* method returning interface/type"
+
+      - pattern: "abstract\\s+create\\w+"
+        weight: 0.30
+        description: "Abstract factory method"
+
+      - pattern: "interface\\s+\\w+Factory"
+        weight: 0.20
+        description: "Factory interface definition"
+
+    secondary_signals:
+      - pattern: "class\\s+\\w+\\s+extends\\s+\\w+Factory"
+        weight: 0.15
+        description: "Concrete factory inheriting from abstract"
+
+      - pattern: "return\\s+new\\s+\\w+\\("
+        weight: 0.10
+        description: "Factory returns new instance"
+
+      - pattern: "switch\\s*\\([^)]*type[^)]*\\)"
+        weight: 0.15
+        description: "Type-based creation logic"
+
+    typescript_specific:
+      - pattern: "create\\w+<T[^>]*>"
+        description: "Generic factory method"
+
+    confidence_threshold: 0.65
+    minimum_signals: 2
+
+  abstract-factory:
+    naming_conventions:
+      - "*AbstractFactory.ts"
+      - "*Factory.ts"
+      - "*FactoryInterface.ts"
+
+    primary_signals:
+      - pattern: "abstract\\s+class\\s+\\w+Factory"
+        weight: 0.30
+        description: "Abstract factory class"
+
+      - pattern: "interface\\s+\\w+Factory\\s*\\{[^}]*create\\w+[^}]*create\\w+"
+        weight: 0.35
+        description: "Factory interface with multiple create methods"
+
+      - pattern: "create\\w+\\s*\\([^)]*\\):\\s*\\w+.*create\\w+\\s*\\([^)]*\\):\\s*\\w+"
+        weight: 0.25
+        description: "Multiple factory methods"
+
+    secondary_signals:
+      - pattern: "class\\s+\\w+\\s+implements\\s+\\w+Factory"
+        weight: 0.15
+        description: "Concrete factory implementing interface"
+
+      - pattern: "family|related|product"
+        weight: 0.10
+        description: "Domain language suggesting related objects"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  builder:
+    naming_conventions:
+      - "*Builder.ts"
+      - "*ConfigBuilder.ts"
+      - "*QueryBuilder.ts"
+
+    primary_signals:
+      - pattern: "\\w+\\s*\\([^)]*\\):\\s*(this|\\w+Builder)"
+        weight: 0.30
+        description: "Fluent interface returning this or builder type"
+
+      - pattern: "build\\s*\\(\\):\\s*\\w+"
+        weight: 0.35
+        description: "Build method returning final product"
+
+      - pattern: "with\\w+\\s*\\([^)]*\\):\\s*this"
+        weight: 0.25
+        description: "with* methods for setting properties"
+
+    secondary_signals:
+      - pattern: "set\\w+\\s*\\([^)]*\\):\\s*this"
+        weight: 0.15
+        description: "set* methods returning this"
+
+      - pattern: "private\\s+\\w+\\?:\\s*\\w+"
+        weight: 0.10
+        description: "Optional private fields being built up"
+
+    typescript_specific:
+      - pattern: "class\\s+\\w+Builder<T"
+        description: "Generic builder"
+
+      - pattern: "\\): this \\{"
+        description: "Explicit 'this' return type"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  prototype:
+    naming_conventions:
+      - "*Prototype.ts"
+      - "*Cloneable.ts"
+
+    primary_signals:
+      - pattern: "clone\\s*\\(\\):\\s*\\w+"
+        weight: 0.45
+        description: "Clone method signature"
+
+      - pattern: "Object\\.create\\("
+        weight: 0.25
+        description: "Using Object.create for prototypal inheritance"
+
+      - pattern: "JSON\\.parse\\(JSON\\.stringify\\("
+        weight: 0.20
+        description: "Deep clone via JSON (simple approach)"
+
+    secondary_signals:
+      - pattern: "\\.\\.\\."
+        weight: 0.10
+        description: "Spread operator for shallow copy"
+
+      - pattern: "structuredClone\\("
+        weight: 0.15
+        description: "Modern structuredClone API"
+
+    confidence_threshold: 0.60
+    minimum_signals: 1
+
+# Structural Patterns
+structural:
+  adapter:
+    naming_conventions:
+      - "*Adapter.ts"
+      - "*Wrapper.ts"
+
+    primary_signals:
+      - pattern: "class\\s+\\w+Adapter\\s+implements\\s+\\w+"
+        weight: 0.35
+        description: "Adapter implementing target interface"
+
+      - pattern: "private\\s+\\w+:\\s*\\w+;"
+        weight: 0.25
+        description: "Holds reference to adaptee"
+
+      - pattern: "constructor\\([^)]*adaptee[^)]*\\)"
+        weight: 0.30
+        description: "Adaptee injected in constructor"
+
+    secondary_signals:
+      - pattern: "this\\.\\w+\\.\\w+\\("
+        weight: 0.15
+        description: "Delegates to adaptee"
+
+      - pattern: "convert|transform|map"
+        weight: 0.10
+        description: "Conversion language in methods"
+
+    confidence_threshold: 0.65
+    minimum_signals: 2
+
+  bridge:
+    naming_conventions:
+      - "*Bridge.ts"
+      - "*Abstraction.ts"
+      - "*Implementation.ts"
+
+    primary_signals:
+      - pattern: "protected\\s+impl:\\s*\\w+Implementation"
+        weight: 0.35
+        description: "Abstraction holds implementation reference"
+
+      - pattern: "interface\\s+\\w+Implementation"
+        weight: 0.30
+        description: "Implementation interface"
+
+      - pattern: "constructor\\([^)]*implementation[^)]*\\)"
+        weight: 0.25
+        description: "Implementation injected"
+
+    secondary_signals:
+      - pattern: "this\\.impl\\."
+        weight: 0.15
+        description: "Delegates to implementation"
+
+    confidence_threshold: 0.60
+    minimum_signals: 2
+
+  composite:
+    naming_conventions:
+      - "*Composite.ts"
+      - "*Component.ts"
+      - "*Container.ts"
+      - "*Group.ts"
+
+    primary_signals:
+      - pattern: "private\\s+children:\\s*\\w+\\[\\]"
+        weight: 0.35
+        description: "Collection of child components"
+
+      - pattern: "add\\s*\\([^)]*\\):|remove\\s*\\([^)]*\\):"
+        weight: 0.30
+        description: "Methods to manage children"
+
+      - pattern: "abstract\\s+class\\s+\\w+Component"
+        weight: 0.25
+        description: "Abstract component class"
+
+    secondary_signals:
+      - pattern: "children\\.forEach\\(|children\\.map\\("
+        weight: 0.15
+        description: "Iterates over children"
+
+      - pattern: "getChild\\(|getChildren\\("
+        weight: 0.10
+        description: "Access to children"
+
+    typescript_specific:
+      - pattern: "children:\\s*Array<\\w+>"
+        description: "Typed array of components"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  decorator:
+    naming_conventions:
+      - "*Decorator.ts"
+      - "*Wrapper.ts"
+
+    primary_signals:
+      - pattern: "class\\s+\\w+Decorator\\s+implements\\s+\\w+"
+        weight: 0.30
+        description: "Decorator implements same interface"
+
+      - pattern: "protected\\s+wrapped:\\s*\\w+"
+        weight: 0.30
+        description: "Holds reference to wrapped object"
+
+      - pattern: "constructor\\([^)]*wrapped[^)]*\\)"
+        weight: 0.25
+        description: "Wrapped object injected"
+
+    secondary_signals:
+      - pattern: "this\\.wrapped\\.\\w+\\("
+        weight: 0.20
+        description: "Delegates to wrapped object"
+
+      - pattern: "super\\(wrapped\\)"
+        weight: 0.15
+        description: "Passes wrapped to base decorator"
+
+    typescript_specific:
+      - pattern: "@\\w+"
+        description: "TypeScript decorator syntax (different usage)"
+
+    confidence_threshold: 0.65
+    minimum_signals: 2
+
+  facade:
+    naming_conventions:
+      - "*Facade.ts"
+      - "*API.ts"
+      - "*Interface.ts"
+      - "*Service.ts"
+
+    primary_signals:
+      - pattern: "private\\s+\\w+Service:\\s*\\w+;[^}]*private\\s+\\w+Service:\\s*\\w+"
+        weight: 0.35
+        description: "Multiple subsystem dependencies"
+
+      - pattern: "constructor\\([^)]*,\\s*[^)]*,\\s*[^)]*\\)"
+        weight: 0.25
+        description: "Multiple injected dependencies"
+
+    secondary_signals:
+      - pattern: "this\\.\\w+Service\\.\\w+\\([^)]*\\);[^}]*this\\.\\w+Service\\.\\w+\\("
+        weight: 0.20
+        description: "Coordinates multiple subsystems"
+
+      - pattern: "public\\s+async\\s+\\w+\\([^)]*\\)"
+        weight: 0.10
+        description: "Simplified public interface"
+
+    confidence_threshold: 0.60
+    minimum_signals: 2
+
+  flyweight:
+    naming_conventions:
+      - "*Flyweight.ts"
+      - "*Pool.ts"
+      - "*Cache.ts"
+
+    primary_signals:
+      - pattern: "private\\s+static\\s+pool:\\s*Map"
+        weight: 0.35
+        description: "Shared pool of flyweights"
+
+      - pattern: "getFlyweight\\s*\\([^)]*\\):\\s*\\w+"
+        weight: 0.30
+        description: "Factory method for shared objects"
+
+      - pattern: "if\\s*\\(!pool\\.has\\([^)]*\\)\\)"
+        weight: 0.25
+        description: "Check if flyweight exists before creating"
+
+    secondary_signals:
+      - pattern: "intrinsic|extrinsic"
+        weight: 0.15
+        description: "Domain language for shared/unique state"
+
+    confidence_threshold: 0.65
+    minimum_signals: 2
+
+  proxy:
+    naming_conventions:
+      - "*Proxy.ts"
+
+    primary_signals:
+      - pattern: "class\\s+\\w+Proxy\\s+implements\\s+\\w+"
+        weight: 0.30
+        description: "Proxy implements same interface as real subject"
+
+      - pattern: "private\\s+realSubject:\\s*\\w+"
+        weight: 0.30
+        description: "Holds reference to real subject"
+
+      - pattern: "lazy|cache|access|log"
+        weight: 0.20
+        description: "Proxy purpose keywords"
+
+    secondary_signals:
+      - pattern: "if\\s*\\(!this\\.realSubject\\)"
+        weight: 0.15
+        description: "Lazy initialization"
+
+      - pattern: "this\\.realSubject\\.\\w+\\("
+        weight: 0.15
+        description: "Delegates to real subject"
+
+    typescript_specific:
+      - pattern: "new\\s+Proxy\\("
+        description: "JavaScript Proxy object"
+
+    confidence_threshold: 0.65
+    minimum_signals: 2
+
+# Behavioral Patterns
+behavioral:
+  chain-of-responsibility:
+    naming_conventions:
+      - "*Handler.ts"
+      - "*Middleware.ts"
+      - "*Chain.ts"
+
+    primary_signals:
+      - pattern: "protected\\s+next:\\s*\\w+Handler"
+        weight: 0.35
+        description: "Reference to next handler"
+
+      - pattern: "setNext\\s*\\([^)]*\\):\\s*\\w+Handler"
+        weight: 0.30
+        description: "Method to set next handler"
+
+      - pattern: "handle\\s*\\([^)]*\\):"
+        weight: 0.25
+        description: "Handle method"
+
+    secondary_signals:
+      - pattern: "if\\s*\\(this\\.next\\)"
+        weight: 0.15
+        description: "Checks if next handler exists"
+
+      - pattern: "this\\.next\\.handle\\("
+        weight: 0.15
+        description: "Passes request to next"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  command:
+    naming_conventions:
+      - "*Command.ts"
+      - "*Action.ts"
+
+    primary_signals:
+      - pattern: "interface\\s+\\w+Command\\s*\\{[^}]*execute"
+        weight: 0.35
+        description: "Command interface with execute"
+
+      - pattern: "execute\\s*\\(\\):"
+        weight: 0.30
+        description: "Execute method"
+
+      - pattern: "undo\\s*\\(\\):"
+        weight: 0.25
+        description: "Undo method for reversibility"
+
+    secondary_signals:
+      - pattern: "private\\s+receiver:\\s*\\w+"
+        weight: 0.15
+        description: "Holds receiver reference"
+
+      - pattern: "history|stack"
+        weight: 0.10
+        description: "Command history tracking"
+
+    confidence_threshold: 0.65
+    minimum_signals: 2
+
+  iterator:
+    naming_conventions:
+      - "*Iterator.ts"
+
+    primary_signals:
+      - pattern: "\\[Symbol\\.iterator\\]\\(\\)"
+        weight: 0.40
+        description: "JavaScript iterator protocol"
+
+      - pattern: "next\\s*\\(\\):\\s*\\{\\s*value[^}]*done"
+        weight: 0.35
+        description: "Iterator next method"
+
+      - pattern: "function\\*|\\*\\w+\\s*\\("
+        weight: 0.25
+        description: "Generator function"
+
+    secondary_signals:
+      - pattern: "yield"
+        weight: 0.15
+        description: "Generator yield"
+
+      - pattern: "implements\\s+Iterator<"
+        weight: 0.15
+        description: "Implements Iterator interface"
+
+    confidence_threshold: 0.65
+    minimum_signals: 1
+
+  mediator:
+    naming_conventions:
+      - "*Mediator.ts"
+      - "*Controller.ts"
+      - "*Coordinator.ts"
+
+    primary_signals:
+      - pattern: "class\\s+\\w+Mediator"
+        weight: 0.30
+        description: "Mediator class"
+
+      - pattern: "private\\s+colleagues:\\s*\\w+\\[\\]"
+        weight: 0.30
+        description: "Collection of colleagues"
+
+      - pattern: "notify\\s*\\([^)]*sender[^)]*\\)"
+        weight: 0.30
+        description: "Notify method with sender"
+
+    secondary_signals:
+      - pattern: "register\\w+\\(|add\\w+\\("
+        weight: 0.15
+        description: "Register colleagues"
+
+    confidence_threshold: 0.65
+    minimum_signals: 2
+
+  memento:
+    naming_conventions:
+      - "*Memento.ts"
+      - "*Snapshot.ts"
+      - "*Caretaker.ts"
+
+    primary_signals:
+      - pattern: "save\\s*\\(\\):\\s*\\w+Memento"
+        weight: 0.35
+        description: "Save state to memento"
+
+      - pattern: "restore\\s*\\([^)]*memento[^)]*\\)"
+        weight: 0.35
+        description: "Restore from memento"
+
+      - pattern: "class\\s+\\w+Memento"
+        weight: 0.20
+        description: "Memento class"
+
+    secondary_signals:
+      - pattern: "private\\s+state:"
+        weight: 0.15
+        description: "Encapsulated state"
+
+      - pattern: "history:\\s*\\w+\\[\\]"
+        weight: 0.10
+        description: "History of mementos"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  observer:
+    naming_conventions:
+      - "*Observer.ts"
+      - "*Subject.ts"
+      - "*Publisher.ts"
+      - "*Subscriber.ts"
+      - "*Event*.ts"
+
+    primary_signals:
+      - pattern: "subscribe\\s*\\([^)]*\\):|attach\\s*\\([^)]*\\):"
+        weight: 0.30
+        description: "Subscribe method"
+
+      - pattern: "unsubscribe\\s*\\([^)]*\\):|detach\\s*\\([^)]*\\):"
+        weight: 0.25
+        description: "Unsubscribe method"
+
+      - pattern: "notify\\s*\\(\\):|emit\\s*\\("
+        weight: 0.30
+        description: "Notify/emit method"
+
+    secondary_signals:
+      - pattern: "private\\s+observers:\\s*\\w+\\[\\]"
+        weight: 0.20
+        description: "Collection of observers"
+
+      - pattern: "observers\\.forEach\\("
+        weight: 0.15
+        description: "Iterates over observers to notify"
+
+    typescript_specific:
+      - pattern: "Subject<"
+        description: "RxJS Subject (common in Angular/React)"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  state:
+    naming_conventions:
+      - "*State.ts"
+      - "*Context.ts"
+
+    primary_signals:
+      - pattern: "interface\\s+\\w+State"
+        weight: 0.30
+        description: "State interface"
+
+      - pattern: "private\\s+state:\\s*\\w+State"
+        weight: 0.30
+        description: "Context holds current state"
+
+      - pattern: "setState\\s*\\([^)]*\\):|changeState\\s*\\([^)]*\\):"
+        weight: 0.30
+        description: "Method to change state"
+
+    secondary_signals:
+      - pattern: "this\\.state\\.handle\\("
+        weight: 0.15
+        description: "Delegates to state"
+
+      - pattern: "class\\s+\\w+State\\s+implements\\s+\\w+State"
+        weight: 0.15
+        description: "Concrete state classes"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  strategy:
+    naming_conventions:
+      - "*Strategy.ts"
+      - "*Policy.ts"
+      - "*Algorithm.ts"
+
+    primary_signals:
+      - pattern: "interface\\s+\\w+Strategy"
+        weight: 0.35
+        description: "Strategy interface"
+
+      - pattern: "private\\s+strategy:\\s*\\w+Strategy"
+        weight: 0.30
+        description: "Context holds strategy"
+
+      - pattern: "setStrategy\\s*\\([^)]*\\):"
+        weight: 0.25
+        description: "Method to set strategy"
+
+    secondary_signals:
+      - pattern: "this\\.strategy\\.execute\\("
+        weight: 0.15
+        description: "Delegates to strategy"
+
+      - pattern: "class\\s+\\w+Strategy\\s+implements\\s+\\w+Strategy"
+        weight: 0.15
+        description: "Concrete strategies"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  template-method:
+    naming_conventions:
+      - "*Template.ts"
+      - "*Abstract*.ts"
+
+    primary_signals:
+      - pattern: "abstract\\s+class"
+        weight: 0.30
+        description: "Abstract class with template"
+
+      - pattern: "abstract\\s+\\w+\\s*\\(\\):"
+        weight: 0.30
+        description: "Abstract primitive operations"
+
+      - pattern: "protected\\s+\\w+\\s*\\(\\):"
+        weight: 0.20
+        description: "Hook methods"
+
+    secondary_signals:
+      - pattern: "this\\.\\w+\\(\\);[^}]*this\\.\\w+\\(\\);"
+        weight: 0.15
+        description: "Template calls primitive operations"
+
+      - pattern: "final\\s+|\\btemplate\\b"
+        weight: 0.10
+        description: "Template method should be final (not overridden)"
+
+    confidence_threshold: 0.65
+    minimum_signals: 2
+
+  visitor:
+    naming_conventions:
+      - "*Visitor.ts"
+
+    primary_signals:
+      - pattern: "interface\\s+\\w+Visitor\\s*\\{[^}]*visit\\w+"
+        weight: 0.35
+        description: "Visitor interface with visit methods"
+
+      - pattern: "visit\\w+\\s*\\([^)]*:\\s*\\w+\\)"
+        weight: 0.30
+        description: "Visit methods for each element type"
+
+      - pattern: "accept\\s*\\([^)]*visitor[^)]*\\)"
+        weight: 0.30
+        description: "Elements accept visitor"
+
+    secondary_signals:
+      - pattern: "visitor\\.visit\\w+\\(this\\)"
+        weight: 0.15
+        description: "Double dispatch pattern"
+
+    confidence_threshold: 0.70
+    minimum_signals: 2
+
+  interpreter:
+    naming_conventions:
+      - "*Interpreter.ts"
+      - "*Expression.ts"
+      - "*Parser.ts"
+
+    primary_signals:
+      - pattern: "interface\\s+\\w+Expression"
+        weight: 0.30
+        description: "Expression interface"
+
+      - pattern: "interpret\\s*\\([^)]*context[^)]*\\)"
+        weight: 0.35
+        description: "Interpret method with context"
+
+      - pattern: "abstract\\s+class\\s+\\w+Expression"
+        weight: 0.25
+        description: "Abstract expression"
+
+    secondary_signals:
+      - pattern: "class\\s+Terminal\\w+|class\\s+NonTerminal\\w+"
+        weight: 0.15
+        description: "Terminal and non-terminal expressions"
+
+      - pattern: "parse\\s*\\("
+        weight: 0.10
+        description: "Parser for grammar"
+
+    confidence_threshold: 0.60
+    minimum_signals: 2
+
+# Confidence Calculation
+confidence_calculation:
+  formula: "sum(matched_signal_weights) / sum(all_possible_weights)"
+  adjustments:
+    - "If pattern name matches naming convention: +0.15"
+    - "If stack has native equivalent and not used: -0.20"
+    - "If anti-pattern detected: -0.30"
+    - "If typescript-specific signals present: +0.10"
+
+# Output Format for Detection Results
+detection_output:
+  file: "path/to/file.ts"
+  pattern: "singleton"
+  lines: "5-28"
+  confidence: 0.85
+  matched_signals:
+    - signal: "private constructor"
+      weight: 0.4
+    - signal: "static getInstance"
+      weight: 0.35
+  stack_context:
+    native_alternative: "Context API"
+    recommendation: "Consider using React Context for better testability"

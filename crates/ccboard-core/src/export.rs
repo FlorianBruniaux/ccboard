@@ -327,6 +327,7 @@ mod tests {
             first_user_message: Some("Test message".to_string()),
             has_subagents: false,
             duration_seconds: Some(2700), // 45 minutes
+            branch: None,
         }
     }
 

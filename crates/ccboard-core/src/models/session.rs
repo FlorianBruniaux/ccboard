@@ -174,6 +174,9 @@ pub struct SessionMetadata {
 
     /// Duration in seconds (from summary)
     pub duration_seconds: Option<u64>,
+
+    /// Git branch name (normalized, extracted from first gitBranch in session)
+    pub branch: Option<String>,
 }
 
 impl SessionMetadata {
@@ -204,6 +207,7 @@ impl SessionMetadata {
             first_user_message: None,
             has_subagents: false,
             duration_seconds: None,
+            branch: None,
         }
     }
 
