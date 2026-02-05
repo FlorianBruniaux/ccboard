@@ -87,12 +87,50 @@ impl SessionIndexParser {
     ///
     /// SECURITY: Validates path to prevent traversal attacks
     pub fn extract_project_path(&self, session_path: &Path) -> String {
-        session_path
+        let raw_path = session_path
             .parent()
             .and_then(|p| p.file_name())
             .and_then(|n| n.to_str())
             .and_then(|encoded| Self::sanitize_project_path(encoded).ok())
-            .unwrap_or_else(|| "unknown".to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+
+        // Normalize worktrees to their parent repo
+        // Example: /path/to/repo/worktrees/feature → /path/to/repo
+        Self::normalize_worktree_path(&raw_path)
+    }
+
+    /// Normalize worktree paths to their parent repository
+    ///
+    /// Git worktrees are typically stored in:
+    /// - /path/to/repo/worktrees/branch-name
+    /// - /path/to/repo/.worktrees/branch-name
+    /// - /path/to/worktrees/repo-branch-name
+    ///
+    /// This function detects common worktree patterns and normalizes them
+    /// to the parent repository path for better project grouping.
+    fn normalize_worktree_path(path: &str) -> String {
+        // Pattern 1: /path/to/repo/worktrees/branch → /path/to/repo
+        if let Some(idx) = path.find("/worktrees/") {
+            return path[..idx].to_string();
+        }
+
+        // Pattern 2: /path/to/repo/.worktrees/branch → /path/to/repo
+        if let Some(idx) = path.find("/.worktrees/") {
+            return path[..idx].to_string();
+        }
+
+        // Pattern 3: /path/to/worktrees/repo-branch → /path/to (heuristic)
+        // Only apply if path contains "worktrees" as a directory component
+        let components: Vec<&str> = path.split('/').collect();
+        if let Some(worktree_idx) = components.iter().position(|&c| c == "worktrees") {
+            if worktree_idx > 0 {
+                // Return everything before "/worktrees"
+                return components[..worktree_idx].join("/");
+            }
+        }
+
+        // No worktree pattern detected, return as-is
+        path.to_string()
     }
 
     /// Sanitize project path from encoded format
@@ -709,5 +747,53 @@ mod tests {
         // Message 2: input(200) + output(75) = 275
         // Total = 1650 + 275 = 1925
         assert_eq!(meta.total_tokens, 1925);
+    }
+
+    #[test]
+    fn test_normalize_worktree_path_pattern1() {
+        // Pattern: /path/to/repo/worktrees/branch → /path/to/repo
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/Users/test/app/worktrees/feature-x"),
+            "/Users/test/app"
+        );
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/path/to/MethodeAristote/app/worktrees/bugfixes"),
+            "/path/to/MethodeAristote/app"
+        );
+    }
+
+    #[test]
+    fn test_normalize_worktree_path_pattern2() {
+        // Pattern: /path/to/repo/.worktrees/branch → /path/to/repo
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/Users/test/app/.worktrees/feature-x"),
+            "/Users/test/app"
+        );
+    }
+
+    #[test]
+    fn test_normalize_worktree_path_pattern3() {
+        // Pattern: /path/to/worktrees/repo-branch → /path/to
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/Users/test/worktrees/bugfixes"),
+            "/Users/test"
+        );
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/home/user/worktrees/feature-x"),
+            "/home/user"
+        );
+    }
+
+    #[test]
+    fn test_normalize_worktree_path_no_worktree() {
+        // No worktree pattern → return as-is
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/Users/test/app"),
+            "/Users/test/app"
+        );
+        assert_eq!(
+            SessionIndexParser::normalize_worktree_path("/path/to/MethodeAristote/app"),
+            "/path/to/MethodeAristote/app"
+        );
     }
 }
