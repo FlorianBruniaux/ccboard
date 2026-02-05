@@ -1,5 +1,7 @@
 # Phase I-TUI: Sessions Tab Enhancement Progress
 
+## 🎉 ALL TIERS COMPLETED ✅
+
 ## ✅ Completed (Tier 1 & 2)
 
 ### Tier 1: Branch Display
@@ -16,7 +18,95 @@
 
 ---
 
-## 📋 Remaining (Tier 3 & 4)
+## ✅ Completed (Tier 3 & 4)
+
+### Tier 3: Cross-Project Search
+- [x] Add `search_global: bool` field to SessionsTab
+- [x] Modify '/' handler to detect focus (global from Projects, local from Sessions)
+- [x] Update session filtering to collect all sessions when global
+- [x] Display project prefix `[project]` in Blue for global results
+
+### Tier 4: Date Filter
+- [x] Add DateFilter enum (All, Last24h, Last7d, Last30d)
+- [x] 'd' key handler to cycle filters
+- [x] Apply date filter in session list
+- [x] Display active filter in panel title
+
+**Commit**: `50d132a` - feat(tui): add cross-project search and date filtering (Tier 3 & 4)
+
+---
+
+## 🧪 Manual Testing Guide
+
+### Test 1: Branch Display
+```bash
+cargo run
+# Navigate to Sessions tab (press 2)
+# Select a session with git branch
+# → Branch should appear in Magenta after message count
+# Press Enter to view detail
+# → "Branch:" line should appear in detail view
+```
+
+### Test 2: Resume Session
+```bash
+cargo run
+# Navigate to Sessions tab, select any session
+# Press 'r'
+# → Should exit TUI and launch: claude --resume <session-id>
+# After exiting Claude CLI
+# → TUI should restore correctly
+```
+
+### Test 3: Global Search
+```bash
+cargo run
+# Navigate to Sessions tab
+# Press Tab to focus on Projects panel
+# Press '/' to activate search
+# Type any query (e.g., "test")
+# → Title should show "Sessions (global) (X results)"
+# → Each session prefixed with [project-name] in Blue
+# → Results from ALL projects displayed
+```
+
+### Test 4: Local Search (Current Behavior)
+```bash
+cargo run
+# Navigate to Sessions tab
+# Press Tab twice to focus on Sessions panel
+# Press '/' to activate search
+# Type any query
+# → Title shows "Sessions (X results)" (no "global")
+# → No project prefix
+# → Only sessions from selected project
+```
+
+### Test 5: Date Filter Cycling
+```bash
+cargo run
+# Navigate to Sessions tab, focus on Sessions panel
+# Press 'd' multiple times
+# → Bottom notification: "Date filter: All" → "24h" → "7d" → "30d" → "All"
+# → Panel title updates: "Sessions (24h)" / "Sessions (7d)" / etc.
+# → Session list updates to show only sessions within timeframe
+```
+
+### Test 6: Combined Filters
+```bash
+cargo run
+# Press 'd' to set "7d" filter
+# → Title: "Sessions (7d) (X)"
+# Press '/' from Projects (global search)
+# Type query
+# → Title: "Sessions (global) (7d) (X results)"
+# → Sessions filtered by BOTH date AND search
+# → Project prefixes visible
+```
+
+---
+
+## 📋 Original Implementation Details (Archived)
 
 ### Tier 3: Cross-Project Search (~60 LOC)
 
@@ -115,16 +205,20 @@ cargo run
 
 ---
 
-## 📊 Metrics
+## 📊 Final Metrics
 
 | Metric | Value |
 |--------|-------|
-| Tiers completed | 2/4 (50%) |
-| LOC added (T1+T2) | ~80 LOC |
-| Files modified | 3 core + 3 formatting |
-| New functions | 1 (`resume_claude_session`) |
+| Tiers completed | 4/4 (100%) ✅ |
+| Total LOC added | ~400 LOC |
+| Files modified | 3 files (sessions.rs, ui.rs, editor.rs) |
+| New types | 1 enum (`DateFilter`) |
+| New functions | 5 (`resume_claude_session`, `DateFilter::{next,cutoff,matches,display}`) |
+| New fields | 2 (`search_global`, `date_filter`) |
+| Commits | 2 (`a0bc804`, `50d132a`) |
 | Tests passing | ✅ (pre-existing failures unrelated) |
 | Clippy warnings | 0 new |
+| Build status | ✅ Success
 
 ---
 
@@ -140,15 +234,16 @@ cargo test --all
 # Run TUI
 cargo run
 
-# Sessions tab shortcuts (after implementation)
+# Sessions tab shortcuts (ALL IMPLEMENTED ✅)
 Tab/Shift+Tab  - Cycle focus (Live → Projects → Sessions)
 ↑↓ j/k         - Navigate lists
 Enter          - Toggle detail view
-/              - Search (global from Projects, local from Sessions)
-r              - Resume session in Claude CLI
+/              - Search (GLOBAL from Projects/Live, LOCAL from Sessions) ⭐
+r              - Resume session in Claude CLI ⭐
 e              - Edit session file
 o              - Reveal in file manager
 y              - Copy session ID
-d              - Cycle date filter (Tier 4)
+d              - Cycle date filter (All → 24h → 7d → 30d → All) ⭐
 gg/G           - Jump to top/bottom
+Esc            - Close detail / Clear error / Exit search
 ```
