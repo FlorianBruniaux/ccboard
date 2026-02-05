@@ -4,6 +4,7 @@ pub mod app;
 pub mod components;
 pub mod editor;
 pub mod empty_state;
+pub mod keybindings;
 pub mod tabs;
 pub mod theme;
 pub mod ui;

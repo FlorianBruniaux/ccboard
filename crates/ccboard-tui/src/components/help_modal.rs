@@ -1,6 +1,7 @@
 //! Help modal component for displaying keybindings
 
 use crate::app::Tab;
+use crate::keybindings::{KeyAction, KeyBindings};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -41,7 +42,13 @@ impl HelpModal {
     }
 
     /// Render the help modal as an overlay
-    pub fn render(&self, frame: &mut Frame, area: Rect, active_tab: Tab) {
+    pub fn render(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        active_tab: Tab,
+        keybindings: &KeyBindings,
+    ) {
         if !self.visible {
             return;
         }
@@ -89,7 +96,7 @@ impl HelpModal {
         frame.render_widget(block, modal_area);
 
         // Build help content
-        let help_lines = self.build_help_content(active_tab);
+        let help_lines = self.build_help_content(active_tab, keybindings);
 
         let help_text = Paragraph::new(help_lines)
             .wrap(Wrap { trim: false })
@@ -99,7 +106,7 @@ impl HelpModal {
     }
 
     /// Build help content based on active tab
-    fn build_help_content(&self, active_tab: Tab) -> Vec<Line<'static>> {
+    fn build_help_content(&self, active_tab: Tab, keybindings: &KeyBindings) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
 
         // Global keybindings
@@ -110,34 +117,42 @@ impl HelpModal {
                 .add_modifier(Modifier::BOLD),
         )]));
         lines.push(Line::from(""));
-        lines.push(Line::from(vec![
-            Span::styled("  q           ", Style::default().fg(Color::Cyan)),
-            Span::raw("Quit application"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::styled("  ?           ", Style::default().fg(Color::Cyan)),
-            Span::raw("Toggle this help"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::styled("  :           ", Style::default().fg(Color::Cyan)),
-            Span::raw("Command palette"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::styled("  F5          ", Style::default().fg(Color::Cyan)),
-            Span::raw("Refresh data"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::styled("  Tab         ", Style::default().fg(Color::Cyan)),
-            Span::raw("Next tab"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::styled("  Shift+Tab   ", Style::default().fg(Color::Cyan)),
-            Span::raw("Previous tab"),
-        ]));
-        lines.push(Line::from(vec![
-            Span::styled("  1-8         ", Style::default().fg(Color::Cyan)),
-            Span::raw("Jump to tab (1=Dashboard, 2=Sessions, ...)"),
-        ]));
+
+        // Helper function to add keybinding line
+        let add_key_line =
+            |lines: &mut Vec<Line<'static>>, action: KeyAction, keybindings: &KeyBindings| {
+                if let Some(key_str) = keybindings.get_key_for_action(action) {
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            format!("  {:12}", key_str),
+                            Style::default().fg(Color::Cyan),
+                        ),
+                        Span::raw(action.description()),
+                    ]));
+                }
+            };
+
+        // Add dynamic keybindings for global actions
+        add_key_line(&mut lines, KeyAction::Quit, keybindings);
+        add_key_line(&mut lines, KeyAction::ToggleHelp, keybindings);
+        add_key_line(&mut lines, KeyAction::ShowCommandPalette, keybindings);
+        add_key_line(&mut lines, KeyAction::Refresh, keybindings);
+        add_key_line(&mut lines, KeyAction::ForceRefresh, keybindings);
+        add_key_line(&mut lines, KeyAction::NextTab, keybindings);
+        add_key_line(&mut lines, KeyAction::PrevTab, keybindings);
+        add_key_line(&mut lines, KeyAction::ThemeToggle, keybindings);
+
+        // Show tab jump shortcuts
+        if let Some(key_str) = keybindings.get_key_for_action(KeyAction::JumpTab0) {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("  {}-...      ", key_str.chars().next().unwrap_or('1')),
+                    Style::default().fg(Color::Cyan),
+                ),
+                Span::raw("Jump to tab (1=Dashboard, 2=Sessions, ...)"),
+            ]));
+        }
+
         lines.push(Line::from(""));
 
         // Tab-specific keybindings

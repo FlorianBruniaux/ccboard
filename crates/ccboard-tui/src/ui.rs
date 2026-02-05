@@ -64,7 +64,7 @@ impl Ui {
     }
 
     /// Handle key input for the active tab
-    pub fn handle_tab_key(&mut self, key: crossterm::event::KeyCode, app: &App) {
+    pub fn handle_tab_key(&mut self, key: crossterm::event::KeyCode, app: &mut App) {
         match app.active_tab {
             Tab::Dashboard => {
                 // Dashboard has no interactive elements yet
@@ -94,7 +94,8 @@ impl Ui {
             }
             Tab::History => {
                 let sessions: Vec<_> = app.store.recent_sessions(10000);
-                self.history.handle_key(key, &sessions);
+                self.history
+                    .handle_key(key, &sessions, &mut app.search_history);
             }
             Tab::Mcp => {
                 let mcp_config = app.store.mcp_config();
@@ -191,7 +192,8 @@ impl Ui {
         app.command_palette.render(frame, size);
 
         // Render help modal (overlay on top of command palette)
-        app.help_modal.render(frame, size, app.active_tab);
+        app.help_modal
+            .render(frame, size, app.active_tab, &app.keybindings);
 
         // Render toast notifications (overlay on top)
         app.toast_manager.render(frame, size);
@@ -372,6 +374,7 @@ impl Ui {
     }
 
     fn render_tab_content(&mut self, frame: &mut Frame, area: Rect, app: &App) {
+        let scheme = app.color_scheme;
         match app.active_tab {
             Tab::Dashboard => {
                 let stats = app.store.stats();
@@ -382,6 +385,7 @@ impl Ui {
                     stats.as_ref(),
                     mcp_config.as_ref(),
                     Some(&app.store),
+                    scheme,
                 );
             }
             Tab::Sessions => {
@@ -391,36 +395,43 @@ impl Ui {
                 let session_count: usize = sessions_by_project.values().map(|v| v.len()).sum();
                 self.sessions.mark_refreshed(session_count);
                 self.sessions
-                    .render(frame, area, &sessions_by_project, live_sessions);
+                    .render(frame, area, &sessions_by_project, live_sessions, scheme);
             }
             Tab::Config => {
                 let config = app.store.settings();
                 let mcp_config = app.store.mcp_config();
                 let rules = app.store.rules();
                 self.config
-                    .render(frame, area, &config, mcp_config.as_ref(), &rules);
+                    .render(frame, area, &config, mcp_config.as_ref(), &rules, scheme);
             }
             Tab::Hooks => {
                 let config = app.store.settings();
-                self.hooks.render(frame, area, &config.merged);
+                self.hooks.render(frame, area, &config.merged, scheme);
             }
             Tab::Agents => {
-                self.agents.render(frame, area);
+                self.agents.render(frame, area, scheme);
             }
             Tab::Costs => {
                 let stats = app.store.stats();
                 let billing_blocks = app.store.billing_blocks();
-                self.costs
-                    .render(frame, area, stats.as_ref(), Some(&billing_blocks));
+                self.costs.render(
+                    frame,
+                    area,
+                    stats.as_ref(),
+                    Some(&billing_blocks),
+                    scheme,
+                    Some(&app.store),
+                );
             }
             Tab::History => {
                 let sessions: Vec<_> = app.store.recent_sessions(10000);
                 let stats = app.store.stats();
-                self.history.render(frame, area, &sessions, stats.as_ref());
+                self.history
+                    .render(frame, area, &sessions, stats.as_ref(), scheme);
             }
             Tab::Mcp => {
                 let mcp_config = app.store.mcp_config();
-                self.mcp.render(frame, area, mcp_config.as_ref());
+                self.mcp.render(frame, area, mcp_config.as_ref(), scheme);
             }
             Tab::Analytics => {
                 use tracing::debug;
@@ -430,7 +441,7 @@ impl Ui {
                     "ui.rs: Rendering Analytics tab"
                 );
                 self.analytics
-                    .render(frame, area, analytics.as_ref(), Some(&app.store));
+                    .render(frame, area, analytics.as_ref(), Some(&app.store), scheme);
             }
         }
     }

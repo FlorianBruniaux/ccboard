@@ -3,6 +3,17 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Color scheme for TUI
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ColorScheme {
+    /// Dark theme (default): Black bg, White fg
+    #[default]
+    Dark,
+    /// Light theme: White bg, Black fg
+    Light,
+}
+
 /// Claude Code settings (from settings.json)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +57,10 @@ pub struct Settings {
     /// Budget configuration
     #[serde(default)]
     pub budget: Option<BudgetConfig>,
+
+    /// Custom keybindings (TUI only)
+    #[serde(default)]
+    pub keybindings: Option<HashMap<String, String>>,
 
     /// Additional untyped fields
     #[serde(flatten)]
@@ -235,6 +250,17 @@ impl MergedConfig {
         }
         if source.subscription_plan.is_some() {
             target.subscription_plan = source.subscription_plan.clone();
+        }
+        if source.budget.is_some() {
+            target.budget = source.budget.clone();
+        }
+
+        // Keybindings: merge maps (custom keybindings override defaults)
+        if let Some(ref src_keybindings) = source.keybindings {
+            let target_keybindings = target.keybindings.get_or_insert_with(HashMap::new);
+            for (k, v) in src_keybindings {
+                target_keybindings.insert(k.clone(), v.clone());
+            }
         }
 
         // Permissions: deep merge

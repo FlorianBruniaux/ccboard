@@ -1,7 +1,10 @@
 //! TUI Application state and event loop
 
 use crate::components::{CommandPalette, ConfirmDialog, HelpModal, Spinner, ToastManager};
+use crate::keybindings::{KeyAction, KeyBindings};
+use ccboard_core::models::config::ColorScheme;
 use ccboard_core::{DataEvent, DataStore};
+use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
@@ -153,11 +156,27 @@ pub struct App {
 
     /// Last time live sessions were refreshed
     pub last_live_refresh: std::time::Instant,
+
+    /// Search history for History tab (last 50 searches, newest first)
+    pub search_history: VecDeque<String>,
+
+    /// Current color scheme (Dark/Light)
+    pub color_scheme: ColorScheme,
+
+    /// Custom keybindings
+    pub keybindings: KeyBindings,
 }
 
 impl App {
     pub fn new(store: Arc<DataStore>) -> Self {
         let event_rx = store.event_bus().subscribe();
+
+        // Load keybindings from settings
+        let mut keybindings = KeyBindings::new();
+        let settings = store.settings();
+        if let Some(custom_keybindings) = &settings.merged.keybindings {
+            keybindings.load_custom(custom_keybindings);
+        }
 
         Self {
             store,
@@ -175,6 +194,9 @@ impl App {
             confirm_dialog: ConfirmDialog::new("Confirm", "Are you sure?"),
             live_sessions_cache: Vec::new(),
             last_live_refresh: std::time::Instant::now(),
+            search_history: VecDeque::with_capacity(50),
+            color_scheme: ColorScheme::default(), // Dark by default
+            keybindings,
         }
     }
 
@@ -197,7 +219,6 @@ impl App {
         modifiers: crossterm::event::KeyModifiers,
     ) -> bool {
         use crate::components::command_palette::CommandAction;
-        use crossterm::event::{KeyCode, KeyModifiers};
 
         // If command palette is visible, handle keys there first
         if self.command_palette.is_visible() {
@@ -220,60 +241,69 @@ impl App {
             return true;
         }
 
-        // Global keybindings (when palette is not active)
-        match key {
-            KeyCode::Char('?') => {
-                // Toggle help modal
-                self.help_modal.toggle();
-                true
-            }
-            KeyCode::Esc if self.help_modal.is_visible() => {
-                // Close help modal with ESC
-                self.help_modal.hide();
-                true
-            }
-            KeyCode::Char(':') => {
-                // Show command palette
-                self.command_palette.show();
-                true
-            }
-            KeyCode::Char('q') if !modifiers.contains(KeyModifiers::CONTROL) => {
+        // Try to match key to action via keybindings
+        if let Some(action) = self.keybindings.get_action(key, modifiers) {
+            self.handle_action(action);
+            return true;
+        }
+
+        // Key not handled by global keybindings
+        false
+    }
+
+    /// Handle a keybinding action
+    fn handle_action(&mut self, action: KeyAction) {
+        match action {
+            KeyAction::Quit | KeyAction::ForceQuit => {
                 self.should_quit = true;
-                true
             }
-            KeyCode::Char('q') if modifiers.contains(KeyModifiers::CONTROL) => {
-                // Ctrl+Q: quit without confirmation
-                self.should_quit = true;
-                true
+            KeyAction::Refresh => {
+                self.needs_refresh = true;
             }
-            KeyCode::Char('r') if modifiers.contains(KeyModifiers::CONTROL) => {
-                // Ctrl+R: force reload + clear cache
+            KeyAction::ForceRefresh => {
                 self.needs_refresh = true;
                 self.store.clear_session_content_cache();
                 self.info_toast("♻ Reloading data...");
-                true
             }
-            KeyCode::F(5) => {
-                // F5 for refresh (was 'r', but 'r' conflicts with search input)
-                self.needs_refresh = true;
-                // Clear session content cache for memory optimization
-                self.store.clear_session_content_cache();
-                true
+            KeyAction::ThemeToggle => {
+                self.color_scheme = match self.color_scheme {
+                    ColorScheme::Dark => ColorScheme::Light,
+                    ColorScheme::Light => ColorScheme::Dark,
+                };
+                let theme_name = match self.color_scheme {
+                    ColorScheme::Dark => "Dark",
+                    ColorScheme::Light => "Light",
+                };
+                self.info_toast(format!("Theme: {}", theme_name));
             }
-            KeyCode::Tab => {
+            KeyAction::NextTab => {
                 self.next_tab();
-                true
             }
-            KeyCode::BackTab => {
+            KeyAction::PrevTab => {
                 self.prev_tab();
-                true
             }
-            KeyCode::Char(c) if ('1'..='8').contains(&c) => {
-                let idx = (c as usize) - ('1' as usize);
-                self.active_tab = Tab::from_index(idx);
-                true
+            KeyAction::JumpTab0 => self.active_tab = Tab::from_index(0),
+            KeyAction::JumpTab1 => self.active_tab = Tab::from_index(1),
+            KeyAction::JumpTab2 => self.active_tab = Tab::from_index(2),
+            KeyAction::JumpTab3 => self.active_tab = Tab::from_index(3),
+            KeyAction::JumpTab4 => self.active_tab = Tab::from_index(4),
+            KeyAction::JumpTab5 => self.active_tab = Tab::from_index(5),
+            KeyAction::JumpTab6 => self.active_tab = Tab::from_index(6),
+            KeyAction::JumpTab7 => self.active_tab = Tab::from_index(7),
+            KeyAction::JumpTab8 => self.active_tab = Tab::from_index(8),
+            KeyAction::ToggleHelp => {
+                self.help_modal.toggle();
             }
-            _ => false,
+            KeyAction::ShowCommandPalette => {
+                self.command_palette.show();
+            }
+            KeyAction::CloseModal => {
+                if self.help_modal.is_visible() {
+                    self.help_modal.hide();
+                } else if self.command_palette.is_visible() {
+                    self.command_palette.hide();
+                }
+            }
         }
     }
 
