@@ -857,6 +857,7 @@ mod tests {
                 has_subagents: false,
                 duration_seconds: Some(1800),
                 branch: None,
+                tool_usage: std::collections::HashMap::new(),
             };
             store.sessions.insert(session.id.clone(), Arc::new(session));
         }
@@ -920,6 +921,7 @@ mod tests {
                 has_subagents: false,
                 duration_seconds: Some(1800),
                 branch: None,
+                tool_usage: std::collections::HashMap::new(),
             };
             store.sessions.insert(session.id.clone(), Arc::new(session));
         }

@@ -219,7 +219,7 @@ pub fn search_sessions(
 // ============================================================================
 
 /// Format sessions as table (human) or JSON
-pub fn format_session_table(sessions: &[Arc<SessionMetadata>], json: bool) -> String {
+pub fn format_session_table(sessions: &[Arc<SessionMetadata>], json: bool, no_color: bool) -> String {
     if json {
         return serde_json::to_string_pretty(sessions).unwrap_or_else(|_| "[]".to_string());
     }
@@ -230,8 +230,15 @@ pub fn format_session_table(sessions: &[Arc<SessionMetadata>], json: bool) -> St
 
     let mut table = Table::new();
     table
-        .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec![
+        .set_content_arrangement(ContentArrangement::Dynamic);
+
+    // Apply colors only if enabled
+    if no_color {
+        table.set_header(vec![
+            "ID", "Project", "Branch", "Date", "Msgs", "Tokens", "Duration", "Preview",
+        ]);
+    } else {
+        table.set_header(vec![
             Cell::new("ID").fg(Color::Cyan),
             Cell::new("Project").fg(Color::Cyan),
             Cell::new("Branch").fg(Color::Cyan),
@@ -241,6 +248,7 @@ pub fn format_session_table(sessions: &[Arc<SessionMetadata>], json: bool) -> St
             Cell::new("Duration").fg(Color::Cyan),
             Cell::new("Preview").fg(Color::Cyan),
         ]);
+    }
 
     for session in sessions {
         let id_short = &session.id[..8.min(session.id.len())];
@@ -460,6 +468,7 @@ mod tests {
             has_subagents: false,
             duration_seconds: Some(1800),
             branch: Some("main".to_string()),
+            tool_usage: std::collections::HashMap::new(),
         })
     }
 
@@ -508,14 +517,14 @@ mod tests {
     #[test]
     fn test_format_session_table_empty() {
         let sessions: Vec<Arc<SessionMetadata>> = vec![];
-        let output = format_session_table(&sessions, false);
+        let output = format_session_table(&sessions, false, false);
         assert!(output.contains("No sessions found"));
     }
 
     #[test]
     fn test_format_session_table_json() {
         let sessions = vec![create_test_session("abc123def456")];
-        let output = format_session_table(&sessions, true);
+        let output = format_session_table(&sessions, true, false);
         assert!(output.contains("abc123def456"));
         assert!(output.starts_with('['));
     }

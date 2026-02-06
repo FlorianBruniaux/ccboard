@@ -29,19 +29,37 @@ use std::sync::Arc;
                     ccboard                          # Run TUI (default)\n\
                     ccboard web --port 8080          # Run web interface on port 8080\n\
                     ccboard stats                    # Print stats summary\n\
-                    ccboard --project ~/myproject    # Focus on specific project"
+                    ccboard --project ~/myproject    # Focus on specific project\n\
+                  \n\
+                  Environment Variables:\n\
+                    CCBOARD_CLAUDE_HOME              # Override Claude home directory\n\
+                    CCBOARD_NON_INTERACTIVE          # Disable interactive prompts (CI/CD)\n\
+                    CCBOARD_FORMAT                   # Force output format: json|table\n\
+                    CCBOARD_NO_COLOR                 # Disable ANSI colors (log-friendly)"
 )]
 struct Cli {
     #[command(subcommand)]
     mode: Option<Mode>,
 
     /// Path to Claude home directory (default: ~/.claude)
-    #[arg(long)]
+    #[arg(long, env = "CCBOARD_CLAUDE_HOME")]
     claude_home: Option<PathBuf>,
 
     /// Focus on specific project directory
     #[arg(long)]
     project: Option<PathBuf>,
+
+    /// Disable interactive prompts (CI/CD mode)
+    #[arg(long, env = "CCBOARD_NON_INTERACTIVE")]
+    non_interactive: bool,
+
+    /// Force output format (json|table)
+    #[arg(long, env = "CCBOARD_FORMAT", value_parser = ["json", "table"])]
+    format: Option<String>,
+
+    /// Disable ANSI colors (log-friendly)
+    #[arg(long, env = "CCBOARD_NO_COLOR")]
+    no_color: bool,
 }
 
 #[derive(Subcommand)]
@@ -125,6 +143,9 @@ async fn main() -> Result<()> {
         }
     });
 
+    // Extract flags for command handlers
+    let no_color = cli.no_color;
+
     match cli.mode.unwrap_or(Mode::Tui) {
         Mode::Tui => {
             run_tui(claude_home, project).await?;
@@ -147,13 +168,13 @@ async fn main() -> Result<()> {
             limit,
             json,
         } => {
-            run_search(claude_home, project, query, since, limit, json).await?;
+            run_search(claude_home, project, query, since, limit, json, no_color).await?;
         }
         Mode::Recent { count, since, json } => {
-            run_recent(claude_home, project, count, since, json).await?;
+            run_recent(claude_home, project, count, since, json, no_color).await?;
         }
         Mode::Info { session_id, json } => {
-            run_info(claude_home, project, session_id, json).await?;
+            run_info(claude_home, project, session_id, json, no_color).await?;
         }
         Mode::Resume { session_id } => {
             run_resume(claude_home, project, session_id).await?;
@@ -411,6 +432,7 @@ async fn run_search(
     since: Option<String>,
     limit: usize,
     json: bool,
+    no_color: bool,
 ) -> Result<()> {
     let store = DataStore::with_defaults(claude_home, project);
 
@@ -444,7 +466,7 @@ async fn run_search(
         .into());
     }
 
-    println!("{}", cli::format_session_table(&results, json));
+    println!("{}", cli::format_session_table(&results, json, no_color));
 
     if !json {
         eprintln!("\n{} results from {} sessions", results.len(), all.len());
@@ -459,6 +481,7 @@ async fn run_recent(
     count: usize,
     since: Option<String>,
     json: bool,
+    no_color: bool,
 ) -> Result<()> {
     let store = DataStore::with_defaults(claude_home, project);
 
@@ -500,7 +523,7 @@ async fn run_recent(
         return Ok(());
     }
 
-    println!("{}", cli::format_session_table(&results, json));
+    println!("{}", cli::format_session_table(&results, json, no_color));
 
     if !json {
         eprintln!(
@@ -518,6 +541,7 @@ async fn run_info(
     project: Option<PathBuf>,
     session_id: String,
     json: bool,
+    _no_color: bool,
 ) -> Result<()> {
     let store = DataStore::with_defaults(claude_home, project);
 

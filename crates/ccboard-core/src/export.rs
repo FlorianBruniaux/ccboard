@@ -328,6 +328,7 @@ mod tests {
             has_subagents: false,
             duration_seconds: Some(2700), // 45 minutes
             branch: None,
+            tool_usage: std::collections::HashMap::new(),
         }
     }
 

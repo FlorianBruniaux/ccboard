@@ -120,11 +120,9 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
             activity_heatmap[weekday][hour] += 1;
         }
 
-        // Tool usage stats - TODO: Extract from session JSONL content
-        // For now, we'll use model names as a proxy for "tools"
-        // This could be enhanced later to parse actual tool_calls from JSONL
-        for model in &session.models_used {
-            *tool_usage.entry(model.clone()).or_default() += 1;
+        // Tool usage stats - extracted from session metadata
+        for (tool_name, count) in &session.tool_usage {
+            *tool_usage.entry(tool_name.clone()).or_default() += count;
         }
 
         // Session duration

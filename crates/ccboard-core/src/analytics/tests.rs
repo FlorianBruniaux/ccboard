@@ -32,6 +32,7 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
                 has_subagents: false,
                 duration_seconds: Some(1800),
                 branch: None,
+                tool_usage: std::collections::HashMap::new(),
             })
         })
         .collect()
@@ -220,6 +221,7 @@ fn test_patterns_multi_model_session_no_double_count() {
         has_subagents: false,
         duration_seconds: Some(1800),
         branch: None,
+        tool_usage: std::collections::HashMap::new(),
     })];
 
     let patterns = detect_patterns(&sessions, 7);

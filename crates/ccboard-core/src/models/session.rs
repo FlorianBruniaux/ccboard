@@ -177,6 +177,10 @@ pub struct SessionMetadata {
 
     /// Git branch name (normalized, extracted from first gitBranch in session)
     pub branch: Option<String>,
+
+    /// Tool usage statistics: tool name -> call count
+    /// Extracted from tool_calls in assistant messages during session scan
+    pub tool_usage: std::collections::HashMap<String, usize>,
 }
 
 impl SessionMetadata {
@@ -208,6 +212,7 @@ impl SessionMetadata {
             has_subagents: false,
             duration_seconds: None,
             branch: None,
+            tool_usage: std::collections::HashMap::new(),
         }
     }
 
