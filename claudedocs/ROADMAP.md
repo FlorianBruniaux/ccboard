@@ -1,9 +1,16 @@
+---
+date: 2026-02-06
+last_updated: 2026-02-06
+title: ccboard Development Roadmap
+status: Phase I complete, Quick Wins complete
+---
+
 # ccboard Development Plan
 
 **Project**: ccboard - Unified TUI/Web dashboard for Claude Code management
 **Language**: Rust (workspace with 4 crates)
 **Status**: Phase I complete, Quick Wins complete (Week 1)
-**Last Updated**: 2025-02-06
+**Last Updated**: 2026-02-06
 
 ---
 

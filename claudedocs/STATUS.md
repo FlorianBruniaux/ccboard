@@ -1,3 +1,9 @@
+---
+date: 2026-02-06
+version: 0.4.0
+status: Production-Ready (TUI) | Backend-Ready (Web)
+---
+
 # ccboard Status Report
 
 **Version**: 0.4.0

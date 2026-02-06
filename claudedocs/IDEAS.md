@@ -1,3 +1,9 @@
+---
+date: 2026-02-06
+last_updated: 2026-02-06
+title: ccboard Ideas & Roadmap
+---
+
 # Ideas & Roadmap
 
 > Public roadmap for ccboard feature development. Transparent priorities and community-driven direction.

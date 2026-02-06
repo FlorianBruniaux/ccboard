@@ -1,3 +1,10 @@
+---
+date: 2026-02-06
+last_updated: 2026-02-06
+version: 0.4.0
+title: ccboard Optimization Plan
+---
+
 # Plan: Optimisation ccboard - ÉTAT ACTUEL
 
 **Dernière mise à jour**: 2026-02-06
