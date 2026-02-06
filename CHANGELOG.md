@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added - Phase I-CLI: Session Management Commands
 
+#### Message Filtering (QW2 - xlaude insights)
+- **System message filtering**: Filter out protocol/system messages for cleaner previews
+  - Excludes: `<local-command`, `<command-`, `<system-reminder>`, `Caveat:`
+  - Excludes: `[Request interrupted`, `[Session resumed`, `[Tool output truncated`
+  - Applied to `first_user_message` preview extraction in session metadata
+- **New module**: `ccboard-core/src/parsers/filters.rs`
+  - `is_meaningful_user_message()`: Reusable filter for UI and analytics
+  - Comprehensive test coverage (5 test cases)
+- **Session parser integration**: Cleaner session previews in TUI and search results
+  - Test: `test_message_filtering_excludes_system_messages` validates behavior
+  - System commands no longer pollute session previews
+
+#### Environment Variables (QW1 - xlaude insights)
+- **`CCBOARD_CLAUDE_HOME`**: Override Claude home directory path
+  - Enables testing with isolated configurations
+  - Example: `CCBOARD_CLAUDE_HOME=/tmp/test-claude ccboard stats`
+- **`CCBOARD_NON_INTERACTIVE`**: Disable interactive prompts for CI/CD
+  - Fail fast instead of waiting for user input
+  - Example: `CCBOARD_NON_INTERACTIVE=1 ccboard stats`
+- **`CCBOARD_FORMAT`**: Force output format (`json` or `table`)
+  - Useful for scripting and automation pipelines
+  - Example: `CCBOARD_FORMAT=json ccboard recent 10 | jq`
+- **`CCBOARD_NO_COLOR`**: Disable ANSI colors for log-friendly output
+  - Clean output for file redirects and log aggregators
+  - Example: `CCBOARD_NO_COLOR=1 ccboard search "error" > results.log`
+- **clap env feature**: Upgraded `clap` with `env` feature for environment variable support
+- **Test suite**: Added `tests/env_vars_test.sh` for validation
+
 #### CLI Commands
 - **`search` command**: Search sessions by query string (ID, project, message, branch)
   - `--since` filter: `7d`, `30d`, `3m`, `1y`, or `YYYY-MM-DD` format

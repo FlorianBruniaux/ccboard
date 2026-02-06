@@ -9,6 +9,7 @@
 use crate::cache::MetadataCache;
 use crate::error::{CoreError, LoadError, LoadReport};
 use crate::models::{SessionLine, SessionMetadata, session::SessionSummary};
+use crate::parsers::filters::is_meaningful_user_message;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -278,6 +279,7 @@ impl SessionIndexParser {
         let mut cache_creation_tokens = 0u64;
         let mut cache_read_tokens = 0u64;
         let mut branch: Option<String> = None;
+        let mut tool_usage: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
 
         while let Some(line_result) = lines.next_line().await.map_err(|e| CoreError::FileRead {
             path: path.to_path_buf(),
@@ -357,7 +359,7 @@ impl SessionIndexParser {
                 }
             }
 
-            // Count user messages and extract first preview
+            // Count user messages and extract first preview (filtered)
             if session_line.line_type == "user" {
                 message_count += 1;
 
@@ -379,8 +381,12 @@ impl SessionIndexParser {
                                 }
                                 _ => String::new(),
                             };
-                            let preview: String = text.chars().take(PREVIEW_MAX_CHARS).collect();
-                            metadata.first_user_message = Some(preview);
+
+                            // Filter out system/protocol messages for cleaner previews
+                            if is_meaningful_user_message(&text) {
+                                let preview: String = text.chars().take(PREVIEW_MAX_CHARS).collect();
+                                metadata.first_user_message = Some(preview);
+                            }
                         }
                     }
                 }
@@ -402,6 +408,36 @@ impl SessionIndexParser {
                     output_tokens += usage.output_tokens;
                     cache_creation_tokens += usage.cache_write_tokens;
                     cache_read_tokens += usage.cache_read_tokens;
+                }
+
+                // Extract tool calls from message
+                if let Some(ref msg) = session_line.message {
+                    // Try tool_calls field first (if present)
+                    if let Some(ref tool_calls) = msg.tool_calls {
+                        for tool_call in tool_calls {
+                            // Format: {"type": "function", "function": {"name": "Read", ...}}
+                            if let Some(function) = tool_call.get("function") {
+                                if let Some(name) = function.get("name").and_then(|n| n.as_str()) {
+                                    *tool_usage.entry(name.to_string()).or_default() += 1;
+                                }
+                            }
+                        }
+                    }
+
+                    // Also check content array for tool_use blocks (real Claude Code format)
+                    if let Some(ref content) = msg.content {
+                        if let Some(blocks) = content.as_array() {
+                            for block in blocks {
+                                if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
+                                    if block_type == "tool_use" {
+                                        if let Some(name) = block.get("name").and_then(|n| n.as_str()) {
+                                            *tool_usage.entry(name.to_string()).or_default() += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -436,6 +472,9 @@ impl SessionIndexParser {
 
         // Apply branch
         metadata.branch = branch;
+
+        // Apply tool usage
+        metadata.tool_usage = tool_usage;
 
         Ok(metadata)
     }
@@ -822,6 +861,128 @@ mod tests {
         assert_eq!(
             SessionIndexParser::normalize_worktree_path("/Users///test///app//worktrees/fix"),
             "/Users/test/app"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_tool_usage_extraction() {
+        let mut file = NamedTempFile::new().unwrap();
+
+        // Create a session with tool calls (in REAL format from Claude Code JSONL)
+        // Format: tool_calls are in message.content blocks, not separate tool_calls field
+        writeln!(
+            file,
+            r#"{{"type": "user", "sessionId": "tool-test", "message": {{"content": "Read a file"}}}}"#
+        )
+        .unwrap();
+
+        // REAL Claude Code format: assistant message with tool_use content blocks
+        writeln!(
+            file,
+            r#"{{"type": "assistant", "model": "claude-sonnet-4-5-20250929", "message": {{"content": [{{"type": "tool_use", "name": "Read", "id": "call_1"}}], "usage": {{"input_tokens": 100, "output_tokens": 50}}}}}}"#
+        )
+        .unwrap();
+
+        writeln!(
+            file,
+            r#"{{"type": "assistant", "model": "claude-sonnet-4-5-20250929", "message": {{"content": [{{"type": "tool_use", "name": "Write", "id": "call_2"}}, {{"type": "tool_use", "name": "Grep", "id": "call_3"}}], "usage": {{"input_tokens": 50, "output_tokens": 25}}}}}}"#
+        )
+        .unwrap();
+
+        writeln!(
+            file,
+            r#"{{"type": "summary", "summary": {{"totalTokens": 225, "messageCount": 3}}}}"#
+        )
+        .unwrap();
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(file.path()).await.unwrap();
+
+        // Check tool usage was extracted
+        assert_eq!(meta.tool_usage.len(), 3, "Should have 3 unique tools");
+        assert_eq!(
+            *meta.tool_usage.get("Read").unwrap_or(&0),
+            1,
+            "Read should be called once"
+        );
+        assert_eq!(
+            *meta.tool_usage.get("Write").unwrap_or(&0),
+            1,
+            "Write should be called once"
+        );
+        assert_eq!(
+            *meta.tool_usage.get("Grep").unwrap_or(&0),
+            1,
+            "Grep should be called once"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_message_filtering_excludes_system_messages() {
+        let mut file = NamedTempFile::new().unwrap();
+
+        // First message is a system command - should be filtered
+        writeln!(
+            file,
+            r#"{{"type": "user", "sessionId": "filter-test", "timestamp": "2025-01-01T10:00:00Z", "message": {{"content": "<local-command>"}}}}"#
+        )
+        .unwrap();
+
+        // Second message is a system reminder - should be filtered
+        writeln!(
+            file,
+            r#"{{"type": "user", "timestamp": "2025-01-01T10:01:00Z", "message": {{"content": "<system-reminder>"}}}}"#
+        )
+        .unwrap();
+
+        // Third message is interrupted - should be filtered
+        writeln!(
+            file,
+            r#"{{"type": "user", "timestamp": "2025-01-01T10:02:00Z", "message": {{"content": "[Request interrupted by user]"}}}}"#
+        )
+        .unwrap();
+
+        // Fourth message is meaningful - should be captured
+        writeln!(
+            file,
+            r#"{{"type": "user", "timestamp": "2025-01-01T10:03:00Z", "message": {{"content": "Fix the bug in authentication"}}}}"#
+        )
+        .unwrap();
+
+        writeln!(
+            file,
+            r#"{{"type": "assistant", "model": "claude-sonnet-4-5-20250929", "message": {{"usage": {{"input_tokens": 100, "output_tokens": 50}}}}}}"#
+        )
+        .unwrap();
+
+        writeln!(
+            file,
+            r#"{{"type": "summary", "summary": {{"totalTokens": 150, "messageCount": 5}}}}"#
+        )
+        .unwrap();
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(file.path()).await.unwrap();
+
+        // Should have 5 messages total (4 user + 1 assistant)
+        assert_eq!(meta.message_count, 5);
+
+        // But first_user_message should skip the first 3 system messages
+        // and capture the 4th meaningful message
+        assert!(meta.first_user_message.is_some());
+        let preview = meta.first_user_message.unwrap();
+        assert!(
+            preview.contains("Fix the bug"),
+            "Should capture meaningful message, got: {}",
+            preview
+        );
+        assert!(
+            !preview.contains("<local-command>"),
+            "Should not contain system commands"
+        );
+        assert!(
+            !preview.contains("[Request interrupted"),
+            "Should not contain noise patterns"
         );
     }
 }

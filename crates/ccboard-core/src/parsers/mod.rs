@@ -1,5 +1,6 @@
 //! Parsers for Claude Code data files
 
+pub mod filters;
 pub mod hooks;
 pub mod invocations;
 pub mod mcp_config;
@@ -9,6 +10,7 @@ pub mod settings;
 pub mod stats;
 pub mod task;
 
+pub use filters::is_meaningful_user_message;
 pub use hooks::{Hook, HookType, HooksParser};
 pub use invocations::InvocationParser;
 pub use mcp_config::McpConfig;
