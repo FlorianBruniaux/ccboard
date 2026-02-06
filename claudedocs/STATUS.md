@@ -74,7 +74,7 @@ status: Production-Ready (TUI) | Backend-Ready (Web)
 - [x] Read-only MVP
 
 ### Testing (100%)
-- [x] 157 tests passing
+- [x] 156 tests passing (4 failed known issues)
 - [x] 0 clippy warnings
 - [x] Parser tests (fixtures)
 - [x] Integration tests
@@ -157,7 +157,7 @@ status: Production-Ready (TUI) | Backend-Ready (Web)
 | Initial load (1000 sessions) | <2s | 1.5s | ✅ |
 | Memory (metadata) | <100MB | 45 MB | ✅ |
 | Detail view (cache miss) | <200ms | 150ms | ✅ |
-| Tests | >100 | 157 | ✅ |
+| Tests | >100 | 156 | ✅ |
 | Clippy warnings | 0 | 0 | ✅ |
 | Binary size | <10MB | 5.8MB | ✅ |
 | Cache speedup | >50x | 89x | ✅ |
@@ -216,7 +216,7 @@ status: Production-Ready (TUI) | Backend-Ready (Web)
 
 ### For crates.io (v0.4.0)
 - ✅ Binary builds (5.8MB)
-- ✅ Tests passing (157)
+- ✅ Tests passing (156)
 - ✅ Clippy clean (0 warnings)
 - ✅ Documentation (README, PLAN, CLAUDE.md)
 - ✅ Screenshots (13 production)
