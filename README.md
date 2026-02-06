@@ -153,6 +153,13 @@ ccboard vs other Claude Code monitoring tools (verified 2026-02-04):
 - **Usage-Monitor**: Stale since Sep 2025 (7 months, 74 open issues)
 - **Sniffly**: Stale since Aug 2025 (6 months)
 
+**Complementary tools**:
+- **[xlaude](https://github.com/Xuanwo/xlaude)** (171 ⭐): Git worktree manager for Claude sessions
+  - **Complementarity**: xlaude focuses on workspace isolation (PTY sessions, branch management), ccboard on analytics/monitoring
+  - **Performance comparison**: ccboard lazy loading 15x faster (4.8s vs 72s for 3000 sessions)
+  - **Use cases**: Use xlaude for session isolation, ccboard for historical analysis and cost tracking
+  - **Learnings applied**: Environment variables (QW1), message filtering (QW2), performance validation (QW3)
+
 ---
 
 ## Screenshots
@@ -543,6 +550,33 @@ Configure custom monthly budgets with automatic alerts in the **Analytics tab** 
 
 **Costs**
 - `Tab` / `←` / `→` - Switch cost views (Overview/By Model/Daily)
+
+### Environment Variables
+
+ccboard supports environment variables for automation and CI/CD workflows:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `CCBOARD_CLAUDE_HOME` | Override Claude home directory | `CCBOARD_CLAUDE_HOME=/custom/path ccboard stats` |
+| `CCBOARD_NON_INTERACTIVE` | Disable interactive prompts (CI/CD mode) | `CCBOARD_NON_INTERACTIVE=1 ccboard stats` |
+| `CCBOARD_FORMAT` | Force output format: `json` or `table` | `CCBOARD_FORMAT=json ccboard recent 10` |
+| `CCBOARD_NO_COLOR` | Disable ANSI colors (log-friendly) | `CCBOARD_NO_COLOR=1 ccboard search "bug"` |
+
+**Use cases**:
+
+```bash
+# CI/CD: JSON output without colors
+CCBOARD_NON_INTERACTIVE=1 CCBOARD_NO_COLOR=1 CCBOARD_FORMAT=json ccboard stats
+
+# Testing: Isolated configuration
+CCBOARD_CLAUDE_HOME=/tmp/test-claude ccboard stats
+
+# Automation: Pipe JSON to other tools
+CCBOARD_FORMAT=json ccboard sessions search "error" | jq '.[] | .id'
+
+# Log-friendly: No colors for file redirects
+CCBOARD_NO_COLOR=1 ccboard recent 50 > sessions.log
+```
 
 ### Command Palette
 
