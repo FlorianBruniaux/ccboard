@@ -80,13 +80,15 @@ mod tests {
     #[test]
     fn test_noise_patterns_filtered() {
         // Noise patterns should be filtered
+        assert!(!is_meaningful_user_message("[Request interrupted by user]"));
         assert!(!is_meaningful_user_message(
-            "[Request interrupted by user]"
+            "[Session resumed from previous state]"
         ));
-        assert!(!is_meaningful_user_message("[Session resumed from previous state]"));
         assert!(!is_meaningful_user_message("[Tool output truncated]"));
         assert!(!is_meaningful_user_message("[Session paused]"));
-        assert!(!is_meaningful_user_message("[Connection lost, retrying...]"));
+        assert!(!is_meaningful_user_message(
+            "[Connection lost, retrying...]"
+        ));
     }
 
     #[test]

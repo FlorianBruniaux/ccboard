@@ -112,7 +112,11 @@ impl SessionIndexParser {
     fn normalize_worktree_path(path: &str) -> String {
         // Normalize multiple slashes (from -- encoding) to single slash
         // Example: /Users/.../app//worktrees → /Users/.../app/worktrees
-        let normalized = path.split('/').filter(|s| !s.is_empty()).collect::<Vec<_>>().join("/");
+        let normalized = path
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("/");
         let normalized = if path.starts_with('/') {
             format!("/{}", normalized)
         } else {
@@ -279,7 +283,8 @@ impl SessionIndexParser {
         let mut cache_creation_tokens = 0u64;
         let mut cache_read_tokens = 0u64;
         let mut branch: Option<String> = None;
-        let mut tool_usage: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        let mut tool_usage: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
 
         while let Some(line_result) = lines.next_line().await.map_err(|e| CoreError::FileRead {
             path: path.to_path_buf(),
@@ -384,7 +389,8 @@ impl SessionIndexParser {
 
                             // Filter out system/protocol messages for cleaner previews
                             if is_meaningful_user_message(&text) {
-                                let preview: String = text.chars().take(PREVIEW_MAX_CHARS).collect();
+                                let preview: String =
+                                    text.chars().take(PREVIEW_MAX_CHARS).collect();
                                 metadata.first_user_message = Some(preview);
                             }
                         }
@@ -428,9 +434,12 @@ impl SessionIndexParser {
                     if let Some(ref content) = msg.content {
                         if let Some(blocks) = content.as_array() {
                             for block in blocks {
-                                if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
+                                if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
+                                {
                                     if block_type == "tool_use" {
-                                        if let Some(name) = block.get("name").and_then(|n| n.as_str()) {
+                                        if let Some(name) =
+                                            block.get("name").and_then(|n| n.as_str())
+                                        {
                                             *tool_usage.entry(name.to_string()).or_default() += 1;
                                         }
                                     }
@@ -805,7 +814,9 @@ mod tests {
             "/Users/test/app"
         );
         assert_eq!(
-            SessionIndexParser::normalize_worktree_path("/path/to/MethodeAristote/app/worktrees/bugfixes"),
+            SessionIndexParser::normalize_worktree_path(
+                "/path/to/MethodeAristote/app/worktrees/bugfixes"
+            ),
             "/path/to/MethodeAristote/app"
         );
     }
@@ -854,7 +865,9 @@ mod tests {
             "/Users/test/app"
         );
         assert_eq!(
-            SessionIndexParser::normalize_worktree_path("/path/to/MethodeAristote/app//worktrees/bugfixes"),
+            SessionIndexParser::normalize_worktree_path(
+                "/path/to/MethodeAristote/app//worktrees/bugfixes"
+            ),
             "/path/to/MethodeAristote/app"
         );
         // Multiple consecutive slashes

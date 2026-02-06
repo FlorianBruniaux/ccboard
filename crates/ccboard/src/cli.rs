@@ -219,7 +219,11 @@ pub fn search_sessions(
 // ============================================================================
 
 /// Format sessions as table (human) or JSON
-pub fn format_session_table(sessions: &[Arc<SessionMetadata>], json: bool, no_color: bool) -> String {
+pub fn format_session_table(
+    sessions: &[Arc<SessionMetadata>],
+    json: bool,
+    no_color: bool,
+) -> String {
     if json {
         return serde_json::to_string_pretty(sessions).unwrap_or_else(|_| "[]".to_string());
     }
@@ -229,8 +233,7 @@ pub fn format_session_table(sessions: &[Arc<SessionMetadata>], json: bool, no_co
     }
 
     let mut table = Table::new();
-    table
-        .set_content_arrangement(ContentArrangement::Dynamic);
+    table.set_content_arrangement(ContentArrangement::Dynamic);
 
     // Apply colors only if enabled
     if no_color {

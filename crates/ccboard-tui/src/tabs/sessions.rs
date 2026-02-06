@@ -26,6 +26,43 @@ pub enum DateFilter {
     Last30d,
 }
 
+/// Sort mode for session list
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionSortMode {
+    DateDesc,     // newest first (default)
+    DateAsc,      // oldest first
+    TokensDesc,   // most tokens first
+    TokensAsc,    // least tokens first
+    DurationDesc, // longest first
+    MessagesDesc, // most messages first
+}
+
+impl SessionSortMode {
+    /// Get the next sort mode in the cycle
+    fn next(&self) -> Self {
+        match self {
+            SessionSortMode::DateDesc => SessionSortMode::DateAsc,
+            SessionSortMode::DateAsc => SessionSortMode::TokensDesc,
+            SessionSortMode::TokensDesc => SessionSortMode::TokensAsc,
+            SessionSortMode::TokensAsc => SessionSortMode::DurationDesc,
+            SessionSortMode::DurationDesc => SessionSortMode::MessagesDesc,
+            SessionSortMode::MessagesDesc => SessionSortMode::DateDesc,
+        }
+    }
+
+    /// Get display string for UI
+    fn display(&self) -> &str {
+        match self {
+            SessionSortMode::DateDesc => "Date ↓",
+            SessionSortMode::DateAsc => "Date ↑",
+            SessionSortMode::TokensDesc => "Tokens ↓",
+            SessionSortMode::TokensAsc => "Tokens ↑",
+            SessionSortMode::DurationDesc => "Duration ↓",
+            SessionSortMode::MessagesDesc => "Messages ↓",
+        }
+    }
+}
+
 impl DateFilter {
     /// Get the next filter in the cycle
     fn next(&self) -> Self {
@@ -90,6 +127,8 @@ pub struct SessionsTab {
     search_global: bool,
     /// Date filter for sessions
     date_filter: DateFilter,
+    /// Sort mode for sessions
+    sort_mode: SessionSortMode,
     /// Show detail popup for historical sessions
     show_detail: bool,
     /// Show detail popup for live sessions
@@ -100,6 +139,8 @@ pub struct SessionsTab {
     last_refresh: Instant,
     /// Refresh notification message
     refresh_message: Option<String>,
+    /// Notification timestamp for auto-clear timing
+    notification_time: Option<Instant>,
     /// Previous session count (to detect changes)
     prev_session_count: usize,
     /// Vim-style: waiting for second 'g' press
@@ -131,11 +172,13 @@ impl SessionsTab {
             search_active: false,
             search_global: false,
             date_filter: DateFilter::All,
+            sort_mode: SessionSortMode::DateDesc,
             show_detail: false,
             show_live_detail: false,
             error_message: None,
             last_refresh: Instant::now(),
             refresh_message: None,
+            notification_time: None,
             prev_session_count: 0,
             pending_gg: false,
         }
@@ -246,13 +289,14 @@ impl SessionsTab {
                             self.error_message = Some(format!("Failed to resume session: {}", e));
                         } else {
                             self.refresh_message = Some("Session resumed".to_string());
+                            self.notification_time = Some(Instant::now());
                         }
                     }
                 }
             }
             KeyCode::Char('y') => {
-                // Copy session ID to clipboard
-                if self.focus == 1 {
+                // Copy session ID to clipboard (works from Sessions pane)
+                if self.focus == 2 {
                     if let Some(session) = self.get_selected_session(_sessions_by_project) {
                         match arboard::Clipboard::new() {
                             Ok(mut clipboard) => {
@@ -263,6 +307,7 @@ impl SessionsTab {
                                         "✓ Copied: {}",
                                         &session.id[..8.min(session.id.len())]
                                     ));
+                                    self.notification_time = Some(Instant::now());
                                 }
                             }
                             Err(e) => {
@@ -273,18 +318,28 @@ impl SessionsTab {
                 }
             }
             KeyCode::Char('d') => {
-                // Cycle date filter
+                // Cycle date filter (works from any pane)
+                self.date_filter = self.date_filter.next();
+                self.refresh_message = Some(format!("Date filter: {}", self.date_filter.display()));
+                self.notification_time = Some(Instant::now());
+                // Reset selection to top when filter changes
+                self.session_state.select(Some(0));
+            }
+            KeyCode::Char('s') => {
+                // Cycle sort mode (works from Sessions pane)
                 if self.focus == 2 {
-                    self.date_filter = self.date_filter.next();
-                    self.refresh_message =
-                        Some(format!("Date filter: {}", self.date_filter.display()));
-                    // Reset selection to top when filter changes
+                    self.sort_mode = self.sort_mode.next();
+                    self.refresh_message = Some(format!("Sort: {}", self.sort_mode.display()));
+                    self.notification_time = Some(Instant::now());
+                    // Reset selection to top when sort changes
                     self.session_state.select(Some(0));
                 }
             }
             KeyCode::Esc => {
                 if self.error_message.is_some() {
                     self.error_message = None;
+                } else if self.show_live_detail {
+                    self.show_live_detail = false;
                 } else {
                     self.show_detail = false;
                 }
@@ -554,7 +609,7 @@ impl SessionsTab {
             .split(content_area);
 
         // Render projects tree
-        self.render_projects(frame, chunks[0]);
+        self.render_projects(frame, chunks[0], sessions_by_project);
 
         // Get sessions for selected project or all projects (global search)
         let selected_project = self
@@ -583,7 +638,7 @@ impl SessionsTab {
         };
 
         // Filter sessions based on search and date filter (Arc clone is cheap: 8 bytes)
-        let sessions: Vec<Arc<SessionMetadata>> = all_sessions
+        let mut sessions: Vec<Arc<SessionMetadata>> = all_sessions
             .iter()
             .filter(|s| {
                 // Apply date filter
@@ -608,6 +663,40 @@ impl SessionsTab {
             })
             .map(Arc::clone)
             .collect();
+
+        // Apply sort mode
+        match self.sort_mode {
+            SessionSortMode::DateDesc => {
+                sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+            }
+            SessionSortMode::DateAsc => {
+                sessions.sort_by(|a, b| a.last_timestamp.cmp(&b.last_timestamp));
+            }
+            SessionSortMode::TokensDesc => {
+                sessions.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
+            }
+            SessionSortMode::TokensAsc => {
+                sessions.sort_by(|a, b| a.total_tokens.cmp(&b.total_tokens));
+            }
+            SessionSortMode::DurationDesc => {
+                sessions.sort_by(|a, b| {
+                    let a_dur = a
+                        .last_timestamp
+                        .zip(a.first_timestamp)
+                        .map(|(end, start)| (end - start).num_seconds())
+                        .unwrap_or(0);
+                    let b_dur = b
+                        .last_timestamp
+                        .zip(b.first_timestamp)
+                        .map(|(end, start)| (end - start).num_seconds())
+                        .unwrap_or(0);
+                    b_dur.cmp(&a_dur)
+                });
+            }
+            SessionSortMode::MessagesDesc => {
+                sessions.sort_by(|a, b| b.message_count.cmp(&a.message_count));
+            }
+        }
 
         // Clamp session selection
         if let Some(sel) = self.session_state.selected() {
@@ -767,7 +856,12 @@ impl SessionsTab {
         }
     }
 
-    fn render_projects(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_projects(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
+    ) {
         let is_focused = self.focus == 1; // Projects focus
         let border_color = if is_focused {
             Color::Cyan
@@ -790,6 +884,7 @@ impl SessionsTab {
             .map(|(i, path)| {
                 let is_selected = self.project_state.selected() == Some(i);
                 let display = Self::format_project_path(path);
+                let session_count = sessions_by_project.get(path).map(|v| v.len()).unwrap_or(0);
 
                 let style = if is_selected && is_focused {
                     Style::default()
@@ -801,10 +896,17 @@ impl SessionsTab {
                     Style::default().fg(Color::DarkGray)
                 };
 
-                ListItem::new(Line::from(Span::styled(
-                    format!(" {} {}", if is_selected { "▶" } else { " " }, display),
-                    style,
-                )))
+                let count_style = if is_selected {
+                    Style::default().fg(Color::Yellow)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                };
+
+                ListItem::new(Line::from(vec![
+                    Span::styled(format!(" {} ", if is_selected { "▶" } else { " " }), style),
+                    Span::styled(display, style),
+                    Span::styled(format!(" ({})", session_count), count_style),
+                ]))
             })
             .collect();
 
@@ -835,7 +937,7 @@ impl SessionsTab {
         let total_count = sessions.len();
         let display_count = total_count.min(MAX_DISPLAY);
 
-        // Build title with optional date filter and search mode indicators
+        // Build title with optional date filter, sort mode, and search mode indicators
         let mut title_parts = vec!["Sessions".to_string()];
 
         // Add search mode indicator
@@ -846,6 +948,11 @@ impl SessionsTab {
         // Add date filter if not "All"
         if self.date_filter != DateFilter::All {
             title_parts.push(format!("({})", self.date_filter.display()));
+        }
+
+        // Add sort mode if not default
+        if self.sort_mode != SessionSortMode::DateDesc {
+            title_parts.push(format!("[{}]", self.sort_mode.display()));
         }
 
         let title_prefix = title_parts.join(" ");
@@ -1144,9 +1251,59 @@ impl SessionsTab {
                     Style::default().fg(Color::Cyan),
                 ),
             ]),
+        ]);
+
+        // Token breakdown (if available)
+        if session.input_tokens > 0 || session.output_tokens > 0 {
+            lines.push(Line::from(vec![
+                Span::styled("  ├─ Input: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    Self::format_tokens(session.input_tokens),
+                    Style::default().fg(Color::Green),
+                ),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("  ├─ Output: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    Self::format_tokens(session.output_tokens),
+                    Style::default().fg(Color::Yellow),
+                ),
+            ]));
+            if session.cache_creation_tokens > 0 {
+                lines.push(Line::from(vec![
+                    Span::styled("  ├─ Cache Write: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        Self::format_tokens(session.cache_creation_tokens),
+                        Style::default().fg(Color::Magenta),
+                    ),
+                ]));
+            }
+            if session.cache_read_tokens > 0 {
+                lines.push(Line::from(vec![
+                    Span::styled("  └─ Cache Read: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        Self::format_tokens(session.cache_read_tokens),
+                        Style::default().fg(Color::Blue),
+                    ),
+                ]));
+            }
+        }
+
+        lines.extend(vec![
             Line::from(vec![
                 Span::styled("File Size: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(session.size_display(), Style::default().fg(Color::White)),
+            ]),
+            Line::from(vec![
+                Span::styled("Subagents: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    if session.has_subagents { "Yes" } else { "No" },
+                    if session.has_subagents {
+                        Style::default().fg(Color::Green)
+                    } else {
+                        Style::default().fg(Color::DarkGray)
+                    },
+                ),
             ]),
             Line::from(""),
             Line::from(vec![
@@ -1160,6 +1317,29 @@ impl SessionsTab {
                     Style::default().fg(Color::Magenta),
                 ),
             ]),
+        ]);
+
+        // Tool usage (top 5 if available)
+        if !session.tool_usage.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Tool Usage (top 5):",
+                Style::default().fg(Color::DarkGray),
+            )));
+
+            let mut tool_usage_vec: Vec<_> = session.tool_usage.iter().collect();
+            tool_usage_vec.sort_by(|a, b| b.1.cmp(a.1)); // sort by count descending
+
+            for (tool, count) in tool_usage_vec.iter().take(5) {
+                lines.push(Line::from(vec![
+                    Span::styled("  • ", Style::default().fg(Color::DarkGray)),
+                    Span::styled(tool.as_str(), Style::default().fg(Color::Cyan)),
+                    Span::styled(format!(" ({})", count), Style::default().fg(Color::Yellow)),
+                ]));
+            }
+        }
+
+        lines.extend(vec![
             Line::from(""),
             Line::from(Span::styled(
                 "First message:",
@@ -1455,8 +1635,10 @@ impl SessionsTab {
             } else {
                 self.refresh_message = Some(format!("✓ {} session(s) removed", -diff));
             }
+            self.notification_time = Some(Instant::now());
         } else if prev_count == 0 || current_session_count == prev_count {
             self.refresh_message = Some("✓ Data refreshed".to_string());
+            self.notification_time = Some(Instant::now());
         }
     }
 
@@ -1603,6 +1785,14 @@ impl SessionsTab {
                     ),
                     Span::raw("] "),
                     Span::styled("date filter", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled(
+                        "s",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
+                    Span::raw("] "),
+                    Span::styled("sort", Style::default().fg(Color::White)),
                 ]
             }
             _ => vec![],
@@ -1617,6 +1807,15 @@ impl SessionsTab {
     }
 
     fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect) {
+        // Check if notification should be cleared (2.5 seconds elapsed)
+        if let Some(notif_time) = self.notification_time {
+            if notif_time.elapsed().as_secs_f32() > 2.5 {
+                self.refresh_message = None;
+                self.notification_time = None;
+                return;
+            }
+        }
+
         let Some(msg) = &self.refresh_message else {
             return;
         };
@@ -1645,8 +1844,5 @@ impl SessionsTab {
             .style(Style::default().fg(Color::Green))
             .alignment(ratatui::layout::Alignment::Center);
         frame.render_widget(paragraph, inner);
-
-        // Auto-clear message after showing (will be cleared on next render)
-        self.refresh_message = None;
     }
 }
