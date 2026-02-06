@@ -239,3 +239,99 @@ Follow Rust-specific error handling rules from RULES.md:
 - **Don't** use single giant lock → DashMap for sessions, separate RwLocks per domain
 - **Don't** fail fast on parse errors → Populate LoadReport, continue loading
 - **Don't** forget `.context()` on `?` operator → Required for all error propagation
+
+## Build Verification (Mandatory)
+
+**CRITICAL**: After ANY Rust file edits, ALWAYS run the full quality check pipeline before committing:
+
+```bash
+cargo fmt --all && cargo clippy --all-targets && cargo test --all
+```
+
+**Rules**:
+- Never commit code that hasn't passed all 3 checks
+- Fix ALL clippy warnings before moving on (zero tolerance)
+- If build fails, fix it immediately before continuing to next task
+- Pre-commit hook will auto-enforce this (see `.claude/settings.json`)
+
+**Why**: Buggy code was the #1 friction point (48% of issues) in usage analysis - compilation errors, type mismatches, and syntax issues requiring multiple fix rounds.
+
+## Testing Policy
+
+**Manual testing is REQUIRED** for CLI commands and TUI changes:
+
+- **For CLI commands**: Actually run them (`cargo run -- <command>`), don't just rely on `cargo test`
+- **For TUI changes**: Launch the TUI (`cargo run`) and navigate through affected tabs
+- **For web changes**: Launch web interface (`cargo run -- web`) and test in browser
+- **Describe what you see**: When testing UI, describe the actual output/behavior observed
+
+**Anti-pattern**: Running only automated tests (cargo test, cargo clippy) without actually exercising the functionality.
+
+**Example**: If fixing the `search` command, run `cargo run -- search "query"` and verify the output, don't just check that unit tests pass.
+
+## Working Directory Confirmation
+
+**ALWAYS confirm working directory before starting any work**:
+
+```bash
+pwd  # Verify you're in /Users/florianbruniaux/Sites/perso/ccboard
+git branch  # Verify correct branch
+```
+
+**Never assume** which project to work in. If user request is ambiguous, ask before exploring files.
+
+**Context**: ccboard shares directory structure with other projects (RTK, cc-economics). Wrong directory detection was the 2nd most common friction (26% of issues).
+
+## Avoiding Rabbit Holes
+
+**Stay focused on the task**. Do not make excessive operations to verify external APIs, documentation, or edge cases unless explicitly asked.
+
+**Rule**: If verification requires more than 3-4 exploratory commands, STOP and ask the user whether to continue or trust available info.
+
+**Examples of rabbit holes to avoid**:
+- Excessive API signature verification across multiple crates
+- Deep diving into external crate documentation when stdlib works
+- Over-testing edge cases not mentioned in requirements
+
+## Plan Execution Protocol
+
+When user provides a numbered plan (QW1-QW4, Phase 1-5, sprint tasks, etc.):
+
+1. **Execute sequentially**: Follow plan order unless explicitly told otherwise
+2. **Commit after each logical step**: One commit per completed phase/task
+3. **Never skip or reorder**: If a step is blocked, report it and ask before proceeding
+4. **Use TodoWrite**: Track progress for plans with 3+ steps
+5. **Validate assumptions**: Before starting, verify all referenced file paths exist and working directory is correct
+
+**Why**: Plan-driven execution produces 47% fully-achieved outcomes vs 12% without structured plans (usage analysis data).
+
+## Language & Communication
+
+- **User communicates in French**: Respond in French unless explicitly writing English content (docs, code comments, READMEs)
+- **"reprend"**: Resume previous task where it was left off
+- **Be direct**: User prefers direct, factual communication (Bold Guy style from global CLAUDE.md)
+
+## Graceful Degradation for Parsers
+
+When implementing or fixing parsers in `ccboard-core/src/parsers/`:
+
+**Pattern**:
+```rust
+// ✅ Correct: Skip malformed entries, continue loading
+match parse_entry(line) {
+    Ok(entry) => sessions.insert(entry.id, entry),
+    Err(e) => {
+        load_report.errors.push(LoadError::MalformedEntry(line_num, e));
+        load_report.sessions_failed += 1;
+        continue; // Skip this entry, continue with next
+    }
+}
+```
+
+**Never**:
+```rust
+// ❌ Wrong: Fail fast on first error
+let entry = parse_entry(line)?; // Panics on first malformed entry
+```
+
+**Rationale**: ccboard must display partial data if some files are corrupted. Only fatal errors (missing ~/.claude directory, permission denied) should prevent UI launch.

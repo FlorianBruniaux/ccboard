@@ -2,5 +2,14 @@
   "budget": {
     "monthlyBudgetUsd": 50.0,
     "alertThresholdPct": 80.0
+  },
+  "hooks": {
+    "preCommit": [
+      {
+        "matcher": "**/*.rs",
+        "command": "cargo check 2>&1 | tail -20 && cargo clippy --all-targets 2>&1 | tail -20",
+        "description": "Run cargo check + clippy before committing Rust files"
+      }
+    ]
   }
 }
