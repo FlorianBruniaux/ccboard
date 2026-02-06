@@ -54,16 +54,20 @@
 ## Medium Priority (P2)
 
 ### Web UI Leptos Frontend
-**Status**: Backend ready (4 API endpoints + SSE), frontend TODO
+**Status**: Backend ready (Axum + SSE + 4 API routes), frontend placeholder only
+
+**Current Reality**:
+- ✅ Backend: Axum server, /api/stats, /api/sessions, /api/health, SSE streaming
+- ❌ Frontend: "Coming soon" text, no Leptos UI components
 
 **Justification**: Differentiator dual-mode unique. But not urgent if TUI distribution first.
 
-**Effort**: 10-15 days
-- Dashboard → Sessions → Analytics (high value, 5 days)
-- Config → Hooks → Agents (medium value, 5 days)
-- Costs → History → MCP (completeness, 3 days)
+**Effort**: 8-12 days (focused on high-value tabs)
+- Dashboard → Sessions → Analytics (high value, 4-5 days)
+- Config → Hooks → Agents (medium value, 3-4 days)
+- Costs → History → MCP (completeness, 2-3 days)
 
-**Target**: After Conversation Viewer (Phase G)
+**Target**: After Conversation Viewer (Phase G) OR crates.io traction
 
 ---
 
@@ -208,5 +212,10 @@ Found something that should be here?
 
 ---
 
-**Last updated**: 2026-02-04
+**Last updated**: 2026-02-06
 **Next review**: After distribution (target 100+ stars)
+
+**Recent changes**:
+- Web status clarified (backend ready, frontend TODO)
+- Quick wins added from usage report (pre-commit hook, /ship skill, CLAUDE.md)
+- Documentation cleanup (28 files archived)

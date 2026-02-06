@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Quick Wins from Usage Report (QW5-7)
+
+#### Pre-commit Hook (QW5)
+- **Cargo check + clippy enforcement**: `.claude/settings.json` hook
+  - Automatically runs `cargo check` and `cargo clippy` before every commit
+  - Prevents 48% of frictions (buggy code from usage analysis)
+  - Tail output (last 20 lines) to avoid overwhelming error messages
+  - Applies to all `**/*.rs` files in the workspace
+
+#### /ship Skill (QW6)
+- **Automated release workflow**: `.claude/skills/ship/SKILL.md`
+  - Build → Test → Commit → Version bump → Push in single command
+  - Workflow: `cargo build && clippy && test` → `git add` → conventional commit → push
+  - Optional version bump with `bump` argument
+  - Dry-run mode with `--dry-run` flag
+  - Co-authored commits with Claude attribution
+
+#### CLAUDE.md Enhancements (QW7)
+- **Build Verification**: Mandatory `fmt && clippy && test` before commit
+  - Addresses #1 friction (buggy code 48% of issues)
+  - Zero tolerance policy for clippy warnings
+- **Testing Policy**: Manual CLI/TUI testing required
+  - Don't rely solely on automated tests
+  - Describe what you see when testing UI changes
+- **Working Directory Confirmation**: `pwd` + `git branch` before work
+  - Prevents wrong directory friction (26% of issues)
+  - Never assume which project to work in
+- **Avoiding Rabbit Holes**: Max 3-4 exploratory commands before asking
+  - Stay focused on task
+  - Stop and ask if verification exceeds threshold
+- **Plan Execution Protocol**: Sequential execution, commit per step
+  - Pattern produces 47% fully-achieved outcomes (vs 12% without)
+  - Use TodoWrite for 3+ step plans
+- **Language & Communication**: French by default
+  - "reprend" = resume previous task
+  - Bold Guy style (direct, factual)
+- **Graceful Degradation**: Parser error handling
+  - Skip malformed entries, continue loading
+  - Populate LoadReport instead of panicking
+
+#### Documentation Cleanup
+- **Archive obsolete docs**: 28 files moved to organized structure
+  - sessions-history/ (4 files)
+  - tasks-completed/ (7 files)
+  - phase-plans/ (4 files)
+  - competitive-old/ (2 files)
+  - reference/ (5 files)
+- **Active docs reduced**: 36 → 8 focused files
+  - PLAN.md, README.md, ACTION_PLAN.md
+  - xlaude learnings (3 files, 67KB)
+  - performance-benchmark.md, competitive-benchmark.md
+- **STATUS.md created**: Single source of truth
+  - Production-ready status (v0.4.0)
+  - Complete feature matrix (94 features)
+  - Web backend/frontend status clarified
+  - Known limitations documented
+
+#### Web Status Clarification
+- **Backend API**: 100% complete (Axum + SSE + 4 routes)
+  - /api/stats, /api/sessions, /api/health
+  - SSE streaming at /api/events
+  - CORS support, dual TUI+Web mode
+- **Frontend UI**: 0% complete (placeholder only)
+  - Current: "ccboard web UI - Coming soon"
+  - Planned: Phase IV (8-12h Leptos implementation)
+  - README corrected to reflect reality
+
 ### Added - Phase I-CLI: Session Management Commands
 
 #### Message Filtering (QW2 - xlaude insights)

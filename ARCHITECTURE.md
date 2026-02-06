@@ -1,7 +1,7 @@
 # ccboard Architecture
 
-**Version**: 0.3.0
-**Last Updated**: 2026-02-05
+**Version**: 0.4.0
+**Last Updated**: 2026-02-06
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
