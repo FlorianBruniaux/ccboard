@@ -113,32 +113,31 @@
 
 ## Competitive Landscape
 
-ccboard vs other Claude Code monitoring tools (verified 2026-02-04):
+ccboard vs other Claude Code monitoring tools (verified 2026-02-06):
 
-| Feature | **ccboard** | vibe-kanban | ccusage | Usage-Monitor | Sniffly |
-|---------|-------------|-------------|---------|---------------|---------|
-| **Status** | ✅ Active | ✅ Active | ✅ Active | 🔴 Stale 7m | 🔴 Stale 6m |
-| **Stars** | 0 | 20,478 | 10,361 | 6,412 | 1,131 |
-| **Language** | Rust | TypeScript | TypeScript | Python | Python |
-| **Type** | TUI+Web | Web UI | CLI | Terminal | Web UI |
-| | | | | | |
-| **TUI Dashboard** | ✅ 9 tabs | ❌ | ❌ | ✅ 1 view | ❌ |
-| **Config Viewer (3-level merge)** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Hooks Viewer + Test** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Agents/Commands/Skills Browser** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **MCP Server Status Detection** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **SQLite Cache (89x speedup)** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Export CSV/JSON** | ✅ | ❌ | ✅ JSON | ❌ | ❌ |
-| **Live File Watcher** | ✅ | ❌ | ❌ | ⚠️ Poll 3s | ❌ |
-| **Advanced Analytics (Forecast, Budget)** | ✅ 4 views | ❌ | ❌ | ⚠️ Basic | ❌ |
-| **Single Binary (no runtime)** | ✅ 5.8MB | ❌ npm | ❌ npm | ❌ pip | ❌ pip |
-| | | | | | |
-| **P90 Predictions** | ❌ | ❌ | ❌ | ✅ | ❌ |
-| **Conversation Viewer** | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **Kanban Workflow** | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Feature | **ccboard** | ccusage | Usage-Monitor | Sniffly |
+|---------|-------------|---------|---------------|---------|
+| **Status** | ✅ Active | ✅ Active | 🔴 Stale 7m | 🔴 Stale 6m |
+| **Stars** | 0 | 10,361 | 6,412 | 1,131 |
+| **Language** | Rust | TypeScript | Python | Python |
+| **Type** | TUI+Web | CLI | Terminal | Web UI |
+| | | | | |
+| **TUI Dashboard** | ✅ 9 tabs | ❌ | ✅ 1 view | ❌ |
+| **Config Viewer (3-level merge)** | ✅ | ❌ | ❌ | ❌ |
+| **Hooks Viewer + Test** | ✅ | ❌ | ❌ | ❌ |
+| **Agents/Commands/Skills Browser** | ✅ | ❌ | ❌ | ❌ |
+| **MCP Server Status Detection** | ✅ | ❌ | ❌ | ❌ |
+| **SQLite Cache (89x speedup)** | ✅ | ❌ | ❌ | ❌ |
+| **Export CSV/JSON** | ✅ | ✅ JSON | ❌ | ❌ |
+| **Live File Watcher** | ✅ | ❌ | ⚠️ Poll 3s | ❌ |
+| **Advanced Analytics (Forecast, Budget)** | ✅ 4 views | ❌ | ⚠️ Basic | ❌ |
+| **Single Binary (no runtime)** | ✅ 5.8MB | ❌ npm | ❌ pip | ❌ pip |
+| | | | | |
+| **P90 Predictions** | ❌ | ❌ | ✅ | ❌ |
+| **Conversation Viewer** | ❌ | ❌ | ❌ | ✅ |
 
 **Unique to ccboard**:
-- Only Rust TUI actively maintained (4/6 competitors stale since Aug-Sep 2025)
+- Only Rust TUI actively maintained (3/4 competitors stale since Aug-Sep 2025)
 - Config 3-level merge viewer (global/project/local)
 - Hooks syntax highlighting + test mode
 - Agents/Commands/Skills browser with invocation stats
@@ -148,7 +147,6 @@ ccboard vs other Claude Code monitoring tools (verified 2026-02-04):
 - Dual TUI + Web single binary
 
 **References**:
-- **vibe-kanban**: Multi-provider kanban (broader scope, different target)
 - **ccusage**: CLI cost tracker (reference for pricing, no dashboard)
 - **Usage-Monitor**: Stale since Sep 2025 (7 months, 74 open issues)
 - **Sniffly**: Stale since Aug 2025 (6 months)
