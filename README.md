@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-157_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-156_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
   <img src="https://img.shields.io/badge/Clippy-0_warnings-success?style=for-the-badge&logo=rust" alt="Clippy"/>
   <img src="https://img.shields.io/badge/Binary-5.8MB-blue?style=for-the-badge" alt="Binary Size"/>
   <img src="https://img.shields.io/badge/Cache_Speedup-89x-orange?style=for-the-badge&logo=sqlite" alt="Speedup"/>
@@ -22,7 +22,7 @@
   <a href="#installation"><img src="https://img.shields.io/badge/platform-macOS_|_Linux_|_Windows-lightgrey?style=flat-square" alt="Platform"/></a>
 </p>
 
-> **The only actively-maintained Rust TUI** combining Claude Code monitoring, config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 157 tests, 0 clippy warnings.
+> **The only actively-maintained Rust TUI** combining Claude Code monitoring, config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 156 tests, 0 clippy warnings.
 
 ---
 
@@ -34,7 +34,7 @@
 | **Language** | Rust 1.85+ |
 | **Binary Size** | 5.8MB (release) |
 | **Startup Time** | <300ms (warm cache) |
-| **Tests** | 157 passing |
+| **Tests** | 156 passing |
 | **Clippy** | 0 warnings |
 | **Tabs** | 9 (TUI) + Web API |
 | **Cache Speedup** | 89x (20s → 224ms) |
@@ -611,7 +611,7 @@ ccboard integrates with your configured editor:
 ccboard/                     # Binary CLI entry point
 ├── ccboard-core/            # Data layer (parsers, models, store, watcher)
 ├── ccboard-tui/             # Ratatui frontend (9 tabs)
-└── ccboard-web/             # Leptos + Axum frontend (backend ready)
+└── ccboard-web/             # Axum API backend (Leptos frontend TODO Phase G)
 ```
 
 **Dependency flow**: `ccboard` → `ccboard-tui` + `ccboard-web` → `ccboard-core`
@@ -620,8 +620,8 @@ ccboard/                     # Binary CLI entry point
 
 1. **Single binary, dual frontends**: TUI and web share thread-safe `DataStore`
 2. **Graceful degradation**: Display partial data if files corrupted/missing
-3. **Lazy loading**: Metadata-only scan at startup, content on-demand
-4. **Concurrency**: DashMap for sessions (per-key locking), parking_lot::RwLock for stats/settings
+3. **Lazy loading**: SQLite metadata cache (89x speedup), content on-demand
+4. **Concurrency**: Arc for sessions (50x memory reduction), parking_lot::RwLock for stats/settings
 
 ### Data Sources
 
@@ -692,7 +692,7 @@ RUST_LOG=ccboard=debug cargo run
 ### Testing
 
 ```bash
-# Run all tests (157 tests)
+# Run all tests (156 tests)
 cargo test --all
 
 # Run tests for specific crate
@@ -751,46 +751,41 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap
 
-**Current Status**: 🎉 **PRODUCTION-READY** (v0.3.0)
+**Current Status**: 🎉 **PRODUCTION-READY** (v0.4.0)
 
 ### Completed Phases ✅
 
-- ✅ **Phase 0**: Profiling & Baseline (4h) - Criterion benchmarks, bottleneck analysis
-- ✅ **Phase 1**: Security Hardening (4h) - Path validation, OOM protection, credential masking
-- ✅ **Phase 2.1**: SQLite Metadata Cache (12h) - **89x speedup** (20s → 224ms)
-- ✅ **Phase 3**: UI/UX Quick Wins (6h) - Loading spinner, help modal, search highlighting
-- ✅ **Phase A.5**: crates.io metadata (0.5h) - Release preparation
-- ✅ **Phase A.6**: Screenshots & assets (0.5h) - 13 production screenshots
+- ✅ **Phase I (Infrastructure)**: Stats parser, Settings merge, Session metadata, DataStore
+- ✅ **Phase D (Dashboard TUI)**: Dashboard tab with sparklines, project filters, model breakdown
+- ✅ **Phase S (Sessions TUI)**: Sessions tab with search, filters, detail view
+- ✅ **Phase C (Config TUI)**: Config tab with merge visualization, setting overrides
+- ✅ **Phase H-A (Hooks & Agents TUI)**: Hooks tab (list + detail), Agents/Capabilities tab
+- ✅ **Phase E (Economics TUI)**: Costs tab, History tab with SQLite-backed timelines
+- ✅ **Phase 0-3**: Profiling, security hardening, SQLite cache (89x speedup), UI/UX quick wins
 
-**Total**: 27h development, 139 tests passing, 0 clippy warnings
+**Total**: 156 tests passing, 0 clippy warnings
 
 ### In Progress 🚧
 
-**Phase A: Polish & Release** (8-12h remaining)
-- ✅ A.5: crates.io metadata
-- ✅ A.6: Demo assets (screenshots)
-- 🔄 A.1: README.md with screenshots (current)
-- ⏳ A.2: CONTRIBUTING.md guide
-- ⏳ A.3: CI/CD GitHub Actions
-- ⏳ A.4: Cross-platform validation (Linux, Windows)
+**Phase A (Analytics TUI)** - Completion (2-4h remaining)
+- 🔄 A.1-A.4: Project leaderboard, session replay, trend forecasting, anomaly detection
 
 ### Planned 📋
 
-**Phase C: Additional Features** (6-10h)
-- MCP Tab enhancements (server details, status)
-- History Tab export (CSV, JSON)
-- Costs Tab billing blocks integration
-- Sessions Tab live refresh
+**Phase F (Conversation Viewer)** (8-12h)
+- Full JSONL content display with syntax highlighting
+- Message navigation, search within conversations
+- Export selected messages
 
-**Phase D: Arc Migration** (2h) - Optional
-- Replace clones with Arc<SessionMetadata> (400x less RAM)
-- Marginal gain post-cache, deferred
+**Phase G (Leptos Frontend)** (20-30h)
+- Web UI matching TUI feature parity
+- Reactive components with WASM compilation
+- SSE live updates integration
 
-**Phase 4: Actor Model Architecture** (20h) - Post-MVP
-- Zero-lock design with message passing
-- CQRS pattern for read/write separation
-- Write operations (session editing, config updates)
-- 100K+ sessions scalability testing
+**Phase H (Plan-Aware)** (6-10h)
+- PLAN.md parsing and visualization
+- Task completion tracking
+- Progress indicators per phase
 
 For detailed roadmap, see [PLAN.md](claudedocs/PLAN.md).
 

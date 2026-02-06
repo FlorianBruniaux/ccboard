@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ccboard** is a unified dashboard for Claude Code management, providing both TUI and web interfaces from a single binary to visualize sessions, stats, configuration, hooks, agents, costs, and history from `~/.claude` directories.
 
-**Stack**: Rust workspace with 4 crates, Ratatui (TUI), Leptos + Axum (Web), DashMap + parking_lot for concurrency.
+**Stack**: Rust workspace with 4 crates, Ratatui (9-tab TUI), Axum (Web API backend, Leptos frontend planned Phase G), DashMap + parking_lot for concurrency.
 
 ## Workspace Architecture
 
@@ -15,8 +15,8 @@ This is a Cargo workspace with a layered architecture:
 ```
 ccboard/                     # Root binary - CLI entry point
 ├─ ccboard-core/             # Shared data layer (parsers, models, store, watcher)
-├─ ccboard-tui/              # Ratatui frontend (7 tabs)
-└─ ccboard-web/              # Leptos + Axum frontend
+├─ ccboard-tui/              # Ratatui frontend (9 tabs)
+└─ ccboard-web/              # Axum API backend (Leptos frontend TODO Phase G)
 ```
 
 **Dependency flow**: `ccboard` → `ccboard-tui` + `ccboard-web` → `ccboard-core`
@@ -50,6 +50,7 @@ cargo run -- recent 10                          # Show 10 most recent sessions
 cargo run -- recent 5 --json                    # JSON output
 cargo run -- info <session-id>                  # Show session details
 cargo run -- resume <session-id>                # Resume session in Claude CLI
+cargo run -- clear-cache                        # Clear SQLite cache
 
 # Specify Claude home directory
 cargo run -- --claude-home ~/.claude --project /path/to/project
@@ -103,9 +104,9 @@ RUST_LOG=ccboard=debug cargo run
 
 `ccboard-core/src/store.rs` is the single source of truth, shared by both TUI and web frontends:
 
-- **DashMap** for sessions (high contention, many entries, per-key locking)
+- **Arc<DataStore>** for shared ownership (replaced DashMap in v0.4.0, ~50x memory reduction)
 - **parking_lot::RwLock** for stats/settings (low contention, frequent reads, better fairness than std)
-- **Moka Cache** for LRU session content (on-demand loading, prevents OOM)
+- **SQLite Cache** for session metadata (89x faster than JSONL parsing, on-demand full content loading)
 - **EventBus** (tokio broadcast) for live updates across frontends
 
 **Key methods**:
@@ -148,7 +149,14 @@ Located in `ccboard-core/src/parsers/`:
 - **Initial scan**: `tokio::spawn` per project directory (up to 8 concurrent)
 - **File watcher**: `notify` crate with 500ms debounce (notify-debouncer-mini)
 - **EventBus**: `tokio::sync::broadcast` with 100 capacity
-- **Cache**: Async-aware Moka cache with 5-minute idle expiry
+- **SQLite Cache**: Thread-safe reads, lazy on-demand content loading
+
+### Performance Optimizations (v0.4.0)
+
+- **SQLite metadata cache**: 89x faster than JSONL parsing (2.9s → 33ms for 1000+ sessions)
+- **Arc migration**: ~50x memory reduction vs DashMap for session storage
+- **Lazy loading**: Full session content loaded on-demand, only metadata at startup
+- **Performance target**: Initial load <2s for 1000+ sessions ✅ achieved (33ms)
 
 ## Data Sources & Locations
 
@@ -172,23 +180,24 @@ ccboard reads from `~/.claude` and optional project `.claude/`:
 
 Located in `ccboard-tui/src/`:
 
-- **7 tabs**: Dashboard, Sessions, Config, Hooks, Agents, Costs, History
-- **Key bindings**: `Tab`/`Shift+Tab` (nav tabs), `j/k` (nav lists), `Enter` (detail), `/` (search), `r` (refresh), `q` (quit), `1-7` (jump tabs)
+- **9 tabs**: Dashboard, Sessions, Config, Hooks, Agents/Capabilities, Costs, History, MCP, Analytics
+- **Key bindings**: `Tab`/`Shift+Tab` (nav tabs), `j/k` (nav lists), `Enter` (detail), `/` (search), `r` (refresh), `q` (quit), `1-9` (jump tabs)
 - **Event loop**: Crossterm events + DataStore EventBus subscriptions
 - **Widgets**: Sparkline, BarChart, Tree, List, Popup, Table (Ratatui components)
 
-**Current implementation status**: Dashboard tab functional, other tabs show "Coming soon" placeholder.
+**Current implementation status**: All 9 tabs fully functional (v0.4.0).
 
-## Web Structure (Leptos + Axum)
+## Web Structure (Axum API + Leptos frontend planned)
 
 Located in `ccboard-web/src/`:
 
-- **Framework**: Leptos (client-side rendering) + Axum (server routing)
+- **Current (v0.4.0)**: Axum backend serving JSON API endpoints, HTML returns "Coming soon" plain text
+- **Planned (Phase G)**: Leptos frontend (reactive UI with Rust types, WASM, no JS build pipeline)
 - **SSE**: Live updates via Server-Sent Events (`/api/events`)
 - **Routes**: `/`, `/sessions`, `/config`, `/hooks`, `/agents`, `/costs`, `/history`
-- **API**: `/api/stats`, `/api/sessions`, `/api/config/merged` (JSON endpoints)
+- **API**: `/api/stats`, `/api/sessions`, `/api/config/merged` (JSON endpoints functional)
 
-**Rationale for Leptos**: Reactive UI with Rust types, no JS build pipeline, compiled to WASM, same binary.
+**Current status**: Backend API complete, Leptos frontend TODO Phase G.
 
 ## Error Handling
 
@@ -211,18 +220,21 @@ Follow Rust-specific error handling rules from RULES.md:
 
 ## Implementation Phases (from PLAN.md)
 
-**Phase 1** (CURRENT): Core parsers + Dashboard TUI
-- ✅ Stats parser
-- ✅ Settings parser + merge
-- ✅ Session metadata extraction
-- ✅ DataStore initial_load
-- ✅ TUI Dashboard tab
-- 🚧 Other tabs (skeletons)
+**Completed Phases (v0.4.0)**:
+- ✅ **Phase I (Infrastructure)**: Stats parser, Settings merge, Session metadata, DataStore, graceful degradation
+- ✅ **Phase D (Dashboard TUI)**: Dashboard tab with sparklines, project filters, model breakdown
+- ✅ **Phase S (Sessions TUI)**: Sessions tab with search, filters, detail view
+- ✅ **Phase C (Config TUI)**: Config tab with merge visualization, setting overrides
+- ✅ **Phase H-A (Hooks & Agents TUI)**: Hooks tab (list + detail), Agents/Capabilities tab (frontmatter parsing)
+- ✅ **Phase E (Economics TUI)**: Costs tab, History tab with SQLite-backed timelines
 
-**Phase 2**: Sessions + Config tabs (full navigation)
-**Phase 3**: Hooks, Agents, Costs, History tabs
-**Phase 4**: File watcher + Web UI
-**Phase 5**: Polish + Open Source (README, CI, cross-platform)
+**Current Phase (v0.4.0)**:
+- 🚧 **Phase A (Analytics TUI)**: A.1-A.4 remaining (project leaderboard, session replay, trend forecasting, anomaly detection)
+
+**Future Phases**:
+- **Phase F (Conversation Viewer)**: Full JSONL content display with syntax highlighting
+- **Phase G (Leptos Frontend)**: Web UI matching TUI feature parity
+- **Phase H (Plan-Aware)**: PLAN.md parsing, task completion tracking
 
 ## Important Constraints
 
@@ -234,9 +246,9 @@ Follow Rust-specific error handling rules from RULES.md:
 
 ## Common Pitfalls
 
-- **Don't** parse full JSONL sessions at startup → Use lazy metadata extraction
+- **Don't** parse full JSONL sessions at startup → Use SQLite cache for metadata, lazy full-content loading
 - **Don't** use `std::sync::RwLock` → Use `parking_lot::RwLock` for better fairness
-- **Don't** use single giant lock → DashMap for sessions, separate RwLocks per domain
+- **Don't** use DashMap for large collections → Arc for shared ownership (50x memory reduction)
 - **Don't** fail fast on parse errors → Populate LoadReport, continue loading
 - **Don't** forget `.context()` on `?` operator → Required for all error propagation
 
