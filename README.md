@@ -91,25 +91,27 @@
 
 ---
 
-## What Makes ccboard Different
+## Why ccboard Exists
 
-ccboard is the **only actively-maintained Rust TUI** that combines:
+**Problem**: Claude Code has no built-in visualization/analysis tools beyond basic CLI commands (`/history`, `/stats`). Users are left scripting with `jq`, `grep`, or manually opening JSON files.
 
-1. **Unified Dashboard**: 9 tabs in a single interface (Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP, Analytics)
-2. **Config Management**: 4-level merge viewer (default → global → global_local → project → project_local) with visual diff
-3. **Hooks Tooling**: Syntax highlighting, test mode, env vars support
-4. **Agents Browser**: Frontmatter parsing, invocation stats, 3 sub-tabs (Agents/Commands/Skills)
-5. **MCP Tooling**: Process detection, status monitoring, env masking, server descriptions
-6. **Performance**: SQLite metadata cache (89x speedup), Arc migration (50x memory reduction)
-7. **Advanced Analytics**: 30-day forecasting with confidence scoring, budget alerts with visual progress bars, session duration statistics (avg/median/P95), usage pattern detection
-8. **Export**: CSV/JSON for sessions, billing blocks, history
-9. **Cross-Platform**: Single 5.8MB binary (macOS, Linux, Windows), no runtime deps
+**Solution**: ccboard is the **only tool** dedicated to Claude Code monitoring and management:
+- **Zero direct competitors** for Claude Code dashboard (verified 2026-02-04)
+- **Not competing with LangSmith/W&B** (they trace LangChain API calls, not local Claude sessions)
+- **Fills the gap** between CLI commands and full observability
 
-**No other tool combines all of these** in a single actively-maintained Rust TUI.
+### Unique Position
+
+1. **All-local**: Reads `~/.claude` files, no SaaS/API required
+2. **Unified Dashboard**: 9 tabs (config, hooks, agents, MCP, analytics) vs basic CLI
+3. **Performance**: SQLite cache (89x speedup), handles 10K+ sessions
+4. **Dual Interface**: TUI + Web in single 5.8MB binary
+
+**Risk**: Anthropic could integrate dashboard into Claude Code CLI. But currently, nothing exists.
 
 ---
 
-## Competitive Comparison
+## Competitive Landscape
 
 ccboard vs other Claude Code monitoring tools (verified 2026-02-04):
 
