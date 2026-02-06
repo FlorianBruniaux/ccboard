@@ -115,41 +115,43 @@
 
 ccboard vs other Claude Code monitoring tools (verified 2026-02-06):
 
-| Feature | **ccboard** | ccusage | Usage-Monitor | Sniffly |
-|---------|-------------|---------|---------------|---------|
-| **Status** | ✅ Active | ✅ Active | 🔴 Stale 7m | 🔴 Stale 6m |
-| **Stars** | 0 | 10,361 | 6,412 | 1,131 |
-| **Language** | Rust | TypeScript | Python | Python |
-| **Type** | TUI+Web | CLI | Terminal | Web UI |
+| Feature | **ccboard** | agtrace | claudelytics | ccusage |
+|---------|-------------|---------|--------------|---------|
+| **Status** | ✅ Active | ✅ Active | 🔴 Stale 6m | ✅ Active |
+| **Stars** | 0 | 23 | 62 | 10,361 |
+| **Language** | Rust | Rust | Rust | TypeScript |
+| **Type** | TUI+Web | TUI | TUI | CLI |
 | | | | | |
-| **TUI Dashboard** | ✅ 9 tabs | ❌ | ✅ 1 view | ❌ |
+| **TUI Dashboard** | ✅ 9 tabs | ✅ Single view | ✅ 8 tabs | ❌ |
 | **Config Viewer (3-level merge)** | ✅ | ❌ | ❌ | ❌ |
 | **Hooks Viewer + Test** | ✅ | ❌ | ❌ | ❌ |
 | **Agents/Commands/Skills Browser** | ✅ | ❌ | ❌ | ❌ |
 | **MCP Server Status Detection** | ✅ | ❌ | ❌ | ❌ |
-| **SQLite Cache (89x speedup)** | ✅ | ❌ | ❌ | ❌ |
-| **Export CSV/JSON** | ✅ | ✅ JSON | ❌ | ❌ |
-| **Live File Watcher** | ✅ | ❌ | ⚠️ Poll 3s | ❌ |
-| **Advanced Analytics (Forecast, Budget)** | ✅ 4 views | ❌ | ⚠️ Basic | ❌ |
-| **Single Binary (no runtime)** | ✅ 5.8MB | ❌ npm | ❌ pip | ❌ pip |
+| **SQLite Cache (89x speedup)** | ✅ | ✅ Pointer-based | ❌ | ❌ |
+| **Export CSV/JSON** | ✅ | ❌ | ✅ | ✅ JSON |
+| **Live File Watcher** | ✅ | ✅ Poll 1s | ❌ | ❌ |
+| **Advanced Analytics (Forecast, Budget)** | ✅ 4 views | ❌ | ⚠️ Burn rate | ❌ |
+| **Single Binary (no runtime)** | ✅ 5.8MB | ✅ Rust | ✅ Rust | ❌ npm |
 | | | | | |
-| **P90 Predictions** | ❌ | ❌ | ✅ | ❌ |
-| **Conversation Viewer** | ❌ | ❌ | ❌ | ✅ |
+| **MCP Server Mode** | ⏳ Phase G | ✅ 6 tools | ❌ | ❌ |
+| **Billing Blocks (5h)** | ⏳ Phase G | ❌ | ✅ | ❌ |
+| **Conversation Viewer** | ⏳ Phase F | ❌ | ✅ | ❌ |
+| **Multi-provider** | ❌ | ✅ 3 providers | ❌ | ❌ |
 
 **Unique to ccboard**:
-- Only Rust TUI actively maintained (3/4 competitors stale since Aug-Sep 2025)
+- Only **multi-concern dashboard** (config + hooks + agents + MCP + analytics)
 - Config 3-level merge viewer (global/project/local)
 - Hooks syntax highlighting + test mode
 - Agents/Commands/Skills browser with invocation stats
-- MCP process detection (cross-platform)
+- MCP server **status** detection (vs agtrace = MCP server mode)
 - SQLite metadata cache (89x faster startup)
 - **Advanced Analytics**: 30-day forecasting, budget alerts, session duration stats, usage patterns
 - Dual TUI + Web single binary
 
 **References**:
-- **ccusage**: CLI cost tracker (reference for pricing, no dashboard)
-- **Usage-Monitor**: Stale since Sep 2025 (7 months, 74 open issues)
-- **Sniffly**: Stale since Aug 2025 (6 months)
+- **agtrace** (23⭐): Observability-focused, MCP self-reflection (6 tools), multi-provider
+- **claudelytics** (62⭐, STALE 6m): Feature-rich TUI (8 tabs, billing blocks, conversation viewer)
+- **ccusage** (10K⭐): CLI cost tracker (reference for pricing, no dashboard)
 
 **Complementary tools**:
 - **[xlaude](https://github.com/Xuanwo/xlaude)** (171 ⭐): Git worktree manager for Claude sessions
