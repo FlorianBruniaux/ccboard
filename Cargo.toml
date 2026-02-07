@@ -65,6 +65,8 @@ leptos_router = "0.7"
 axum = "0.8"
 tower-http = { version = "0.6", features = ["cors", "fs"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
+gloo-net = "0.6"
+web-sys = { version = "0.3", features = ["Window", "Navigator", "Clipboard"] }
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }

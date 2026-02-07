@@ -39,12 +39,17 @@ anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+# Time
+chrono.workspace = true
+
 # Streaming
 futures = "0.3"
 
 # WASM support
 console_error_panic_hook = "0.1"
 wasm-bindgen = "0.2"
+gloo-net.workspace = true
+web-sys.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

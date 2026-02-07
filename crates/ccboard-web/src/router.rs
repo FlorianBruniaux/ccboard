@@ -4,8 +4,8 @@ use axum::{Router, response::Html, routing::get};
 use ccboard_core::DataStore;
 use std::sync::Arc;
 use tower_http::{
-  cors::{Any, CorsLayer},
-  services::ServeDir,
+    cors::{Any, CorsLayer},
+    services::ServeDir,
 };
 
 use crate::sse;
@@ -132,19 +132,68 @@ async fn stats_handler(
 async fn sessions_handler(
     axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
 ) -> axum::Json<serde_json::Value> {
-    let count = store.session_count();
-    let recent = store.recent_sessions(10);
+    // Get all sessions, not just recent 10
+    let all_sessions = store.all_sessions();
 
     axum::Json(serde_json::json!({
-        "count": count,
-        "recent": recent.iter().map(|s| serde_json::json!({
-            "id": s.id,
-            "project": s.project_path,
-            "tokens": s.total_tokens,
-            "messages": s.message_count,
-            "preview": s.first_user_message,
-        })).collect::<Vec<_>>()
+        "sessions": all_sessions.iter().map(|s| {
+            // Calculate cost estimate (rough approximation)
+            let cost = calculate_session_cost(
+                s.input_tokens,
+                s.output_tokens,
+                s.cache_creation_tokens,
+                s.cache_read_tokens,
+                &s.models_used,
+            );
+
+            serde_json::json!({
+                "id": s.id,
+                "date": s.last_timestamp.map(|t| t.to_rfc3339()),
+                "project": s.project_path,
+                "model": s.models_used.first().unwrap_or(&"unknown".to_string()),
+                "messages": s.message_count,
+                "tokens": s.total_tokens,
+                "input_tokens": s.input_tokens,
+                "output_tokens": s.output_tokens,
+                "cache_creation_tokens": s.cache_creation_tokens,
+                "cache_read_tokens": s.cache_read_tokens,
+                "cost": cost,
+                "status": "completed",
+                "first_timestamp": s.first_timestamp.map(|t| t.to_rfc3339()),
+                "duration_seconds": s.duration_seconds,
+                "preview": s.first_user_message,
+            })
+        }).collect::<Vec<_>>()
     }))
+}
+
+/// Calculate rough cost estimate for a session
+fn calculate_session_cost(
+    input_tokens: u64,
+    output_tokens: u64,
+    cache_creation_tokens: u64,
+    cache_read_tokens: u64,
+    models: &[String],
+) -> f64 {
+    // Default to Sonnet 4.5 pricing if unknown model
+    // Input: $3/MTok, Output: $15/MTok, Cache write: $3.75/MTok, Cache read: $0.30/MTok
+    let is_opus = models.iter().any(|m| m.contains("opus"));
+    let is_haiku = models.iter().any(|m| m.contains("haiku"));
+
+    let (input_price, output_price, cache_write_price, cache_read_price) = if is_opus {
+        (15.0, 75.0, 18.75, 1.5) // Opus 4 pricing
+    } else if is_haiku {
+        (0.8, 4.0, 1.0, 0.08) // Haiku 4 pricing
+    } else {
+        (3.0, 15.0, 3.75, 0.3) // Sonnet 4.5 pricing (default)
+    };
+
+    let input_cost = (input_tokens as f64 / 1_000_000.0) * input_price;
+    let output_cost = (output_tokens as f64 / 1_000_000.0) * output_price;
+    let cache_write_cost = (cache_creation_tokens as f64 / 1_000_000.0) * cache_write_price;
+    let cache_read_cost = (cache_read_tokens as f64 / 1_000_000.0) * cache_read_price;
+
+    input_cost + output_cost + cache_write_cost + cache_read_cost
 }
 
 async fn health_handler(

@@ -524,14 +524,19 @@ impl DataStore {
         by_project
     }
 
+    /// Get all sessions (unsorted)
+    /// Returns Arc<SessionMetadata> for cheap cloning
+    pub fn all_sessions(&self) -> Vec<Arc<SessionMetadata>> {
+        self.sessions
+            .iter()
+            .map(|r| Arc::clone(r.value()))
+            .collect()
+    }
+
     /// Get recent sessions (sorted by last timestamp, newest first)
     /// Returns Arc<SessionMetadata> for cheap cloning
     pub fn recent_sessions(&self, limit: usize) -> Vec<Arc<SessionMetadata>> {
-        let mut sessions: Vec<_> = self
-            .sessions
-            .iter()
-            .map(|r| Arc::clone(r.value()))
-            .collect();
+        let mut sessions = self.all_sessions();
         sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
         sessions.truncate(limit);
         sessions
