@@ -1,11 +1,10 @@
 //! Dashboard page component
 
 use crate::api::{fetch_sessions, fetch_stats, format_cost, format_number};
-use crate::components::{CardColor, Sparkline, StatsCard};
+use crate::components::{CardColor, Sparkline, StatsCard, use_toast};
+use crate::sse_hook::{SseEvent, use_sse};
+use crate::utils::export::export_as_json;
 use leptos::prelude::*;
-use leptos::web_sys::{EventSource, MessageEvent};
-use wasm_bindgen::JsCast;
-use wasm_bindgen::closure::Closure;
 
 /// Dashboard page - main overview with live stats
 #[component]
@@ -23,30 +22,52 @@ pub fn Dashboard() -> impl IntoView {
         async move { fetch_sessions().await }
     });
 
+    // Toast notifications
+    let toast = use_toast();
+
     // SSE setup for live updates
+    let sse_event = use_sse();
+
     Effect::new(move |_| {
-        let event_source = match EventSource::new("/api/events") {
-            Ok(es) => es,
-            Err(_) => return,
-        };
-
-        // Handle stats_updated events
-        let on_message = Closure::wrap(Box::new(move |event: MessageEvent| {
-            if let Some(data) = event.data().as_string() {
-                if data.contains("stats_updated") {
-                    // Increment version to trigger resource refetch
+        if let Some(event) = sse_event.get() {
+            match event {
+                SseEvent::StatsUpdated => {
                     set_stats_version.update(|v| *v += 1);
+                    toast.info("Stats updated".to_string());
                 }
+                SseEvent::SessionCreated { .. } => {
+                    set_stats_version.update(|v| *v += 1);
+                    toast.info("New session detected".to_string());
+                }
+                SseEvent::AnalyticsUpdated => {
+                    set_stats_version.update(|v| *v += 1);
+                    toast.info("Analytics refreshed".to_string());
+                }
+                SseEvent::WatcherError { message } => {
+                    toast.error(format!("Watcher error: {}", message));
+                }
+                _ => {}
             }
-        }) as Box<dyn FnMut(MessageEvent)>);
-
-        event_source.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
-        on_message.forget();
+        }
     });
 
     view! {
         <div class="page dashboard-page">
-            <h2>"Dashboard"</h2>
+            <div class="page-header">
+                <h2>"Dashboard"</h2>
+                <div class="page-actions">
+                    <button
+                        class="export-button"
+                        on:click=move |_| {
+                            if let Some(Ok(data)) = stats.get().as_ref().map(|r| r.as_ref()) {
+                                export_as_json(&data, "ccboard-stats");
+                            }
+                        }
+                    >
+                        "📥 Export JSON"
+                    </button>
+                </div>
+            </div>
             <div class="page-content">
                 <Suspense fallback=move || view! { <div class="loading">"Loading stats..."</div> }>
                     {move || match stats.get().as_ref().map(|r| r.as_ref()) {

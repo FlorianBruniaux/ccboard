@@ -49,6 +49,7 @@ futures = "0.3"
 console_error_panic_hook = "0.1"
 wasm-bindgen = "0.2"
 gloo-net.workspace = true
+js-sys.workspace = true
 web-sys.workspace = true
 
 [dev-dependencies]

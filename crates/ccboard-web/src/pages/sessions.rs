@@ -1,6 +1,8 @@
 //! Sessions Explorer page component
 
-use crate::components::{SearchBar, SessionData, SessionDetailModal, SessionTable};
+use crate::components::{SearchBar, SessionData, SessionDetailModal, SessionTable, use_toast};
+use crate::sse_hook::{SseEvent, use_sse};
+use crate::utils::export::{export_as_csv, export_as_json};
 use chrono::{DateTime, Duration, Utc};
 use leptos::prelude::*;
 use serde::Deserialize;
@@ -33,8 +35,14 @@ async fn fetch_sessions() -> Result<Vec<SessionData>, String> {
 /// Sessions Explorer page
 #[component]
 pub fn Sessions() -> impl IntoView {
+    // Version signal to trigger refetch
+    let (sessions_version, set_sessions_version) = signal(0u32);
+
     // Fetch sessions data (use LocalResource for CSR with non-Send futures)
-    let sessions_resource = LocalResource::new(|| fetch_sessions());
+    let sessions_resource = LocalResource::new(move || {
+        let _ = sessions_version.get(); // Track version to trigger refetch
+        fetch_sessions()
+    });
 
     // Filter state
     let (search, set_search) = signal(String::new());
@@ -44,6 +52,31 @@ pub fn Sessions() -> impl IntoView {
 
     // Modal state
     let (modal_session, set_modal_session) = signal(None::<SessionData>);
+
+    // Toast notifications
+    let toast = use_toast();
+
+    // SSE setup for live updates
+    let sse_event = use_sse();
+
+    Effect::new(move |_| {
+        if let Some(event) = sse_event.get() {
+            match event {
+                SseEvent::SessionCreated { id } => {
+                    set_sessions_version.update(|v| *v += 1);
+                    toast.success(format!("New session: {}", id));
+                }
+                SseEvent::SessionUpdated { id } => {
+                    set_sessions_version.update(|v| *v += 1);
+                    toast.info(format!("Session updated: {}", id));
+                }
+                SseEvent::StatsUpdated => {
+                    set_sessions_version.update(|v| *v += 1);
+                }
+                _ => {}
+            }
+        }
+    });
 
     // Extract unique projects from sessions
     let available_projects = Memo::new(move |_| {
@@ -144,7 +177,52 @@ pub fn Sessions() -> impl IntoView {
 
     view! {
         <div class="page sessions-page">
-            <h2>"Sessions Explorer"</h2>
+            <div class="page-header">
+                <h2>"Sessions Explorer"</h2>
+                <div class="page-actions">
+                    <button
+                        class="export-button"
+                        on:click=move |_| {
+                            if let Some(sessions) = filtered_sessions.get() {
+                                let headers = vec![
+                                    "Date".to_string(),
+                                    "Project".to_string(),
+                                    "Model".to_string(),
+                                    "Messages".to_string(),
+                                    "Tokens".to_string(),
+                                    "Cost".to_string(),
+                                ];
+                                let rows: Vec<Vec<String>> = sessions
+                                    .iter()
+                                    .map(|s| {
+                                        vec![
+                                            s.date.clone().unwrap_or_default(),
+                                            s.project.clone(),
+                                            s.model.clone(),
+                                            s.messages.to_string(),
+                                            s.tokens.to_string(),
+                                            format!("{:.4}", s.cost),
+                                        ]
+                                    })
+                                    .collect();
+                                export_as_csv(headers, rows, "ccboard-sessions");
+                            }
+                        }
+                    >
+                        "📥 Export CSV"
+                    </button>
+                    <button
+                        class="export-button"
+                        on:click=move |_| {
+                            if let Some(sessions) = filtered_sessions.get() {
+                                export_as_json(&sessions, "ccboard-sessions");
+                            }
+                        }
+                    >
+                        "📥 Export JSON"
+                    </button>
+                </div>
+            </div>
 
             <Suspense fallback=move || {
                 view! { <div class="loading">"Loading sessions..."</div> }

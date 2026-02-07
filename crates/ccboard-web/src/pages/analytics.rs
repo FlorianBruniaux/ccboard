@@ -1,18 +1,78 @@
 //! Analytics page component
 
 use crate::api::{fetch_stats, format_cost, format_number};
-use crate::components::{BudgetStatus, CardColor, ForecastChart, ProjectsBreakdown, StatsCard};
+use crate::components::{
+    BudgetStatus, CardColor, ForecastChart, ProjectsBreakdown, StatsCard, use_toast,
+};
+use crate::sse_hook::{SseEvent, use_sse};
+use crate::utils::export::export_as_csv;
 use leptos::prelude::*;
 
 /// Analytics page
 #[component]
 pub fn Analytics() -> impl IntoView {
+    // Version signal to trigger refetch
+    let (stats_version, set_stats_version) = signal(0u32);
+
     // Fetch stats with analytics data
-    let stats = LocalResource::new(|| async move { fetch_stats().await });
+    let stats = LocalResource::new(move || {
+        let _ = stats_version.get(); // Track version to trigger refetch
+        async move { fetch_stats().await }
+    });
+
+    // Toast notifications
+    let toast = use_toast();
+
+    // SSE setup for live updates
+    let sse_event = use_sse();
+
+    Effect::new(move |_| {
+        if let Some(event) = sse_event.get() {
+            match event {
+                SseEvent::StatsUpdated | SseEvent::AnalyticsUpdated => {
+                    set_stats_version.update(|v| *v += 1);
+                    toast.info("Analytics refreshed".to_string());
+                }
+                _ => {}
+            }
+        }
+    });
 
     view! {
         <div class="page analytics-page">
-            <h2>"Analytics"</h2>
+            <div class="page-header">
+                <h2>"Analytics"</h2>
+                <div class="page-actions">
+                    <button
+                        class="export-button"
+                        on:click=move |_| {
+                            if let Some(Ok(data)) = stats.get().as_ref().map(|r| r.as_ref()) {
+                                let headers = vec![
+                                    "Day".to_string(),
+                                    "Historical Tokens".to_string(),
+                                    "Forecast Tokens".to_string(),
+                                ];
+                                let rows: Vec<Vec<String>> = data
+                                    .daily_tokens_30d
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, &tokens)| {
+                                        let forecast = data.forecast_tokens_30d.get(i).copied().unwrap_or(0);
+                                        vec![
+                                            format!("Day {}", i + 1),
+                                            tokens.to_string(),
+                                            forecast.to_string(),
+                                        ]
+                                    })
+                                    .collect();
+                                export_as_csv(headers, rows, "ccboard-analytics-forecast");
+                            }
+                        }
+                    >
+                        "📥 Export CSV"
+                    </button>
+                </div>
+            </div>
             <div class="page-content">
                 <Suspense fallback=move || {
                     view! {
