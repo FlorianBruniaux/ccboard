@@ -20,6 +20,41 @@ pub struct StatsData {
     pub daily_activity: Vec<DailyActivityEntry>,
     #[serde(default)]
     pub model_usage: HashMap<String, ModelUsage>,
+    // Analytics extension
+    #[serde(default)]
+    pub daily_tokens_30d: Vec<u64>,
+    #[serde(default)]
+    pub forecast_tokens_30d: Vec<u64>,
+    #[serde(default)]
+    pub forecast_confidence: f64,
+    #[serde(default)]
+    pub forecast_cost_30d: f64,
+    #[serde(default)]
+    pub projects_by_cost: Vec<ProjectCost>,
+    #[serde(default)]
+    pub most_used_model: Option<MostUsedModel>,
+    #[serde(default)]
+    pub this_month_cost: f64,
+    #[serde(default)]
+    pub avg_session_cost: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectCost {
+    pub project: String,
+    #[serde(default)]
+    pub cost: f64,
+    #[serde(default)]
+    pub percentage: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MostUsedModel {
+    pub name: String,
+    #[serde(default)]
+    pub count: u64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

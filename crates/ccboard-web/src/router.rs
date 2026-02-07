@@ -123,8 +123,143 @@ async fn stats_handler(
     axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
 ) -> axum::Json<serde_json::Value> {
     let stats = store.stats();
+
+    // Compute analytics for last 30 days
+    let sessions = store.all_sessions();
+    let analytics = ccboard_core::analytics::AnalyticsData::compute(
+        &sessions,
+        ccboard_core::analytics::Period::last_30d(),
+    );
+
+    // Extract forecast data points for chart
+    let historical_tokens: Vec<u64> = analytics.trends.daily_tokens.clone();
+    let forecast_tokens: Vec<u64> = {
+        let mut forecast = Vec::new();
+        if analytics.trends.dates.len() >= 7 {
+            // Extend with 30 days forecast using linear projection
+            for i in 1..=30 {
+                // Simple linear extrapolation from last value + trend
+                let projected = analytics.forecast.next_30_days_tokens as f64 / 30.0 * i as f64;
+                forecast.push(projected as u64);
+            }
+        }
+        forecast
+    };
+
+    // Get top 5 projects by cost
+    let projects_by_cost: Vec<serde_json::Value> = {
+        let mut project_costs: std::collections::HashMap<String, f64> =
+            std::collections::HashMap::new();
+
+        for session in &sessions {
+            let cost = calculate_session_cost(
+                session.input_tokens,
+                session.output_tokens,
+                session.cache_creation_tokens,
+                session.cache_read_tokens,
+                &session.models_used,
+            );
+            *project_costs
+                .entry(session.project_path.clone())
+                .or_insert(0.0) += cost;
+        }
+
+        let mut sorted: Vec<_> = project_costs.into_iter().collect();
+        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        let total_cost: f64 = sorted.iter().map(|(_, c)| c).sum();
+
+        sorted
+            .iter()
+            .take(5)
+            .map(|(project, cost)| {
+                let percentage = if total_cost > 0.0 {
+                    cost / total_cost * 100.0
+                } else {
+                    0.0
+                };
+                serde_json::json!({
+                    "project": project,
+                    "cost": cost,
+                    "percentage": percentage,
+                })
+            })
+            .collect()
+    };
+
+    // Get most used model
+    let most_used_model = analytics
+        .trends
+        .model_usage_over_time
+        .iter()
+        .max_by_key(|(_, counts)| counts.iter().sum::<usize>())
+        .map(|(model, counts)| {
+            let total: usize = counts.iter().sum();
+            serde_json::json!({
+                "name": model,
+                "count": total,
+            })
+        });
+
     match stats {
-        Some(s) => axum::Json(serde_json::to_value(s).unwrap_or(serde_json::Value::Null)),
+        Some(s) => {
+            let mut value = serde_json::to_value(s).unwrap_or(serde_json::Value::Null);
+
+            // Inject analytics data
+            if let Some(obj) = value.as_object_mut() {
+                obj.insert(
+                    "dailyTokens30d".to_string(),
+                    serde_json::json!(historical_tokens),
+                );
+                obj.insert(
+                    "forecastTokens30d".to_string(),
+                    serde_json::json!(forecast_tokens),
+                );
+                obj.insert(
+                    "forecastConfidence".to_string(),
+                    serde_json::json!(analytics.forecast.confidence),
+                );
+                obj.insert(
+                    "forecastCost30d".to_string(),
+                    serde_json::json!(analytics.forecast.next_30_days_cost),
+                );
+                obj.insert(
+                    "projectsByCost".to_string(),
+                    serde_json::json!(projects_by_cost),
+                );
+                obj.insert(
+                    "mostUsedModel".to_string(),
+                    serde_json::json!(most_used_model),
+                );
+
+                // Add aggregated totals for current month
+                let total_cost: f64 = sessions
+                    .iter()
+                    .map(|s| {
+                        calculate_session_cost(
+                            s.input_tokens,
+                            s.output_tokens,
+                            s.cache_creation_tokens,
+                            s.cache_read_tokens,
+                            &s.models_used,
+                        )
+                    })
+                    .sum();
+                let avg_session_cost = if sessions.len() > 0 {
+                    total_cost / sessions.len() as f64
+                } else {
+                    0.0
+                };
+
+                obj.insert("thisMonthCost".to_string(), serde_json::json!(total_cost));
+                obj.insert(
+                    "avgSessionCost".to_string(),
+                    serde_json::json!(avg_session_cost),
+                );
+            }
+
+            axum::Json(value)
+        }
         None => axum::Json(serde_json::json!({"error": "Stats not loaded"})),
     }
 }

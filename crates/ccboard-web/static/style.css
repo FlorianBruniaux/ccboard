@@ -1269,3 +1269,196 @@ pre code {
     margin: var(--space-sm);
   }
 }
+
+/* ========================================
+   Analytics Page Styles
+   ======================================== */
+
+.analytics-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.metrics-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+}
+
+.forecast-section {
+  margin-top: var(--space-md);
+}
+
+.breakdown-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+  margin-top: var(--space-md);
+}
+
+.breakdown-left,
+.breakdown-right {
+  min-width: 0; /* Prevent grid blowout */
+}
+
+/* Forecast Chart */
+.forecast-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.forecast-confidence {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-weight: var(--font-medium);
+}
+
+.forecast-chart {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Budget Status */
+.budget-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.budget-text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: baseline;
+  font-size: var(--text-base);
+}
+
+.budget-label {
+  color: var(--text-secondary);
+}
+
+.budget-value {
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.budget-percentage {
+  font-weight: var(--font-bold);
+  margin-left: var(--space-sm);
+}
+
+.budget-percentage.budget-ok {
+  color: var(--color-green);
+}
+
+.budget-percentage.budget-warning {
+  color: var(--color-yellow);
+}
+
+.budget-percentage.budget-danger {
+  color: var(--color-red);
+}
+
+.budget-bar {
+  width: 100%;
+  height: 24px;
+  background-color: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: var(--border-width) solid var(--border-color);
+}
+
+.budget-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.budget-fill.budget-ok {
+  background-color: var(--color-green);
+}
+
+.budget-fill.budget-warning {
+  background-color: var(--color-yellow);
+}
+
+.budget-fill.budget-danger {
+  background-color: var(--color-red);
+}
+
+.hint-sub {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-xs);
+}
+
+/* Projects Breakdown */
+.projects-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.project-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--text-sm);
+}
+
+.project-name {
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.project-cost {
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+}
+
+.project-bar {
+  width: 100%;
+  height: 16px;
+  background-color: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: var(--border-width) solid var(--border-color);
+}
+
+.project-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: var(--radius-sm);
+}
+
+/* Responsive Analytics */
+@media (max-width: 768px) {
+  .breakdown-section {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-summary {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .forecast-chart {
+    font-size: 10px;
+  }
+
+  .budget-text {
+    font-size: var(--text-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .metrics-summary {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,6 +1,6 @@
 //! ccboard-web - Web frontend for ccboard using Leptos + Axum
 
-#![recursion_limit = "1024"]
+#![recursion_limit = "2048"]
 
 pub mod api;
 pub mod app;
