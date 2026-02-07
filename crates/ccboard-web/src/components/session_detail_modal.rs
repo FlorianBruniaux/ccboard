@@ -2,7 +2,7 @@
 
 use crate::components::session_table::SessionData;
 use leptos::prelude::*;
-use web_sys::window;
+use leptos::web_sys::window;
 
 /// Session detail modal
 #[component]

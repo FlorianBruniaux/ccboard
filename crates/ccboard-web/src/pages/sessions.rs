@@ -49,7 +49,7 @@ pub fn Sessions() -> impl IntoView {
     let available_projects = Memo::new(move |_| {
         sessions_resource
             .get()
-            .and_then(|result| result.ok())
+            .and_then(|result| result.as_ref().ok().cloned())
             .map(|sessions| {
                 let mut projects: Vec<String> = sessions
                     .iter()
@@ -67,7 +67,7 @@ pub fn Sessions() -> impl IntoView {
     let filtered_sessions = Memo::new(move |_| {
         sessions_resource
             .get()
-            .and_then(|result| result.ok())
+            .and_then(|result| result.as_ref().ok().cloned())
             .map(|sessions| {
                 let search_term = search.get().to_lowercase();
                 let project_f = project_filter.get();
@@ -153,7 +153,7 @@ pub fn Sessions() -> impl IntoView {
                     sessions_resource
                         .get()
                         .map(|result| {
-                            match result {
+                            match result.as_ref() {
                                 Ok(_) => {
                                     view! {
                                         <div class="page-content">
@@ -210,10 +210,11 @@ pub fn Sessions() -> impl IntoView {
                                         .into_any()
                                 }
                                 Err(e) => {
+                                    let error_msg = e.clone();
                                     view! {
                                         <div class="error-state">
                                             <p>"Failed to load sessions"</p>
-                                            <p class="hint">{e}</p>
+                                            <p class="hint">{error_msg}</p>
                                         </div>
                                     }
                                         .into_any()
