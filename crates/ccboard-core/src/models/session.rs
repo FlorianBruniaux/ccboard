@@ -6,7 +6,7 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 /// A single line from a session JSONL file
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLine {
     /// Session ID

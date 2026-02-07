@@ -1,7 +1,8 @@
 //! Sessions tab - Project tree + session list + detail view
 
 use crate::components::highlight_matches;
-use ccboard_core::models::SessionMetadata;
+use ccboard_core::models::{SessionLine, SessionMetadata};
+use ccboard_core::parsers::SessionContentParser;
 use chrono::{DateTime, Duration, Utc};
 use ratatui::{
     Frame,
@@ -13,7 +14,8 @@ use ratatui::{
         ScrollbarState,
     },
 };
-use std::collections::HashMap;
+use serde_json;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -133,6 +135,14 @@ pub struct SessionsTab {
     show_detail: bool,
     /// Show detail popup for live sessions
     show_live_detail: bool,
+    /// Show replay popup for selected session
+    show_replay: bool,
+    /// Replay messages cache (loaded on demand)
+    replay_messages: Vec<SessionLine>,
+    /// Replay scroll state
+    replay_scroll: ListState,
+    /// Expanded tool results (set of message indices)
+    replay_expanded: HashSet<usize>,
     /// Error message to display
     error_message: Option<String>,
     /// Last refresh timestamp
@@ -161,6 +171,8 @@ impl SessionsTab {
         session_state.select(Some(0));
         let mut live_sessions_state = ListState::default();
         live_sessions_state.select(Some(0));
+        let mut replay_scroll = ListState::default();
+        replay_scroll.select(Some(0));
 
         Self {
             project_state,
@@ -175,6 +187,10 @@ impl SessionsTab {
             sort_mode: SessionSortMode::DateDesc,
             show_detail: false,
             show_live_detail: false,
+            show_replay: false,
+            replay_messages: Vec::new(),
+            replay_scroll,
+            replay_expanded: HashSet::new(),
             error_message: None,
             last_refresh: Instant::now(),
             refresh_message: None,
@@ -231,28 +247,47 @@ impl SessionsTab {
                 self.focus = (self.focus + 1) % 3;
             }
             KeyCode::Up | KeyCode::Char('k') => {
-                match self.focus {
-                    0 => self.move_live_sessions_selection(-1),
-                    1 => {
-                        self.move_project_selection(-1);
-                        // Reset session selection when project changes
-                        self.session_state.select(Some(0));
+                if self.show_replay {
+                    self.move_replay_selection(-1);
+                } else {
+                    match self.focus {
+                        0 => self.move_live_sessions_selection(-1),
+                        1 => {
+                            self.move_project_selection(-1);
+                            // Reset session selection when project changes
+                            self.session_state.select(Some(0));
+                        }
+                        2 => self.move_session_selection(-1),
+                        _ => {}
                     }
-                    2 => self.move_session_selection(-1),
-                    _ => {}
                 }
             }
-            KeyCode::Down | KeyCode::Char('j') => match self.focus {
-                0 => self.move_live_sessions_selection(1),
-                1 => {
-                    self.move_project_selection(1);
-                    self.session_state.select(Some(0));
+            KeyCode::Down | KeyCode::Char('j') => {
+                if self.show_replay {
+                    self.move_replay_selection(1);
+                } else {
+                    match self.focus {
+                        0 => self.move_live_sessions_selection(1),
+                        1 => {
+                            self.move_project_selection(1);
+                            self.session_state.select(Some(0));
+                        }
+                        2 => self.move_session_selection(1),
+                        _ => {}
+                    }
                 }
-                2 => self.move_session_selection(1),
-                _ => {}
-            },
+            }
             KeyCode::Enter => {
-                if self.focus == 0 {
+                if self.show_replay {
+                    // Toggle expanded state for selected message
+                    if let Some(idx) = self.replay_scroll.selected() {
+                        if self.replay_expanded.contains(&idx) {
+                            self.replay_expanded.remove(&idx);
+                        } else {
+                            self.replay_expanded.insert(idx);
+                        }
+                    }
+                } else if self.focus == 0 {
                     // Toggle live session detail
                     self.show_live_detail = !self.show_live_detail;
                 } else if self.focus == 2 {
@@ -290,6 +325,37 @@ impl SessionsTab {
                         } else {
                             self.refresh_message = Some("Session resumed".to_string());
                             self.notification_time = Some(Instant::now());
+                        }
+                    }
+                }
+            }
+            KeyCode::Char('v') => {
+                // Toggle replay viewer for selected session (works from Sessions pane)
+                if self.focus == 2 && !self.show_replay {
+                    if let Some(session) = self.get_selected_session(_sessions_by_project) {
+                        // Load session content asynchronously (blocking for now, will improve later)
+                        match tokio::runtime::Runtime::new() {
+                            Ok(rt) => {
+                                let path = session.file_path.clone();
+                                match rt.block_on(SessionContentParser::parse_session(&path)) {
+                                    Ok(mut messages) => {
+                                        // Filter to only user/assistant/tool messages
+                                        messages = SessionContentParser::filter_messages(messages);
+                                        self.replay_messages = messages;
+                                        self.replay_scroll.select(Some(0));
+                                        self.replay_expanded.clear();
+                                        self.show_replay = true;
+                                    }
+                                    Err(e) => {
+                                        self.error_message =
+                                            Some(format!("Failed to load session: {}", e));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                self.error_message =
+                                    Some(format!("Failed to create runtime: {}", e));
+                            }
                         }
                     }
                 }
@@ -338,6 +404,10 @@ impl SessionsTab {
             KeyCode::Esc => {
                 if self.error_message.is_some() {
                     self.error_message = None;
+                } else if self.show_replay {
+                    self.show_replay = false;
+                    self.replay_messages.clear();
+                    self.replay_expanded.clear();
                 } else if self.show_live_detail {
                     self.show_live_detail = false;
                 } else {
@@ -451,6 +521,15 @@ impl SessionsTab {
         let current = self.live_sessions_state.selected().unwrap_or(0) as i32;
         let new_idx = (current + delta).max(0) as usize;
         self.live_sessions_state.select(Some(new_idx));
+    }
+
+    fn move_replay_selection(&mut self, delta: i32) {
+        if self.replay_messages.is_empty() {
+            return;
+        }
+        let current = self.replay_scroll.selected().unwrap_or(0) as i32;
+        let new_idx = (current + delta).clamp(0, self.replay_messages.len() as i32 - 1) as usize;
+        self.replay_scroll.select(Some(new_idx));
     }
 
     fn get_selected_session<'a>(
@@ -567,6 +646,12 @@ impl SessionsTab {
         };
 
         let content_area = main_chunks[content_chunk_idx];
+
+        // If replay is open, show it full width
+        if self.show_replay {
+            self.render_replay_popup(frame, content_area);
+            return;
+        }
 
         // If live session detail is open, show it full width
         if self.show_live_detail {
@@ -1581,6 +1666,273 @@ impl SessionsTab {
         frame.render_widget(paragraph, inner);
     }
 
+    fn render_replay_popup(&mut self, frame: &mut Frame, area: Rect) {
+        let total_messages = self.replay_messages.len();
+        let selected_idx = self.replay_scroll.selected().unwrap_or(0);
+
+        let title = format!(
+            " 🎬 Session Replay • Message {}/{} ",
+            if total_messages > 0 {
+                selected_idx + 1
+            } else {
+                0
+            },
+            total_messages
+        );
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Magenta))
+            .title(Span::styled(
+                title,
+                Style::default().fg(Color::Magenta).bold(),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        if self.replay_messages.is_empty() {
+            let empty = Paragraph::new("No messages in this session")
+                .style(Style::default().fg(Color::DarkGray));
+            frame.render_widget(empty, inner);
+            return;
+        }
+
+        // Build message list items
+        let items: Vec<ListItem> = self
+            .replay_messages
+            .iter()
+            .enumerate()
+            .flat_map(|(idx, msg)| {
+                let is_selected = Some(idx) == self.replay_scroll.selected();
+                let is_expanded = self.replay_expanded.contains(&idx);
+
+                let mut lines = Vec::new();
+
+                // Timestamp + type indicator
+                let timestamp_str = msg
+                    .timestamp
+                    .map(|ts| ts.format("%H:%M:%S").to_string())
+                    .unwrap_or_else(|| "??:??:??".to_string());
+
+                let (type_icon, type_color) = match msg.line_type.as_str() {
+                    "user" => ("👤", Color::Cyan),
+                    "assistant" => ("🤖", Color::Green),
+                    "tool_use" => ("🔧", Color::Yellow),
+                    "tool_result" => ("📊", Color::Blue),
+                    _ => ("•", Color::DarkGray),
+                };
+
+                // Header line: timestamp + icon + type
+                let header_style = if is_selected {
+                    Style::default().fg(type_color).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(type_color)
+                };
+
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        if is_selected { "▶ " } else { "  " },
+                        Style::default().fg(Color::White),
+                    ),
+                    Span::styled(format!("[{}] ", timestamp_str), header_style),
+                    Span::styled(format!("{} ", type_icon), header_style),
+                    Span::styled(msg.line_type.clone(), header_style),
+                ]));
+
+                // Message content
+                if let Some(message) = &msg.message {
+                    if let Some(content) = &message.content {
+                        let content_text = Self::extract_message_content(content);
+                        let preview = if content_text.len() > 150 {
+                            format!("{}...", &content_text[..147])
+                        } else {
+                            content_text
+                        };
+
+                        lines.push(Line::from(vec![Span::styled(
+                            format!("  {}", preview),
+                            Style::default().fg(Color::White),
+                        )]));
+                    }
+
+                    // Tool calls (if present and expanded)
+                    if let Some(tool_calls) = &message.tool_calls {
+                        if !tool_calls.is_empty() {
+                            lines.push(Line::from(vec![Span::styled(
+                                format!(
+                                    "  {} {} tool call(s) {}",
+                                    if is_expanded { "▼" } else { "▶" },
+                                    tool_calls.len(),
+                                    if is_expanded { "" } else { "[Enter to expand]" }
+                                ),
+                                Style::default().fg(Color::Yellow),
+                            )]));
+
+                            if is_expanded {
+                                for (i, tool_call) in tool_calls.iter().enumerate() {
+                                    let tool_name = tool_call
+                                        .get("name")
+                                        .and_then(|n| n.as_str())
+                                        .unwrap_or("unknown");
+                                    lines.push(Line::from(vec![Span::styled(
+                                        format!("    {}. {}", i + 1, tool_name),
+                                        Style::default().fg(Color::Yellow),
+                                    )]));
+                                }
+                            }
+                        }
+                    }
+
+                    // Tool results (if present and expanded)
+                    if let Some(tool_results) = &message.tool_results {
+                        if !tool_results.is_empty() {
+                            lines.push(Line::from(vec![Span::styled(
+                                format!(
+                                    "  {} {} result(s) {}",
+                                    if is_expanded { "▼" } else { "▶" },
+                                    tool_results.len(),
+                                    if is_expanded { "" } else { "[Enter to expand]" }
+                                ),
+                                Style::default().fg(Color::Blue),
+                            )]));
+
+                            if is_expanded {
+                                for (i, result) in tool_results.iter().enumerate() {
+                                    let output = result
+                                        .get("output")
+                                        .and_then(|o| o.as_str())
+                                        .unwrap_or("(no output)");
+                                    let preview = if output.len() > 100 {
+                                        format!("{}...", &output[..97])
+                                    } else {
+                                        output.to_string()
+                                    };
+                                    lines.push(Line::from(vec![Span::styled(
+                                        format!("    {}. {}", i + 1, preview),
+                                        Style::default().fg(Color::DarkGray),
+                                    )]));
+                                }
+                            }
+                        }
+                    }
+
+                    // Token usage
+                    if let Some(usage) = &message.usage {
+                        let total = usage.total();
+                        if total > 0 {
+                            lines.push(Line::from(vec![Span::styled(
+                                format!(
+                                    "  📊 {} tokens (in:{} out:{} cache_r:{} cache_w:{})",
+                                    total,
+                                    usage.input_tokens,
+                                    usage.output_tokens,
+                                    usage.cache_read_tokens,
+                                    usage.cache_write_tokens
+                                ),
+                                Style::default().fg(Color::DarkGray),
+                            )]));
+                        }
+                    }
+                } else if msg.line_type == "tool_use" || msg.line_type == "tool_result" {
+                    // Tool events without message wrapper (fallback)
+                    lines.push(Line::from(vec![Span::styled(
+                        "  (Tool event details not available)",
+                        Style::default().fg(Color::DarkGray).italic(),
+                    )]));
+                }
+
+                // Separator line
+                lines.push(Line::from(""));
+
+                vec![ListItem::new(lines)]
+            })
+            .collect();
+
+        let list = List::new(items).highlight_style(
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD),
+        );
+
+        frame.render_stateful_widget(list, inner, &mut self.replay_scroll);
+
+        // Scrollbar
+        if self.replay_messages.len() > (inner.height as usize) {
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("↑"))
+                .end_symbol(Some("↓"));
+
+            let mut scrollbar_state = ScrollbarState::new(self.replay_messages.len())
+                .position(self.replay_scroll.selected().unwrap_or(0));
+
+            frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
+        }
+
+        // Keyboard hints overlay (bottom of popup)
+        let hints_area = Rect {
+            x: area.x + 1,
+            y: area.y + area.height.saturating_sub(2),
+            width: area.width.saturating_sub(2),
+            height: 1,
+        };
+
+        let hints = Line::from(vec![
+            Span::raw(" ["),
+            Span::styled(
+                "j/k ↑↓",
+                Style::default().fg(Color::Black).bg(Color::Magenta).bold(),
+            ),
+            Span::raw("] "),
+            Span::styled("scroll", Style::default().fg(Color::White)),
+            Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+            Span::raw("["),
+            Span::styled(
+                "Enter",
+                Style::default().fg(Color::Black).bg(Color::Magenta).bold(),
+            ),
+            Span::raw("] "),
+            Span::styled("expand/collapse", Style::default().fg(Color::White)),
+            Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+            Span::raw("["),
+            Span::styled(
+                "Esc",
+                Style::default().fg(Color::Black).bg(Color::Magenta).bold(),
+            ),
+            Span::raw("] "),
+            Span::styled("close", Style::default().fg(Color::White)),
+        ]);
+
+        let hints_widget = Paragraph::new(hints)
+            .style(Style::default().bg(Color::DarkGray))
+            .alignment(ratatui::layout::Alignment::Center);
+
+        frame.render_widget(hints_widget, hints_area);
+    }
+
+    /// Extract text content from message content field
+    ///
+    /// Content can be either a String or an array of content blocks.
+    /// This handles both formats gracefully.
+    fn extract_message_content(content: &serde_json::Value) -> String {
+        match content {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Array(blocks) => {
+                let mut parts = Vec::new();
+                for block in blocks {
+                    if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
+                        parts.push(text.to_string());
+                    } else if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
+                        // Handle non-text blocks (like tool_use)
+                        parts.push(format!("[{}]", block_type));
+                    }
+                }
+                parts.join(" ")
+            }
+            _ => "(unsupported content format)".to_string(),
+        }
+    }
+
     fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
         // Center popup (40% width, 30% height)
         let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
@@ -1756,19 +2108,19 @@ impl SessionsTab {
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
                     Span::styled(
+                        "v",
+                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                    ),
+                    Span::raw("] "),
+                    Span::styled("replay", Style::default().fg(Color::White)),
+                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::raw("["),
+                    Span::styled(
                         "e",
                         Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
                     ),
                     Span::raw("] "),
                     Span::styled("edit", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
-                    Span::raw("["),
-                    Span::styled(
-                        "o",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
-                    ),
-                    Span::raw("] "),
-                    Span::styled("reveal", Style::default().fg(Color::White)),
                     Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
                     Span::raw("["),
                     Span::styled(
@@ -1785,14 +2137,6 @@ impl SessionsTab {
                     ),
                     Span::raw("] "),
                     Span::styled("date filter", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
-                    Span::raw("["),
-                    Span::styled(
-                        "s",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
-                    ),
-                    Span::raw("] "),
-                    Span::styled("sort", Style::default().fg(Color::White)),
                 ]
             }
             _ => vec![],
