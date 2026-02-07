@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use crate::models::session::SessionMetadata;
 
+pub mod anomalies;
 pub mod forecasting;
 pub mod insights;
 pub mod patterns;
@@ -16,6 +17,7 @@ pub mod trends;
 #[cfg(test)]
 mod tests;
 
+pub use anomalies::{Anomaly, AnomalyMetric, AnomalySeverity, detect_anomalies};
 pub use forecasting::{ForecastData, TrendDirection, forecast_usage};
 pub use insights::{Alert, generate_budget_alerts, generate_insights};
 pub use patterns::{UsagePatterns, detect_patterns};
