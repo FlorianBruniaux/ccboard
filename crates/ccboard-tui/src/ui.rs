@@ -141,6 +141,14 @@ impl Ui {
                         self.analytics.scroll_down(max_items);
                     }
                     KeyCode::Char('k') | KeyCode::Up => self.analytics.scroll_up(),
+                    KeyCode::Char('s') => {
+                        // Cycle sort column for project leaderboard
+                        self.analytics.cycle_sort_column();
+                    }
+                    KeyCode::Char('o') => {
+                        // Toggle sort order (ascending/descending) for project leaderboard
+                        self.analytics.toggle_sort_order();
+                    }
                     KeyCode::Char('r') => {
                         // Recompute analytics with current period (async operation)
                         let store = app.store.clone();
@@ -483,7 +491,9 @@ impl Ui {
                 Tab::Costs => "Tab/←→/h/l switch views",
                 Tab::History => "/ search │ gg/G/Home/End jump │ c clear │ x export",
                 Tab::Mcp => "←→ focus │ ↑↓ select │ e edit │ o reveal │ r refresh",
-                Tab::Analytics => "F1-F4 period │ ←→/h/l switch views │ j/k scroll │ r refresh",
+                Tab::Analytics => {
+                    "F1-F4 period │ ←→/h/l switch views │ j/k scroll │ s sort │ o order │ r refresh"
+                }
             };
 
             Line::from(vec![

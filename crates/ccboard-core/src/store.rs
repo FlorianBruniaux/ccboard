@@ -105,6 +105,16 @@ pub struct DataStore {
     metadata_cache: Option<Arc<MetadataCache>>,
 }
 
+/// Project leaderboard entry with aggregated metrics
+#[derive(Debug, Clone)]
+pub struct ProjectLeaderboardEntry {
+    pub project_name: String,
+    pub total_sessions: usize,
+    pub total_tokens: u64,
+    pub total_cost: f64,
+    pub avg_session_cost: f64,
+}
+
 impl DataStore {
     /// Create a new data store
     pub fn new(
@@ -576,6 +586,82 @@ impl DataStore {
         let mut results: Vec<_> = day_totals.into_iter().collect();
         results.sort_by(|a, b| b.1.cmp(&a.1));
         results.truncate(10); // Top 10
+        results
+    }
+
+    /// Get project leaderboard with aggregated metrics
+    ///
+    /// Returns all projects with session count, total tokens, total cost, and average session cost.
+    /// Cost is calculated using accurate model-based pricing from the pricing module.
+    pub fn projects_leaderboard(&self) -> Vec<ProjectLeaderboardEntry> {
+        let mut project_metrics = std::collections::HashMap::new();
+
+        // Aggregate metrics per project
+        for session in self.sessions.iter() {
+            let metadata = session.value();
+            let project_path = &metadata.project_path;
+
+            // Get model for this session (use first model, or "unknown")
+            let model = metadata
+                .models_used
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or("unknown");
+
+            // Calculate cost using accurate pricing
+            let cost = crate::pricing::calculate_cost(
+                model,
+                metadata.input_tokens,
+                metadata.output_tokens,
+                metadata.cache_creation_tokens,
+                metadata.cache_read_tokens,
+            );
+
+            let entry = project_metrics
+                .entry(project_path.clone())
+                .or_insert((0, 0u64, 0.0f64)); // (session_count, total_tokens, total_cost)
+
+            entry.0 += 1; // session count
+            entry.1 += metadata.total_tokens; // total tokens
+            entry.2 += cost; // total cost
+        }
+
+        // Convert to leaderboard entries
+        let mut results: Vec<_> = project_metrics
+            .into_iter()
+            .map(
+                |(project_path, (session_count, total_tokens, total_cost))| {
+                    let avg_session_cost = if session_count > 0 {
+                        total_cost / session_count as f64
+                    } else {
+                        0.0
+                    };
+
+                    // Extract project name from path (last component)
+                    let project_name = std::path::Path::new(&project_path)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or(&project_path)
+                        .to_string();
+
+                    ProjectLeaderboardEntry {
+                        project_name,
+                        total_sessions: session_count,
+                        total_tokens,
+                        total_cost,
+                        avg_session_cost,
+                    }
+                },
+            )
+            .collect();
+
+        // Default sort: by total cost descending
+        results.sort_by(|a, b| {
+            b.total_cost
+                .partial_cmp(&a.total_cost)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
         results
     }
 

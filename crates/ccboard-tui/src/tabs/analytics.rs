@@ -1,6 +1,7 @@
-//! Analytics tab - Trends, forecasting, patterns, insights with 4 sub-views
+//! Analytics tab - Trends, forecasting, patterns, insights, anomalies with 5 sub-views
 
-use ccboard_core::analytics::{AnalyticsData, Period};
+use ccboard_core::analytics::{AnalyticsData, Period, detect_anomalies};
+use ccboard_core::models::session::SessionMetadata;
 use ccboard_core::store::DataStore;
 use ratatui::{
     Frame,
@@ -9,8 +10,8 @@ use ratatui::{
     symbols,
     text::{Line, Span},
     widgets::{
-        Axis, BarChart, Block, Borders, Chart, Dataset, GraphType, List, ListItem, Paragraph,
-        Sparkline,
+        Axis, BarChart, Block, Borders, Cell, Chart, Dataset, GraphType, List, ListItem, Paragraph,
+        Row, Sparkline, Table,
     },
 };
 use std::sync::Arc;
@@ -22,6 +23,7 @@ pub enum AnalyticsView {
     Trends,
     Patterns,
     Insights,
+    Anomalies,
 }
 
 impl AnalyticsView {
@@ -31,17 +33,19 @@ impl AnalyticsView {
             Self::Overview => Self::Trends,
             Self::Trends => Self::Patterns,
             Self::Patterns => Self::Insights,
-            Self::Insights => Self::Overview,
+            Self::Insights => Self::Anomalies,
+            Self::Anomalies => Self::Overview,
         }
     }
 
     /// Cycle to previous view
     pub fn prev(self) -> Self {
         match self {
-            Self::Overview => Self::Insights,
+            Self::Overview => Self::Anomalies,
             Self::Trends => Self::Overview,
             Self::Patterns => Self::Trends,
             Self::Insights => Self::Patterns,
+            Self::Anomalies => Self::Insights,
         }
     }
 
@@ -52,6 +56,41 @@ impl AnalyticsView {
             Self::Trends => "Trends",
             Self::Patterns => "Patterns",
             Self::Insights => "Insights",
+            Self::Anomalies => "Anomalies",
+        }
+    }
+}
+
+/// Sort column for project leaderboard
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LeaderboardSortColumn {
+    ProjectName,
+    TotalSessions,
+    TotalTokens,
+    TotalCost,
+    AvgSessionCost,
+}
+
+impl LeaderboardSortColumn {
+    /// Cycle to next column
+    pub fn next(self) -> Self {
+        match self {
+            Self::ProjectName => Self::TotalSessions,
+            Self::TotalSessions => Self::TotalTokens,
+            Self::TotalTokens => Self::TotalCost,
+            Self::TotalCost => Self::AvgSessionCost,
+            Self::AvgSessionCost => Self::ProjectName,
+        }
+    }
+
+    /// Column header name
+    pub fn header(&self) -> &'static str {
+        match self {
+            Self::ProjectName => "Project",
+            Self::TotalSessions => "Sessions",
+            Self::TotalTokens => "Tokens",
+            Self::TotalCost => "Cost",
+            Self::AvgSessionCost => "Avg Cost",
         }
     }
 }
@@ -64,6 +103,10 @@ pub struct AnalyticsTab {
     current_view: AnalyticsView,
     /// Scroll offset for insights list
     scroll_offset: usize,
+    /// Leaderboard sort column
+    leaderboard_sort: LeaderboardSortColumn,
+    /// Leaderboard sort descending
+    leaderboard_sort_desc: bool,
 }
 
 impl Default for AnalyticsTab {
@@ -78,6 +121,8 @@ impl AnalyticsTab {
             current_period: Period::last_30d(),
             current_view: AnalyticsView::Overview,
             scroll_offset: 0,
+            leaderboard_sort: LeaderboardSortColumn::TotalCost,
+            leaderboard_sort_desc: true,
         }
     }
 
@@ -115,6 +160,16 @@ impl AnalyticsTab {
         if self.scroll_offset > 0 {
             self.scroll_offset -= 1;
         }
+    }
+
+    /// Cycle sort column (s key)
+    pub fn cycle_sort_column(&mut self) {
+        self.leaderboard_sort = self.leaderboard_sort.next();
+    }
+
+    /// Toggle sort order (r key)
+    pub fn toggle_sort_order(&mut self) {
+        self.leaderboard_sort_desc = !self.leaderboard_sort_desc;
     }
 
     /// Render the analytics tab
@@ -155,6 +210,7 @@ impl AnalyticsTab {
                     AnalyticsView::Trends => self.render_trends(frame, chunks[1], data),
                     AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data),
                     AnalyticsView::Insights => self.render_insights(frame, chunks[1], data),
+                    AnalyticsView::Anomalies => self.render_anomalies(frame, chunks[1], store),
                 }
             }
             None => {
@@ -205,6 +261,7 @@ impl AnalyticsTab {
             AnalyticsView::Trends,
             AnalyticsView::Patterns,
             AnalyticsView::Insights,
+            AnalyticsView::Anomalies,
         ];
         let tabs_text: Vec<Span> = views
             .iter()
@@ -261,10 +318,11 @@ impl AnalyticsTab {
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([
-                Constraint::Length(7), // Summary cards
-                Constraint::Length(6), // Budget status
-                Constraint::Length(9), // Token sparkline
-                Constraint::Min(8),    // Top insights
+                Constraint::Length(7),  // Summary cards
+                Constraint::Length(6),  // Budget status
+                Constraint::Length(9),  // Token sparkline
+                Constraint::Length(12), // Project leaderboard
+                Constraint::Min(5),     // Top insights
             ])
             .split(area);
 
@@ -279,8 +337,13 @@ impl AnalyticsTab {
         // Token sparkline
         self.render_token_sparkline(frame, chunks[2], data);
 
+        // Project leaderboard
+        if let Some(store) = store {
+            self.render_project_leaderboard(frame, chunks[3], store);
+        }
+
         // Top insights preview
-        self.render_insights_preview(frame, chunks[3], data);
+        self.render_insights_preview(frame, chunks[4], data);
     }
 
     /// Render summary cards
@@ -1159,5 +1222,339 @@ impl AnalyticsTab {
         } else {
             n.to_string()
         }
+    }
+
+    /// Render project leaderboard table
+    fn render_project_leaderboard(&self, frame: &mut Frame, area: Rect, store: &Arc<DataStore>) {
+        use ccboard_core::store::DataStore;
+
+        // Get leaderboard data
+        let mut entries = store.projects_leaderboard();
+
+        // Sort based on current selection
+        match self.leaderboard_sort {
+            LeaderboardSortColumn::ProjectName => {
+                entries.sort_by(|a, b| {
+                    if self.leaderboard_sort_desc {
+                        b.project_name.cmp(&a.project_name)
+                    } else {
+                        a.project_name.cmp(&b.project_name)
+                    }
+                });
+            }
+            LeaderboardSortColumn::TotalSessions => {
+                entries.sort_by(|a, b| {
+                    if self.leaderboard_sort_desc {
+                        b.total_sessions.cmp(&a.total_sessions)
+                    } else {
+                        a.total_sessions.cmp(&b.total_sessions)
+                    }
+                });
+            }
+            LeaderboardSortColumn::TotalTokens => {
+                entries.sort_by(|a, b| {
+                    if self.leaderboard_sort_desc {
+                        b.total_tokens.cmp(&a.total_tokens)
+                    } else {
+                        a.total_tokens.cmp(&b.total_tokens)
+                    }
+                });
+            }
+            LeaderboardSortColumn::TotalCost => {
+                entries.sort_by(|a, b| {
+                    let cmp = b
+                        .total_cost
+                        .partial_cmp(&a.total_cost)
+                        .unwrap_or(std::cmp::Ordering::Equal);
+                    if self.leaderboard_sort_desc {
+                        cmp
+                    } else {
+                        cmp.reverse()
+                    }
+                });
+            }
+            LeaderboardSortColumn::AvgSessionCost => {
+                entries.sort_by(|a, b| {
+                    let cmp = b
+                        .avg_session_cost
+                        .partial_cmp(&a.avg_session_cost)
+                        .unwrap_or(std::cmp::Ordering::Equal);
+                    if self.leaderboard_sort_desc {
+                        cmp
+                    } else {
+                        cmp.reverse()
+                    }
+                });
+            }
+        }
+
+        // Create header with sort indicators
+        let sort_indicator = if self.leaderboard_sort_desc {
+            "↓"
+        } else {
+            "↑"
+        };
+
+        let header_cells = [
+            LeaderboardSortColumn::ProjectName,
+            LeaderboardSortColumn::TotalSessions,
+            LeaderboardSortColumn::TotalTokens,
+            LeaderboardSortColumn::TotalCost,
+            LeaderboardSortColumn::AvgSessionCost,
+        ]
+        .iter()
+        .map(|col| {
+            let header = if *col == self.leaderboard_sort {
+                format!("{} {}", col.header(), sort_indicator)
+            } else {
+                col.header().to_string()
+            };
+
+            Cell::from(header).style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+        });
+
+        let header = Row::new(header_cells).height(1).bottom_margin(1);
+
+        // Create rows (top 5 projects)
+        let rows: Vec<Row> = entries
+            .iter()
+            .take(5)
+            .enumerate()
+            .map(|(idx, entry)| {
+                // Highlight top 3 with different colors
+                let row_color = match idx {
+                    0 => Color::LightGreen,
+                    1 => Color::LightCyan,
+                    2 => Color::LightYellow,
+                    _ => Color::White,
+                };
+
+                let cells = vec![
+                    Cell::from(entry.project_name.clone()).style(Style::default().fg(row_color)),
+                    Cell::from(entry.total_sessions.to_string())
+                        .style(Style::default().fg(row_color)),
+                    Cell::from(Self::format_number(entry.total_tokens))
+                        .style(Style::default().fg(row_color)),
+                    Cell::from(format!("${:.2}", entry.total_cost))
+                        .style(Style::default().fg(row_color)),
+                    Cell::from(format!("${:.2}", entry.avg_session_cost))
+                        .style(Style::default().fg(row_color)),
+                ];
+
+                Row::new(cells).height(1)
+            })
+            .collect();
+
+        let widths = [
+            Constraint::Percentage(40), // Project name
+            Constraint::Percentage(15), // Sessions
+            Constraint::Percentage(15), // Tokens
+            Constraint::Percentage(15), // Cost
+            Constraint::Percentage(15), // Avg Cost
+        ];
+
+        let table = Table::new(rows, widths)
+            .header(header)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Project Leaderboard (Top 5) - [s] sort column | [o] order"),
+            )
+            .column_spacing(1);
+
+        frame.render_widget(table, area);
+    }
+
+    /// Render anomalies sub-view (Z-score based anomaly detection)
+    fn render_anomalies(&self, frame: &mut Frame, area: Rect, store: Option<&Arc<DataStore>>) {
+        let Some(store) = store else {
+            self.render_loading(frame, area);
+            return;
+        };
+
+        // Get all sessions for current period
+        let sessions: Vec<Arc<SessionMetadata>> = store
+            .all_sessions()
+            .filter(|s| {
+                // Filter by period (same logic as analytics computation)
+                let days_ago = chrono::Utc::now()
+                    .signed_duration_since(s.start_time)
+                    .num_days();
+                days_ago <= self.current_period.days() as i64
+            })
+            .collect();
+
+        // Detect anomalies
+        let anomalies = detect_anomalies(&sessions);
+
+        // Check minimum data requirement
+        if sessions.len() < 10 {
+            let text = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "Insufficient data for anomaly detection",
+                    Style::default().fg(Color::Yellow).bold(),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    format!("Found {} sessions (minimum 10 required)", sessions.len()),
+                    Style::default().fg(Color::DarkGray),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "Anomaly detection uses Z-score statistical analysis",
+                    Style::default().fg(Color::DarkGray).italic(),
+                )),
+                Line::from(Span::styled(
+                    "to identify sessions with unusual token usage or costs.",
+                    Style::default().fg(Color::DarkGray).italic(),
+                )),
+            ];
+
+            let paragraph = Paragraph::new(text)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Anomaly Detection"),
+                )
+                .alignment(Alignment::Center);
+
+            frame.render_widget(paragraph, area);
+            return;
+        }
+
+        // Check if no anomalies found
+        if anomalies.is_empty() {
+            let text = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "✅ No anomalies detected",
+                    Style::default().fg(Color::Green).bold(),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    format!(
+                        "Analyzed {} sessions - All within normal range",
+                        sessions.len()
+                    ),
+                    Style::default().fg(Color::Gray),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "Anomalies are flagged when tokens or cost exceed 2σ from mean",
+                    Style::default().fg(Color::DarkGray).italic(),
+                )),
+            ];
+
+            let paragraph = Paragraph::new(text)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Anomaly Detection"),
+                )
+                .alignment(Alignment::Center);
+
+            frame.render_widget(paragraph, area);
+            return;
+        }
+
+        // Render anomaly table
+        let header = Row::new(vec![
+            Cell::from(Span::styled("Severity", Style::default().bold())),
+            Cell::from(Span::styled("Date", Style::default().bold())),
+            Cell::from(Span::styled("Session ID", Style::default().bold())),
+            Cell::from(Span::styled("Metric", Style::default().bold())),
+            Cell::from(Span::styled("Value", Style::default().bold())),
+            Cell::from(Span::styled("Z-Score", Style::default().bold())),
+            Cell::from(Span::styled("Deviation", Style::default().bold())),
+        ])
+        .style(Style::default().fg(Color::Yellow))
+        .height(1);
+
+        // Take top 10 anomalies (they're already sorted by severity)
+        let rows: Vec<Row> = anomalies
+            .iter()
+            .take(10)
+            .skip(self.scroll_offset)
+            .map(|anomaly| {
+                use ccboard_core::analytics::AnomalySeverity;
+
+                // Severity column with emoji and color
+                let (severity_color, severity_icon) = match anomaly.severity {
+                    AnomalySeverity::Critical => (Color::Red, "🚨"),
+                    AnomalySeverity::Warning => (Color::Yellow, "⚠️"),
+                };
+
+                let cells = vec![
+                    Cell::from(Span::styled(
+                        severity_icon,
+                        Style::default().fg(severity_color).bold(),
+                    )),
+                    Cell::from(anomaly.date.clone()),
+                    Cell::from(Span::styled(
+                        &anomaly.session_id[..8.min(anomaly.session_id.len())],
+                        Style::default().fg(Color::Cyan),
+                    )),
+                    Cell::from(anomaly.metric.name()),
+                    Cell::from(Span::styled(
+                        anomaly.format_value(),
+                        Style::default().fg(severity_color).bold(),
+                    )),
+                    Cell::from(Span::styled(
+                        format!("{:.2}", anomaly.z_score),
+                        Style::default().fg(Color::White),
+                    )),
+                    Cell::from(Span::styled(
+                        anomaly.format_deviation(),
+                        Style::default().fg(severity_color),
+                    )),
+                ];
+
+                Row::new(cells).height(1)
+            })
+            .collect();
+
+        let widths = [
+            Constraint::Length(4),      // Severity emoji
+            Constraint::Length(16),     // Date
+            Constraint::Length(10),     // Session ID (truncated)
+            Constraint::Length(8),      // Metric
+            Constraint::Length(12),     // Value
+            Constraint::Length(8),      // Z-Score
+            Constraint::Percentage(15), // Deviation
+        ];
+
+        let scroll_indicator = if anomalies.len() > 10 {
+            format!(
+                " (showing {} of {}) - [j/k] scroll",
+                (self.scroll_offset + 10).min(anomalies.len()),
+                anomalies.len()
+            )
+        } else {
+            format!(" (showing all {} anomalies)", anomalies.len())
+        };
+
+        let critical_count = anomalies
+            .iter()
+            .filter(|a| a.severity == ccboard_core::analytics::AnomalySeverity::Critical)
+            .count();
+
+        let title = format!(
+            "Anomaly Detection - {} critical, {} total{}",
+            critical_count,
+            anomalies.len(),
+            scroll_indicator
+        );
+
+        let table = Table::new(rows, widths)
+            .header(header)
+            .block(Block::default().borders(Borders::ALL).title(title))
+            .column_spacing(1);
+
+        frame.render_widget(table, area);
     }
 }
