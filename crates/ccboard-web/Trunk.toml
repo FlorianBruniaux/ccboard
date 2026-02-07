@@ -1,0 +1,12 @@
+# Trunk build configuration for Leptos CSR
+[build]
+target = "crates/ccboard-web/index.html"
+dist = "crates/ccboard-web/dist"
+public_url = "/"
+
+[watch]
+watch = ["crates/ccboard-web/src"]
+
+[serve]
+port = 8080
+address = "127.0.0.1"

@@ -8,8 +8,9 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::BroadcastStream;
 
 /// Create an SSE stream from the event bus
+/// Takes EventBus by value (cheap clone, Arc internally)
 pub fn create_sse_stream(
-    event_bus: &EventBus,
+    event_bus: EventBus,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let rx = event_bus.subscribe();
     let stream = BroadcastStream::new(rx);

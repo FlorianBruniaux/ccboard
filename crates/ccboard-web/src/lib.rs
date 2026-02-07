@@ -1,8 +1,12 @@
 //! ccboard-web - Web frontend for ccboard using Leptos + Axum
 
+pub mod app;
+pub mod components;
+pub mod pages;
 pub mod router;
 pub mod sse;
 
+pub use app::App;
 pub use router::create_router;
 
 use anyhow::Result;

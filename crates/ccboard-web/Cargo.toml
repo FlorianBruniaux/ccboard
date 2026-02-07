@@ -12,6 +12,9 @@ documentation.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 ccboard-core.workspace = true
 
@@ -38,6 +41,10 @@ serde_json.workspace = true
 
 # Streaming
 futures = "0.3"
+
+# WASM support
+console_error_panic_hook = "0.1"
+wasm-bindgen = "0.2"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
