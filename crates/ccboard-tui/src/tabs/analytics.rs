@@ -703,19 +703,27 @@ impl AnalyticsTab {
             .map(|(i, &sessions)| (i as f64, sessions as f64 * 100.0)) // Scale for visibility
             .collect();
 
-        // Forecast line (from last historical point to 30 days ahead)
+        // Forecast line using linear regression (30 days ahead)
         let forecast_data = if data.forecast.unavailable_reason.is_none() && !token_data.is_empty()
         {
             let last_day = token_data.len() as f64 - 1.0;
             let last_tokens = token_data.last().map(|p| p.1).unwrap_or(0.0);
-            let forecast_end_tokens = data.forecast.next_30_days_tokens as f64;
 
-            // Create intermediate points for smoother line
+            // Compute linear regression: y = slope * x + intercept
+            let n = token_data.len() as f64;
+            let sum_x: f64 = (0..token_data.len()).map(|i| i as f64).sum();
+            let sum_y: f64 = data.trends.daily_tokens.iter().map(|&t| t as f64).sum();
+            let sum_xx: f64 = (0..token_data.len()).map(|i| (i as f64).powi(2)).sum();
+            let sum_xy: f64 = token_data.iter().map(|(x, y)| x * y).sum();
+
+            let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
+            let intercept = (sum_y - slope * sum_x) / n;
+
+            // Generate forecast points (30 days ahead using regression line)
             let mut points = vec![(last_day, last_tokens)];
             for i in 1..=30 {
                 let x = last_day + i as f64;
-                let progress = i as f64 / 30.0;
-                let y = last_tokens + (forecast_end_tokens - last_tokens) * progress;
+                let y = (slope * x + intercept).max(0.0); // Linear projection
                 points.push((x, y));
             }
             points
@@ -732,36 +740,36 @@ impl AnalyticsTab {
 
         let mut datasets = vec![
             Dataset::default()
-                .name("Tokens")
+                .name("Historical Tokens")
                 .marker(symbols::Marker::Braille)
                 .graph_type(GraphType::Line)
                 .style(Style::default().fg(Color::Cyan))
                 .data(&token_data),
             Dataset::default()
-                .name("Sessions (x100)")
+                .name("Sessions (×100)")
                 .marker(symbols::Marker::Braille)
                 .graph_type(GraphType::Line)
                 .style(Style::default().fg(Color::Green))
                 .data(&session_data),
         ];
 
-        // Add forecast dataset if available
+        // Add 30d forecast dataset (orange dashed line)
         if !forecast_data.is_empty() {
             let forecast_color = if data.forecast.confidence > 0.7 {
-                Color::LightGreen
+                Color::LightYellow // High confidence: bright
             } else if data.forecast.confidence > 0.4 {
-                Color::Yellow
+                Color::Yellow // Medium confidence
             } else {
-                Color::LightRed
+                Color::LightRed // Low confidence: red warning
             };
 
             datasets.push(
                 Dataset::default()
                     .name(format!(
-                        "Forecast ({:.0}% conf)",
+                        "30d Forecast ({:.0}% conf)",
                         data.forecast.confidence * 100.0
                     ))
-                    .marker(symbols::Marker::Dot)
+                    .marker(symbols::Marker::Dot) // Dotted line for forecast
                     .graph_type(GraphType::Line)
                     .style(Style::default().fg(forecast_color))
                     .data(&forecast_data),
@@ -1378,13 +1386,19 @@ impl AnalyticsTab {
 
         // Get all sessions for current period
         let sessions: Vec<Arc<SessionMetadata>> = store
-            .all_sessions()
+            .sessions_by_project()
+            .values()
+            .flat_map(|v| v.iter().cloned())
             .filter(|s| {
                 // Filter by period (same logic as analytics computation)
-                let days_ago = chrono::Utc::now()
-                    .signed_duration_since(s.start_time)
-                    .num_days();
-                days_ago <= self.current_period.days() as i64
+                if let Some(timestamp) = s.first_timestamp {
+                    let days_ago = chrono::Utc::now()
+                        .signed_duration_since(timestamp)
+                        .num_days();
+                    days_ago <= self.current_period.days() as i64
+                } else {
+                    false
+                }
             })
             .collect();
 
