@@ -85,7 +85,7 @@ pub fn export_as_json<T: Serialize>(data: &T, filename: &str) {
     let json = match serde_json::to_string_pretty(data) {
         Ok(j) => j,
         Err(e) => {
-            tracing::error!("Failed to serialize JSON for export: {}", e);
+            web_sys::console::error_1(&format!("Failed to serialize JSON for export: {}", e).into());
             return;
         }
     };
@@ -101,7 +101,7 @@ fn trigger_download(content: &str, filename: &str, mime_type: &str) {
     let window = match web_sys::window() {
         Some(w) => w,
         None => {
-            tracing::error!("Failed to get window object");
+            web_sys::console::error_1(&"Failed to get window object".into());
             return;
         }
     };
@@ -109,7 +109,7 @@ fn trigger_download(content: &str, filename: &str, mime_type: &str) {
     let document = match window.document() {
         Some(d) => d,
         None => {
-            tracing::error!("Failed to get document object");
+            web_sys::console::error_1(&"Failed to get document object".into());
             return;
         }
     };
@@ -124,7 +124,7 @@ fn trigger_download(content: &str, filename: &str, mime_type: &str) {
     let blob = match Blob::new_with_str_sequence_and_options(&blob_parts, &blob_options) {
         Ok(b) => b,
         Err(e) => {
-            tracing::error!("Failed to create Blob: {:?}", e);
+            web_sys::console::error_1(&format!("Failed to create Blob: {:?}", e).into());
             return;
         }
     };
@@ -133,7 +133,7 @@ fn trigger_download(content: &str, filename: &str, mime_type: &str) {
     let url = match Url::create_object_url_with_blob(&blob) {
         Ok(u) => u,
         Err(e) => {
-            tracing::error!("Failed to create object URL: {:?}", e);
+            web_sys::console::error_1(&format!("Failed to create object URL: {:?}", e).into());
             return;
         }
     };
@@ -146,7 +146,7 @@ fn trigger_download(content: &str, filename: &str, mime_type: &str) {
     {
         Some(a) => a,
         None => {
-            tracing::error!("Failed to create anchor element");
+            web_sys::console::error_1(&"Failed to create anchor element".into());
             let _ = Url::revoke_object_url(&url);
             return;
         }
@@ -158,6 +158,6 @@ fn trigger_download(content: &str, filename: &str, mime_type: &str) {
 
     // Clean up object URL
     if let Err(e) = Url::revoke_object_url(&url) {
-        tracing::error!("Failed to revoke object URL: {:?}", e);
+        web_sys::console::error_1(&format!("Failed to revoke object URL: {:?}", e).into());
     }
 }

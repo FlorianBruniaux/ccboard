@@ -15,6 +15,9 @@ pub fn SearchBar(
     set_date_filter: WriteSignal<Option<String>>,
     available_projects: Signal<Vec<String>>,
 ) -> impl IntoView {
+    // Suppress unused variable warnings - these signals are passed to parent for filter logic
+    let _ = (project_filter, model_filter, date_filter);
+
     let clear_filters = move |_| {
         set_search.set(String::new());
         set_project_filter.set(None);
