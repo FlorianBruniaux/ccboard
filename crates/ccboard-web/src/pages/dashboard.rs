@@ -1,6 +1,6 @@
 //! Dashboard page component
 
-use crate::api::{fetch_sessions, fetch_stats, format_cost, format_number};
+use crate::api::{fetch_recent_sessions, fetch_stats, format_cost, format_number};
 use crate::components::{CardColor, Sparkline, StatsCard, use_toast};
 use crate::sse_hook::{SseEvent, use_sse};
 use crate::utils::export_as_json;
@@ -16,10 +16,10 @@ pub fn Dashboard() -> impl IntoView {
         async move { fetch_stats().await }
     });
 
-    // Sessions resource for recent sessions list
+    // Sessions resource for recent sessions list (limit 5 for dashboard)
     let sessions = LocalResource::new(move || {
         let _ = stats_version.get(); // Track this to trigger refetch
-        async move { fetch_sessions().await }
+        async move { fetch_recent_sessions(5).await }
     });
 
     // Toast notifications
@@ -156,7 +156,7 @@ pub fn Dashboard() -> impl IntoView {
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
-                                                                    {session_data.recent.iter().take(5).map(|s| {
+                                                                    {session_data.sessions.iter().map(|s| {
                                                                         let id = s.id.clone();
                                                                         let project = s.project.clone();
                                                                         let tokens = s.tokens;

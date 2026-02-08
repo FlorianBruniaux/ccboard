@@ -85,7 +85,9 @@ pub fn export_as_json<T: Serialize>(data: &T, filename: &str) {
     let json = match serde_json::to_string_pretty(data) {
         Ok(j) => j,
         Err(e) => {
-            web_sys::console::error_1(&format!("Failed to serialize JSON for export: {}", e).into());
+            web_sys::console::error_1(
+                &format!("Failed to serialize JSON for export: {}", e).into(),
+            );
             return;
         }
     };

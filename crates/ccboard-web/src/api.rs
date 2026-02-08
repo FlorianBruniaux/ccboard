@@ -156,21 +156,31 @@ impl StatsData {
     }
 }
 
-/// Session data structure for recent sessions list
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Session data structure (complete version)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SessionData {
     pub id: String,
+    pub date: Option<String>,
     pub project: String,
-    pub tokens: u64,
+    pub model: String,
     pub messages: u64,
+    pub tokens: u64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_creation_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub cost: f64,
+    pub status: String,
+    pub first_timestamp: Option<String>,
+    pub duration_seconds: Option<u64>,
     pub preview: Option<String>,
 }
 
-/// Sessions response from API
+/// Recent sessions response from API
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionsResponse {
-    pub count: u64,
-    pub recent: Vec<SessionData>,
+pub struct RecentSessionsResponse {
+    pub sessions: Vec<SessionData>,
+    pub total: u64,
 }
 
 /// Fetch stats from API
@@ -192,9 +202,10 @@ pub async fn fetch_stats() -> Result<StatsData, String> {
     Ok(stats)
 }
 
-/// Fetch sessions from API
-pub async fn fetch_sessions() -> Result<SessionsResponse, String> {
-    let response = Request::get("/api/sessions")
+/// Fetch recent sessions from API (for dashboard)
+pub async fn fetch_recent_sessions(limit: u32) -> Result<RecentSessionsResponse, String> {
+    let url = format!("/api/sessions/recent?limit={}", limit);
+    let response = Request::get(&url)
         .send()
         .await
         .map_err(|e| format!("Network error: {}", e))?;
@@ -204,7 +215,7 @@ pub async fn fetch_sessions() -> Result<SessionsResponse, String> {
     }
 
     let sessions = response
-        .json::<SessionsResponse>()
+        .json::<RecentSessionsResponse>()
         .await
         .map_err(|e| format!("Parse error: {}", e))?;
 

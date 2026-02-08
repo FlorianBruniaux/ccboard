@@ -1,27 +1,7 @@
 //! Session table component with sorting
 
+use crate::api::SessionData;
 use leptos::prelude::*;
-use serde::{Deserialize, Serialize};
-
-/// Session data from API
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SessionData {
-    pub id: String,
-    pub date: Option<String>,
-    pub project: String,
-    pub model: String,
-    pub messages: u64,
-    pub tokens: u64,
-    pub input_tokens: u64,
-    pub output_tokens: u64,
-    pub cache_creation_tokens: u64,
-    pub cache_read_tokens: u64,
-    pub cost: f64,
-    pub status: String,
-    pub first_timestamp: Option<String>,
-    pub duration_seconds: Option<u64>,
-    pub preview: Option<String>,
-}
 
 /// Sort column
 #[derive(Debug, Clone, Copy, PartialEq)]

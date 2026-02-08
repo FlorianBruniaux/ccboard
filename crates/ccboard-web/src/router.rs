@@ -1,7 +1,8 @@
 //! Web router using Axum
 
-use axum::{Router, routing::get};
+use axum::{Router, extract::Query, routing::get};
 use ccboard_core::DataStore;
+use serde::Deserialize;
 use std::sync::Arc;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -9,6 +10,48 @@ use tower_http::{
 };
 
 use crate::sse;
+
+/// Query parameters for sessions pagination
+#[derive(Debug, Deserialize)]
+struct SessionsQuery {
+    #[serde(default)]
+    page: usize,
+    #[serde(default = "default_page_size")]
+    limit: usize,
+    #[serde(default)]
+    search: Option<String>,
+    #[serde(default)]
+    project: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    since: Option<String>, // e.g., "7d", "30d"
+    #[serde(default = "default_sort")]
+    sort: String, // "date", "tokens", "cost"
+    #[serde(default = "default_order")]
+    order: String, // "asc", "desc"
+}
+
+fn default_page_size() -> usize {
+    50
+}
+fn default_sort() -> String {
+    "date".to_string()
+}
+fn default_order() -> String {
+    "desc".to_string()
+}
+
+/// Query parameters for recent sessions
+#[derive(Debug, Deserialize)]
+struct RecentQuery {
+    #[serde(default = "default_recent_limit")]
+    limit: usize,
+}
+
+fn default_recent_limit() -> usize {
+    5
+}
 
 /// Create the web router
 pub fn create_router(store: Arc<DataStore>) -> Router {
@@ -25,6 +68,7 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
     Router::new()
         // API routes (must be before catch-all static files)
         .route("/api/stats", get(stats_handler))
+        .route("/api/sessions/recent", get(recent_sessions_handler)) // Must be before /api/sessions
         .route("/api/sessions", get(sessions_handler))
         .route("/api/health", get(health_handler))
         .route("/api/events", get(sse_handler))
@@ -181,42 +225,171 @@ async fn stats_handler(
     }
 }
 
-async fn sessions_handler(
+/// Recent sessions handler (lightweight, for dashboard)
+async fn recent_sessions_handler(
+    Query(params): Query<RecentQuery>,
     axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
 ) -> axum::Json<serde_json::Value> {
-    // Get all sessions, not just recent 10
-    let all_sessions = store.all_sessions();
+    let mut all_sessions = store.all_sessions();
+
+    // Sort by date desc
+    all_sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+
+    let sessions: Vec<_> = all_sessions
+        .iter()
+        .take(params.limit)
+        .map(|s| session_to_json(s))
+        .collect();
 
     axum::Json(serde_json::json!({
-        "sessions": all_sessions.iter().map(|s| {
-            // Calculate cost estimate (rough approximation)
-            let cost = calculate_session_cost(
-                s.input_tokens,
-                s.output_tokens,
-                s.cache_creation_tokens,
-                s.cache_read_tokens,
-                &s.models_used,
-            );
-
-            serde_json::json!({
-                "id": s.id,
-                "date": s.last_timestamp.map(|t| t.to_rfc3339()),
-                "project": s.project_path,
-                "model": s.models_used.first().unwrap_or(&"unknown".to_string()),
-                "messages": s.message_count,
-                "tokens": s.total_tokens,
-                "input_tokens": s.input_tokens,
-                "output_tokens": s.output_tokens,
-                "cache_creation_tokens": s.cache_creation_tokens,
-                "cache_read_tokens": s.cache_read_tokens,
-                "cost": cost,
-                "status": "completed",
-                "first_timestamp": s.first_timestamp.map(|t| t.to_rfc3339()),
-                "duration_seconds": s.duration_seconds,
-                "preview": s.first_user_message,
-            })
-        }).collect::<Vec<_>>()
+        "sessions": sessions,
+        "total": all_sessions.len() as u64,
     }))
+}
+
+/// Sessions handler with pagination and filters
+async fn sessions_handler(
+    Query(params): Query<SessionsQuery>,
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    let mut all_sessions = store.all_sessions();
+
+    // Filter by search
+    if let Some(ref search) = params.search {
+        let search_lower = search.to_lowercase();
+        all_sessions.retain(|s| {
+            s.id.to_lowercase().contains(&search_lower)
+                || s.project_path.to_lowercase().contains(&search_lower)
+                || s.first_user_message
+                    .as_ref()
+                    .map(|m| m.to_lowercase().contains(&search_lower))
+                    .unwrap_or(false)
+        });
+    }
+
+    // Filter by project
+    if let Some(ref project) = params.project {
+        all_sessions.retain(|s| s.project_path.contains(project));
+    }
+
+    // Filter by model
+    if let Some(ref model) = params.model {
+        all_sessions.retain(|s| s.models_used.iter().any(|m| m.contains(model)));
+    }
+
+    // Filter by time range (since)
+    if let Some(ref since) = params.since {
+        if let Some(cutoff) = parse_since(since) {
+            all_sessions.retain(|s| s.last_timestamp.map(|t| t >= cutoff).unwrap_or(false));
+        }
+    }
+
+    // Sort
+    match params.sort.as_str() {
+        "date" => all_sessions.sort_by(|a, b| {
+            if params.order == "asc" {
+                a.last_timestamp.cmp(&b.last_timestamp)
+            } else {
+                b.last_timestamp.cmp(&a.last_timestamp)
+            }
+        }),
+        "tokens" => all_sessions.sort_by(|a, b| {
+            if params.order == "asc" {
+                a.total_tokens.cmp(&b.total_tokens)
+            } else {
+                b.total_tokens.cmp(&a.total_tokens)
+            }
+        }),
+        "cost" => all_sessions.sort_by(|a, b| {
+            let cost_a = calculate_session_cost(
+                a.input_tokens,
+                a.output_tokens,
+                a.cache_creation_tokens,
+                a.cache_read_tokens,
+                &a.models_used,
+            );
+            let cost_b = calculate_session_cost(
+                b.input_tokens,
+                b.output_tokens,
+                b.cache_creation_tokens,
+                b.cache_read_tokens,
+                &b.models_used,
+            );
+            if params.order == "asc" {
+                cost_a
+                    .partial_cmp(&cost_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            } else {
+                cost_b
+                    .partial_cmp(&cost_a)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }
+        }),
+        _ => {} // Keep current order
+    }
+
+    let total = all_sessions.len();
+    let page_size = params.limit.min(100); // Cap at 100
+    let offset = params.page * page_size;
+
+    let sessions: Vec<_> = all_sessions
+        .iter()
+        .skip(offset)
+        .take(page_size)
+        .map(|s| session_to_json(s))
+        .collect();
+
+    axum::Json(serde_json::json!({
+        "sessions": sessions,
+        "total": total as u64,
+        "page": params.page,
+        "page_size": page_size,
+    }))
+}
+
+/// Convert session to JSON (shared helper)
+fn session_to_json(s: &ccboard_core::models::SessionMetadata) -> serde_json::Value {
+    let cost = calculate_session_cost(
+        s.input_tokens,
+        s.output_tokens,
+        s.cache_creation_tokens,
+        s.cache_read_tokens,
+        &s.models_used,
+    );
+
+    serde_json::json!({
+        "id": s.id,
+        "date": s.last_timestamp.map(|t: chrono::DateTime<chrono::Utc>| t.to_rfc3339()),
+        "project": s.project_path,
+        "model": s.models_used.first().unwrap_or(&"unknown".to_string()),
+        "messages": s.message_count,
+        "tokens": s.total_tokens,
+        "input_tokens": s.input_tokens,
+        "output_tokens": s.output_tokens,
+        "cache_creation_tokens": s.cache_creation_tokens,
+        "cache_read_tokens": s.cache_read_tokens,
+        "cost": cost,
+        "status": "completed",
+        "first_timestamp": s.first_timestamp.map(|t: chrono::DateTime<chrono::Utc>| t.to_rfc3339()),
+        "duration_seconds": s.duration_seconds,
+        "preview": s.first_user_message,
+    })
+}
+
+/// Parse "since" parameter (e.g., "7d", "30d", "1h")
+fn parse_since(since: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    let now = chrono::Utc::now();
+    if let Some(days) = since.strip_suffix('d') {
+        if let Ok(d) = days.parse::<i64>() {
+            return Some(now - chrono::Duration::days(d));
+        }
+    }
+    if let Some(hours) = since.strip_suffix('h') {
+        if let Ok(h) = hours.parse::<i64>() {
+            return Some(now - chrono::Duration::hours(h));
+        }
+    }
+    None
 }
 
 /// Calculate rough cost estimate for a session

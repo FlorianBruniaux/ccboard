@@ -20,7 +20,7 @@ pub use header::Header;
 pub use projects_breakdown::ProjectsBreakdown;
 pub use search_bar::SearchBar;
 pub use session_detail_modal::SessionDetailModal;
-pub use session_table::{SessionData, SessionTable, SortColumn, SortDirection};
+pub use session_table::{SessionTable, SortColumn, SortDirection};
 pub use sidebar::Sidebar;
 pub use sparkline::Sparkline;
 pub use stats_card::{CardColor, StatsCard};

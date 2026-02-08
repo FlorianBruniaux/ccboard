@@ -40,6 +40,21 @@
   --error: var(--color-red);
   --info: var(--color-blue);
 
+  /* Accent Aliases (used by charts/components) */
+  --accent-primary: var(--color-cyan);
+  --accent-secondary: var(--color-yellow);
+  --accent-tertiary: var(--color-purple);
+
+  /* Semantic Color Aliases (used by charts) */
+  --color-danger: var(--color-red);
+  --color-info: var(--color-blue);
+  --color-warning: var(--color-yellow);
+
+  /* UI Aliases */
+  --card-bg: var(--bg-surface);
+  --text-md: var(--text-base);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+
   /* ========== TYPOGRAPHY ========== */
 
   /* Font Families */
@@ -237,6 +252,7 @@ body {
   padding: var(--space-lg);
   overflow-y: auto;
   overflow-x: hidden;
+  background-color: var(--bg-primary);
 }
 
 .content-container {
