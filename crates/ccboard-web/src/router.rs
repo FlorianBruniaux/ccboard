@@ -5,7 +5,7 @@ use ccboard_core::DataStore;
 use std::sync::Arc;
 use tower_http::{
     cors::{Any, CorsLayer},
-    services::ServeDir,
+    services::{ServeDir, ServeFile},
 };
 
 use crate::sse;
@@ -18,8 +18,9 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         .allow_headers(Any);
 
     // Serve WASM frontend files (JS, WASM, CSS) from dist/
+    // SPA routing: fallback to index.html for client-side routes
     let dist_dir = ServeDir::new("crates/ccboard-web/dist")
-        .not_found_service(ServeDir::new("crates/ccboard-web/dist/index.html"));
+        .not_found_service(ServeFile::new("crates/ccboard-web/dist/index.html"));
 
     Router::new()
         // API routes (must be before catch-all static files)
