@@ -2,7 +2,7 @@
 
 use crate::components::{SearchBar, SessionData, SessionDetailModal, SessionTable, use_toast};
 use crate::sse_hook::{SseEvent, use_sse};
-use crate::utils::export::{export_as_csv, export_as_json};
+use crate::utils::{export_as_csv, export_as_json};
 use chrono::{DateTime, Duration, Utc};
 use leptos::prelude::*;
 use serde::Deserialize;

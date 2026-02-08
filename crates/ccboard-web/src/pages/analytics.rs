@@ -5,7 +5,7 @@ use crate::components::{
     BudgetStatus, CardColor, ForecastChart, ProjectsBreakdown, StatsCard, use_toast,
 };
 use crate::sse_hook::{SseEvent, use_sse};
-use crate::utils::export::export_as_csv;
+use crate::utils::export_as_csv;
 use leptos::prelude::*;
 
 /// Analytics page
