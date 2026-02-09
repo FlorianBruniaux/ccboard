@@ -415,7 +415,7 @@ fn session_to_json(s: &ccboard_core::models::SessionMetadata) -> serde_json::Val
         "id": s.id,
         "date": s.last_timestamp.map(|t: chrono::DateTime<chrono::Utc>| t.to_rfc3339()),
         "project": s.project_path,
-        "model": s.models_used.first().unwrap_or(&"unknown".to_string()),
+        "model": s.models_used.first().map(|s| s.as_str()).unwrap_or("unknown"),
         "messages": s.message_count,
         "tokens": s.total_tokens,
         "input_tokens": s.input_tokens,

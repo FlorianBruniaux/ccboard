@@ -5,6 +5,7 @@ use crate::components::{CardColor, Sparkline, StatsCard, use_toast};
 use crate::sse_hook::{SseEvent, use_sse};
 use crate::utils::export_as_json;
 use leptos::prelude::*;
+use leptos_router::hooks::use_navigate;
 
 /// Dashboard page - main overview with live stats
 #[component]
@@ -24,6 +25,9 @@ pub fn Dashboard() -> impl IntoView {
 
     // Toast notifications
     let toast = use_toast();
+
+    // Navigation for clickable cards
+    let navigate = use_navigate();
 
     // SSE setup for live updates
     let sse_event = use_sse();
@@ -93,6 +97,14 @@ pub fn Dashboard() -> impl IntoView {
                                 CardColor::Green
                             };
 
+                            // Clone navigate for each closure
+                            let nav1 = navigate.clone();
+                            let nav2 = navigate.clone();
+                            let nav3 = navigate.clone();
+                            let nav4 = navigate.clone();
+                            let nav5 = navigate.clone();
+                            let nav6 = navigate.clone();
+
                             view! {
                                 <div>
                                     <div class="stats-grid">
@@ -101,6 +113,9 @@ pub fn Dashboard() -> impl IntoView {
                                             value=data.total_sessions.to_string()
                                             icon="📊".to_string()
                                             color=CardColor::Default
+                                            on_click=Box::new(move || {
+                                                nav1("/sessions", Default::default());
+                                            })
                                         />
                                         <StatsCard
                                             label="Total Tokens".to_string()
@@ -113,30 +128,45 @@ pub fn Dashboard() -> impl IntoView {
                                             value=format_cost(total_cost)
                                             icon="💰".to_string()
                                             color=cost_color
+                                            on_click=Box::new(move || {
+                                                nav2("/costs", Default::default());
+                                            })
                                         />
                                         <StatsCard
                                             label="Avg Session Cost".to_string()
                                             value=format_cost(avg_cost)
                                             icon="📈".to_string()
                                             color=CardColor::Default
+                                            on_click=Box::new(move || {
+                                                nav3("/analytics", Default::default());
+                                            })
                                         />
                                         <StatsCard
                                             label="This Month Sessions".to_string()
                                             value=this_month.to_string()
                                             icon="📅".to_string()
                                             color=CardColor::Default
+                                            on_click=Box::new(move || {
+                                                nav4("/sessions", Default::default());
+                                            })
                                         />
                                         <StatsCard
                                             label="This Week Tokens".to_string()
                                             value=format_number(this_week)
                                             icon="🔥".to_string()
                                             color=CardColor::Default
+                                            on_click=Box::new(move || {
+                                                nav5("/sessions", Default::default());
+                                            })
                                         />
                                         <StatsCard
                                             label="Total Messages".to_string()
                                             value=format_number(total_messages)
                                             icon="💬".to_string()
                                             color=CardColor::Default
+                                            on_click=Box::new(move || {
+                                                nav6("/sessions", Default::default());
+                                            })
                                         />
                                         <StatsCard
                                             label="Cache Hit Rate".to_string()
@@ -185,13 +215,38 @@ pub fn Dashboard() -> impl IntoView {
                                                                         let tokens = s.tokens;
                                                                         let messages = s.messages;
                                                                         let preview = s.preview.clone().unwrap_or_default();
+                                                                        let cost = s.cost;
+
+                                                                        // Clone for tooltip
+                                                                        let project_tooltip = project.clone();
+                                                                        let preview_tooltip = preview.clone();
+
                                                                         view! {
-                                                                            <tr>
+                                                                            <tr class="session-row">
                                                                                 <td class="session-id">{id}</td>
                                                                                 <td>{project}</td>
                                                                                 <td class="tokens">{format_number(tokens)}</td>
                                                                                 <td>{messages}</td>
                                                                                 <td class="preview">{preview}</td>
+
+                                                                                // Tooltip preview
+                                                                                <div class="session-preview-tooltip">
+                                                                                    <div class="preview-header">
+                                                                                        <strong>"Project: "</strong>
+                                                                                        {project_tooltip}
+                                                                                    </div>
+                                                                                    <div class="preview-stats">
+                                                                                        <span>{format_number(tokens)} " tokens"</span>
+                                                                                        <span>{format_cost(cost)}</span>
+                                                                                        <span>{messages} " messages"</span>
+                                                                                    </div>
+                                                                                    <div class="preview-snippet">
+                                                                                        {preview_tooltip}
+                                                                                    </div>
+                                                                                    <div class="preview-cta">
+                                                                                        "Click for details →"
+                                                                                    </div>
+                                                                                </div>
                                                                             </tr>
                                                                         }
                                                                     }).collect::<Vec<_>>()}
