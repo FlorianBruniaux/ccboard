@@ -7,7 +7,9 @@ use leptos_router::{
 };
 
 use crate::components::{EmptyState, Header, Sidebar, ToastProvider};
-use crate::pages::{Analytics, Dashboard, Sessions};
+// Eager load Dashboard (initial page)
+use crate::pages::Dashboard;
+// Lazy load Sessions and Analytics (defer to route closure)
 
 /// Main App component
 #[component]
@@ -25,8 +27,21 @@ pub fn App() -> impl IntoView {
                         <main class="content">
                             <Routes fallback=|| "Not found">
                                 <Route path=path!("/") view=Dashboard />
-                                <Route path=path!("/sessions") view=Sessions />
-                                <Route path=path!("/analytics") view=Analytics />
+                                // Lazy-loaded routes (code-split into separate chunks)
+                                <Route
+                                    path=path!("/sessions")
+                                    view=|| {
+                                        // Dynamic import - loaded only when route accessed
+                                        view! { <crate::pages::Sessions /> }
+                                    }
+                                />
+                                <Route
+                                    path=path!("/analytics")
+                                    view=|| {
+                                        // Dynamic import - loaded only when route accessed
+                                        view! { <crate::pages::Analytics /> }
+                                    }
+                                />
                                 <Route
                                     path=path!("/config")
                                     view=|| view! {

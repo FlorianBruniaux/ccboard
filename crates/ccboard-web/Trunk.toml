@@ -7,11 +7,12 @@ public_url = "/"
 no_default_features = true
 features = ["hydrate"]
 
-# WASM optimization (reduce bundle size from ~7.5MB to <2MB target)
-# Uses wasm-opt from binaryen toolchain for aggressive compression
+# WASM optimization
+# NOTE: wasm-opt disabled due to bulk-memory validation errors
+# Cargo opt-level="z" + lto="fat" still provide ~30-40% size reduction
+# TODO: Re-enable wasm-opt with proper --enable-bulk-memory config
 [build.wasm-opt]
-optimization_level = "z" # Aggressive size optimization (z > s > 2)
-# Note: This adds ~30s to build time but reduces bundle 60-70%
+skip = true # Explicitly disable wasm-opt
 
 [watch]
 watch = ["src"]
