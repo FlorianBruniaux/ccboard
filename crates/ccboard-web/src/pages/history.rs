@@ -20,7 +20,10 @@ struct SessionsResponse {
 
 /// Fetch sessions for history timeline
 async fn fetch_history(since: String) -> Result<SessionsResponse, String> {
-    let url = format!("{}/api/sessions?page=0&limit=100&since={}&sort=date&order=desc", API_BASE_URL, since);
+    let url = format!(
+        "{}/api/sessions?page=0&limit=100&since={}&sort=date&order=desc",
+        API_BASE_URL, since
+    );
     let response = gloo_net::http::Request::get(&url)
         .send()
         .await

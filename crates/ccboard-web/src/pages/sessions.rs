@@ -23,6 +23,49 @@ struct SessionsResponse {
     page_size: usize,
 }
 
+/// Live session data structure
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LiveSessionData {
+    pid: u32,
+    start_time: String,
+    working_directory: Option<String>,
+    command: String,
+    cpu_percent: f64,
+    memory_mb: u64,
+    tokens: Option<u64>,
+    session_id: Option<String>,
+    session_name: Option<String>,
+}
+
+/// API response for live sessions
+#[derive(Debug, Clone, Deserialize)]
+struct LiveSessionsResponse {
+    sessions: Vec<LiveSessionData>,
+    total: usize,
+}
+
+/// Fetch live sessions from API
+async fn fetch_live_sessions() -> Result<LiveSessionsResponse, String> {
+    let url = format!("{}/api/sessions/live", API_BASE_URL);
+
+    let response = gloo_net::http::Request::get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch live sessions: {}", e))?;
+
+    if !response.ok() {
+        return Err(format!("HTTP error: {}", response.status()));
+    }
+
+    let data: LiveSessionsResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+    Ok(data)
+}
+
 /// Fetch sessions from API with pagination and filters
 async fn fetch_sessions(
     page: usize,
@@ -83,6 +126,13 @@ pub fn Sessions() -> impl IntoView {
 
     // Search triggers immediate refetch (debouncing could be added later with gloo_timers)
     let search_debounced = Signal::derive(move || search.get());
+
+    // Fetch live sessions (with manual refresh)
+    let (live_refresh, set_live_refresh) = signal(0u32);
+    let live_sessions_resource = LocalResource::new(move || {
+        let _ = live_refresh.get(); // Track to trigger refetch
+        async move { fetch_live_sessions().await }
+    });
 
     // Fetch sessions data
     let sessions_resource = LocalResource::new(move || {
@@ -199,6 +249,60 @@ pub fn Sessions() -> impl IntoView {
                     </button>
                 </div>
             </div>
+
+            // Active Sessions Panel
+            <Suspense fallback=move || view! { <div class="loading">"Loading active sessions..."</div> }>
+                {move || {
+                    live_sessions_resource.get().map(|result| {
+                        match result.as_ref() {
+                            Ok(response) if !response.sessions.is_empty() => {
+                                view! {
+                                    <div class="active-sessions-panel">
+                                        <div class="active-sessions-header">
+                                            <h3>"🟢 Active Sessions (" {response.total.to_string()} ")"</h3>
+                                            <button
+                                                class="refresh-button"
+                                                on:click=move |_| set_live_refresh.update(|v| *v += 1)
+                                            >
+                                                "🔄 Refresh"
+                                            </button>
+                                        </div>
+                                        <div class="active-sessions-grid">
+                                            {response.sessions.iter().map(|live| {
+                                                let cpu_color = if live.cpu_percent > 50.0 { "high" } else if live.cpu_percent > 20.0 { "medium" } else { "low" };
+                                                let working_dir = live.working_directory.clone().unwrap_or_else(|| "Unknown".to_string());
+                                                let session_name = live.session_name.clone().unwrap_or_else(|| "Unnamed session".to_string());
+
+                                                view! {
+                                                    <div class="active-session-card">
+                                                        <div class="active-session-name">{session_name}</div>
+                                                        <div class="active-session-dir">{working_dir}</div>
+                                                        <div class="active-session-metrics">
+                                                            <div class=format!("metric cpu-{}", cpu_color)>
+                                                                <span class="metric-label">"CPU:"</span>
+                                                                <span class="metric-value">{format!("{:.1}%", live.cpu_percent)}</span>
+                                                            </div>
+                                                            <div class="metric">
+                                                                <span class="metric-label">"RAM:"</span>
+                                                                <span class="metric-value">{format!("{} MB", live.memory_mb)}</span>
+                                                            </div>
+                                                            <div class="metric">
+                                                                <span class="metric-label">"PID:"</span>
+                                                                <span class="metric-value">{live.pid.to_string()}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            }).collect::<Vec<_>>()}
+                                        </div>
+                                    </div>
+                                }.into_any()
+                            }
+                            _ => view! {}.into_any() // Hide if no active sessions or error
+                        }
+                    })
+                }}
+            </Suspense>
 
             <div class="page-content">
                 // Quick filters (above search)

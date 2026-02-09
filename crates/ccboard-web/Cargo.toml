@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["ssr"]
-ssr = ["leptos/ssr", "leptos_axum", "dep:axum", "dep:tower-http", "dep:tokio", "dep:tokio-stream", "dep:tracing", "dep:ccboard-core", "dep:futures", "dep:anyhow"]
+ssr = ["leptos/ssr", "leptos_axum", "dep:axum", "dep:tower-http", "dep:tokio", "dep:tokio-stream", "dep:tracing", "dep:ccboard-core", "dep:futures", "dep:anyhow", "dep:serde_yaml"]
 hydrate = ["leptos/hydrate"]
 
 [dependencies]
@@ -40,6 +40,7 @@ tokio-stream = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
+serde_yaml = { version = "0.9", optional = true }
 
 # Client-side only (WASM/Hydrate)
 console_error_panic_hook = "0.1"

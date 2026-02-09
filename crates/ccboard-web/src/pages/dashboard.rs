@@ -142,7 +142,7 @@ pub fn Dashboard() -> impl IntoView {
                                             label="Cache Hit Rate".to_string()
                                             value=format!("{:.1}%", cache_hit)
                                             icon="⚡".to_string()
-                                            color=if cache_hit > 90.0 { CardColor::Green } else if cache_hit > 70.0 { CardColor::Yellow } else { CardColor::Red }
+                                            color={if cache_hit > 90.0 { CardColor::Green } else if cache_hit > 70.0 { CardColor::Yellow } else { CardColor::Red }}
                                         />
                                         <StatsCard
                                             label="MCP Servers".to_string()

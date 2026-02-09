@@ -69,8 +69,14 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         // API routes (must be before catch-all static files)
         .route("/api/stats", get(stats_handler))
         .route("/api/sessions/recent", get(recent_sessions_handler)) // Must be before /api/sessions
+        .route("/api/sessions/live", get(live_sessions_handler)) // Live sessions with CPU/RAM
         .route("/api/sessions", get(sessions_handler))
         .route("/api/config/merged", get(config_handler))
+        .route("/api/hooks", get(hooks_handler))
+        .route("/api/mcp", get(mcp_handler))
+        .route("/api/agents", get(agents_handler))
+        .route("/api/commands", get(commands_handler))
+        .route("/api/skills", get(skills_handler))
         .route("/api/health", get(health_handler))
         .route("/api/events", get(sse_handler))
         // Static assets from static/ folder
@@ -165,7 +171,7 @@ async fn stats_handler(
 
     match stats {
         Some(s) => {
-            let mut value = serde_json::to_value(s).unwrap_or(serde_json::Value::Null);
+            let mut value = serde_json::to_value(&s).unwrap_or(serde_json::Value::Null);
 
             // Inject analytics data
             if let Some(obj) = value.as_object_mut() {
@@ -220,7 +226,7 @@ async fn stats_handler(
                 );
 
                 // Add cache hit ratio
-                let cache_hit_ratio = s.cache_hit_ratio();
+                let cache_hit_ratio = s.cache_ratio();
                 obj.insert(
                     "cacheHitRatio".to_string(),
                     serde_json::json!(cache_hit_ratio),
@@ -228,10 +234,7 @@ async fn stats_handler(
 
                 // Add MCP servers count
                 let mcp_count = store.mcp_config().map(|c| c.servers.len()).unwrap_or(0);
-                obj.insert(
-                    "mcpServersCount".to_string(),
-                    serde_json::json!(mcp_count),
-                );
+                obj.insert("mcpServersCount".to_string(), serde_json::json!(mcp_count));
             }
 
             axum::Json(value)
@@ -260,6 +263,42 @@ async fn recent_sessions_handler(
         "sessions": sessions,
         "total": all_sessions.len() as u64,
     }))
+}
+
+/// Live sessions handler - returns active Claude Code processes with CPU/RAM
+async fn live_sessions_handler() -> axum::Json<serde_json::Value> {
+    use ccboard_core::detect_live_sessions;
+
+    match detect_live_sessions() {
+        Ok(live_sessions) => {
+            let sessions: Vec<_> = live_sessions
+                .iter()
+                .map(|ls| {
+                    serde_json::json!({
+                        "pid": ls.pid,
+                        "startTime": ls.start_time.to_rfc3339(),
+                        "workingDirectory": ls.working_directory,
+                        "command": ls.command,
+                        "cpuPercent": ls.cpu_percent,
+                        "memoryMb": ls.memory_mb,
+                        "tokens": ls.tokens,
+                        "sessionId": ls.session_id,
+                        "sessionName": ls.session_name,
+                    })
+                })
+                .collect();
+
+            axum::Json(serde_json::json!({
+                "sessions": sessions,
+                "total": sessions.len(),
+            }))
+        }
+        Err(e) => axum::Json(serde_json::json!({
+            "sessions": [],
+            "total": 0,
+            "error": format!("Failed to detect live sessions: {}", e),
+        })),
+    }
 }
 
 /// Sessions handler with pagination and filters
@@ -464,4 +503,255 @@ async fn sse_handler(
     // Clone EventBus to avoid lifetime issues (it's cheap - Arc internally)
     let event_bus = store.event_bus().clone();
     sse::create_sse_stream(event_bus)
+}
+
+/// Hooks handler - returns all hooks from merged settings
+async fn hooks_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    let settings = store.settings();
+
+    let mut hooks_list = Vec::new();
+
+    if let Some(hooks_map) = &settings.merged.hooks {
+        for (event_name, hook_groups) in hooks_map {
+            for (group_idx, hook_group) in hook_groups.iter().enumerate() {
+                for (hook_idx, hook_def) in hook_group.hooks.iter().enumerate() {
+                    // Generate unique hook name
+                    let hook_name = if hook_groups.len() == 1 && hook_group.hooks.len() == 1 {
+                        event_name.clone()
+                    } else {
+                        format!("{}-{}-{}", event_name, group_idx, hook_idx)
+                    };
+
+                    // Try to read script content if command points to a .sh file
+                    let (script_path, script_content) = if hook_def.command.ends_with(".sh") {
+                        let path = std::path::Path::new(&hook_def.command);
+                        let content = std::fs::read_to_string(path).ok();
+                        (Some(hook_def.command.clone()), content)
+                    } else {
+                        (None, None)
+                    };
+
+                    hooks_list.push(serde_json::json!({
+                        "name": hook_name,
+                        "event": event_name,
+                        "command": hook_def.command,
+                        "description": extract_description(&hook_def.command, script_content.as_deref()),
+                        "async": hook_def.r#async.unwrap_or(false),
+                        "timeout": hook_def.timeout,
+                        "cwd": hook_def.cwd,
+                        "matcher": hook_group.matcher,
+                        "scriptPath": script_path,
+                        "scriptContent": script_content,
+                    }));
+                }
+            }
+        }
+    }
+
+    axum::Json(serde_json::json!({
+        "hooks": hooks_list,
+        "total": hooks_list.len(),
+    }))
+}
+
+/// Extract description from script content (look for # Description: comment)
+fn extract_description(command: &str, script_content: Option<&str>) -> Option<String> {
+    if let Some(content) = script_content {
+        for line in content.lines().take(20) {
+            let trimmed = line.trim();
+            if trimmed.starts_with("# Description:") {
+                return Some(
+                    trimmed
+                        .trim_start_matches("# Description:")
+                        .trim()
+                        .to_string(),
+                );
+            }
+        }
+    }
+
+    // Fallback: use command as description
+    Some(command.to_string())
+}
+
+/// MCP handler - returns MCP server configuration
+async fn mcp_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    match store.mcp_config() {
+        Some(config) => {
+            let mut servers_list = Vec::new();
+
+            for (name, server) in &config.servers {
+                servers_list.push(serde_json::json!({
+                    "name": name,
+                    "command": server.display_command(),
+                    "serverType": if server.is_http() { "http" } else { "stdio" },
+                    "url": server.url,
+                    "args": server.args,
+                    "env": server.env,
+                    "hasEnv": !server.env.is_empty(),
+                }));
+            }
+
+            axum::Json(serde_json::json!({
+                "servers": servers_list,
+                "total": servers_list.len(),
+            }))
+        }
+        None => axum::Json(serde_json::json!({
+            "servers": [],
+            "total": 0,
+        })),
+    }
+}
+
+/// Helper to scan markdown files from a directory
+fn scan_markdown_files(dir_path: &std::path::Path) -> Vec<serde_json::Value> {
+    let mut items = Vec::new();
+
+    if !dir_path.exists() {
+        return items;
+    }
+
+    if let Ok(entries) = std::fs::read_dir(dir_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("md") {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    let (frontmatter, body) = parse_frontmatter(&content);
+                    let name = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+
+                    items.push(serde_json::json!({
+                        "name": name,
+                        "frontmatter": frontmatter,
+                        "body": body,
+                        "path": path.to_string_lossy(),
+                    }));
+                }
+            }
+        }
+    }
+
+    // Sort by name
+    items.sort_by(|a, b| {
+        let a_name = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let b_name = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        a_name.cmp(b_name)
+    });
+
+    items
+}
+
+/// Parse frontmatter (YAML between ---) and body
+fn parse_frontmatter(content: &str) -> (serde_json::Value, String) {
+    let lines: Vec<&str> = content.lines().collect();
+
+    // Check if starts with ---
+    if lines.first() != Some(&"---") {
+        return (serde_json::json!({}), content.to_string());
+    }
+
+    // Find closing ---
+    if let Some(end_idx) = lines[1..].iter().position(|&line| line == "---") {
+        let yaml_lines = &lines[1..=end_idx];
+        let body_lines = &lines[end_idx + 2..];
+
+        let yaml_str = yaml_lines.join("\n");
+        let frontmatter: serde_json::Value =
+            serde_yaml::from_str(&yaml_str).unwrap_or_else(|_| serde_json::json!({}));
+
+        let body = body_lines.join("\n");
+
+        (frontmatter, body)
+    } else {
+        (serde_json::json!({}), content.to_string())
+    }
+}
+
+/// Agents handler - returns agents from ~/.claude/agents/
+async fn agents_handler() -> axum::Json<serde_json::Value> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let agents_dir = std::path::Path::new(&home).join(".claude/agents");
+    let agents = scan_markdown_files(&agents_dir);
+
+    axum::Json(serde_json::json!({
+        "items": agents,
+        "total": agents.len(),
+    }))
+}
+
+/// Commands handler - returns commands from ~/.claude/commands/
+async fn commands_handler() -> axum::Json<serde_json::Value> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let commands_dir = std::path::Path::new(&home).join(".claude/commands");
+    let commands = scan_markdown_files(&commands_dir);
+
+    axum::Json(serde_json::json!({
+        "items": commands,
+        "total": commands.len(),
+    }))
+}
+
+/// Skills handler - returns skills from ~/.claude/skills/ subdirectories
+async fn skills_handler() -> axum::Json<serde_json::Value> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let skills_dir = std::path::Path::new(&home).join(".claude/skills");
+    let skills = scan_skills_recursive(&skills_dir);
+
+    axum::Json(serde_json::json!({
+        "items": skills,
+        "total": skills.len(),
+    }))
+}
+
+/// Helper to scan skills from subdirectories (looks for SKILL.md files)
+fn scan_skills_recursive(dir_path: &std::path::Path) -> Vec<serde_json::Value> {
+    let mut items = Vec::new();
+
+    if !dir_path.exists() {
+        return items;
+    }
+
+    // Scan subdirectories for SKILL.md files
+    if let Ok(entries) = std::fs::read_dir(dir_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let skill_file = path.join("SKILL.md");
+                if skill_file.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&skill_file) {
+                        let (frontmatter, body) = parse_frontmatter(&content);
+                        let name = path
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("unknown")
+                            .to_string();
+
+                        items.push(serde_json::json!({
+                            "name": name,
+                            "frontmatter": frontmatter,
+                            "body": body,
+                            "path": skill_file.to_string_lossy(),
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort by name
+    items.sort_by(|a, b| {
+        let a_name = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let b_name = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        a_name.cmp(b_name)
+    });
+
+    items
 }

@@ -1234,7 +1234,6 @@ impl AnalyticsTab {
 
     /// Render project leaderboard table
     fn render_project_leaderboard(&self, frame: &mut Frame, area: Rect, store: &Arc<DataStore>) {
-
         // Get leaderboard data
         let mut entries = store.projects_leaderboard();
 

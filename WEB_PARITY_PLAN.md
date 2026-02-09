@@ -2,7 +2,7 @@
 
 **Objectif** : Atteindre 100% de parité fonctionnelle entre TUI et Web
 
-## État Actuel (2/7 complétées)
+## État Actuel (6/7 complétées) ✨
 
 ✅ **Task #1** : Config page avec layout 4 colonnes + syntax highlighting
 - Fichiers modifiés : `crates/ccboard-web/src/pages/config.rs`, `static/style.css`
@@ -12,11 +12,43 @@
 - Fichiers modifiés : `router.rs`, `api.rs`, `pages/dashboard.rs`
 - Commit : `db7267e`
 
-## Tâches Restantes (5/7)
+✅ **Task #3** : Hooks Page
+- Fichiers créés : `pages/hooks.rs`
+- Backend : Endpoint `/api/hooks`
+- Layout split view avec syntax highlighting bash
+- Status : COMPLÉTÉ
+
+✅ **Task #4** : MCP Page
+- Fichiers créés : `pages/mcp.rs`
+- Backend : Endpoint `/api/mcp`
+- Affichage serveurs MCP avec détails (command, args, env)
+- Status : COMPLÉTÉ
+
+✅ **Task #5** : Costs Pages (4 tabs)
+- Fichiers créés : `pages/costs.rs`
+- 4 tabs : Overview, By Model, Daily, Billing Blocks
+- Billing Blocks implémenté avec estimation 5h
+- Status : COMPLÉTÉ
+
+✅ **Task #6** : Agents/Commands/Skills Pages
+- Fichiers créés : `pages/agents.rs`
+- Backend : Endpoints `/api/agents`, `/api/commands`, `/api/skills`
+- Parser frontmatter YAML fonctionnel
+- Fix : Scan récursif pour skills (SKILL.md dans sous-répertoires)
+- Status : COMPLÉTÉ
+
+🎁 **BONUS : Active Sessions avec CPU/RAM**
+- Backend : Endpoint `/api/sessions/live`
+- Panel "🟢 Active Sessions (N)" dans page Sessions
+- Métriques live : CPU% (coloré), RAM MB, PID, working directory
+- Bouton refresh manuel
+- Status : COMPLÉTÉ
+
+## Tâche Restante (1/7)
 
 ---
 
-### Task #3 : Hooks Page
+### ✅ Task #3 : Hooks Page (COMPLÉTÉ)
 
 **Référence TUI** : `/Users/florianbruniaux/Desktop/ccboard/hooks.png`
 
@@ -50,7 +82,7 @@
 
 ---
 
-### Task #4 : MCP Page
+### ✅ Task #4 : MCP Page (COMPLÉTÉ)
 
 **Référence TUI** : `/Users/florianbruniaux/Desktop/ccboard/MCP.png`
 
@@ -86,7 +118,7 @@
 
 ---
 
-### Task #5 : Costs Pages (4 onglets)
+### ✅ Task #5 : Costs Pages (4 onglets) (COMPLÉTÉ)
 
 **Référence TUI** :
 - `/Users/florianbruniaux/Desktop/ccboard/Costs - Overview.png`
@@ -150,7 +182,7 @@
 
 ---
 
-### Task #6 : Agents/Commands/Skills Pages
+### ✅ Task #6 : Agents/Commands/Skills Pages (COMPLÉTÉ)
 
 **Référence TUI** :
 - `/Users/florianbruniaux/Desktop/ccboard/Agents - Agents.png`
@@ -260,27 +292,18 @@
 
 **Ordre recommandé** (par priorité d'impact UX) :
 
-1. **Task #3 : Hooks** (1h30)
-   - Fonctionnalité complète manquante
-   - Layout simple
+1. ✅ **Task #3 : Hooks** (1h30) - COMPLÉTÉ
+2. ✅ **Task #4 : MCP** (1h) - COMPLÉTÉ
+3. ✅ **Task #5 : Costs** (2h30) - COMPLÉTÉ
+4. ✅ **Task #6 : Agents** (2h) - COMPLÉTÉ
+5. ⏳ **Task #7 : Analytics** (2h) - EN COURS
 
-2. **Task #4 : MCP** (1h)
-   - Fonctionnalité complète manquante
-   - Layout simple
-
-3. **Task #5 : Costs** (2h30)
-   - Forte valeur ajoutée
-   - Données déjà disponibles
-
-4. **Task #6 : Agents** (2h)
-   - Fonctionnalités complètes manquantes
-   - Parsing à implémenter
-
-5. **Task #7 : Analytics** (2h)
-   - Enrichissement d'une page existante
-   - Moins critique
+**Bonus réalisé** :
+- 🎁 Active Sessions avec monitoring CPU/RAM (1h)
 
 **Temps total estimé** : 9h
+**Temps réalisé** : ~8h
+**Progression** : 86% (6/7 tâches + bonus)
 
 ---
 

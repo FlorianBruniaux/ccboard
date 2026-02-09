@@ -41,8 +41,7 @@ async fn fetch_config() -> Result<MergedConfigResponse, String> {
 
 /// Format JSON with syntax highlighting (simple version with CSS classes)
 fn format_json_highlighted(value: &Value) -> String {
-    serde_json::to_string_pretty(value)
-        .unwrap_or_else(|_| "Error formatting JSON".to_string())
+    serde_json::to_string_pretty(value).unwrap_or_else(|_| "Error formatting JSON".to_string())
 }
 
 /// Config column component

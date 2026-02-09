@@ -49,6 +49,30 @@ pub fn App() -> impl IntoView {
                                     }
                                 />
                                 <Route
+                                    path=path!("/hooks")
+                                    view=|| {
+                                        view! { <crate::pages::Hooks /> }
+                                    }
+                                />
+                                <Route
+                                    path=path!("/mcp")
+                                    view=|| {
+                                        view! { <crate::pages::Mcp /> }
+                                    }
+                                />
+                                <Route
+                                    path=path!("/agents")
+                                    view=|| {
+                                        view! { <crate::pages::Agents /> }
+                                    }
+                                />
+                                <Route
+                                    path=path!("/costs")
+                                    view=|| {
+                                        view! { <crate::pages::Costs /> }
+                                    }
+                                />
+                                <Route
                                     path=path!("/history")
                                     view=|| {
                                         view! { <crate::pages::History /> }
