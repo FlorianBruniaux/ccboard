@@ -8,6 +8,12 @@ use leptos::prelude::*;
 use serde::Deserialize;
 use wasm_bindgen::JsCast;
 
+/// API base URL constant (shared with api.rs)
+#[cfg(debug_assertions)]
+const API_BASE_URL: &str = "http://localhost:8080";
+#[cfg(not(debug_assertions))]
+const API_BASE_URL: &str = "";
+
 /// API response for paginated sessions
 #[derive(Debug, Clone, Deserialize)]
 struct SessionsResponse {
@@ -25,7 +31,7 @@ async fn fetch_sessions(
     model: Option<String>,
     date_filter: Option<String>,
 ) -> Result<SessionsResponse, String> {
-    let mut url = format!("/api/sessions?page={}&limit=50", page);
+    let mut url = format!("{}/api/sessions?page={}&limit=50", API_BASE_URL, page);
 
     if !search.is_empty() {
         // Simple URL encoding: replace spaces with %20

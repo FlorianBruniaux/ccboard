@@ -4,6 +4,15 @@ use gloo_net::http::Request;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// API base URL - points to Axum backend
+/// In dev: Trunk (3333) → Axum (8080)
+/// In prod: Same origin (integrated server)
+#[cfg(debug_assertions)]
+const API_BASE_URL: &str = "http://localhost:8080";
+
+#[cfg(not(debug_assertions))]
+const API_BASE_URL: &str = "";
+
 /// Stats data structure matching backend API response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -185,7 +194,8 @@ pub struct RecentSessionsResponse {
 
 /// Fetch stats from API
 pub async fn fetch_stats() -> Result<StatsData, String> {
-    let response = Request::get("/api/stats")
+    let url = format!("{}/api/stats", API_BASE_URL);
+    let response = Request::get(&url)
         .send()
         .await
         .map_err(|e| format!("Network error: {}", e))?;
@@ -204,7 +214,7 @@ pub async fn fetch_stats() -> Result<StatsData, String> {
 
 /// Fetch recent sessions from API (for dashboard)
 pub async fn fetch_recent_sessions(limit: u32) -> Result<RecentSessionsResponse, String> {
-    let url = format!("/api/sessions/recent?limit={}", limit);
+    let url = format!("{}/api/sessions/recent?limit={}", API_BASE_URL, limit);
     let response = Request::get(&url)
         .send()
         .await
