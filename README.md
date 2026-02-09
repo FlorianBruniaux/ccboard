@@ -776,13 +776,14 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ✅ **Phase C (Config TUI)**: Config tab with merge visualization, setting overrides
 - ✅ **Phase H-A (Hooks & Agents TUI)**: Hooks tab (list + detail), Agents/Capabilities tab
 - ✅ **Phase E (Economics TUI)**: Costs tab, History tab with SQLite-backed timelines
+- ✅ **Phase G (Leptos Frontend)**: Full Web UI with 100% TUI/Web parity (9 pages)
 - ✅ **Phase 0-3**: Profiling, security hardening, SQLite cache (89x speedup), UI/UX quick wins
 
 **Total**: 156 tests passing, 0 clippy warnings
 
-### In Progress 🚧
+### Recently Completed ✅
 
-**Phase G (Leptos Frontend)** - 86% Complete (2h remaining) 🚀
+**Phase G (Leptos Frontend)** - 100% Complete 🎉
 - ✅ Dashboard with KPIs and 30-day forecast
 - ✅ Sessions with **live CPU/RAM monitoring** (bonus feature)
 - ✅ Config with 4-column diff view
@@ -791,7 +792,11 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ✅ Agents/Commands/Skills with frontmatter parsing
 - ✅ Costs with 4 tabs (Overview, By Model, Daily, Billing Blocks)
 - ✅ History with search and filters
-- 🔄 Analytics: Overview done, remaining sub-views (Trends, Patterns, Insights)
+- ✅ Analytics with 4 tabs (Overview, Trends, Patterns, Insights)
+
+**Full TUI/Web parity achieved** 🎯
+
+### In Progress 🚧
 
 **Phase A (Analytics TUI)** - Completion (2-4h remaining)
 - 🔄 A.1-A.4: Project leaderboard, session replay, trend forecasting, anomaly detection
