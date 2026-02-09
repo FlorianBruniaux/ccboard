@@ -1284,6 +1284,64 @@ pre code {
   box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
+/* Quick Filters */
+.quick-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  flex-wrap: wrap;
+}
+
+.quick-filters-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.quick-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.quick-filter-btn:hover {
+  background-color: var(--hover-bg);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.quick-filter-btn.active {
+  background-color: var(--active-bg);
+  border-color: var(--active-border);
+  color: var(--accent-primary);
+}
+
+.quick-filter-btn.clear-btn {
+  background-color: transparent;
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.quick-filter-btn.clear-btn:hover {
+  background-color: rgba(244, 67, 54, 0.1);
+  border-color: var(--error);
+}
+
 .filter-group {
   display: flex;
   flex-wrap: wrap;

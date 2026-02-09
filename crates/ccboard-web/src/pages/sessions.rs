@@ -71,6 +71,10 @@ pub fn Sessions() -> impl IntoView {
     let (date_filter, set_date_filter) = signal(None::<String>);
     let (current_page, set_current_page) = signal(0usize);
 
+    // Quick filters state (client-side filtering)
+    let (cost_filter, set_cost_filter) = signal(None::<f64>); // Min cost threshold
+    let (tokens_filter, set_tokens_filter) = signal(None::<u64>); // Min tokens threshold
+
     // Search triggers immediate refetch (debouncing could be added later with gloo_timers)
     let search_debounced = Signal::derive(move || search.get());
 
@@ -191,6 +195,75 @@ pub fn Sessions() -> impl IntoView {
             </div>
 
             <div class="page-content">
+                // Quick filters (above search)
+                <div class="quick-filters">
+                    <span class="quick-filters-label">"Quick filters:"</span>
+                    <button
+                        class="quick-filter-btn"
+                        class:active=move || cost_filter.get() == Some(5.0)
+                        on:click=move |_| {
+                            if cost_filter.get() == Some(5.0) {
+                                set_cost_filter.set(None);
+                            } else {
+                                set_cost_filter.set(Some(5.0));
+                                set_tokens_filter.set(None); // Clear other filter
+                            }
+                            set_current_page.set(0);
+                        }
+                    >
+                        "💰 High Cost >$5"
+                    </button>
+                    <button
+                        class="quick-filter-btn"
+                        class:active=move || tokens_filter.get() == Some(10_000_000)
+                        on:click=move |_| {
+                            if tokens_filter.get() == Some(10_000_000) {
+                                set_tokens_filter.set(None);
+                            } else {
+                                set_tokens_filter.set(Some(10_000_000));
+                                set_cost_filter.set(None); // Clear other filter
+                            }
+                            set_current_page.set(0);
+                        }
+                    >
+                        "🔥 High Tokens >10M"
+                    </button>
+                    <button
+                        class="quick-filter-btn"
+                        class:active=move || date_filter.get() == Some("7d".to_string())
+                        on:click=move |_| {
+                            if date_filter.get() == Some("7d".to_string()) {
+                                set_date_filter.set(None);
+                            } else {
+                                set_date_filter.set(Some("7d".to_string()));
+                            }
+                            set_current_page.set(0);
+                        }
+                    >
+                        "📅 Last 7 Days"
+                    </button>
+                    {move || {
+                        // Show clear filters if any quick filter active
+                        if cost_filter.get().is_some() || tokens_filter.get().is_some() || date_filter.get().is_some() {
+                            view! {
+                                <button
+                                    class="quick-filter-btn clear-btn"
+                                    on:click=move |_| {
+                                        set_cost_filter.set(None);
+                                        set_tokens_filter.set(None);
+                                        set_date_filter.set(None);
+                                        set_current_page.set(0);
+                                    }
+                                >
+                                    "✕ Clear Filters"
+                                </button>
+                            }.into_any()
+                        } else {
+                            view! {}.into_any()
+                        }
+                    }}
+                </div>
+
                 // Search bar (simple input)
                 <div class="search-bar">
                     <input
@@ -271,13 +344,25 @@ pub fn Sessions() -> impl IntoView {
                     {move || {
                         sessions_resource.get().map(|result| match result.as_ref() {
                             Ok(response) => {
-                                let sessions = response.sessions.clone();
+                                // Apply client-side filters (cost, tokens)
+                                let mut sessions = response.sessions.clone();
+
+                                // Filter by cost if set
+                                if let Some(min_cost) = cost_filter.get() {
+                                    sessions.retain(|s| s.cost >= min_cost);
+                                }
+
+                                // Filter by tokens if set
+                                if let Some(min_tokens) = tokens_filter.get() {
+                                    sessions.retain(|s| s.tokens >= min_tokens);
+                                }
+
                                 let total = response.total;
                                 let page = response.page;
                                 let page_size = response.page_size;
                                 let total_pages = (total as f64 / page_size as f64).ceil() as usize;
 
-                                // Store count before move
+                                // Store count AFTER filtering
                                 let sessions_count = sessions.len();
 
                                 // Create signals for SessionTable
