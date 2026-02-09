@@ -4,7 +4,7 @@ use crate::api::format_number;
 use leptos::prelude::*;
 
 const CHART_WIDTH: f64 = 800.0;
-const CHART_HEIGHT: f64 = 300.0;
+const CHART_HEIGHT: f64 = 150.0;
 const MARGIN_TOP: f64 = 40.0;
 const MARGIN_BOTTOM: f64 = 60.0;
 const MARGIN_LEFT: f64 = 60.0;
