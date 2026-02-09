@@ -7,6 +7,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-02-09
+
+### Added - Sprint 1 UX/UI Improvements
+
+#### Visual Design System (60% visual improvement achieved)
+- **Elevation system**: 4-level shadows with glow effects
+  - `--elevation-1` through `--elevation-4` tokens
+  - `--glow-cyan` and `--glow-blue` for accent elements
+  - Depth perception and visual hierarchy
+- **Hero typography**: Extended font scale for impactful KPI numbers
+  - `--text-4xl` (48px) for dashboard statistics
+  - `--font-extrabold` (800) for emphasis
+  - Gradient text effects on primary numbers
+- **Improved contrast**: +16 luminosity boost for better readability
+  - `--text-primary`: #f0f0f0 (was #e0e0e0)
+  - `--text-secondary`: #b0b0b0 (was #a0a0a0)
+  - `--text-muted`: #707070 (was #606060)
+  - Better WCAG 2.1 compliance
+- **Table spacing**: Breathing room for better scannability
+  - Padding: 8px → 16px per cell
+  - Zebra striping for row distinction
+  - Hover states with cyan accent border
+- **Border radius system**: Semantic radius values
+  - `--radius-button`: 6px
+  - `--radius-card`: 10px
+  - `--radius-modal`: 12px
+  - Consistent modern look
+
+#### Config Page Enhancements
+- **Real-time search**: Filter JSON config with live highlighting
+  - Highlights matches with yellow background
+  - Case-insensitive search
+  - Search results counter
+- **Copy buttons**: One-click JSON copy to clipboard
+  - Per-column copy functionality
+  - Visual feedback on hover
+- **Fullscreen modal**: View config without horizontal scrolling
+  - Glassmorphism backdrop with blur effect
+  - Expand button (📖) next to copy button
+  - Scrollable JSON content
+  - Click outside to close
+- **Diff mode toggle**: Show only overridden settings (planned)
+
+#### Dashboard Interactive Features
+- **Clickable KPI cards**: Navigate directly from metrics
+  - Total Sessions → Sessions page
+  - Total Messages → Sessions page filtered
+  - Click hint: "Click to explore →"
+- **Session preview tooltips**: Hover to see session details
+  - Project path
+  - Token stats (input/output)
+  - First message snippet
+  - Instant preview without modal
+  - Glassmorphism styling
+
+#### Design Tokens & CSS Architecture
+- **Gradients**: Vertical gradients for depth
+  - `--gradient-cyan`, `--gradient-blue`, `--gradient-purple`
+  - Chart area fill gradients
+  - Surface gradients for cards
+- **Opacity scale**: Systematic transparency values
+  - `--opacity-5` through `--opacity-80`
+  - Consistent layering system
+- **400+ lines of new CSS**: Comprehensive design system
+  - Component-specific styles
+  - Responsive patterns
+  - Animation utilities
+
+### Fixed
+
+- **Cost calculation**: Recalculate costs after loading stats
+  - Cost analysis was showing $0.00 for all models
+  - Added `recalculate_costs()` method to `StatsCache`
+  - Applies accurate Anthropic pricing (Opus $15/M, Sonnet $3/M, Haiku $1/M)
+  - Calculates cache read/write costs correctly
+- **Model display**: Fixed "model unknown" in history page
+  - Line 418 in `router.rs` had incorrect String reference
+  - Changed `.unwrap_or(&"unknown".to_string())` to `.map(|s| s.as_str()).unwrap_or("unknown")`
+  - Proper Option<&String> → &str conversion
+
+### Changed
+
+- **Stats card component**: Added `on_click` handler support
+  - Optional click handler parameter
+  - Hover states with transform
+  - Action hint display
+- **Dashboard layout**: Enhanced with navigation callbacks
+  - Uses `leptos_router::hooks::use_navigate`
+  - Cloned navigate for each closure to avoid move issues
+
+### Technical
+
+- **Files modified**: 7 files, 714 additions, 49 deletions
+  - `crates/ccboard-core/src/models/stats.rs`: Add recalculate_costs()
+  - `crates/ccboard-core/src/store.rs`: Call cost recalculation
+  - `crates/ccboard-web/src/components/stats_card.rs`: Add on_click
+  - `crates/ccboard-web/src/pages/config.rs`: Search + modal
+  - `crates/ccboard-web/src/pages/dashboard.rs`: Navigation + tooltips
+  - `crates/ccboard-web/src/router.rs`: Fix model field bug
+  - `crates/ccboard-web/static/style.css`: Design system expansion
+- **Merge commit**: feat/web-w1-leptos-spa → main (15,026 additions total)
+
 ## [0.4.0] - 2026-02-06
 
 ### Added - Quick Wins from Usage Report (QW5-7)

@@ -2,6 +2,49 @@
 
 **Objectif** : Atteindre 100% de parité fonctionnelle entre TUI et Web
 
+## 🎨 Sprint 1: UX/UI Improvements (v0.5.0) - COMPLÉTÉ
+
+### Objectif
+Améliorer l'expérience utilisateur et le design visuel pour atteindre un niveau professionnel (Vercel/Linear).
+
+### Réalisations (2026-02-09)
+
+#### Visual Quick Wins (60% amélioration visuelle)
+- ✅ **Elevation system**: 4 niveaux d'ombres + glow effects
+- ✅ **Hero typography**: 48px KPI numbers avec gradient text
+- ✅ **Contraste amélioré**: +16 luminosité pour WCAG 2.1
+- ✅ **Table spacing**: 8px → 16px padding, zebra striping
+- ✅ **Border radius**: Système sémantique cohérent
+
+#### UX Priority Features
+- ✅ **Config Search**: Recherche temps réel avec highlighting
+  - Highlighting jaune des matches
+  - Compteur de résultats
+  - Copy buttons par colonne
+- ✅ **Dashboard Quick Actions**: Cartes KPI cliquables
+  - Navigation directe vers Sessions
+  - Tooltips de preview au hover
+  - Action hints ("Click to explore →")
+- ✅ **Config Modal**: Vue fullscreen pour JSON
+  - Bouton expand (📖)
+  - Glassmorphism backdrop
+  - Scrollable content
+  - Click outside to close
+
+#### Bug Fixes
+- ✅ Fix "model unknown" dans history page
+- ✅ Fix cost analysis montrant $0.00
+  - Implémentation recalculate_costs()
+  - Pricing Anthropic accurate
+
+### Métriques
+- **Fichiers modifiés**: 7 files, 714 additions
+- **Design tokens**: 400+ lignes CSS ajoutées
+- **Commit**: `c4162ce` (feat/web-w1-leptos-spa)
+- **Release**: v0.5.0 (2026-02-09)
+
+---
+
 ## État Actuel (7/7 complétées) ✨ 🎉 100%
 
 ✅ **Task #1** : Config page avec layout 4 colonnes + syntax highlighting
