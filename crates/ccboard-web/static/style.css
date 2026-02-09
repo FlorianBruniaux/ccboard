@@ -2396,3 +2396,153 @@ pre code {
 .error-message strong {
   font-weight: var(--font-semibold);
 }
+
+/* ========================================
+   CONFIG PAGE - 4 COLUMN LAYOUT
+   ======================================== */
+
+.config-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  flex: 1;
+  overflow: hidden;
+}
+
+.config-column {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.config-column-header {
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+}
+
+.config-column-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  margin: 0 0 var(--space-sm) 0;
+  color: var(--text-primary);
+}
+
+.config-badge {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.badge-global {
+  background: rgba(33, 150, 243, 0.15);
+  color: var(--color-blue);
+  border: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.badge-project {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--color-green);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.badge-local {
+  background: rgba(255, 193, 7, 0.15);
+  color: var(--color-yellow);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.badge-merged {
+  background: rgba(0, 188, 212, 0.15);
+  color: var(--color-cyan);
+  border: 1px solid rgba(0, 188, 212, 0.3);
+}
+
+.config-file-path {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.config-column-body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-md);
+}
+
+.config-json-highlighted {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  padding: var(--space-md);
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.config-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+}
+
+.config-empty-text {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-style: italic;
+}
+
+.config-help {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: var(--space-lg);
+}
+
+.config-help h3 {
+  margin: 0 0 var(--space-sm) 0;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.config-help p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.config-help strong {
+  color: var(--text-primary);
+  font-weight: var(--font-semibold);
+}
+
+/* Responsive: stack columns on smaller screens */
+@media (max-width: 1400px) {
+  .config-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .config-grid {
+    grid-template-columns: 1fr;
+  }
+}
