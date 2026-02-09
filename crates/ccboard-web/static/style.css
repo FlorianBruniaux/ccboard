@@ -3761,11 +3761,12 @@ pre code {
 }
 
 .trends-chart__grid {
-  display: grid;
-  grid-template-columns: repeat(30, 1fr);
+  display: flex;
   gap: 0.5rem;
-  min-height: 250px;
-  align-items: end;
+  height: 350px;
+  align-items: flex-end;
+  padding-bottom: 40px;
+  position: relative;
 }
 
 .trends-chart__day {
@@ -3773,17 +3774,21 @@ pre code {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
-  min-width: 30px;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 25px;
+  height: 100%;
 }
 
 .trends-chart__bar {
-  position: relative;
-  width: 100%;
+  position: absolute;
+  bottom: 35px;
+  left: 0;
+  right: 0;
   background: linear-gradient(to top, rgba(33, 150, 243, 0.8), rgba(33, 150, 243, 0.6));
   border-radius: 4px 4px 0 0;
-  min-height: 5px;
   transition: all 0.3s ease;
+  z-index: 2;
 }
 
 .trends-chart__bar:hover {
@@ -3795,11 +3800,12 @@ pre code {
   top: -20px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.2s ease;
+  pointer-events: none;
 }
 
 .trends-chart__bar:hover .trends-chart__value {
@@ -3808,20 +3814,24 @@ pre code {
 
 .trends-chart__trend {
   position: absolute;
-  bottom: 0;
-  width: 100%;
-  background: rgba(255, 193, 7, 0.3);
-  border: 2px solid rgba(255, 193, 7, 0.8);
-  border-radius: 4px 4px 0 0;
-  min-height: 3px;
+  bottom: 35px;
+  left: 0;
+  right: 0;
+  background: rgba(255, 193, 7, 0.2);
+  border-top: 3px solid rgba(255, 193, 7, 0.9);
+  border-radius: 2px 2px 0 0;
+  z-index: 1;
 }
 
 .trends-chart__label {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  transform: rotate(-45deg);
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) rotate(-45deg);
   transform-origin: center;
-  margin-top: 0.5rem;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .trends-legend {
@@ -4110,11 +4120,16 @@ pre code {
 
   .trends-chart__grid {
     gap: 0.25rem;
-    min-height: 200px;
+    height: 280px;
+    padding-bottom: 35px;
   }
 
   .trends-chart__day {
-    min-width: 20px;
+    min-width: 18px;
+  }
+
+  .trends-chart__label {
+    font-size: 0.6rem;
   }
 
   .patterns-grid {
