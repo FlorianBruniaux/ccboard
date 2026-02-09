@@ -85,9 +85,9 @@ arboard = "3"
 comfy-table = "7"
 
 # Internal crates
-ccboard-core = { version = "0.4.0", path = "crates/ccboard-core" }
-ccboard-tui = { version = "0.4.0", path = "crates/ccboard-tui" }
-ccboard-web = { version = "0.4.0", path = "crates/ccboard-web" }
+ccboard-core = { version = "0.5.0", path = "crates/ccboard-core" }
+ccboard-tui = { version = "0.5.0", path = "crates/ccboard-tui" }
+ccboard-web = { version = "0.5.0", path = "crates/ccboard-web" }
 
 [profile.release]
 opt-level = "z" # Optimize for size (critical for WASM bundle)

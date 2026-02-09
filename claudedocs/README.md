@@ -1,90 +1,41 @@
-# ccboard Documentation Index
+# ccboard Documentation
 
-Documentation générée par Claude pour référence future et onboarding.
+This directory contains active documentation for ccboard development and design decisions.
 
----
+## Active Documentation
 
-## xlaude Repository Analysis
+**Architecture & Development**
+- [PLAN.md](PLAN.md) - Complete architecture phases and development history
+- [ROADMAP.md](ROADMAP.md) - Future features and planned improvements
 
-**Date**: 2026-02-06
+**Performance & Benchmarks**
+- [performance-benchmark.md](performance-benchmark.md) - v0.4.0 optimization results (SQLite cache, Arc migration)
+- [competitive-benchmark-2026-02-04.md](competitive-benchmark-2026-02-04.md) - Market positioning and competitive analysis
 
-Analyse complète du repository xlaude (171 ⭐) pour insights architecturaux ccboard.
+**Design Learnings (xlaude Analysis)**
+- [xlaude-analysis.md](xlaude-analysis.md) - Deep dive into xlaude TUI design patterns
+- [xlaude-vs-ccboard-comparison.md](xlaude-vs-ccboard-comparison.md) - Feature comparison and differentiation
+- [xlaude-actionable-insights.md](xlaude-actionable-insights.md) - Actionable design insights for ccboard
 
-### Documents
+## Archives
 
-1. **[xlaude-analysis.md](./xlaude-analysis.md)** (24KB)
-   - Deep dive technique complet
-   - Architecture patterns, code analysis, comparaisons
-   - Performance benchmarks, trade-offs détaillés
-   - **Audience**: Développeurs cherchant understanding approfondi
+**archive/** - Pre-v0.4.0 development artifacts and historical documentation
 
-2. **[xlaude-actionable-insights.md](./xlaude-actionable-insights.md)** (10KB)
-   - 5 insights concrets avec code snippets
-   - Priorités d'implémentation (Phase 1-5)
-   - Quick reference pour développement
-   - **Audience**: Implémenteurs cherchant actions immédiates
+**archive-v05/** - Phase G (Web UI) development artifacts
+- `web-phases/` - Wave 1-7 implementation plans and web architecture analysis
+- `planning/` - Action plans and testing strategies
+- `sessions/` - Status reports and completion summaries
 
-3. **[xlaude-vs-ccboard-comparison.md](./xlaude-vs-ccboard-comparison.md)** (12KB)
-   - Comparaison architecturale side-by-side
-   - Technology stack, patterns, trade-offs
-   - Matrice de recommandations
-   - **Audience**: Decision-makers et architects
+## Usage
 
-### Quick Navigation
+For project-wide documentation, see:
+- [../README.md](../README.md) - Main project README
+- [../CLAUDE.md](../CLAUDE.md) - Claude Code instructions
+- [../ARCHITECTURE.md](../ARCHITECTURE.md) - Technical architecture overview
+- [../CHANGELOG.md](../CHANGELOG.md) - Version history
 
-**Besoin d'overview rapide ?**
-→ Lire [xlaude-actionable-insights.md](./xlaude-actionable-insights.md) (15 min)
+## Notes
 
-**Besoin de comparaison détaillée ?**
-→ Lire [xlaude-vs-ccboard-comparison.md](./xlaude-vs-ccboard-comparison.md) (20 min)
-
-**Besoin d'analyse complète ?**
-→ Lire [xlaude-analysis.md](./xlaude-analysis.md) (45 min)
-
-### Key Takeaways
-
-1. **BIP39 Session Names** (Phase 3, 2h effort)
-   - Replace UUID avec noms human-readable
-   - `ea23759... → "mountain-river-forest"`
-
-2. **Environment Variables** (Phase 2, 1h effort)
-   - `CCBOARD_NON_INTERACTIVE=1` pour CI/CD
-   - `CCBOARD_CLAUDE_HOME=/path` pour testing
-
-3. **Message Filtering** (Phase 2, 30min effort)
-   - Filter out system messages pour cleaner previews
-   - Reuse xlaude filter logic
-
-4. **xlaude State Integration** (Phase 4, 3h effort)
-   - Parse `~/.config/xlaude/state.json`
-   - Display branch associations in Sessions tab
-
-5. **Performance Validation** ✅
-   - ccboard lazy loading déjà correct
-   - Avoid xlaude's full-parse anti-pattern
-
-### Repository
-
-- **URL**: https://github.com/Xuanwo/xlaude
-- **Stars**: 171 ⭐
-- **License**: Apache-2.0
-- **Language**: Rust (4500 lines)
-- **Created**: 2025-08-04
-- **Last push**: 2025-11-17
-
----
-
-## Future Documentation
-
-- [ ] Phase I completion report
-- [ ] Phase II implementation guide
-- [ ] TUI architecture deep dive
-- [ ] Web frontend design decisions
-- [ ] Performance benchmarks (1000+ sessions)
-- [ ] Integration guide (xlaude + ccboard)
-
----
-
-**Maintained by**: Claude Sonnet 4.5
-**Project**: ccboard (unified Claude Code dashboard)
-**Last updated**: 2026-02-06
+- Active documentation files are referenced by CLAUDE.md and should not be moved without updating references
+- Archives preserve historical context and design decisions for future reference
+- Phase-specific artifacts are archived after completion (e.g., archive-v05/ for Phase G)

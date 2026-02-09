@@ -1,7 +1,7 @@
 //! Config page - displays Claude Code settings in 4-column layout (Global | Project | Local | Merged)
 
-use leptos::prelude::*;
 use leptos::ev;
+use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
