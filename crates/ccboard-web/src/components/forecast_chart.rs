@@ -4,10 +4,10 @@ use crate::api::format_number;
 use leptos::prelude::*;
 
 const CHART_WIDTH: f64 = 800.0;
-const CHART_HEIGHT: f64 = 150.0;
-const MARGIN_TOP: f64 = 40.0;
-const MARGIN_BOTTOM: f64 = 60.0;
-const MARGIN_LEFT: f64 = 60.0;
+const CHART_HEIGHT: f64 = 250.0;
+const MARGIN_TOP: f64 = 50.0;
+const MARGIN_BOTTOM: f64 = 50.0;
+const MARGIN_LEFT: f64 = 70.0;
 const MARGIN_RIGHT: f64 = 40.0;
 
 /// Forecast chart props
@@ -83,10 +83,10 @@ pub fn ForecastChart(
     // Budget line (horizontal red dashed)
     let budget_y = budget.map(|b| y_scale(b));
 
-    // Y-axis labels (5 ticks)
-    let y_ticks: Vec<_> = (0..=4)
+    // Y-axis labels (4 ticks)
+    let y_ticks: Vec<_> = (0..=3)
         .map(|i| {
-            let value = min_value + (max_value - min_value) * i / 4;
+            let value = min_value + (max_value - min_value) * i / 3;
             let y = y_scale(value);
             (y, format_number(value))
         })
@@ -239,7 +239,7 @@ pub fn ForecastChart(
                     }}
 
                     // Legend
-                    <g transform="translate(80, 20)">
+                    <g transform="translate(100, 25)">
                         <rect x="0" y="0" width="20" height="3" fill="var(--accent-primary)" />
                         <text x="25" y="5" fill="var(--text-secondary)" font-size="12">"Historical"</text>
 
