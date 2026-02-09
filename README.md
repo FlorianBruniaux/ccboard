@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-156_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-234_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
   <img src="https://img.shields.io/badge/Clippy-0_warnings-success?style=for-the-badge&logo=rust" alt="Clippy"/>
   <img src="https://img.shields.io/badge/Binary-5.8MB-blue?style=for-the-badge" alt="Binary Size"/>
   <img src="https://img.shields.io/badge/Cache_Speedup-89x-orange?style=for-the-badge&logo=sqlite" alt="Speedup"/>
@@ -22,7 +22,7 @@
   <a href="#installation"><img src="https://img.shields.io/badge/platform-macOS_|_Linux_|_Windows-lightgrey?style=flat-square" alt="Platform"/></a>
 </p>
 
-> **The only actively-maintained Rust TUI** combining Claude Code monitoring, config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 156 tests, 0 clippy warnings.
+> **The only actively-maintained Rust TUI** combining Claude Code monitoring, config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 234 tests, 0 clippy warnings.
 
 ---
 
@@ -34,7 +34,7 @@
 | **Language** | Rust 1.85+ |
 | **Binary Size** | 5.8MB (release) |
 | **Startup Time** | <300ms (warm cache) |
-| **Tests** | 156 passing |
+| **Tests** | 234 passing |
 | **Clippy** | 0 warnings |
 | **Tabs** | 9 (TUI) + Web API |
 | **Cache Speedup** | 89x (20s → 224ms) |
