@@ -1235,6 +1235,22 @@ pre code {
   color: var(--text-secondary);
 }
 
+/* Cost Color Coding */
+.cost-high {
+  color: var(--color-red);
+  font-weight: var(--font-semibold);
+}
+
+.cost-medium {
+  color: var(--color-yellow);
+  font-weight: var(--font-semibold);
+}
+
+.cost-low {
+  color: var(--color-green);
+  font-weight: var(--font-medium);
+}
+
 /* Loading and Error States */
 .loading {
   text-align: center;

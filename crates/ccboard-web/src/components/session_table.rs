@@ -21,6 +21,17 @@ pub enum SortDirection {
     Desc,
 }
 
+/// Get CSS class for cost cell based on threshold
+fn cost_color_class(cost: f64) -> &'static str {
+    if cost >= 10.0 {
+        "cost-high" // Red
+    } else if cost >= 1.0 {
+        "cost-medium" // Yellow
+    } else {
+        "cost-low" // Green
+    }
+}
+
 /// Session table component
 #[component]
 pub fn SessionTable(
@@ -202,7 +213,9 @@ pub fn SessionTable(
                                                 <td>{format_model(&session.model)}</td>
                                                 <td>{session.messages.to_string()}</td>
                                                 <td>{format_tokens(session.tokens)}</td>
-                                                <td>{format!("${:.4}", session.cost)}</td>
+                                                <td class={cost_color_class(session.cost)}>
+                                                    {format!("${:.4}", session.cost)}
+                                                </td>
                                                 <td>
                                                     <span class="badge badge-success">
                                                         {session.status.clone()}
