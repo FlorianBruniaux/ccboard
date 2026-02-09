@@ -1,6 +1,7 @@
 //! Leptos UI components
 
 mod budget_status;
+mod empty_state;
 mod error_boundary;
 mod forecast_chart;
 mod header;
@@ -14,6 +15,7 @@ mod stats_card;
 mod toast;
 
 pub use budget_status::BudgetStatus;
+pub use empty_state::EmptyState;
 pub use error_boundary::{ErrorBoundary, ErrorFallback};
 pub use forecast_chart::ForecastChart;
 pub use header::Header;

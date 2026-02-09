@@ -6,7 +6,7 @@ use leptos_router::{
     path,
 };
 
-use crate::components::{Header, Sidebar, ToastProvider};
+use crate::components::{EmptyState, Header, Sidebar, ToastProvider};
 use crate::pages::{Analytics, Dashboard, Sessions};
 
 /// Main App component
@@ -27,8 +27,28 @@ pub fn App() -> impl IntoView {
                                 <Route path=path!("/") view=Dashboard />
                                 <Route path=path!("/sessions") view=Sessions />
                                 <Route path=path!("/analytics") view=Analytics />
-                                <Route path=path!("/config") view=|| view! { <div class="page-stub">"Config - Coming Soon"</div> } />
-                                <Route path=path!("/history") view=|| view! { <div class="page-stub">"History - Coming Soon"</div> } />
+                                <Route
+                                    path=path!("/config")
+                                    view=|| view! {
+                                        <EmptyState
+                                            title="Config"
+                                            description="Configuration management interface is under development. View and edit Claude Code settings across global, project, and local levels with merge visualization."
+                                            workaround="Edit ~/.claude/settings.json directly"
+                                            timeline="Q2 2026"
+                                        />
+                                    }
+                                />
+                                <Route
+                                    path=path!("/history")
+                                    view=|| view! {
+                                        <EmptyState
+                                            title="History"
+                                            description="Session history timeline with filters and search. Track your Claude Code usage patterns over time with detailed analytics."
+                                            workaround="Use Sessions Explorer with date filters"
+                                            timeline="Q2 2026"
+                                        />
+                                    }
+                                />
                             </Routes>
                         </main>
                     </div>

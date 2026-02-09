@@ -657,7 +657,7 @@ pre code {
   }
 }
 
-/* Page Stubs (for incomplete pages) */
+/* Page Stubs (for incomplete pages) - DEPRECATED, use empty-state instead */
 .page-stub {
   display: flex;
   align-items: center;
@@ -665,6 +665,88 @@ pre code {
   min-height: 400px;
   font-size: var(--text-xl);
   color: var(--text-muted);
+}
+
+/* Empty State Component */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: var(--space-3xl);
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.empty-state-icon {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-xl);
+  color: var(--text-muted);
+}
+
+.empty-state-icon svg {
+  opacity: 0.6;
+}
+
+.empty-state-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+}
+
+.empty-state-description {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+  margin-bottom: var(--space-xl);
+}
+
+.empty-state-workaround {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background-color: var(--bg-elevated);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--accent-primary);
+  margin-bottom: var(--space-md);
+  text-align: left;
+  width: 100%;
+}
+
+.empty-state-workaround strong {
+  color: var(--accent-primary);
+}
+
+.empty-state-timeline {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-xl);
+}
+
+.empty-state-timeline strong {
+  color: var(--text-secondary);
+}
+
+.empty-state-actions {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.empty-state-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
 /* ========== RESPONSIVE DESIGN ========== */
