@@ -454,9 +454,9 @@ mod tests {
 
     fn create_test_session(id: &str) -> Arc<SessionMetadata> {
         Arc::new(SessionMetadata {
-            id: id.to_string(),
+            id: id.into(),
             file_path: std::path::PathBuf::from(format!("/{}.jsonl", id)),
-            project_path: "/test".to_string(),
+            project_path: "/test".into(),
             first_timestamp: Some(Utc::now()),
             last_timestamp: Some(Utc::now()),
             message_count: 10,
