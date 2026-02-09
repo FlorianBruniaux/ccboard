@@ -90,6 +90,7 @@ ccboard-tui = { version = "0.4.0", path = "crates/ccboard-tui" }
 ccboard-web = { version = "0.4.0", path = "crates/ccboard-web" }
 
 [profile.release]
-lto = true
-codegen-units = 1
-strip = true
+opt-level = "z" # Optimize for size (critical for WASM bundle)
+lto = "fat" # Full link-time optimization
+codegen-units = 1 # Better optimization, slower compile
+strip = true # Strip symbols
