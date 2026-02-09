@@ -179,7 +179,7 @@ impl AnalyticsTab {
         area: Rect,
         analytics: Option<&AnalyticsData>,
         store: Option<&Arc<DataStore>>,
-        scheme: ccboard_core::models::config::ColorScheme,
+        _scheme: ccboard_core::models::config::ColorScheme,
     ) {
         use tracing::debug;
 
@@ -1019,7 +1019,7 @@ impl AnalyticsTab {
     }
 
     /// Render hourly distribution bar chart
-    fn render_hourly_distribution(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn _render_hourly_distribution(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
         // Group hours into 6 blocks (4-hour chunks)
         let mut hour_blocks = [0; 6];
         for (hour, count) in data.patterns.hourly_distribution.iter().enumerate() {
@@ -1234,7 +1234,6 @@ impl AnalyticsTab {
 
     /// Render project leaderboard table
     fn render_project_leaderboard(&self, frame: &mut Frame, area: Rect, store: &Arc<DataStore>) {
-        use ccboard_core::store::DataStore;
 
         // Get leaderboard data
         let mut entries = store.projects_leaderboard();

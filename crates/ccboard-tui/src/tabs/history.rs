@@ -371,7 +371,7 @@ impl HistoryTab {
         area: Rect,
         sessions: &[Arc<SessionMetadata>],
         stats: Option<&StatsCache>,
-        scheme: ccboard_core::models::config::ColorScheme,
+        _scheme: ccboard_core::models::config::ColorScheme,
     ) {
         // Ensure filtered sessions are initialized
         if self.filtered_sessions.is_empty() && !sessions.is_empty() && self.search_query.is_empty()

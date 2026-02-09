@@ -170,7 +170,7 @@ impl ConfigTab {
         config: &MergedConfig,
         mcp_config: Option<&McpConfig>,
         rules: &Rules,
-        scheme: ccboard_core::models::config::ColorScheme,
+        _scheme: ccboard_core::models::config::ColorScheme,
     ) {
         // Layout: [Help header (2 lines), Content columns]
         let main_chunks = Layout::default()

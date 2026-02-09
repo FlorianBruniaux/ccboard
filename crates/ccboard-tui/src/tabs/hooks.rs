@@ -295,7 +295,7 @@ impl HooksTab {
         frame: &mut Frame,
         area: Rect,
         settings: &Settings,
-        scheme: ccboard_core::models::config::ColorScheme,
+        _scheme: ccboard_core::models::config::ColorScheme,
     ) {
         let hooks = settings.hooks.as_ref();
 

@@ -366,7 +366,7 @@ impl AgentsTab {
         &mut self,
         frame: &mut Frame,
         area: Rect,
-        scheme: ccboard_core::models::config::ColorScheme,
+        _scheme: ccboard_core::models::config::ColorScheme,
     ) {
         // Layout: sub-tabs header (2 lines with padding) | content
         let chunks = Layout::default()

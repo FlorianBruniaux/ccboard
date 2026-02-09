@@ -152,7 +152,7 @@ impl CostsTab {
         area: Rect,
         stats: Option<&StatsCache>,
         billing_blocks: Option<&BillingBlockManager>,
-        scheme: ccboard_core::models::config::ColorScheme,
+        _scheme: ccboard_core::models::config::ColorScheme,
         store: Option<&ccboard_core::store::DataStore>,
     ) {
         // Main layout
