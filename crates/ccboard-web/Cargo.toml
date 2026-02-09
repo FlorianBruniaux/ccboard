@@ -48,6 +48,8 @@ gloo-net.workspace = true
 js-sys.workspace = true
 web-sys.workspace = true
 
+# Icons will be inline SVG for now (simpler, zero-cost)
+
 # Dev-dependencies for SSR backend tests only
 # These are NOT needed for WASM builds (hydrate feature)
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
