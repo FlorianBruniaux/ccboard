@@ -59,12 +59,24 @@ ratatui = "0.30"
 crossterm = "0.28"
 
 # Web - Leptos (AMENDED: htmx -> Leptos)
-leptos = { version = "0.7", features = ["csr"] }
+leptos = { version = "0.7", default-features = false }
 leptos_axum = "0.7"
-leptos_router = "0.7"
+leptos_router = { version = "0.7", default-features = false }
 axum = "0.8"
 tower-http = { version = "0.6", features = ["cors", "fs"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
+gloo-net = "0.6"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+  "Window",
+  "Navigator",
+  "Clipboard",
+  "Blob",
+  "BlobPropertyBag",
+  "Url",
+  "HtmlAnchorElement",
+  "Document",
+] }
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }
@@ -78,6 +90,7 @@ ccboard-tui = { version = "0.4.0", path = "crates/ccboard-tui" }
 ccboard-web = { version = "0.4.0", path = "crates/ccboard-web" }
 
 [profile.release]
-lto = true
-codegen-units = 1
-strip = true
+opt-level = "z" # Optimize for size (critical for WASM bundle)
+lto = "fat" # Full link-time optimization
+codegen-units = 1 # Better optimization, slower compile
+strip = true # Strip symbols

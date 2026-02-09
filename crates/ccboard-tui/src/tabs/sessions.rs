@@ -574,7 +574,7 @@ impl SessionsTab {
         area: Rect,
         sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
         live_sessions: &[ccboard_core::LiveSession],
-        scheme: ccboard_core::models::config::ColorScheme,
+        _scheme: ccboard_core::models::config::ColorScheme,
     ) {
         // Update project cache
         self.projects = sessions_by_project.keys().cloned().collect();

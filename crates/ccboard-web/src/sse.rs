@@ -8,8 +8,9 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::BroadcastStream;
 
 /// Create an SSE stream from the event bus
+/// Takes EventBus by value (cheap clone, Arc internally)
 pub fn create_sse_stream(
-    event_bus: &EventBus,
+    event_bus: EventBus,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let rx = event_bus.subscribe();
     let stream = BroadcastStream::new(rx);
@@ -39,4 +40,23 @@ pub fn create_sse_stream(
     });
 
     Sse::new(sse_stream).keep_alive(KeepAlive::default())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_sse_stream_creation() {
+        let bus = EventBus::default_capacity();
+
+        // EventBus can be cloned (cheap, Arc internally)
+        let bus_clone = bus.clone();
+
+        // create_sse_stream should accept EventBus by value
+        let _sse = create_sse_stream(bus_clone);
+
+        // Original bus still usable
+        assert_eq!(bus.subscriber_count(), 1);
+    }
 }

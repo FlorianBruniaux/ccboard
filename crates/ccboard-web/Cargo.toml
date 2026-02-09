@@ -12,32 +12,48 @@ documentation.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["ssr"]
+ssr = ["leptos/ssr", "leptos_axum", "dep:axum", "dep:tower-http", "dep:tokio", "dep:tokio-stream", "dep:tracing", "dep:ccboard-core", "dep:futures", "dep:anyhow", "dep:serde_yaml"]
+hydrate = ["leptos/hydrate"]
+
 [dependencies]
-ccboard-core.workspace = true
+# Backend only - NOT compiled in WASM
+ccboard-core = { workspace = true, optional = true }
 
-# Web - Leptos
-leptos.workspace = true
-leptos_axum.workspace = true
-leptos_router.workspace = true
-axum.workspace = true
-tower-http.workspace = true
-tokio-stream.workspace = true
-
-# Async
-tokio.workspace = true
-
-# Logging
-tracing.workspace = true
-
-# Error handling
-anyhow.workspace = true
-
-# Serialization
+# Leptos (always needed)
+leptos = { workspace = true, default-features = false }
+leptos_router = { workspace = true, default-features = false }
 serde.workspace = true
 serde_json.workspace = true
+chrono.workspace = true
+futures = { version = "0.3", optional = true }
 
-# Streaming
-futures = "0.3"
+# Server-side only (SSR)
+leptos_axum = { workspace = true, optional = true }
+axum = { workspace = true, optional = true }
+tower-http = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+anyhow = { workspace = true, optional = true }
+serde_yaml = { version = "0.9", optional = true }
 
-[dev-dependencies]
+# Client-side only (WASM/Hydrate)
+console_error_panic_hook = "0.1"
+wasm-bindgen = "0.2"
+gloo-net.workspace = true
+js-sys.workspace = true
+web-sys.workspace = true
+
+# Icons will be inline SVG for now (simpler, zero-cost)
+
+# Dev-dependencies for SSR backend tests only
+# These are NOT needed for WASM builds (hydrate feature)
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

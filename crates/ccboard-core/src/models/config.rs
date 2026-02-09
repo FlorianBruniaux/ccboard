@@ -174,7 +174,7 @@ pub struct HookDefinition {
 }
 
 /// Merged configuration from all levels
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MergedConfig {
     /// Source of each field for debugging
     pub global: Option<Settings>,

@@ -173,6 +173,22 @@ impl StatsCache {
             .sum()
     }
 
+    /// Recalculate costs for all models using accurate pricing
+    ///
+    /// This should be called after loading stats from stats-cache.json to ensure
+    /// cost_usd fields are populated with accurate pricing data.
+    pub fn recalculate_costs(&mut self) {
+        for (model_name, usage) in self.model_usage.iter_mut() {
+            usage.cost_usd = crate::pricing::calculate_cost(
+                model_name,
+                usage.input_tokens,
+                usage.output_tokens,
+                usage.cache_creation_input_tokens,
+                usage.cache_read_input_tokens,
+            );
+        }
+    }
+
     /// Get session count
     pub fn session_count(&self) -> u64 {
         self.total_sessions

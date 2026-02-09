@@ -1,0 +1,22 @@
+# Trunk build configuration for Leptos CSR
+[build]
+target = "index.html"
+dist = "dist"
+public_url = "/"
+# Use hydrate feature for client-side WASM build (Leptos 0.7 terminology for CSR mode)
+no_default_features = true
+features = ["hydrate"]
+
+# WASM optimization
+# NOTE: wasm-opt disabled due to bulk-memory validation errors
+# Cargo opt-level="z" + lto="fat" still provide ~30-40% size reduction
+# TODO: Re-enable wasm-opt with proper --enable-bulk-memory config
+[build.wasm-opt]
+skip = true # Explicitly disable wasm-opt
+
+[watch]
+watch = ["src"]
+
+[serve]
+port = 3333
+addresses = ["127.0.0.1"]

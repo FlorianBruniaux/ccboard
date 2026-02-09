@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ccboard** is a unified dashboard for Claude Code management, providing both TUI and web interfaces from a single binary to visualize sessions, stats, configuration, hooks, agents, costs, and history from `~/.claude` directories.
 
-**Stack**: Rust workspace with 4 crates, Ratatui (9-tab TUI), Axum (Web API backend, Leptos frontend planned Phase G), DashMap + parking_lot for concurrency.
+**Stack**: Rust workspace with 4 crates, Ratatui (9-tab TUI), Axum (Web API backend), Leptos (WASM frontend), Arc + parking_lot for concurrency.
 
 ## Workspace Architecture
 
@@ -16,7 +16,7 @@ This is a Cargo workspace with a layered architecture:
 ccboard/                     # Root binary - CLI entry point
 ├─ ccboard-core/             # Shared data layer (parsers, models, store, watcher)
 ├─ ccboard-tui/              # Ratatui frontend (9 tabs)
-└─ ccboard-web/              # Axum API backend (Leptos frontend TODO Phase G)
+└─ ccboard-web/              # Axum API backend + Leptos WASM frontend
 ```
 
 **Dependency flow**: `ccboard` → `ccboard-tui` + `ccboard-web` → `ccboard-core`
@@ -54,6 +54,19 @@ cargo run -- clear-cache                        # Clear SQLite cache
 
 # Specify Claude home directory
 cargo run -- --claude-home ~/.claude --project /path/to/project
+
+# Frontend (Leptos/WASM)
+trunk serve --port 3333                             # Serve frontend on http://127.0.0.1:3333
+```
+
+**Full stack workflow**:
+```bash
+# Terminal 1: Backend API
+cargo run -- web --port 8080
+
+# Terminal 2: Frontend
+trunk serve --port 3333
+# Frontend communicates with backend via http://localhost:8080/api/*
 ```
 
 ### Testing
@@ -187,17 +200,23 @@ Located in `ccboard-tui/src/`:
 
 **Current implementation status**: All 9 tabs fully functional (v0.4.0).
 
-## Web Structure (Axum API + Leptos frontend planned)
+## Web Structure (Axum API + Leptos Frontend)
 
 Located in `ccboard-web/src/`:
 
-- **Current (v0.4.0)**: Axum backend serving JSON API endpoints, HTML returns "Coming soon" plain text
-- **Planned (Phase G)**: Leptos frontend (reactive UI with Rust types, WASM, no JS build pipeline)
-- **SSE**: Live updates via Server-Sent Events (`/api/events`)
-- **Routes**: `/`, `/sessions`, `/config`, `/hooks`, `/agents`, `/costs`, `/history`
-- **API**: `/api/stats`, `/api/sessions`, `/api/config/merged` (JSON endpoints functional)
+**Backend (Axum)**:
+- JSON API endpoints: `/api/stats`, `/api/sessions`, `/api/config/merged`
+- Server-Sent Events: `/api/events` for live updates
+- CORS enabled for local development
 
-**Current status**: Backend API complete, Leptos frontend TODO Phase G.
+**Frontend (Leptos + WASM)**:
+- Reactive UI built with Leptos (Rust → WASM, no JavaScript build pipeline)
+- Served via `trunk serve` on port 3333
+- Pages: Dashboard, Sessions, Analytics, Config, History
+- Features: Token usage forecast, session management, real-time updates
+- Design: Dark mode with cyan/blue palette
+
+**Architecture**: Frontend (port 3333) communicates with backend (port 8080) via REST API.
 
 ## Error Handling
 
@@ -220,20 +239,20 @@ Follow Rust-specific error handling rules from RULES.md:
 
 ## Implementation Phases (from PLAN.md)
 
-**Completed Phases (v0.4.0)**:
+**Completed Phases (v0.4.0+)**:
 - ✅ **Phase I (Infrastructure)**: Stats parser, Settings merge, Session metadata, DataStore, graceful degradation
 - ✅ **Phase D (Dashboard TUI)**: Dashboard tab with sparklines, project filters, model breakdown
 - ✅ **Phase S (Sessions TUI)**: Sessions tab with search, filters, detail view
 - ✅ **Phase C (Config TUI)**: Config tab with merge visualization, setting overrides
 - ✅ **Phase H-A (Hooks & Agents TUI)**: Hooks tab (list + detail), Agents/Capabilities tab (frontmatter parsing)
 - ✅ **Phase E (Economics TUI)**: Costs tab, History tab with SQLite-backed timelines
+- ✅ **Phase G (Leptos Frontend)**: Web UI with Dashboard, Sessions, Analytics, Config, History pages
 
-**Current Phase (v0.4.0)**:
-- 🚧 **Phase A (Analytics TUI)**: A.1-A.4 remaining (project leaderboard, session replay, trend forecasting, anomaly detection)
+**Current Phase**:
+- 🚧 **Phase A (Analytics)**: Remaining TUI features (project leaderboard, session replay, trend forecasting, anomaly detection)
 
 **Future Phases**:
 - **Phase F (Conversation Viewer)**: Full JSONL content display with syntax highlighting
-- **Phase G (Leptos Frontend)**: Web UI matching TUI feature parity
 - **Phase H (Plan-Aware)**: PLAN.md parsing, task completion tracking
 
 ## Important Constraints
@@ -270,11 +289,12 @@ cargo fmt --all && cargo clippy --all-targets && cargo test --all
 
 ## Testing Policy
 
-**Manual testing is REQUIRED** for CLI commands and TUI changes:
+**Manual testing is REQUIRED** for CLI commands and UI changes:
 
 - **For CLI commands**: Actually run them (`cargo run -- <command>`), don't just rely on `cargo test`
 - **For TUI changes**: Launch the TUI (`cargo run`) and navigate through affected tabs
-- **For web changes**: Launch web interface (`cargo run -- web`) and test in browser
+- **For backend API changes**: Launch backend (`cargo run -- web --port 8080`) and test endpoints
+- **For frontend changes**: Launch full stack (`cargo run -- web` + `trunk serve`) and test in browser at http://127.0.0.1:3333
 - **Describe what you see**: When testing UI, describe the actual output/behavior observed
 
 **Anti-pattern**: Running only automated tests (cargo test, cargo clippy) without actually exercising the functionality.

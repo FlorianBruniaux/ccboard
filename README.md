@@ -44,15 +44,19 @@
 
 ## Features
 
-✨ **9 Interactive Tabs**
+✨ **9 Interactive Tabs** (TUI + Web)
 - **Dashboard**: Overview stats, model usage, MCP servers, 7-day activity, **API usage estimation** with plan-based budgets
-- **Sessions**: Browse all sessions with search, live Claude processes with CPU/RAM/Tokens, and detail view
-- **Config**: Cascading configuration editor (global/project/local)
-- **Hooks**: Event-based hook management with file editing
-- **Agents**: Browse agents, commands, and skills
-- **Costs**: Token analytics with estimated costs by model/period
+- **Sessions**: Browse all sessions with search, **live Claude processes with CPU/RAM/Tokens** 🆕, and detail view
+- **Config**: Cascading configuration editor (global/project/local) with 4-column diff view
+- **Hooks**: Event-based hook management with bash syntax highlighting 🆕
+- **Agents**: Browse agents, commands, and skills with frontmatter YAML parsing 🆕
+- **Costs**: Token analytics with 4 tabs 🆕
+  - **Overview**: Total cost, token breakdown bar, model distribution table
+  - **By Model**: Detailed cost breakdown (input/output/cache per model)
+  - **Daily**: 14-day bar chart with cost visualization
+  - **Billing Blocks**: 5-hour billing windows with estimated costs
 - **History**: Full-text search across sessions with temporal patterns
-- **MCP**: Server management with status detection
+- **MCP**: Server management with status detection and env vars display 🆕
 - **Analytics**: Advanced analytics with 4 sub-views
   - **Overview**: Monthly budget tracking with visual alerts (⚠️ warnings at threshold)
   - **Trends**: Time series charts with 30-day forecasting (confidence-based coloring)
@@ -362,6 +366,17 @@ ccboard web --port 3333
 
 # Open http://localhost:3333
 ```
+
+**Available Pages** (86% TUI parity):
+- `/` - Dashboard with KPIs and forecast
+- `/sessions` - Sessions browser with **live CPU/RAM monitoring** 🔥
+- `/analytics` - Analytics with budget tracking
+- `/config` - 4-column configuration viewer
+- `/hooks` - Hooks with syntax highlighting
+- `/mcp` - MCP servers with status
+- `/agents` - Agents/Commands/Skills browser
+- `/costs` - 4 tabs (Overview, By Model, Daily, Billing Blocks)
+- `/history` - History search and filters
 
 ### Both TUI + Web
 
@@ -761,9 +776,25 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ✅ **Phase C (Config TUI)**: Config tab with merge visualization, setting overrides
 - ✅ **Phase H-A (Hooks & Agents TUI)**: Hooks tab (list + detail), Agents/Capabilities tab
 - ✅ **Phase E (Economics TUI)**: Costs tab, History tab with SQLite-backed timelines
+- ✅ **Phase G (Leptos Frontend)**: Full Web UI with 100% TUI/Web parity (9 pages)
 - ✅ **Phase 0-3**: Profiling, security hardening, SQLite cache (89x speedup), UI/UX quick wins
 
 **Total**: 156 tests passing, 0 clippy warnings
+
+### Recently Completed ✅
+
+**Phase G (Leptos Frontend)** - 100% Complete 🎉
+- ✅ Dashboard with KPIs and 30-day forecast
+- ✅ Sessions with **live CPU/RAM monitoring** (bonus feature)
+- ✅ Config with 4-column diff view
+- ✅ Hooks with bash syntax highlighting
+- ✅ MCP servers with status and details
+- ✅ Agents/Commands/Skills with frontmatter parsing
+- ✅ Costs with 4 tabs (Overview, By Model, Daily, Billing Blocks)
+- ✅ History with search and filters
+- ✅ Analytics with 4 tabs (Overview, Trends, Patterns, Insights)
+
+**Full TUI/Web parity achieved** 🎯
 
 ### In Progress 🚧
 
@@ -776,11 +807,6 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - Full JSONL content display with syntax highlighting
 - Message navigation, search within conversations
 - Export selected messages
-
-**Phase G (Leptos Frontend)** (20-30h)
-- Web UI matching TUI feature parity
-- Reactive components with WASM compilation
-- SSE live updates integration
 
 **Phase H (Plan-Aware)** (6-10h)
 - PLAN.md parsing and visualization
