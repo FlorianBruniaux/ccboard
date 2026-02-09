@@ -2,6 +2,7 @@
 //!
 //! Provides a publish-subscribe mechanism for data updates.
 
+use crate::models::SessionId;
 use tokio::sync::broadcast;
 
 /// Events emitted by the data layer
@@ -10,9 +11,9 @@ pub enum DataEvent {
     /// Stats cache was updated
     StatsUpdated,
     /// A new session was created
-    SessionCreated(String),
+    SessionCreated(SessionId),
     /// An existing session was updated
-    SessionUpdated(String),
+    SessionUpdated(SessionId),
     /// Configuration changed
     ConfigChanged(ConfigScope),
     /// Analytics data was computed and cached
@@ -93,13 +94,15 @@ mod tests {
         let mut rx = bus.subscribe();
 
         bus.publish(DataEvent::StatsUpdated);
-        bus.publish(DataEvent::SessionCreated("test-session".to_string()));
+        bus.publish(DataEvent::SessionCreated(SessionId::from("test-session")));
 
         let event1 = rx.recv().await.unwrap();
         assert!(matches!(event1, DataEvent::StatsUpdated));
 
         let event2 = rx.recv().await.unwrap();
-        assert!(matches!(event2, DataEvent::SessionCreated(id) if id == "test-session"));
+        assert!(
+            matches!(event2, DataEvent::SessionCreated(ref id) if id.as_str() == "test-session")
+        );
     }
 
     #[tokio::test]

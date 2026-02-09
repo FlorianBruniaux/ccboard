@@ -627,7 +627,7 @@ impl HistoryTab {
                     })
                     .unwrap_or_else(|| "No preview".to_string());
 
-                let project_short = Self::shorten_path(&session.project_path);
+                let project_short = Self::shorten_path(session.project_path.as_str());
 
                 let style = if is_selected {
                     Style::default()
@@ -907,7 +907,7 @@ impl HistoryTab {
         let mut lines = vec![
             Line::from(vec![
                 Span::styled("ID: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&session.id, Style::default().fg(Color::White)),
+                Span::styled(session.id.as_str(), Style::default().fg(Color::White)),
             ]),
             Line::from(vec![
                 Span::styled("File: ", Style::default().fg(Color::DarkGray)),

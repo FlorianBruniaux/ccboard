@@ -326,7 +326,7 @@ mod tests {
     fn test_cache_ratio() {
         let mut stats = StatsCache::default();
         stats.model_usage.insert(
-            "test".to_string(),
+            "test".into(),
             ModelUsage {
                 input_tokens: 800,
                 cache_read_input_tokens: 200,
@@ -407,7 +407,7 @@ mod tests {
         {
             let mut meta = SessionMetadata::from_path(
                 PathBuf::from(format!("/test{}.jsonl", i)),
-                "test".to_string(),
+                "test".into(),
             );
             meta.total_tokens = *tokens;
             meta.last_timestamp = Some(now - chrono::Duration::seconds((4 - i) as i64 * 60));
@@ -447,7 +447,7 @@ mod tests {
         for (i, tokens) in [60_000u64, 80_000, 120_000].iter().enumerate() {
             let mut meta = SessionMetadata::from_path(
                 PathBuf::from(format!("/test{}.jsonl", i)),
-                "test".to_string(),
+                "test".into(),
             );
             meta.total_tokens = *tokens;
             meta.last_timestamp = Some(now - chrono::Duration::seconds((2 - i) as i64 * 60));

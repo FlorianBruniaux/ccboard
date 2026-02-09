@@ -128,7 +128,7 @@ async fn stats_handler(
                 &session.models_used,
             );
             *project_costs
-                .entry(session.project_path.clone())
+                .entry(session.project_path.as_str().to_string())
                 .or_insert(0.0) += cost;
         }
 

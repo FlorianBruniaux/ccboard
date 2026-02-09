@@ -1508,7 +1508,7 @@ impl AnalyticsTab {
                     )),
                     Cell::from(anomaly.date.clone()),
                     Cell::from(Span::styled(
-                        &anomaly.session_id[..8.min(anomaly.session_id.len())],
+                        &anomaly.session_id.as_str()[..8.min(anomaly.session_id.len())],
                         Style::default().fg(Color::Cyan),
                     )),
                     Cell::from(anomaly.metric.name()),

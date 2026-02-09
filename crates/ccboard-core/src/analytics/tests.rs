@@ -15,9 +15,9 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
             let ts = now - chrono::Duration::days(day_offset);
 
             Arc::new(SessionMetadata {
-                id: format!("session-{}", i),
+                id: format!("session-{}", i).into(),
                 file_path: std::path::PathBuf::from(format!("/test/session-{}.jsonl", i)),
-                project_path: "/test".to_string(),
+                project_path: "/test".into(),
                 first_timestamp: Some(ts),
                 last_timestamp: Some(ts + chrono::Duration::minutes(30)),
                 message_count: 10,
@@ -204,9 +204,9 @@ fn test_patterns_multi_model_session_no_double_count() {
     // Test fix for double-counting bug when session uses multiple models
     let now = Utc::now();
     let sessions = vec![Arc::new(SessionMetadata {
-        id: "multi-model".to_string(),
+        id: "multi-model".into(),
         file_path: std::path::PathBuf::from("/test/multi.jsonl"),
-        project_path: "/test".to_string(),
+        project_path: "/test".into(),
         first_timestamp: Some(now),
         last_timestamp: Some(now + chrono::Duration::minutes(30)),
         message_count: 10,

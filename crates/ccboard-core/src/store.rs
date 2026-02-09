@@ -8,14 +8,14 @@ use crate::cache::MetadataCache;
 use crate::error::{DegradedState, LoadReport};
 use crate::event::{ConfigScope, DataEvent, EventBus};
 use crate::models::{
-    BillingBlockManager, InvocationStats, MergedConfig, SessionMetadata, StatsCache,
+    BillingBlockManager, InvocationStats, MergedConfig, SessionId, SessionMetadata, StatsCache,
 };
 use crate::parsers::{
     InvocationParser, McpConfig, Rules, SessionIndexParser, SettingsParser, StatsParser,
 };
 use dashmap::DashMap;
 use moka::future::Cache;
-use parking_lot::RwLock;
+use parking_lot::RwLock; // parking_lot > std::sync::RwLock: smaller (40B vs 72B), no poisoning, better fairness
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -89,11 +89,15 @@ pub struct DataStore {
 
     /// Session metadata (high contention with many entries)
     /// Arc<SessionMetadata> for cheap cloning (8 bytes vs ~400 bytes)
-    sessions: DashMap<String, Arc<SessionMetadata>>,
+    ///
+    /// Why Arc over Box: Multi-thread access from TUI + Web frontends
+    /// justifies atomic refcount overhead (~4 bytes). Box would require
+    /// cloning entire struct on each frontend access.
+    sessions: DashMap<SessionId, Arc<SessionMetadata>>,
 
     /// Session content cache (LRU for on-demand loading)
     #[allow(dead_code)]
-    session_content_cache: Cache<String, Vec<String>>,
+    session_content_cache: Cache<SessionId, Vec<String>>,
 
     /// Event bus for notifying subscribers
     event_bus: EventBus,
@@ -493,7 +497,7 @@ impl DataStore {
     }
 
     /// Get all session IDs
-    pub fn session_ids(&self) -> Vec<String> {
+    pub fn session_ids(&self) -> Vec<SessionId> {
         self.sessions.iter().map(|r| r.key().clone()).collect()
     }
 
@@ -513,7 +517,7 @@ impl DataStore {
         for entry in self.sessions.iter() {
             let session = Arc::clone(entry.value());
             by_project
-                .entry(session.project_path.clone())
+                .entry(session.project_path.as_str().to_string())
                 .or_insert_with(Vec::new)
                 .push(session);
         }
@@ -645,10 +649,10 @@ impl DataStore {
                     };
 
                     // Extract project name from path (last component)
-                    let project_name = std::path::Path::new(&project_path)
+                    let project_name = std::path::Path::new(project_path.as_str())
                         .file_name()
                         .and_then(|n| n.to_str())
-                        .unwrap_or(&project_path)
+                        .unwrap_or(project_path.as_str())
                         .to_string();
 
                     ProjectLeaderboardEntry {
@@ -934,9 +938,9 @@ mod tests {
         for i in 0..10 {
             let total_tokens = 1000 * (i as u64 + 1);
             let session = SessionMetadata {
-                id: format!("test-{}", i),
+                id: format!("test-{}", i).into(),
                 file_path: std::path::PathBuf::from(format!("/test-{}.jsonl", i)),
-                project_path: "/test".to_string(),
+                project_path: "/test".into(),
                 first_timestamp: Some(now - chrono::Duration::days(i)),
                 last_timestamp: Some(now),
                 message_count: 10,
@@ -999,9 +1003,9 @@ mod tests {
 
         for (id, tokens, model, days_ago) in test_data {
             let session = SessionMetadata {
-                id: id.to_string(),
+                id: id.into(),
                 file_path: std::path::PathBuf::from(format!("/{}.jsonl", id)),
-                project_path: "/test".to_string(),
+                project_path: "/test".into(),
                 first_timestamp: Some(now - chrono::Duration::days(days_ago)),
                 last_timestamp: Some(now),
                 message_count: 10,

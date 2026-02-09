@@ -157,7 +157,10 @@ impl MetadataCache {
             .context("Invalid mtime")?
             .as_secs();
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
 
         let result: Option<Vec<u8>> = conn
             .query_row(
@@ -196,7 +199,10 @@ impl MetadataCache {
         let models_used =
             serde_json::to_string(&meta.models_used).context("Failed to serialize models")?;
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
 
         conn.execute(
             r#"
@@ -208,8 +214,8 @@ impl MetadataCache {
             params![
                 path_str.as_ref(),
                 mtime_secs as i64,
-                &meta.project_path,
-                &meta.id,
+                meta.project_path.as_str(),
+                meta.id.as_str(),
                 meta.first_timestamp.as_ref().map(|t| t.to_rfc3339()),
                 meta.last_timestamp.as_ref().map(|t| t.to_rfc3339()),
                 meta.message_count as i64,
@@ -230,7 +236,10 @@ impl MetadataCache {
     pub fn invalidate(&self, path: &Path) -> Result<()> {
         let path_str = path.to_string_lossy();
 
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
 
         conn.execute(
             "DELETE FROM session_metadata WHERE path = ?",
@@ -244,7 +253,10 @@ impl MetadataCache {
 
     /// Get all cached paths for a project
     pub fn get_project_paths(&self, project: &str) -> Result<Vec<PathBuf>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
 
         let mut stmt = conn
             .prepare("SELECT path FROM session_metadata WHERE project = ?")
@@ -267,7 +279,10 @@ impl MetadataCache {
 
     /// Get cache statistics
     pub fn stats(&self) -> Result<CacheStats> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
 
         let total_entries: i64 = conn
             .query_row("SELECT COUNT(*) FROM session_metadata", [], |row| {
@@ -300,7 +315,10 @@ impl MetadataCache {
 
     /// Clear all cache entries (for testing or rebuild)
     pub fn clear(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
 
         conn.execute("DELETE FROM session_metadata", [])
             .context("Failed to clear cache")?;
@@ -311,7 +329,10 @@ impl MetadataCache {
 
     /// Vacuum database to reclaim space
     pub fn vacuum(&self) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
 
         conn.execute("VACUUM", []).context("Failed to vacuum")?;
 
@@ -359,8 +380,8 @@ mod tests {
         let cache = MetadataCache::new(dir.path()).unwrap();
 
         let path = PathBuf::from("/tmp/test.jsonl");
-        let mut meta = SessionMetadata::from_path(path.clone(), "/test".to_string());
-        meta.id = "test-123".to_string();
+        let mut meta = SessionMetadata::from_path(path.clone(), "/test".into());
+        meta.id = "test-123".into();
         meta.message_count = 42;
         meta.total_tokens = 1000;
         meta.models_used = vec!["sonnet".to_string()].into_iter().collect();
@@ -390,7 +411,7 @@ mod tests {
         let cache = MetadataCache::new(dir.path()).unwrap();
 
         let path = PathBuf::from("/tmp/test.jsonl");
-        let meta = SessionMetadata::from_path(path.clone(), "/test".to_string());
+        let meta = SessionMetadata::from_path(path.clone(), "/test".into());
         let mtime = SystemTime::now();
 
         cache.put(&path, &meta, mtime).unwrap();
@@ -413,13 +434,13 @@ mod tests {
         // Add sessions for two projects
         for i in 0..3 {
             let path = PathBuf::from(format!("/tmp/project1/session{}.jsonl", i));
-            let meta = SessionMetadata::from_path(path.clone(), "/project1".to_string());
+            let meta = SessionMetadata::from_path(path.clone(), "/project1".into());
             cache.put(&path, &meta, mtime).unwrap();
         }
 
         for i in 0..2 {
             let path = PathBuf::from(format!("/tmp/project2/session{}.jsonl", i));
-            let meta = SessionMetadata::from_path(path.clone(), "/project2".to_string());
+            let meta = SessionMetadata::from_path(path.clone(), "/project2".into());
             cache.put(&path, &meta, mtime).unwrap();
         }
 
@@ -442,7 +463,7 @@ mod tests {
         // Add some entries
         for i in 0..10 {
             let path = PathBuf::from(format!("/tmp/session{}.jsonl", i));
-            let meta = SessionMetadata::from_path(path.clone(), "/test".to_string());
+            let meta = SessionMetadata::from_path(path.clone(), "/test".into());
             cache.put(&path, &meta, mtime).unwrap();
         }
 
@@ -458,7 +479,7 @@ mod tests {
         let cache = MetadataCache::new(dir.path()).unwrap();
 
         let path = PathBuf::from("/tmp/test.jsonl");
-        let meta = SessionMetadata::from_path(path.clone(), "/test".to_string());
+        let meta = SessionMetadata::from_path(path.clone(), "/test".into());
         cache.put(&path, &meta, SystemTime::now()).unwrap();
 
         assert_eq!(cache.stats().unwrap().total_entries, 1);

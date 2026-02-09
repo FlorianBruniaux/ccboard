@@ -154,7 +154,7 @@ impl FileWatcher {
                 .unwrap_or("unknown")
                 .to_string();
 
-            return Some((DataEvent::SessionUpdated(session_id), path.clone()));
+            return Some((DataEvent::SessionUpdated(session_id.into()), path.clone()));
         }
 
         // Global settings
@@ -311,7 +311,7 @@ mod tests {
         assert!(!state.should_emit(&DataEvent::StatsUpdated));
 
         // Different event type should pass
-        assert!(state.should_emit(&DataEvent::SessionUpdated("test".to_string())));
+        assert!(state.should_emit(&DataEvent::SessionUpdated("test".into())));
     }
 
     #[test]

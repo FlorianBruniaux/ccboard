@@ -943,7 +943,7 @@ impl CostsTab {
                         };
                         truncated
                     })
-                    .unwrap_or_else(|| session.id[..session.id.len().min(20)].to_string());
+                    .unwrap_or_else(|| session.id.as_str()[..session.id.len().min(20)].to_string());
 
                 Row::new(vec![
                     medal.to_string(),

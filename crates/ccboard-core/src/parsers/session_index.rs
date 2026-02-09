@@ -255,7 +255,7 @@ impl SessionIndexParser {
     /// Scan session without cache (internal)
     async fn scan_session_uncached(&self, path: &Path) -> Result<SessionMetadata, CoreError> {
         let project_path = self.extract_project_path(path);
-        let mut metadata = SessionMetadata::from_path(path.to_path_buf(), project_path);
+        let mut metadata = SessionMetadata::from_path(path.to_path_buf(), project_path.into());
 
         let file = File::open(path).await.map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
@@ -343,7 +343,7 @@ impl SessionIndexParser {
                     || !metadata.id.chars().all(|c| c.is_alphanumeric() || c == '-')
                     || metadata.id.starts_with(".tmp")
                 {
-                    metadata.id = id.clone();
+                    metadata.id = id.clone().into();
                 }
             }
 
@@ -575,7 +575,14 @@ impl SessionIndexParser {
             let parser = self.clone();
 
             let handle = tokio::spawn(async move {
-                let _permit = sem.acquire().await.unwrap();
+                // Graceful degradation: skip this session if semaphore acquisition fails
+                let _permit = match sem.acquire().await {
+                    Ok(p) => p,
+                    Err(e) => {
+                        warn!(path = %path.display(), error = %e, "Failed to acquire semaphore permit, skipping session");
+                        return Err(CoreError::LockTimeout);
+                    }
+                };
                 parser.scan_session(&path).await
             });
 

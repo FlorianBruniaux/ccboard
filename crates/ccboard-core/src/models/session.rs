@@ -1,9 +1,249 @@
 //! Session models for JSONL session files
 
 use chrono::{DateTime, Utc};
+use rusqlite::types::{FromSql, FromSqlError, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::borrow::{Borrow, Cow};
+use std::fmt;
+use std::ops::{Deref, Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::path::PathBuf;
+
+/// Newtype for Session ID - zero-cost type safety
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SessionId(String);
+
+impl SessionId {
+    /// Create a new SessionId
+    pub fn new(id: String) -> Self {
+        Self(id)
+    }
+
+    /// Get reference to inner string
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Extract inner String, consuming self
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+
+    /// Check if the session ID is empty
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Get an iterator over the characters
+    pub fn chars(&self) -> std::str::Chars<'_> {
+        self.0.chars()
+    }
+
+    /// Check if the session ID starts with a given pattern
+    pub fn starts_with(&self, pattern: &str) -> bool {
+        self.0.starts_with(pattern)
+    }
+
+    /// Get the length of the session ID
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl From<String> for SessionId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&str> for SessionId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl fmt::Display for SessionId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl AsRef<str> for SessionId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl PartialEq<str> for SessionId {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
+
+impl PartialEq<&str> for SessionId {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<String> for SessionId {
+    fn eq(&self, other: &String) -> bool {
+        &self.0 == other
+    }
+}
+
+impl ToSql for SessionId {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.0.as_str()))
+    }
+}
+
+impl FromSql for SessionId {
+    fn column_result(value: ValueRef<'_>) -> Result<Self, FromSqlError> {
+        value.as_str().map(|s| SessionId::from(s))
+    }
+}
+
+impl Borrow<str> for SessionId {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Deref for SessionId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Index<RangeFull> for SessionId {
+    type Output = str;
+
+    fn index(&self, _index: RangeFull) -> &Self::Output {
+        &self.0
+    }
+}
+
+impl Index<Range<usize>> for SessionId {
+    type Output = str;
+
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl Index<RangeFrom<usize>> for SessionId {
+    type Output = str;
+
+    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl Index<RangeTo<usize>> for SessionId {
+    type Output = str;
+
+    fn index(&self, index: RangeTo<usize>) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl<'a> From<&'a SessionId> for Cow<'a, str> {
+    fn from(id: &'a SessionId) -> Self {
+        Cow::Borrowed(id.as_str())
+    }
+}
+
+/// Newtype for Project ID - zero-cost type safety
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ProjectId(String);
+
+impl ProjectId {
+    /// Create a new ProjectId
+    pub fn new(id: String) -> Self {
+        Self(id)
+    }
+
+    /// Get reference to inner string
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Extract inner String, consuming self
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+
+    /// Get the length of the project ID
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Check if the project ID is empty
+    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Convert to lowercase
+    pub fn to_lowercase(&self) -> String {
+        self.0.to_lowercase()
+    }
+}
+
+impl From<String> for ProjectId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&str> for ProjectId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl fmt::Display for ProjectId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl AsRef<str> for ProjectId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl ToSql for ProjectId {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.0.as_str()))
+    }
+}
+
+impl FromSql for ProjectId {
+    fn column_result(value: ValueRef<'_>) -> Result<Self, FromSqlError> {
+        value.as_str().map(|s| ProjectId::from(s))
+    }
+}
+
+impl Deref for ProjectId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> From<&'a ProjectId> for Cow<'a, str> {
+    fn from(id: &'a ProjectId) -> Self {
+        Cow::Borrowed(id.as_str())
+    }
+}
 
 /// A single line from a session JSONL file
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -134,13 +374,13 @@ pub struct SessionSummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMetadata {
     /// Session ID (from filename or content)
-    pub id: String,
+    pub id: SessionId,
 
     /// Full path to the JSONL file
     pub file_path: PathBuf,
 
     /// Project path (extracted from directory structure)
-    pub project_path: String,
+    pub project_path: ProjectId,
 
     /// First timestamp in session
     pub first_timestamp: Option<DateTime<Utc>>,
@@ -185,12 +425,13 @@ pub struct SessionMetadata {
 
 impl SessionMetadata {
     /// Create a minimal metadata from just file path
-    pub fn from_path(path: PathBuf, project_path: String) -> Self {
-        let id = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unknown")
-            .to_string();
+    pub fn from_path(path: PathBuf, project_path: ProjectId) -> Self {
+        let id = SessionId::new(
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string(),
+        );
 
         let file_size_bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
 
@@ -255,7 +496,8 @@ mod tests {
 
     #[test]
     fn test_session_metadata_duration_display() {
-        let mut meta = SessionMetadata::from_path(PathBuf::from("/test.jsonl"), "test".to_string());
+        let mut meta =
+            SessionMetadata::from_path(PathBuf::from("/test.jsonl"), ProjectId::from("test"));
 
         meta.duration_seconds = Some(90);
         assert_eq!(meta.duration_display(), "1m 30s");
@@ -269,7 +511,8 @@ mod tests {
 
     #[test]
     fn test_session_metadata_size_display() {
-        let mut meta = SessionMetadata::from_path(PathBuf::from("/test.jsonl"), "test".to_string());
+        let mut meta =
+            SessionMetadata::from_path(PathBuf::from("/test.jsonl"), ProjectId::from("test"));
 
         meta.file_size_bytes = 500;
         assert_eq!(meta.size_display(), "500 B");

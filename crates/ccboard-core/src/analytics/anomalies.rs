@@ -3,7 +3,7 @@
 //! Uses Z-score based statistical analysis to flag sessions that deviate
 //! significantly from normal behavior patterns.
 
-use crate::models::session::SessionMetadata;
+use crate::models::session::{SessionId, SessionMetadata};
 use std::sync::Arc;
 
 /// Severity level for anomalies based on standard deviations
@@ -56,7 +56,7 @@ impl AnomalyMetric {
 #[derive(Debug, Clone)]
 pub struct Anomaly {
     /// Session ID
-    pub session_id: String,
+    pub session_id: SessionId,
     /// Session date (ISO format)
     pub date: String,
     /// Metric that triggered anomaly
@@ -226,9 +226,9 @@ mod tests {
 
     fn create_test_session(id: &str, tokens: u64) -> Arc<SessionMetadata> {
         Arc::new(SessionMetadata {
-            id: id.to_string(),
+            id: id.into(),
             file_path: PathBuf::from(format!("/tmp/{}.jsonl", id)),
-            project_path: "test".to_string(),
+            project_path: "test".into(),
             first_timestamp: Some(Utc::now()),
             last_timestamp: Some(Utc::now()),
             message_count: 10,

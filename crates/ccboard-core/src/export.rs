@@ -311,9 +311,9 @@ mod tests {
     fn create_test_session(id: &str, project: &str, messages: u64, tokens: u64) -> SessionMetadata {
         let timestamp = Utc.with_ymd_and_hms(2026, 2, 3, 14, 30, 0).unwrap();
         SessionMetadata {
-            id: id.to_string(),
+            id: id.into(),
             file_path: PathBuf::from(format!("/test/{}.jsonl", id)),
-            project_path: project.to_string(),
+            project_path: project.into(),
             first_timestamp: Some(timestamp),
             last_timestamp: Some(timestamp + chrono::Duration::minutes(45)),
             message_count: messages,
