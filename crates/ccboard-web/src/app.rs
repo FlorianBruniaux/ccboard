@@ -6,10 +6,10 @@ use leptos_router::{
     path,
 };
 
-use crate::components::{EmptyState, Header, Sidebar, ToastProvider};
+use crate::components::{Header, Sidebar, ToastProvider};
 // Eager load Dashboard (initial page)
 use crate::pages::Dashboard;
-// Lazy load Sessions and Analytics (defer to route closure)
+// Lazy load Sessions, Analytics, Config, History (defer to route closure)
 
 /// Main App component
 #[component]
@@ -44,24 +44,14 @@ pub fn App() -> impl IntoView {
                                 />
                                 <Route
                                     path=path!("/config")
-                                    view=|| view! {
-                                        <EmptyState
-                                            title="Config"
-                                            description="Configuration management interface is under development. View and edit Claude Code settings across global, project, and local levels with merge visualization."
-                                            workaround="Edit ~/.claude/settings.json directly"
-                                            timeline="Q2 2026"
-                                        />
+                                    view=|| {
+                                        view! { <crate::pages::Config /> }
                                     }
                                 />
                                 <Route
                                     path=path!("/history")
-                                    view=|| view! {
-                                        <EmptyState
-                                            title="History"
-                                            description="Session history timeline with filters and search. Track your Claude Code usage patterns over time with detailed analytics."
-                                            workaround="Use Sessions Explorer with date filters"
-                                            timeline="Q2 2026"
-                                        />
+                                    view=|| {
+                                        view! { <crate::pages::History /> }
                                     }
                                 />
                             </Routes>

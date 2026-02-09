@@ -2252,3 +2252,147 @@ pre code {
     width: 100%;
   }
 }
+
+/* ========== CONFIG PAGE ========== */
+
+.config-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.config-card {
+  background-color: var(--bg-surface);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+.config-section-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+}
+
+.config-json {
+  background-color: var(--bg-secondary);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.config-info {
+  background-color: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.config-info h3 {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.config-info ol {
+  padding-left: var(--space-lg);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.config-info code {
+  background-color: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-cyan);
+}
+
+/* ========== HISTORY PAGE ========== */
+
+.filter-bar {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  background-color: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.filter-btn:hover {
+  background-color: var(--hover-bg);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+.filter-btn.active {
+  background-color: var(--active-bg);
+  border-color: var(--active-border);
+  color: var(--color-cyan);
+  font-weight: var(--font-semibold);
+}
+
+.history-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.history-stats {
+  padding: var(--space-md);
+  background-color: var(--bg-elevated);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.history-count {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+}
+
+/* ========== LOADING & ERROR STATES ========== */
+
+.loading {
+  text-align: center;
+  padding: var(--space-xl);
+  color: var(--text-muted);
+  font-size: var(--text-base);
+}
+
+.error-message {
+  background-color: rgba(244, 67, 54, 0.1);
+  border: var(--border-width) solid var(--color-red);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  color: var(--color-red);
+}
+
+.error-message p {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.error-message strong {
+  font-weight: var(--font-semibold);
+}

@@ -70,6 +70,7 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         .route("/api/stats", get(stats_handler))
         .route("/api/sessions/recent", get(recent_sessions_handler)) // Must be before /api/sessions
         .route("/api/sessions", get(sessions_handler))
+        .route("/api/config/merged", get(config_handler))
         .route("/api/health", get(health_handler))
         .route("/api/events", get(sse_handler))
         // Static assets from static/ folder
@@ -419,6 +420,14 @@ fn calculate_session_cost(
     let cache_read_cost = (cache_read_tokens as f64 / 1_000_000.0) * cache_read_price;
 
     input_cost + output_cost + cache_write_cost + cache_read_cost
+}
+
+/// Config handler - returns merged settings (global + project + local)
+async fn config_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    let settings = store.settings();
+    axum::Json(serde_json::to_value(&settings).unwrap_or_default())
 }
 
 async fn health_handler(
