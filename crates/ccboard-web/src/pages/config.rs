@@ -1,7 +1,6 @@
 //! Config page - displays merged Claude Code settings
 
 use leptos::prelude::*;
-use serde::Deserialize;
 use serde_json::Value;
 
 /// API base URL constant
@@ -9,13 +8,6 @@ use serde_json::Value;
 const API_BASE_URL: &str = "http://localhost:8080";
 #[cfg(not(debug_assertions))]
 const API_BASE_URL: &str = "";
-
-/// Merged config response from API
-#[derive(Debug, Clone, Deserialize)]
-struct ConfigResponse {
-    #[serde(flatten)]
-    settings: Value,
-}
 
 /// Fetch config from API
 async fn fetch_config() -> Result<Value, String> {
