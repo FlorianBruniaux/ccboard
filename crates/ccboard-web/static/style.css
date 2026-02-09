@@ -159,6 +159,29 @@ body {
   z-index: 100;
 }
 
+.header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.logo {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--color-cyan);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
+  color: var(--text-muted);
+  line-height: 1.2;
+  margin: 0;
+  padding-bottom: var(--space-sm);
+}
+
 .header-logo {
   font-size: var(--text-lg);
   font-weight: var(--font-bold);
