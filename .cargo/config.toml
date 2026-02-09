@@ -1,0 +1,2 @@
+[lints.clippy]
+unwrap_used = "deny"
