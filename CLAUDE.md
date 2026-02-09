@@ -198,7 +198,7 @@ Located in `ccboard-tui/src/`:
 - **Event loop**: Crossterm events + DataStore EventBus subscriptions
 - **Widgets**: Sparkline, BarChart, Tree, List, Popup, Table (Ratatui components)
 
-**Current implementation status**: All 9 tabs fully functional (v0.4.0).
+**Current implementation status**: All 9 tabs fully functional (v0.5.0).
 
 ## Web Structure (Axum API + Leptos Frontend)
 

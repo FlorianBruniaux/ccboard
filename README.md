@@ -367,7 +367,7 @@ ccboard web --port 3333
 # Open http://localhost:3333
 ```
 
-**Available Pages** (86% TUI parity):
+**Available Pages** (100% TUI parity) ✅:
 - `/` - Dashboard with KPIs and forecast
 - `/sessions` - Sessions browser with **live CPU/RAM monitoring** 🔥
 - `/analytics` - Analytics with budget tracking
@@ -766,7 +766,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap
 
-**Current Status**: 🎉 **PRODUCTION-READY** (v0.4.0)
+**Current Status**: 🎉 **PRODUCTION-READY** (v0.5.0)
 
 ### Completed Phases ✅
 

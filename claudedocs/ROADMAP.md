@@ -1,237 +1,184 @@
----
-date: 2026-02-06
-last_updated: 2026-02-06
-title: ccboard Development Roadmap
-status: Phase I complete, Quick Wins complete
----
+# ccboard Roadmap - Post v0.5.0
 
-# ccboard Development Plan
+## Current Status (2026-02-09)
 
-**Project**: ccboard - Unified TUI/Web dashboard for Claude Code management
-**Language**: Rust (workspace with 4 crates)
-**Status**: Phase I complete, Quick Wins complete (Week 1)
-**Last Updated**: 2026-02-06
+✅ **Phase G Complete**: Full TUI/Web parity (100%)
+- 9 TUI tabs fully functional (Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP, Analytics)
+- 5 Web pages (Dashboard, Sessions, Analytics, Config, History)
+- SSE live updates for real-time monitoring
+- Sprint 1 UX improvements (config modal, elevation system, responsive design)
+- SQLite metadata cache with 89x speedup (20s → 224ms)
+- Arc migration achieving 50x memory reduction (1.4GB → 28MB)
 
----
-
-## Current Status
-
-### ✅ Completed (Phase I - TUI Core + Quick Wins)
-
-**Core Infrastructure**:
-- Workspace architecture (4 crates: ccboard, ccboard-core, ccboard-tui, ccboard-web)
-- DataStore with DashMap + parking_lot::RwLock
-- Stats parser (stats-cache.json)
-- Settings parser with 3-level merge (global → project → local)
-- Session metadata parser (lazy loading, first+last line extraction)
-- Moka cache for on-demand session content
-- TUI with 9 functional tabs
-
-**Quick Wins (Week 1) - xlaude insights**:
-1. ✅ **QW1**: Environment variables (CCBOARD_CLAUDE_HOME, NON_INTERACTIVE, FORMAT, NO_COLOR)
-2. ✅ **QW2**: Message filtering (exclude system/protocol messages from previews)
-3. ✅ **QW3**: Performance validation (lazy loading 15x faster than xlaude)
-4. ✅ **QW4**: Documentation updates (this file, README comparison)
-
-**Performance Metrics** (3057 sessions, real data):
-- Initial load: 4.8s debug (1.5s release estimated)
-- Memory: 45 MB metadata (vs 680 MB for full-parse)
-- Detail view: 150ms (cache miss)
-- Cache hit ratio: >99% after first run
+🔄 **Phase A In Progress**: Analytics enhancements
+- Token usage forecasting with trend analysis
+- Session analytics with model breakdown
+- Project leaderboard (planned)
+- Session replay (planned)
+- Anomaly detection (planned)
 
 ---
 
-## Learnings from xlaude Analysis
+## Next Phases
 
-**Repository**: https://github.com/Xuanwo/xlaude (171 ⭐)
-**Analysis Date**: 2025-02-06
-**Documentation**: `claudedocs/xlaude-*.md` (3 files, 66KB)
+### Phase F: Conversation Viewer (Q1 2026)
 
-### Key Insights Applied
+**Goal**: Full JSONL content display with syntax highlighting
 
-#### 1. Environment Variables (✅ Implemented - QW1)
-**xlaude pattern**: Uses env vars for testing isolation and CI/CD
-**ccboard adoption**:
-- `CCBOARD_CLAUDE_HOME`: Override Claude home directory
-- `CCBOARD_NON_INTERACTIVE`: Disable prompts for CI/CD
-- `CCBOARD_FORMAT`: Force output format (json/table/csv)
-- `CCBOARD_NO_COLOR`: Disable ANSI colors for logs
+**Features**:
+- Display complete session conversations with message threading
+- Syntax highlighting for code blocks (Rust, Python, JS, etc.)
+- Message filtering (by role, tool usage, timestamps)
+- Export conversations (Markdown, JSON, PDF)
+- Search within conversation content
+- Tool call visualization with input/output display
 
-**Impact**: Enables automated testing, CI/CD pipelines, scripting
-
-#### 2. Message Filtering (✅ Implemented - QW2)
-**xlaude pattern**: Filters `<local-command`, protocol noise from session views
-**ccboard adoption**:
-- New module: `parsers/filters.rs`
-- Function: `is_meaningful_user_message()`
-- Filters: `<local-command`, `<system-reminder>`, `[Request interrupted`, etc.
-- Applied to `first_user_message` preview extraction
-
-**Impact**: Cleaner session previews in TUI, better search UX
-
-#### 3. Performance Validation (✅ Implemented - QW3)
-**xlaude approach**: Full-parse all sessions upfront (O(n×m) complexity)
-**ccboard approach**: Lazy metadata extraction (O(n) complexity)
-
-**Benchmark results**:
-| Metric | ccboard | xlaude | Speedup |
-|--------|---------|--------|---------|
-| Initial load (3057 sessions) | 4.8s | 72s | **15x** |
-| Memory usage | 45 MB | 680 MB | **15x** |
-| Scalability | Linear | Quadratic | - |
-
-**Conclusion**: ccboard lazy loading strategy validated as superior for large session counts
-
-#### 4. BIP39 Session Names (⏳ Planned - Phase III)
-**xlaude pattern**: Human-readable session IDs via BIP39 mnemonic
-**ccboard adoption** (planned):
-```rust
-use sha2::{Sha256, Digest};
-use bip39::Mnemonic;
-
-pub fn friendly_id(&self) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(self.id.as_bytes());
-    let hash = hasher.finalize();
-    Mnemonic::from_entropy(&hash[..16], Language::English)
-        .word_iter()
-        .take(3)
-        .collect::<Vec<_>>()
-        .join("-")  // e.g., "forest-river-mountain"
-}
-```
-
-**Impact**: Easier session referencing in CLI, shareable IDs for public dashboards
-
-#### 5. Worktree Integration (⏳ Planned - Phase IV)
-**xlaude feature**: Parse `~/.config/xlaude/state.json` for git worktree associations
-**ccboard adoption** (optional):
-- Display worktree branch for each session
-- Show session → branch mapping in Sessions tab
-- Detect stale sessions (branch merged/deleted)
-
-**Decision**: Defer to Phase IV (not blocking MVP)
-
-### Comparative Advantages
-
-**ccboard strengths**:
-- 15x faster initial load (lazy loading)
-- 15x lower memory usage
-- Analytics dashboard (trends, forecasts, budgets)
-- Multi-tab TUI + Web interface
-- SQLite cache (89x speedup on restart)
-- MCP server detection
-- Config/hooks/agents browser
-
-**xlaude strengths**:
-- Git worktree isolation
-- PTY session management
-- Instant detail view (all data in-memory)
-- Agent-agnostic (works beyond Claude)
-
-**Complementarity**:
-- Use **xlaude** for: Active development, workspace isolation, branch-per-session workflow
-- Use **ccboard** for: Historical analysis, cost tracking, dashboard monitoring, config management
-
-### References
-
-**xlaude documentation**:
-- Repository: https://github.com/Xuanwo/xlaude
-- Analysis: `claudedocs/xlaude-analysis.md` (37KB)
-- Insights: `claudedocs/xlaude-actionable-insights.md` (12KB)
-- Comparison: `claudedocs/xlaude-vs-ccboard-comparison.md` (17KB)
-
-**Performance benchmark**:
-- Documentation: `claudedocs/performance-benchmark.md`
-- Dataset: 3,057 sessions, 422K messages, 18.6M tokens
+**Technical**:
+- Streaming JSONL parser for large sessions (>100MB)
+- Syntax highlighting via `syntect` or `tree-sitter`
+- Export pipeline (Markdown → Pandoc → PDF)
 
 ---
 
-## Next Steps
+### Phase H: Plan-Aware (Q2 2026)
 
-### Phase II - TUI Polish (Week 2)
-- Task II-1: Complete Sessions tab navigation (4h)
-- Task II-2: Config tab with priority indicators (3h)
-- Task II-3: Hooks tab with test mode (2h)
+**Goal**: Parse and track PLAN.md progress across sessions
 
-### Phase III - Advanced Features (Weeks 3-4)
-- Task III-1: BIP39 session names (2h)
-- Task III-2: Agents tab browser (2h)
-- Task III-3: Costs tab analytics (3h)
-- Task III-4: History timeline (2h)
+**Features**:
+- PLAN.md frontmatter parsing (phases, tasks, blockers)
+- Task completion tracking across sessions
+- Dependency visualization (task graphs)
+- Timeline view (planned vs actual completion)
+- Phase progress indicators in TUI/Web
 
-### Phase IV - Web Dashboard (Weeks 5-6)
-- Task IV-1: Leptos + Axum setup (4h)
-- Task IV-2: Web UI components (8h)
-- Task IV-3: SSE live updates (2h)
-
-### Phase V - File Watcher (Week 7)
-- Task V-1: Notify integration with debounce (3h)
-
-### Phase VI - Testing (Week 8)
-- Task VI-1: Parser tests with fixtures (2h)
-- Task VI-2: TUI tests with snapshots (3h)
-- Task VI-3: Integration tests (2h)
+**Technical**:
+- YAML frontmatter parser for plan metadata
+- Task dependency resolution (DAG construction)
+- Session-to-task mapping via TodoWrite events
+- D3.js integration for web dependency graphs
 
 ---
 
-## Architecture Decisions
+### Phase 11: Tokens & Invocations (Q2 2026)
 
-### Why Lazy Loading?
-**Problem**: Full-parse of 3000+ sessions takes 72s (xlaude approach)
-**Solution**: Stream JSONL until `summary` event, extract metadata only
-**Result**: 4.8s initial load, 15x speedup
+**Goal**: Deep analytics for token usage and tool invocations
 
-### Why DashMap + parking_lot?
-**Problem**: High contention on session store (1000s of concurrent reads)
-**Solution**: DashMap for per-key locking, parking_lot RwLock for global state
-**Result**: No lock contention, predictable performance
+**Features**:
+- Token usage per tool (Read, Write, Bash, etc.)
+- Token usage per agent (explore, plan, test-runner)
+- Invocation patterns analysis (most used tools, chains)
+- Cost optimization suggestions (detect expensive patterns)
+- Token heatmap per session/project
+- Tool efficiency metrics (tokens per invocation)
 
-### Why SQLite cache?
-**Problem**: Metadata extraction dominates startup (4.8s)
-**Solution**: MessagePack-serialized cache in `~/.cache/ccboard/metadata.bin`
-**Result**: 89x speedup (4.8s → 224ms cold start)
-
-### Why Moka over LRU?
-**Problem**: Session content can be large (10MB+), need eviction policy
-**Solution**: Moka with time-based expiry (5 min) + size-based LRU
-**Result**: Bounded memory, automatic cleanup
+**Technical**:
+- JSONL parser enhancement for `usage` object extraction
+- Tool invocation counting via message role analysis
+- Cost calculation per tool (using Claude pricing)
+- Heatmap visualization (TUI: ratatui charts, Web: Chart.js)
 
 ---
 
-## Performance Targets
+### Phase 12: Write Operations (Q3 2026)
 
-### Phase I (MVP) - ✅ Validated
-- ✅ Initial load <2s for 1000 sessions (1.5s measured)
-- ✅ Memory <100MB metadata (45 MB measured)
-- ✅ Detail view <200ms cache miss (150ms measured)
+**Goal**: Enable configuration editing from TUI/Web
 
-### Phase II (Polish)
-- ⏳ TUI responsive <100ms (all operations)
-- ⏳ Search <1s for 1000 sessions
+**⚠️ Safety-First Design**:
+- Backup before any write operation (`~/.claude/.backups/`)
+- Dry-run mode showing diff before applying
+- Rollback capability (restore from backup)
+- Audit log for all config changes
 
-### Phase III (Advanced)
-- ⏳ Inverted index: search <50ms
-- ⏳ Export CSV/JSON <500ms
+**Features**:
+- Edit settings.json from Config tab (global, project, local)
+- Create/edit/delete hooks from Hooks tab
+- Create/edit agents/commands/skills from Agents tab
+- Toggle MCP servers from MCP tab
+- Settings validation before write (JSON schema)
 
-### Phase IV (Web)
-- ⏳ Web SSE latency <100ms
-- ⏳ First contentful paint <1s
-
-### Phase V (Watcher)
-- ⏳ File change detection <500ms (debounced)
-- ⏳ Incremental update <100ms
-
----
-
-## Contributing
-
-See detailed development plan in `claudedocs/ACTION_PLAN.md` (95KB)
-
-**Current focus**: Phase II - TUI Polish (Sessions tab navigation)
+**Technical**:
+- JSON schema validation via `jsonschema` crate
+- YAML frontmatter validation for agents/commands/skills
+- Atomic writes (temp file → rename pattern)
+- File watching integration for live reload after edit
 
 ---
 
-**Maintainer**: Florian Bruniaux
-**License**: MIT OR Apache-2.0
-**Repository**: https://github.com/FlorianBruniaux/ccboard
+### Phase 13: Team & Collaboration (Q3 2026)
+
+**Goal**: Multi-user ccboard for team Claude Code monitoring
+
+**Features**:
+- Central server aggregating multiple `~/.claude` directories
+- Team dashboard (all members' stats aggregated)
+- Project sharing (multiple devs working on same project)
+- Cost allocation per developer
+- Leaderboard (tokens, sessions, projects)
+
+**Technical**:
+- Server mode: `ccboard server --port 8080 --team-config team.toml`
+- Agent-based directory sync (poll each dev's `~/.claude`)
+- User authentication (token-based, no passwords)
+- PostgreSQL backend for multi-user data
+
+---
+
+### Phase 14: IDE Integrations (Q4 2026)
+
+**Goal**: Launch ccboard from IDEs (VS Code, Neovim, JetBrains)
+
+**Features**:
+- VS Code extension: Show session stats in sidebar
+- Neovim plugin: Floating window with dashboard
+- JetBrains plugin: Tool window with config viewer
+- Quick actions: Resume session, search history, open config
+
+**Technical**:
+- VS Code: TypeScript extension + Webview API
+- Neovim: Lua plugin + terminal buffer
+- JetBrains: Kotlin plugin + Tool Window API
+- IPC via `ccboard --json` commands (JSON RPC)
+
+---
+
+### Phase 15: CI/CD Integration (Q4 2026)
+
+**Goal**: Generate reports for CI pipelines
+
+**Features**:
+- CLI report generation: `ccboard report --format json --since 1d`
+- Token budget enforcement (fail CI if budget exceeded)
+- Session quality gates (fail if error rate > 10%)
+- Cost tracking per PR/branch
+- GitHub Actions integration (automatic reports on PRs)
+
+**Technical**:
+- `ccboard report` command with JSON/Markdown/HTML output
+- Exit codes for CI failures (non-zero if budget exceeded)
+- GitHub Action manifest (`action.yml`)
+- Artifact upload for report storage
+
+---
+
+## Archived/Completed Phases
+
+For historical phases (Phase I-VI, Phase G), see:
+- `claudedocs/archive/roadmap-phase-i.md` (original roadmap)
+- `CHANGELOG.md` (detailed release history)
+
+---
+
+## Contributing to Roadmap
+
+Have ideas for new features? Open a [GitHub Discussion](https://github.com/FlorianBruniaux/ccboard/discussions) or [Issue](https://github.com/FlorianBruniaux/ccboard/issues) with:
+- **Use case**: What problem does it solve?
+- **Priority**: How critical is it?
+- **Complexity**: Rough estimate (hours/days/weeks)
+- **Alternatives**: Any existing solutions?
+
+Maintainer will review and potentially add to roadmap with priority/phase assignment.
+
+---
+
+**Last Updated**: 2026-02-09
+**Current Version**: v0.5.0

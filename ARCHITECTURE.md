@@ -1,7 +1,7 @@
 # ccboard Architecture
 
-**Version**: 0.4.0
-**Last Updated**: 2026-02-06
+**Version**: 0.5.0
+**Last Updated**: 2026-02-09
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
@@ -593,9 +593,10 @@ async fn sse_handler(
 ### Current Status
 
 - ✅ Axum backend (4 routes + SSE)
-- ❌ Leptos frontend (declared but not implemented)
+- ✅ Leptos frontend (5 pages: Dashboard, Sessions, Analytics, Config, History)
+- ✅ Full TUI/Web parity (100%) - Phase G Complete
 
-**Roadmap**: Phase F (Web UI) → Leptos components + routing.
+**Architecture**: Leptos WASM frontend (port 3333) communicates with Axum backend (port 8080) via REST API + SSE for live updates. Sprint 1 UX improvements include config modal, elevation system, and responsive design.
 
 ---
 
