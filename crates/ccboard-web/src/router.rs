@@ -218,6 +218,20 @@ async fn stats_handler(
                     "avgSessionCost".to_string(),
                     serde_json::json!(avg_session_cost),
                 );
+
+                // Add cache hit ratio
+                let cache_hit_ratio = s.cache_hit_ratio();
+                obj.insert(
+                    "cacheHitRatio".to_string(),
+                    serde_json::json!(cache_hit_ratio),
+                );
+
+                // Add MCP servers count
+                let mcp_count = store.mcp_config().map(|c| c.servers.len()).unwrap_or(0);
+                obj.insert(
+                    "mcpServersCount".to_string(),
+                    serde_json::json!(mcp_count),
+                );
             }
 
             axum::Json(value)

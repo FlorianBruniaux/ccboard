@@ -79,6 +79,11 @@ pub fn Dashboard() -> impl IntoView {
                             let this_week = data.this_week_tokens();
                             let daily_tokens = data.daily_tokens_30d();
 
+                            // Additional KPIs
+                            let total_messages = data.total_messages;
+                            let cache_hit = data.cache_hit_ratio * 100.0; // Convert to percentage
+                            let mcp_servers = data.mcp_servers_count;
+
                             // Determine color based on cost (example thresholds)
                             let cost_color = if total_cost > 100.0 {
                                 CardColor::Red
@@ -125,6 +130,24 @@ pub fn Dashboard() -> impl IntoView {
                                             label="This Week Tokens".to_string()
                                             value=format_number(this_week)
                                             icon="🔥".to_string()
+                                            color=CardColor::Default
+                                        />
+                                        <StatsCard
+                                            label="Total Messages".to_string()
+                                            value=format_number(total_messages)
+                                            icon="💬".to_string()
+                                            color=CardColor::Default
+                                        />
+                                        <StatsCard
+                                            label="Cache Hit Rate".to_string()
+                                            value=format!("{:.1}%", cache_hit)
+                                            icon="⚡".to_string()
+                                            color=if cache_hit > 90.0 { CardColor::Green } else if cache_hit > 70.0 { CardColor::Yellow } else { CardColor::Red }
+                                        />
+                                        <StatsCard
+                                            label="MCP Servers".to_string()
+                                            value=mcp_servers.to_string()
+                                            icon="🔌".to_string()
                                             color=CardColor::Default
                                         />
                                     </div>

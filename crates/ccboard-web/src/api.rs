@@ -46,6 +46,10 @@ pub struct StatsData {
     pub this_month_cost: f64,
     #[serde(default)]
     pub avg_session_cost: f64,
+    #[serde(default)]
+    pub cache_hit_ratio: f64,
+    #[serde(default)]
+    pub mcp_servers_count: usize,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
