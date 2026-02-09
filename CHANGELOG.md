@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-02-10
+
+### Documentation
+- **Installation guide clarity**: Prioritize `cargo install`, explain tier system (macOS tested, Linux/Windows community-tested)
+- **Troubleshooting section**: Common issues + solutions (stats not loading, WASM compilation, port conflicts, Linux file manager, Windows terminal rendering)
+- **Platform support transparency**: Clear tier system with emoji indicators (✅ macOS tested, ⚠️ Linux CI-tested, 🧪 Windows experimental)
+- **Future package managers**: Define explicit thresholds (100+ stars + community demand) for Homebrew/Scoop/AUR
+
+### Internal
+- No code changes (documentation-only release)
+
 ## [0.5.0] - 2026-02-09
 
 ### Added - Sprint 1 UX/UI Improvements

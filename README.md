@@ -320,26 +320,97 @@ Choose your path based on your goal:
 
 ## Installation
 
-### From crates.io
+### Recommended: cargo install (requires Rust 1.85+)
 
 ```bash
 cargo install ccboard
 ```
 
-### From source
+**Why cargo?** ccboard's target audience (Claude Code users) already has Rust installed. This ensures compatibility and freshness.
+
+### Alternative: Pre-built binaries
+
+Download from [GitHub Releases](https://github.com/FlorianBruniaux/ccboard/releases/latest):
+
+| Platform | Status | Download |
+|----------|--------|----------|
+| **macOS** (x86_64/ARM64) | ✅ Fully tested | [ccboard-macos-*.tar.gz](https://github.com/FlorianBruniaux/ccboard/releases) |
+| **Linux** (x86_64/ARM64) | ⚠️ Community-tested | [ccboard-linux-*.tar.gz](https://github.com/FlorianBruniaux/ccboard/releases) |
+| **Windows** (x86_64) | 🧪 Experimental | [ccboard-windows-*.exe.zip](https://github.com/FlorianBruniaux/ccboard/releases) |
+
+**Platform support:**
+- ✅ **macOS**: Manually tested on every release
+- ⚠️ **Linux**: CI-tested, community validation welcome
+- 🧪 **Windows**: Best-effort support (feedback appreciated)
+
+### Future: Package managers
+
+Once ccboard reaches **100+ stars** and community demand justifies it:
+- Homebrew (macOS/Linux)
+- Scoop (Windows)
+- AUR (Arch Linux)
+
+**Currently:** Focus on `cargo install` for fastest updates and compatibility.
+
+---
+
+## Troubleshooting
+
+### "Stats not loading" or "No sessions found"
+
+Run Claude Code at least once to generate `~/.claude` directory:
 
 ```bash
-git clone https://github.com/FlorianBruniaux/ccboard.git
-cd ccboard
-cargo build --release
+claude  # Or use Claude Code via IDE
 ```
 
-Binary location: `target/release/ccboard` (~5.8MB)
+Then relaunch ccboard.
 
-### Requirements
+### "WASM compilation failed" (Web mode)
 
-- Rust 1.85+ (for development)
-- Claude Code installed with `~/.claude` directory
+Ensure trunk is installed:
+
+```bash
+cargo install trunk
+trunk --version  # Should be 0.18+
+```
+
+Then rebuild:
+
+```bash
+cd ccboard-web
+trunk build --release
+```
+
+### "Connection refused" (Web mode)
+
+Check if backend port is in use:
+
+```bash
+lsof -i :8080  # macOS/Linux
+netstat -ano | findstr :8080  # Windows
+```
+
+Change port if needed:
+
+```bash
+ccboard web --port 3333
+```
+
+### Linux: "File manager not opening"
+
+Install xdg-utils:
+
+```bash
+sudo apt install xdg-utils  # Debian/Ubuntu
+sudo dnf install xdg-utils  # Fedora
+```
+
+### Windows: Terminal rendering issues
+
+Use Windows Terminal (not cmd.exe) for proper Unicode support:
+- Download: [Windows Terminal](https://aka.ms/terminal)
+- Braille spinners `⠋⠙⠹` render correctly in Windows Terminal
 
 ---
 
