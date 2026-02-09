@@ -216,7 +216,7 @@ Located in `ccboard-web/src/`:
 - Features: Token usage forecast, session management, real-time updates
 - Design: Dark mode with cyan/blue palette
 
-**Architecture**: Frontend (port 3333) communicates with backend (port 8080) via REST API.
+**Architecture**: Frontend (port 3333) communicates with backend (port 8080) via REST API. See [docs/API.md](../docs/API.md) for complete API documentation (endpoints, SSE, CORS, examples).
 
 ## Error Handling
 

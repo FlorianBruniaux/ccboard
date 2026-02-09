@@ -813,7 +813,12 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - Task completion tracking
 - Progress indicators per phase
 
-For detailed roadmap, see [PLAN.md](claudedocs/PLAN.md).
+For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [PLAN.md](claudedocs/PLAN.md).
+
+**Documentation**:
+- [API Documentation](docs/API.md) - REST API and SSE endpoints for Web UI
+- [Architecture](ARCHITECTURE.md) - Technical architecture and design patterns
+- [Contributing](CONTRIBUTING.md) - Development guidelines and workflow
 
 ---
 
