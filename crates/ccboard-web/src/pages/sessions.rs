@@ -8,10 +8,7 @@ use leptos::prelude::*;
 use serde::Deserialize;
 use wasm_bindgen::JsCast;
 
-/// API base URL constant (shared with api.rs)
-#[cfg(debug_assertions)]
-const API_BASE_URL: &str = "http://localhost:8080";
-#[cfg(not(debug_assertions))]
+/// API base URL constant (empty = relative URL, same origin)
 const API_BASE_URL: &str = "";
 
 /// API response for paginated sessions

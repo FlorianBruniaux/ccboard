@@ -3,9 +3,9 @@
 target = "index.html"
 dist = "dist"
 public_url = "/"
-# Use hydrate feature for client-side WASM build (Leptos 0.7 terminology for CSR mode)
+# Use csr feature for pure client-side rendering (no SSR)
 no_default_features = true
-features = ["hydrate"]
+features = ["csr"]
 
 # WASM optimization
 # NOTE: wasm-opt disabled due to bulk-memory validation errors

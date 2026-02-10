@@ -5,10 +5,7 @@ use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// API base URL constant
-#[cfg(debug_assertions)]
-const API_BASE_URL: &str = "http://localhost:8080";
-#[cfg(not(debug_assertions))]
+/// API base URL constant (empty = relative URL, same origin)
 const API_BASE_URL: &str = "";
 
 /// Merged config structure matching backend

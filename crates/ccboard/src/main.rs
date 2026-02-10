@@ -282,10 +282,10 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
     // Check if frontend dist/ exists
     let dist_path = std::path::Path::new("crates/ccboard-web/dist");
     if dist_path.exists() && dist_path.join("index.html").exists() {
-        println!("\n🌐 Backend API + Frontend: http://127.0.0.1:{}", port);
-        println!("   API endpoints:          http://127.0.0.1:{}/api/*", port);
+        println!("\n🌐 Backend API + Frontend: http://localhost:{}", port);
+        println!("   API endpoints:          http://localhost:{}/api/*", port);
     } else {
-        println!("\n🌐 Backend API only:       http://127.0.0.1:{}/api/*", port);
+        println!("\n🌐 Backend API only:       http://localhost:{}/api/*", port);
         println!("   💡 Run 'trunk build' to compile frontend");
     }
 
@@ -357,9 +357,9 @@ async fn run_both(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> 
     // Check if frontend dist/ exists
     let dist_path = std::path::Path::new("crates/ccboard-web/dist");
     if dist_path.exists() && dist_path.join("index.html").exists() {
-        println!("🌐 Backend API + Frontend: http://127.0.0.1:{}", port);
+        println!("🌐 Backend API + Frontend: http://localhost:{}", port);
     } else {
-        println!("🌐 Backend API only:       http://127.0.0.1:{}/api/*", port);
+        println!("🌐 Backend API only:       http://localhost:{}/api/*", port);
         println!("   💡 Run 'trunk build' to compile frontend");
     }
 

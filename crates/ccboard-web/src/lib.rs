@@ -29,11 +29,11 @@ pub async fn run(store: std::sync::Arc<ccboard_core::DataStore>, port: u16) -> a
 
     let router = create_router(store);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = TcpListener::bind(addr).await?;
 
-    info!("Web server listening on http://{}", addr);
-    println!("Web server listening on http://{}", addr);
+    info!("Web server listening on http://localhost:{}", port);
+    println!("Web server listening on http://localhost:{}", port);
 
     axum::serve(listener, router).await?;
 

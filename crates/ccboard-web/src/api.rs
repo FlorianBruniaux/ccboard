@@ -5,12 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// API base URL - points to Axum backend
-/// In dev: Trunk (3333) → Axum (8080)
-/// In prod: Same origin (integrated server)
-#[cfg(debug_assertions)]
-const API_BASE_URL: &str = "http://localhost:8080";
-
-#[cfg(not(debug_assertions))]
+/// Backend and frontend are served from the same origin (port 3333 by default)
+/// Use empty string for relative URLs (works in both dev and prod)
 const API_BASE_URL: &str = "";
 
 /// Stats data structure matching backend API response

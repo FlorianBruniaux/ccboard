@@ -19,6 +19,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["ssr"]
 ssr = ["leptos/ssr", "leptos_axum", "dep:axum", "dep:tower-http", "dep:tokio", "dep:tokio-stream", "dep:tracing", "dep:ccboard-core", "dep:futures", "dep:anyhow", "dep:serde_yaml"]
 hydrate = ["leptos/hydrate"]
+csr = ["leptos/csr"]
 
 [dependencies]
 # Backend only - NOT compiled in WASM

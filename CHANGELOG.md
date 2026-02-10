@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-02-10
+
+### Fixed
+- **Web frontend API communication**: Fixed URL configuration for proper frontend-backend communication
+  - Changed hardcoded `http://localhost:8080` URLs to relative paths (`""`) in 7 frontend modules
+  - Fixed Leptos CSR feature configuration (was incorrectly using `hydrate` instead of `csr`)
+  - Server now binds to `0.0.0.0` allowing access via both `localhost:3333` and `127.0.0.1:3333`
+  - Updated display messages to show `http://localhost:3333` for better user experience
+  - Resolves issue where web interface would load initially but hang on "Loading..." when navigating between pages
+
 ## [0.5.1] - 2026-02-10
 
 ### Added
