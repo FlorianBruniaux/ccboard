@@ -159,11 +159,13 @@ pub fn Sessions() -> impl IntoView {
                     toast.success(format!("New session: {}", id));
                 }
                 SseEvent::SessionUpdated { id } => {
-                    sessions_resource.refetch();
+                    // Don't refetch on every update - too expensive with 4000+ sessions
+                    // User can manually refresh if needed
                     toast.info(format!("Session updated: {}", id));
                 }
                 SseEvent::StatsUpdated => {
-                    sessions_resource.refetch();
+                    // Don't refetch sessions list when stats change
+                    // Only dashboard needs this
                 }
                 _ => {}
             }
