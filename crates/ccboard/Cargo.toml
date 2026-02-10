@@ -41,5 +41,6 @@ dirs.workspace = true
 
 # CLI Utilities
 comfy-table = "7"
+indicatif = "0.17"
 serde_json.workspace = true
 chrono.workspace = true

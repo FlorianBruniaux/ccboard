@@ -354,6 +354,103 @@ Download from [GitHub Releases](https://github.com/FlorianBruniaux/ccboard/relea
 
 ---
 
+## Usage
+
+### TUI Mode (Default)
+
+```bash
+ccboard              # Launch TUI dashboard
+ccboard stats        # Print stats and exit
+ccboard search "query"   # Search sessions
+ccboard recent 10    # Show 10 most recent sessions
+```
+
+### Web Mode
+
+ccboard has **2 web workflows** depending on your use case:
+
+#### Option 1: Production (Single Command) ⭐ Recommended
+
+**For**: Running the full stack (API + Frontend) in production or for general use.
+
+```bash
+# Step 1: Compile frontend once (run in ccboard repo root)
+trunk build --release
+
+# Step 2: Start server (serves API + static frontend)
+ccboard web
+```
+
+**Output**:
+```
+⠋ Loading sessions and statistics...
+✓ Ready in 2.34s (1,247 sessions loaded)
+
+🌐 Backend API + Frontend: http://127.0.0.1:3333
+   API endpoints:          http://127.0.0.1:3333/api/*
+```
+
+**Features**:
+- ✅ Single process, single port
+- ✅ Serves backend API (`/api/*`) + frontend static files
+- ✅ Real-time data updates via Server-Sent Events (SSE)
+- ❌ No hot reload (need `trunk build` + F5 after code changes)
+
+**When to use**: Daily use, demos, production, or when you just want the web interface running.
+
+---
+
+#### Option 2: Development (Hot Reload) 🔧
+
+**For**: Developing the frontend with automatic recompilation and browser refresh.
+
+```bash
+# Terminal 1: Start backend API
+ccboard web --port 8080
+
+# Terminal 2: Start frontend dev server (run in ccboard repo root)
+trunk serve --port 3333
+```
+
+**Output Terminal 1**:
+```
+🌐 Backend API only:       http://127.0.0.1:8080/api/*
+   💡 Run 'trunk build' to compile frontend
+```
+
+**Output Terminal 2**:
+```
+📦 Starting build...
+✅ Success! App is being served at: http://127.0.0.1:3333
+```
+
+**Features**:
+- ✅ Real-time data updates via SSE
+- ✅ **Hot reload**: Frontend code changes auto-recompile and refresh browser
+- ✅ Separate logs for backend and frontend
+- ❌ Two terminals required
+
+**When to use**: When developing the Leptos frontend (editing `crates/ccboard-web/src/**/*.rs`).
+
+**Note**: `trunk serve` automatically proxies `/api/*` requests to `http://localhost:8080` via Trunk.toml config.
+
+---
+
+### Dual Mode (TUI + Web)
+
+Run both TUI and web server simultaneously:
+
+```bash
+ccboard both --port 3333
+```
+
+- Web server runs in background
+- TUI runs in foreground
+- Shared DataStore (same data, live updates)
+- Press `q` in TUI to exit both
+
+---
+
 ## Troubleshooting
 
 ### "Stats not loading" or "No sessions found"

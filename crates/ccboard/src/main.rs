@@ -27,9 +27,21 @@ use std::sync::Arc;
                   \n\
                   Examples:\n\
                     ccboard                          # Run TUI (default)\n\
-                    ccboard web --port 8080          # Run web interface on port 8080\n\
+                    ccboard web                      # Run web (API + frontend if built)\n\
+                    ccboard web --port 8080          # Custom port\n\
+                    ccboard both                     # Run both TUI and web server\n\
                     ccboard stats                    # Print stats summary\n\
-                    ccboard --project ~/myproject    # Focus on specific project\n\
+                    ccboard search \"query\"           # Search sessions\n\
+                    ccboard recent 10                # Show 10 most recent sessions\n\
+                    \n\
+                  Web Frontend Workflow:\n\
+                    # Option 1: Production (single command)\n\
+                    trunk build --release            # Compile frontend once\n\
+                    ccboard web                      # Serves API + static frontend\n\
+                    \n\
+                    # Option 2: Development (hot reload)\n\
+                    ccboard web --port 8080          # Terminal 1: API server\n\
+                    trunk serve --port 3333          # Terminal 2: Frontend dev server\n\
                   \n\
                   Environment Variables:\n\
                     CCBOARD_CLAUDE_HOME              # Override Claude home directory\n\
@@ -206,16 +218,34 @@ async fn run_tui(claude_home: PathBuf, project: Option<PathBuf>) -> Result<()> {
 }
 
 async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> Result<()> {
+    use indicatif::{ProgressBar, ProgressStyle};
+    use std::time::Instant;
+
+    let start = Instant::now();
+
+    // Create spinner
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+    );
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
     // Initialize data store
+    spinner.set_message("Initializing data store...");
     let store = Arc::new(DataStore::with_defaults(
         claude_home.clone(),
         project.clone(),
     ));
 
     // Load initial data
+    spinner.set_message("Loading sessions and statistics...");
     let report = store.initial_load().await;
 
     if report.has_fatal_errors() {
+        spinner.finish_and_clear();
         eprintln!("Fatal errors during data load:");
         for error in report.errors.iter() {
             eprintln!("  - {}: {}", error.source, error.message);
@@ -224,12 +254,15 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
     }
 
     // Compute invocation statistics (agents/commands/skills usage)
+    spinner.set_message("Computing invocation statistics...");
     store.compute_invocations().await;
 
     // Compute billing blocks (5h usage tracking)
+    spinner.set_message("Computing billing blocks...");
     store.compute_billing_blocks().await;
 
     // Start file watcher for live updates
+    spinner.set_message("Starting file watcher...");
     let _watcher = ccboard_core::FileWatcher::start(
         claude_home,
         project,
@@ -239,21 +272,55 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
     .await
     .context("Failed to start file watcher")?;
 
-    // Run web server
+    let elapsed = start.elapsed();
+    spinner.finish_with_message(format!(
+        "✓ Ready in {:.2}s ({} sessions loaded)",
+        elapsed.as_secs_f64(),
+        report.sessions_scanned
+    ));
+
+    // Check if frontend dist/ exists
+    let dist_path = std::path::Path::new("crates/ccboard-web/dist");
+    if dist_path.exists() && dist_path.join("index.html").exists() {
+        println!("\n🌐 Backend API + Frontend: http://127.0.0.1:{}", port);
+        println!("   API endpoints:          http://127.0.0.1:{}/api/*", port);
+    } else {
+        println!("\n🌐 Backend API only:       http://127.0.0.1:{}/api/*", port);
+        println!("   💡 Run 'trunk build' to compile frontend");
+    }
+
     ccboard_web::run(store, port).await
 }
 
 async fn run_both(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> Result<()> {
+    use indicatif::{ProgressBar, ProgressStyle};
+    use std::time::Instant;
+
+    let start = Instant::now();
+
+    // Create spinner
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+    );
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
     // Initialize data store
+    spinner.set_message("Initializing data store...");
     let store = Arc::new(DataStore::with_defaults(
         claude_home.clone(),
         project.clone(),
     ));
 
     // Load initial data
+    spinner.set_message("Loading sessions and statistics...");
     let report = store.initial_load().await;
 
     if report.has_fatal_errors() {
+        spinner.finish_and_clear();
         eprintln!("Fatal errors during data load:");
         for error in report.errors.iter() {
             eprintln!("  - {}: {}", error.source, error.message);
@@ -262,12 +329,15 @@ async fn run_both(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> 
     }
 
     // Compute invocation statistics (agents/commands/skills usage)
+    spinner.set_message("Computing invocation statistics...");
     store.compute_invocations().await;
 
     // Compute billing blocks (5h usage tracking)
+    spinner.set_message("Computing billing blocks...");
     store.compute_billing_blocks().await;
 
     // Start file watcher for live updates (shared by TUI and web)
+    spinner.set_message("Starting file watcher...");
     let _watcher = ccboard_core::FileWatcher::start(
         claude_home.clone(),
         project.clone(),
@@ -276,6 +346,22 @@ async fn run_both(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> 
     )
     .await
     .context("Failed to start file watcher")?;
+
+    let elapsed = start.elapsed();
+    spinner.finish_with_message(format!(
+        "✓ Ready in {:.2}s ({} sessions loaded)",
+        elapsed.as_secs_f64(),
+        report.sessions_scanned
+    ));
+
+    // Check if frontend dist/ exists
+    let dist_path = std::path::Path::new("crates/ccboard-web/dist");
+    if dist_path.exists() && dist_path.join("index.html").exists() {
+        println!("🌐 Backend API + Frontend: http://127.0.0.1:{}", port);
+    } else {
+        println!("🌐 Backend API only:       http://127.0.0.1:{}/api/*", port);
+        println!("   💡 Run 'trunk build' to compile frontend");
+    }
 
     // Start web server in background
     let web_store = Arc::clone(&store);
