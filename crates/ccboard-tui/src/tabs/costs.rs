@@ -693,11 +693,15 @@ impl CostsTab {
         }
 
         let model_name = parts[0];
-        let capitalized = format!(
-            "{}{}",
-            model_name.chars().next().unwrap_or(' ').to_uppercase(),
-            &model_name[1.min(model_name.len())..]
-        );
+        let capitalized = if let Some(first_char) = model_name.chars().next() {
+            format!(
+                "{}{}",
+                first_char.to_uppercase(),
+                model_name.chars().skip(1).collect::<String>()
+            )
+        } else {
+            String::new()
+        };
 
         if parts.len() >= 3 {
             let p1_numeric = parts[1].chars().all(|c| c.is_ascii_digit());
@@ -936,14 +940,15 @@ impl CostsTab {
                     .first_user_message
                     .as_ref()
                     .map(|s| {
-                        let truncated = if s.len() > 40 {
-                            format!("{}...", &s[..37])
+                        let truncated = if s.chars().count() > 40 {
+                            let truncated: String = s.chars().take(37).collect();
+                            format!("{}...", truncated)
                         } else {
                             s.clone()
                         };
                         truncated
                     })
-                    .unwrap_or_else(|| session.id.as_str()[..session.id.len().min(20)].to_string());
+                    .unwrap_or_else(|| session.id.chars().take(20).collect::<String>());
 
                 Row::new(vec![
                     medal.to_string(),
