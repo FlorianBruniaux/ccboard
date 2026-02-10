@@ -8,7 +8,7 @@
 
 use crate::cache::MetadataCache;
 use crate::error::{CoreError, LoadError, LoadReport};
-use crate::models::{SessionLine, SessionMetadata, session::SessionSummary};
+use crate::models::{session::SessionSummary, SessionLine, SessionMetadata};
 use crate::parsers::filters::is_meaningful_user_message;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -623,7 +623,7 @@ impl SessionIndexParser {
 mod tests {
     use super::*;
     use std::io::Write;
-    use tempfile::{NamedTempFile, tempdir};
+    use tempfile::{tempdir, NamedTempFile};
 
     #[test]
     fn test_normalize_branch_plain() {
@@ -703,10 +703,9 @@ mod tests {
         assert_eq!(meta.duration_seconds, Some(60));
         assert!(meta.first_user_message.is_some());
         assert!(meta.first_user_message.unwrap().contains("Hello"));
-        assert!(
-            meta.models_used
-                .contains(&"claude-sonnet-4-20250514".to_string())
-        );
+        assert!(meta
+            .models_used
+            .contains(&"claude-sonnet-4-20250514".to_string()));
     }
 
     #[tokio::test]

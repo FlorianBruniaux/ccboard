@@ -1,11 +1,11 @@
 use ratatui::{
-    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::Span,
     widgets::{
         Block, Borders, List, ListItem, ListState, Scrollbar, ScrollbarOrientation, ScrollbarState,
     },
+    Frame,
 };
 
 /// Reusable list pane component for displaying selectable items

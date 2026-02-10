@@ -32,7 +32,7 @@ pub fn open_in_editor(file_path: &Path) -> Result<()> {
     // Exit alternate screen and disable raw mode
     use crossterm::{
         execute,
-        terminal::{LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+        terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
     };
     use std::io::stdout;
 
@@ -118,7 +118,7 @@ pub fn resume_claude_session(session_id: &str) -> Result<()> {
     // Exit alternate screen and disable raw mode
     use crossterm::{
         execute,
-        terminal::{LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+        terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
     };
     use std::io::stdout;
 
@@ -165,8 +165,13 @@ fn get_default_editor() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
+
+    // Note: These tests manipulate environment variables which are process-global.
+    // The #[serial] attribute ensures they run sequentially to prevent race conditions.
 
     #[test]
+    #[serial]
     fn test_get_editor_command_visual() {
         unsafe {
             env::set_var("VISUAL", "vim");
@@ -176,6 +181,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_editor_command_editor() {
         unsafe {
             env::remove_var("VISUAL");
@@ -186,6 +192,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_editor_command_default() {
         unsafe {
             env::remove_var("VISUAL");

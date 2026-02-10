@@ -1,11 +1,11 @@
 use crate::app::Tab;
 use crossterm::event::KeyCode;
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    Frame,
 };
 
 /// Action triggered by a command

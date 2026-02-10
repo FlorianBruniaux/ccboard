@@ -4,7 +4,6 @@ use crate::components::highlight_matches;
 use ccboard_core::models::{SessionMetadata, StatsCache};
 use chrono::Local;
 use ratatui::{
-    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -12,6 +11,7 @@ use ratatui::{
         Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
         ScrollbarState, Sparkline,
     },
+    Frame,
 };
 use std::sync::Arc;
 

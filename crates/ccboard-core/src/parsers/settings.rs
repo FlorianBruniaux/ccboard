@@ -211,7 +211,7 @@ impl SettingsParser {
 mod tests {
     use super::*;
     use std::io::Write;
-    use tempfile::{NamedTempFile, tempdir};
+    use tempfile::{tempdir, NamedTempFile};
 
     #[tokio::test]
     async fn test_parse_valid_settings() {

@@ -77,13 +77,11 @@ impl InvocationParser {
                 Err(_) => continue,
             };
 
-            // Detect agents: Task tool with subagent_type
+            // Detect agents and skills from assistant messages (tool_use content)
             if let Some(ref message) = session_line.message {
                 if let Some(ref content) = message.content {
                     // Content is now Value (can be String or Array)
-                    if let Some(content_str) = content.as_str() {
-                        self.extract_invocations(content_str, &mut stats);
-                    } else if let Some(content_array) = content.as_array() {
+                    if let Some(content_array) = content.as_array() {
                         for item in content_array {
                             if let Some(obj) = item.as_object() {
                                 // Check for Task tool
@@ -210,7 +208,7 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         writeln!(
             file,
-            r#"{{"type": "assistant", "message": {{"content": "[{{\"type\":\"tool_use\",\"name\":\"Task\",\"input\":{{\"subagent_type\":\"technical-writer\",\"description\":\"Create docs\"}}}}]"}}}}"#
+            r#"{{"type": "assistant", "message": {{"content": [{{"type":"tool_use","name":"Task","input":{{"subagent_type":"technical-writer","description":"Create docs"}}}}]}}}}"#
         )
         .unwrap();
 
@@ -226,7 +224,7 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         writeln!(
             file,
-            r#"{{"type": "assistant", "message": {{"content": "[{{\"type\":\"tool_use\",\"name\":\"Skill\",\"input\":{{\"skill\":\"pdf-generator\"}}}}]"}}}}"#
+            r#"{{"type": "assistant", "message": {{"content": [{{"type":"tool_use","name":"Skill","input":{{"skill":"pdf-generator"}}}}]}}}}"#
         )
         .unwrap();
 

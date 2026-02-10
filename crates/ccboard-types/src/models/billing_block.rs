@@ -25,7 +25,7 @@ impl BillingBlock {
     ///
     /// ```
     /// use chrono::{DateTime, Utc, TimeZone};
-    /// use ccboard_core::models::BillingBlock;
+    /// use ccboard_types::models::BillingBlock;
     ///
     /// let timestamp = Utc.with_ymd_and_hms(2026, 2, 2, 14, 30, 0).unwrap();
     /// let block = BillingBlock::from_timestamp(&timestamp);

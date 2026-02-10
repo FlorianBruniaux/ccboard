@@ -1,9 +1,9 @@
 use ratatui::{
-    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::Span,
     widgets::{Block, Borders, Paragraph, Wrap},
+    Frame,
 };
 
 /// Reusable detail pane component for displaying content

@@ -1,11 +1,11 @@
 //! Toast notification component
 
 use ratatui::{
-    Frame,
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
+    Frame,
 };
 use std::time::{Duration, Instant};
 

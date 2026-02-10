@@ -3,11 +3,11 @@
 use ccboard_core::models::{MergedConfig, Settings};
 use ccboard_core::parsers::{McpConfig, Rules};
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    Frame,
 };
 
 /// Config tab state

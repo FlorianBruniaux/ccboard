@@ -1,8 +1,8 @@
 //! Integration tests for metadata cache with real sessions
 
-use ccboard_core::DataStore;
 use ccboard_core::cache::MetadataCache;
 use ccboard_core::parsers::SessionIndexParser;
+use ccboard_core::DataStore;
 use std::sync::Arc;
 
 #[tokio::test]

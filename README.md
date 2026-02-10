@@ -917,13 +917,29 @@ This project was developed following Test-Driven Development (TDD) principles wi
 
 ---
 
+## Author
+
+**Florian Bruniaux** - Independent Developer
+🌐 [florian.bruniaux.com](https://florian.bruniaux.com/) | 💼 [LinkedIn](https://www.linkedin.com/in/florianbruniaux/) | 🐙 [GitHub](https://github.com/FlorianBruniaux)
+
+---
+
 ## Links
+
+### Project
 
 - **Repository**: https://github.com/FlorianBruniaux/ccboard
 - **Issues**: https://github.com/FlorianBruniaux/ccboard/issues
 - **Releases**: https://github.com/FlorianBruniaux/ccboard/releases
 - **Crates.io**: https://crates.io/crates/ccboard (coming soon)
 - **Documentation**: [PLAN.md](claudedocs/PLAN.md) | [CHANGELOG.md](CHANGELOG.md)
+
+### Related Projects
+
+- **[RTK (Rust Token Killer)](https://github.com/FlorianBruniaux/rtk)** - CLI proxy for 60-90% token reduction on dev operations
+- **[Claude Code Ultimate Guide](https://cc.bruniaux.com/)** - Comprehensive guide to Claude Code CLI
+- **[ccbridge](https://ccbridge.bruniaux.com/)** - Claude Code bridge for team collaboration
+- **[Cowork Guide](https://cowork.bruniaux.com/)** - Technical coworking patterns and practices
 
 ---
 

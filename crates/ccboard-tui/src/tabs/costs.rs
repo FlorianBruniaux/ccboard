@@ -2,11 +2,11 @@
 
 use ccboard_core::models::{BillingBlockManager, StatsCache};
 use ratatui::{
-    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{BarChart, Block, Borders, Gauge, List, ListItem, ListState, Paragraph, Row, Table},
+    Frame,
 };
 
 /// Model pricing (per 1M tokens) - approximate as of 2024

@@ -1,10 +1,9 @@
 //! Analytics tab - Trends, forecasting, patterns, insights, anomalies with 5 sub-views
 
-use ccboard_core::analytics::{AnalyticsData, Period, detect_anomalies};
+use ccboard_core::analytics::{detect_anomalies, AnalyticsData, Period};
 use ccboard_core::models::session::SessionMetadata;
 use ccboard_core::store::DataStore;
 use ratatui::{
-    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     symbols,
@@ -13,6 +12,7 @@ use ratatui::{
         Axis, BarChart, Block, Borders, Cell, Chart, Dataset, GraphType, List, ListItem, Paragraph,
         Row, Sparkline, Table,
     },
+    Frame,
 };
 use std::sync::Arc;
 

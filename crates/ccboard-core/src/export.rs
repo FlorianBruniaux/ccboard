@@ -298,7 +298,7 @@ mod tests {
         let lines: Vec<&str> = contents.lines().collect();
 
         assert_eq!(lines.len(), 4); // Header + 3 blocks
-        // Most recent first
+                                    // Most recent first
         assert!(lines[1].contains("2026-02-03")); // Feb 3
         assert!(lines[2].contains("2026-02-02")); // Feb 2
         assert!(lines[3].contains("2026-02-01")); // Feb 1

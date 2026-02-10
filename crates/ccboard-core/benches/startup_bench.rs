@@ -12,7 +12,7 @@
 //! ```
 
 use ccboard_core::DataStore;
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::path::PathBuf;
 use std::time::Duration;
 

@@ -7,11 +7,11 @@
 //! - generate_insights() → <10ms
 
 use ccboard_core::analytics::{
-    AnalyticsData, Period, compute_trends, detect_patterns, forecast_usage, generate_insights,
+    compute_trends, detect_patterns, forecast_usage, generate_insights, AnalyticsData, Period,
 };
 use ccboard_core::models::session::SessionMetadata;
 use chrono::Utc;
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 
 /// Generate test sessions for benchmarking

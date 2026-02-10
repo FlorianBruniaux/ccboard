@@ -4,8 +4,8 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use ccboard_core::{DataEvent, EventBus};
 use futures::stream::Stream;
 use std::convert::Infallible;
-use tokio_stream::StreamExt;
 use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::StreamExt;
 
 /// Create an SSE stream from the event bus
 /// Takes EventBus by value (cheap clone, Arc internally)

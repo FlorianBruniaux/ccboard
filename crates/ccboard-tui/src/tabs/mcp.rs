@@ -20,11 +20,11 @@ use crate::theme::ServerStatusColor;
 use ccboard_core::parsers::mcp_config::{McpConfig, McpServer};
 use crossterm::event::KeyCode;
 use ratatui::{
-    Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    Frame,
 };
 use std::collections::HashMap;
 use std::time::Instant;

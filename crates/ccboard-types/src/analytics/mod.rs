@@ -17,11 +17,11 @@ pub mod trends;
 // #[cfg(test)]
 // mod tests;
 
-pub use anomalies::{Anomaly, AnomalyMetric, AnomalySeverity, detect_anomalies};
-pub use forecasting::{ForecastData, TrendDirection, forecast_usage};
-pub use insights::{Alert, generate_budget_alerts, generate_insights};
-pub use patterns::{UsagePatterns, detect_patterns};
-pub use trends::{SessionDurationStats, TrendsData, compute_trends};
+pub use anomalies::{detect_anomalies, Anomaly, AnomalyMetric, AnomalySeverity};
+pub use forecasting::{forecast_usage, ForecastData, TrendDirection};
+pub use insights::{generate_budget_alerts, generate_insights, Alert};
+pub use patterns::{detect_patterns, UsagePatterns};
+pub use trends::{compute_trends, SessionDurationStats, TrendsData};
 
 /// Period selection for analytics computation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

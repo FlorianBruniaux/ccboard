@@ -1,8 +1,8 @@
 //! Dashboard page component
 
 use crate::api::{fetch_recent_sessions, fetch_stats, format_cost, format_number};
-use crate::components::{CardColor, Sparkline, StatsCard, use_toast};
-use crate::sse_hook::{SseEvent, use_sse};
+use crate::components::{use_toast, CardColor, Sparkline, StatsCard};
+use crate::sse_hook::{use_sse, SseEvent};
 use crate::utils::export_as_json;
 use leptos::prelude::*;
 use leptos_router::hooks::use_navigate;

@@ -2,11 +2,11 @@
 
 use ccboard_core::error::{ErrorSeverity, LoadError};
 use ratatui::{
-    Frame,
     layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
+    Frame,
 };
 
 /// Render error panel showing LoadReport errors

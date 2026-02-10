@@ -2,7 +2,6 @@
 
 use ccboard_core::models::{HookDefinition, HookGroup, Settings};
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -10,6 +9,7 @@ use ratatui::{
         Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
         ScrollbarState,
     },
+    Frame,
 };
 use std::collections::HashMap;
 

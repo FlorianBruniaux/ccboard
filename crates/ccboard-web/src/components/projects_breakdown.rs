@@ -1,6 +1,6 @@
 //! Projects breakdown horizontal bar chart
 
-use crate::api::{ProjectCost, format_cost};
+use crate::api::{format_cost, ProjectCost};
 use leptos::prelude::*;
 
 /// Projects breakdown component

@@ -16,6 +16,6 @@ pub use detail_pane::DetailPane;
 pub use error_panel::{render_error_panel, render_error_summary};
 pub use help_modal::HelpModal;
 pub use list_pane::ListPane;
-pub use search_bar::{SearchBar, highlight_matches};
+pub use search_bar::{highlight_matches, SearchBar};
 pub use spinner::{Spinner, SpinnerStyle};
 pub use toast::{Toast, ToastManager, ToastType};

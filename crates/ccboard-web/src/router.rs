@@ -1,6 +1,6 @@
 //! Web router using Axum
 
-use axum::{Router, extract::Query, routing::get};
+use axum::{extract::Query, routing::get, Router};
 use ccboard_core::DataStore;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -133,7 +133,7 @@ async fn stats_handler(
         }
 
         let mut sorted: Vec<_> = project_costs.into_iter().collect();
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         let total_cost: f64 = sorted.iter().map(|(_, c)| c).sum();
 

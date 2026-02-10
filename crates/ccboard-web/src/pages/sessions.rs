@@ -1,8 +1,8 @@
 //! Sessions Explorer page component with server-side pagination
 
 use crate::api::SessionData;
-use crate::components::{SessionDetailModal, SessionTable, use_toast};
-use crate::sse_hook::{SseEvent, use_sse};
+use crate::components::{use_toast, SessionDetailModal, SessionTable};
+use crate::sse_hook::{use_sse, SseEvent};
 use crate::utils::{export_as_csv, export_as_json};
 use leptos::prelude::*;
 use serde::Deserialize;

@@ -217,12 +217,12 @@ impl MergedConfig {
         }
 
         // Store sources for debugging (merge global_local into global for compatibility)
-        let global_combined = if global.is_some() && global_local.is_some() {
-            let mut g = global.clone().unwrap();
-            Self::merge_into(&mut g, &global_local.unwrap());
-            Some(g)
-        } else {
-            global.or(global_local)
+        let global_combined = match (global, global_local) {
+            (Some(mut g), Some(ref gl)) => {
+                Self::merge_into(&mut g, gl);
+                Some(g)
+            }
+            (g, gl) => g.or(gl),
         };
 
         Self {

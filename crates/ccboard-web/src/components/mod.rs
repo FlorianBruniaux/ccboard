@@ -26,4 +26,4 @@ pub use session_table::{SessionTable, SortColumn, SortDirection};
 pub use sidebar::Sidebar;
 pub use sparkline::Sparkline;
 pub use stats_card::{CardColor, StatsCard};
-pub use toast::{Toast, ToastContext, ToastProvider, ToastType, use_toast};
+pub use toast::{use_toast, Toast, ToastContext, ToastProvider, ToastType};

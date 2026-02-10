@@ -3,8 +3,8 @@
 use leptos::prelude::*;
 use leptos::web_sys::{ErrorEvent, EventSource, MessageEvent};
 use serde::Deserialize;
-use wasm_bindgen::JsCast;
 use wasm_bindgen::closure::Closure;
+use wasm_bindgen::JsCast;
 
 /// SSE event types matching backend DataEvent
 #[derive(Debug, Clone, PartialEq)]
@@ -76,7 +76,7 @@ fn parse_sse_event(event_type: &str, data: &str) -> Option<SseEvent> {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// let sse_event = use_sse();
 ///
 /// Effect::new(move |_| {

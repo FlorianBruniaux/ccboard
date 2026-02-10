@@ -5,12 +5,12 @@ use ccboard_core::models::StatsCache;
 use ccboard_core::parsers::McpConfig;
 use ccboard_core::store::DataStore;
 use ratatui::{
-    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     symbols,
     text::{Line, Span},
     widgets::{Block, Borders, Gauge, Paragraph, Sparkline},
+    Frame,
 };
 use std::sync::Arc;
 

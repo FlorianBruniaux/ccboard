@@ -1,7 +1,6 @@
 //! Agents tab - Browse agents, commands, and skills from .claude directory
 
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -9,6 +8,7 @@ use ratatui::{
         Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
         ScrollbarState, Tabs,
     },
+    Frame,
 };
 use std::path::Path;
 

@@ -1,6 +1,6 @@
 //! Costs page - displays cost analysis with 4 tabs (Overview, By Model, Daily, Billing Blocks)
 
-use crate::api::{StatsData, fetch_stats};
+use crate::api::{fetch_stats, StatsData};
 use leptos::prelude::*;
 
 /// Costs page component with 4 tabs
@@ -173,7 +173,11 @@ fn CostsOverview(stats: StatsData) -> impl IntoView {
 fn CostsByModel(stats: StatsData) -> impl IntoView {
     // Sort models by cost descending
     let mut models: Vec<_> = stats.model_usage.iter().collect();
-    models.sort_by(|a, b| b.1.cost_usd.partial_cmp(&a.1.cost_usd).unwrap());
+    models.sort_by(|a, b| {
+        b.1.cost_usd
+            .partial_cmp(&a.1.cost_usd)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     view! {
         <div class="costs-by-model">

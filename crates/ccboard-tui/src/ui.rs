@@ -8,11 +8,11 @@ use crate::tabs::{
 };
 use ccboard_core::DegradedState;
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Tabs},
+    Frame,
 };
 
 /// Main UI renderer
@@ -415,7 +415,7 @@ impl Ui {
             Tab::Sessions => {
                 let sessions_by_project = app.store.sessions_by_project();
                 let live_sessions = app.live_sessions(); // Use cached live sessions
-                // Count total sessions for refresh tracking
+                                                         // Count total sessions for refresh tracking
                 let session_count: usize = sessions_by_project.values().map(|v| v.len()).sum();
                 self.sessions.mark_refreshed(session_count);
                 self.sessions

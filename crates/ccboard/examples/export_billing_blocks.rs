@@ -5,7 +5,7 @@
 //!
 //! Run with: cargo run --example export_billing_blocks
 
-use ccboard_core::{DataStore, export_billing_blocks_to_csv};
+use ccboard_core::{export_billing_blocks_to_csv, DataStore};
 use std::path::PathBuf;
 use std::sync::Arc;
 
