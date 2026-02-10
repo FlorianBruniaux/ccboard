@@ -320,13 +320,22 @@ Choose your path based on your goal:
 
 ## Installation
 
-### Recommended: cargo install (requires Rust 1.85+)
+### Recommended: Homebrew (macOS/Linux)
+
+```bash
+brew tap FlorianBruniaux/tap
+brew install ccboard
+```
+
+**Why Homebrew?** Simple one-command install, automatic updates via `brew upgrade`, no manual Rust setup required.
+
+### Alternative: cargo install (requires Rust 1.85+)
 
 ```bash
 cargo install ccboard
 ```
 
-**Why cargo?** ccboard's target audience (Claude Code users) already has Rust installed. This ensures compatibility and freshness.
+**Why cargo?** ccboard's target audience (Claude Code users) often has Rust installed. Ensures compatibility and always installs latest crates.io version.
 
 ### Alternative: Pre-built binaries
 
@@ -342,15 +351,6 @@ Download from [GitHub Releases](https://github.com/FlorianBruniaux/ccboard/relea
 - ✅ **macOS**: Manually tested on every release
 - ⚠️ **Linux**: CI-tested, community validation welcome
 - 🧪 **Windows**: Best-effort support (feedback appreciated)
-
-### Future: Package managers
-
-Once ccboard reaches **100+ stars** and community demand justifies it:
-- Homebrew (macOS/Linux)
-- Scoop (Windows)
-- AUR (Arch Linux)
-
-**Currently:** Focus on `cargo install` for fastest updates and compatibility.
 
 ---
 

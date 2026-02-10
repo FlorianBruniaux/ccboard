@@ -9,14 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.1] - 2026-02-10
 
+### Added
+- **Homebrew formula**: ccboard now available via `brew tap FlorianBruniaux/tap && brew install ccboard`
+  - macOS/Linux support
+  - Automatic updates via `brew upgrade`
+  - Added to [FlorianBruniaux/homebrew-tap](https://github.com/FlorianBruniaux/homebrew-tap)
+
 ### Documentation
-- **Installation guide clarity**: Prioritize `cargo install`, explain tier system (macOS tested, Linux/Windows community-tested)
+- **Installation guide**: Prioritize Homebrew (simplest), then cargo install, then pre-built binaries
 - **Troubleshooting section**: Common issues + solutions (stats not loading, WASM compilation, port conflicts, Linux file manager, Windows terminal rendering)
 - **Platform support transparency**: Clear tier system with emoji indicators (✅ macOS tested, ⚠️ Linux CI-tested, 🧪 Windows experimental)
-- **Future package managers**: Define explicit thresholds (100+ stars + community demand) for Homebrew/Scoop/AUR
 
 ### Internal
-- No code changes (documentation-only release)
+- No code changes (documentation + distribution-only release)
 
 ## [0.5.0] - 2026-02-09
 
