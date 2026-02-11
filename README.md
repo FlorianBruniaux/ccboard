@@ -1,6 +1,6 @@
 # ccboard
 
-**A unified TUI/Web dashboard for Claude Code management**
+**A free, open-source TUI/Web dashboard for Claude Code session monitoring, cost tracking & config management**
 
 <p align="center">
   <a href="https://github.com/FlorianBruniaux/ccboard/stargazers"><img src="https://img.shields.io/github/stars/FlorianBruniaux/ccboard?style=for-the-badge" alt="GitHub stars"/></a>
@@ -26,7 +26,7 @@
   <img src="assets/demo.gif" alt="ccboard demo" width="800"/>
 </p>
 
-> **The only actively-maintained Rust TUI** combining Claude Code monitoring, config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 281 tests, 0 clippy warnings.
+> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 281 tests, 0 clippy warnings.
 
 ---
 
@@ -238,7 +238,7 @@ Navigate tabs with `1-9`, search with `/`, refresh with `r`, quit with `q`. Pres
 
 ## Competitive Landscape
 
-ccboard vs other Claude Code monitoring tools (verified 2026-02-06):
+ccboard vs ccusage vs agtrace vs claudelytics — Claude Code monitoring tools compared (verified 2026-02-06):
 
 | Feature | **ccboard** | agtrace | claudelytics | ccusage |
 |---------|-------------|---------|--------------|---------|
