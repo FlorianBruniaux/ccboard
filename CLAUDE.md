@@ -161,7 +161,7 @@ Located in `ccboard-core/src/parsers/`:
 
 - **Initial scan**: `tokio::spawn` per project directory (up to 8 concurrent)
 - **File watcher**: `notify` crate with 500ms debounce (notify-debouncer-mini)
-- **EventBus**: `tokio::sync::broadcast` with 100 capacity
+- **EventBus**: `tokio::sync::broadcast` with 256 capacity
 - **SQLite Cache**: Thread-safe reads, lazy on-demand content loading
 
 ### Performance Optimizations (v0.4.0)
@@ -181,11 +181,11 @@ ccboard reads from `~/.claude` and optional project `.claude/`:
 | Global settings | `~/.claude/settings.json` | `SettingsParser` | JSON with merge |
 | Project settings | `.claude/settings.json` | `SettingsParser` | JSON with merge |
 | Local settings | `.claude/settings.local.json` | `SettingsParser` | JSON (highest priority) |
-| MCP config | `~/.claude/claude_desktop_config.json` | TODO | JSON |
+| MCP config | `~/.claude/claude_desktop_config.json` | `McpConfig` parser | JSON |
 | Sessions | `~/.claude/projects/<path>/<id>.jsonl` | `SessionIndexParser` | Streaming JSONL |
-| Tasks | `~/.claude/tasks/<list-id>/<task-id>.json` | TODO | JSON |
+| Tasks | `~/.claude/tasks/<list-id>/<task-id>.json` | `TaskParser` | JSON |
 | Agents/Commands/Skills | `.claude/{agents,commands,skills}/*.md` | Frontmatter | YAML + Markdown |
-| Hooks | `.claude/hooks/bash/*.sh` | TODO | Shell scripts |
+| Hooks | `.claude/hooks/bash/*.sh` | `HooksParser` | Shell scripts |
 
 **Settings merge priority**: local > project > global > defaults
 
@@ -212,11 +212,11 @@ Located in `ccboard-web/src/`:
 **Frontend (Leptos + WASM)**:
 - Reactive UI built with Leptos (Rust → WASM, no JavaScript build pipeline)
 - Served via `trunk serve` on port 3333
-- Pages: Dashboard, Sessions, Analytics, Config, History
+- Pages: Dashboard, Sessions, Analytics, Config, Hooks, MCP, Agents, Costs, History (100% TUI parity)
 - Features: Token usage forecast, session management, real-time updates
 - Design: Dark mode with cyan/blue palette
 
-**Architecture**: Frontend (port 3333) communicates with backend (port 8080) via REST API. See [docs/API.md](../docs/API.md) for complete API documentation (endpoints, SSE, CORS, examples).
+**Architecture**: Frontend (port 3333) communicates with backend (port 8080) via REST API. See [docs/API.md](docs/API.md) for complete API documentation (endpoints, SSE, CORS, examples).
 
 ## Error Handling
 
@@ -249,15 +249,15 @@ Follow Rust-specific error handling rules from RULES.md:
 - ✅ **Phase G (Leptos Frontend)**: Web UI with Dashboard, Sessions, Analytics, Config, History pages
 
 **Current Phase**:
-- 🚧 **Phase A (Analytics)**: Remaining TUI features (project leaderboard, session replay, trend forecasting, anomaly detection)
+- 🚧 **Phase F (Conversation Viewer)**: Full JSONL content display with syntax highlighting
 
 **Future Phases**:
-- **Phase F (Conversation Viewer)**: Full JSONL content display with syntax highlighting
 - **Phase H (Plan-Aware)**: PLAN.md parsing, task completion tracking
+- **MCP Server Mode**: Expose ccboard data as MCP tools for Claude Code
 
 ## Important Constraints
 
-- **Read-only MVP**: No write operations to `~/.claude` in initial release (Phase 6+)
+- **Read-only**: No write operations to `~/.claude` (monitoring/analytics only)
 - **Metadata-only scan**: Session content loaded on demand, not at startup
 - **Performance target**: Initial load <2s for 1000+ sessions
 - **Graceful degradation**: Display partial UI if some data unavailable
