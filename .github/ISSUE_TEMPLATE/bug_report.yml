@@ -1,0 +1,74 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in ccboard
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this issue!
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of ccboard is affected?
+      options:
+        - Dashboard (Tab 1)
+        - Sessions (Tab 2)
+        - Config (Tab 3)
+        - Hooks (Tab 4)
+        - Agents (Tab 5)
+        - Costs (Tab 6)
+        - History (Tab 7)
+        - MCP (Tab 8)
+        - Analytics (Tab 9)
+        - Web Interface
+        - CLI Commands
+        - Startup / Loading
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clear description of the bug
+      placeholder: "When I do X, I expect Y but Z happens instead"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps to reproduce the behavior
+      placeholder: |
+        1. Run `ccboard`
+        2. Press `2` (Sessions tab)
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Your system details
+      value: |
+        - ccboard version:
+        - OS:
+        - Terminal:
+        - Rust version:
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output from `RUST_LOG=ccboard=debug ccboard 2> debug.log`
+      render: shell
+    validations:
+      required: false

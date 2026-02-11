@@ -1,0 +1,81 @@
+name: Feature Request
+description: Suggest a new feature or improvement for ccboard
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest an improvement!
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of ccboard does this affect?
+      options:
+        - Dashboard (Tab 1)
+        - Sessions (Tab 2)
+        - Config (Tab 3)
+        - Hooks (Tab 4)
+        - Agents (Tab 5)
+        - Costs (Tab 6)
+        - History (Tab 7)
+        - MCP (Tab 8)
+        - Analytics (Tab 9)
+        - Web Interface
+        - CLI Commands
+        - Performance
+        - New Tab / New Feature
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve? What's missing today?
+      placeholder: "I want to... but currently I have to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How would you like this to work?
+      placeholder: "It would be great if ccboard could..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any workarounds or alternative approaches you've thought about?
+      placeholder: "I currently work around this by..."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      description: Which interface should this be available in?
+      options:
+        - TUI only
+        - Web only
+        - Both TUI + Web
+        - CLI only
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Screenshots, mockups, or any other context
+    validations:
+      required: false

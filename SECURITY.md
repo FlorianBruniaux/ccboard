@@ -6,8 +6,8 @@ ccboard is currently in active development. Security updates are provided for th
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.5.x   | :white_check_mark: |
-| < 0.5   | :x:                |
+| 0.4.x+  | :white_check_mark: |
+| < 0.4   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -85,6 +85,27 @@ ccboard is designed with security in mind:
 - **Local Processing**: All data processing is local, no external connections
 - **Minimal Dependencies**: Small dependency footprint to reduce attack surface
 - **Memory Safety**: Rust's memory safety guarantees prevent common vulnerabilities
+
+### Security Testing
+
+ccboard includes security-focused tooling in its development workflow:
+
+- **`cargo audit`**: Dependency vulnerability scanning (run periodically)
+- **`cargo clippy`**: Static analysis for unsafe patterns (enforced pre-commit)
+- **Path traversal tests**: `sanitize_project_path()` strips `..` components
+- **Symlink rejection**: Prevents directory traversal via symlinks
+- **OOM protection**: 10MB line size limit for JSONL parsing
+- **Credential masking**: API keys displayed as `sk-ant-••••cdef`
+
+### Attack Surface
+
+| Surface | Risk | Mitigation |
+|---------|------|------------|
+| **File system** | Path traversal, symlink attacks | `sanitize_project_path()`, symlink rejection |
+| **SQLite cache** | SQL injection via file paths | Parameterized queries only |
+| **JSONL parsing** | OOM via large lines | 10MB line size limit |
+| **Dependencies** | Supply chain vulnerabilities | Minimal deps, periodic `cargo audit` |
+| **Web API** | Unauthorized access | Local-only binding (127.0.0.1), CORS restricted |
 
 ---
 

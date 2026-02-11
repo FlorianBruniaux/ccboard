@@ -163,15 +163,8 @@ explorer /select,C:\Users\name\.claude\sessions\file.jsonl
 
 **1. Unicode Rendering in cmd.exe/PowerShell**
 - **Issue**: Braille spinner (`⠋⠙⠹⠸`) may render as `????`
-- **Mitigation**: TODO - Add ASCII fallback spinner for Windows
-  ```rust
-  #[cfg(target_os = "windows")]
-  const SPINNER_FRAMES: &[&str] = &["-", "\\", "|", "/"];
-
-  #[cfg(not(target_os = "windows"))]
-  const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-  ```
-- **Workaround**: Use Windows Terminal instead of cmd.exe
+- **Status**: Won't Fix — Use Windows Terminal for full Unicode support
+- **Recommendation**: Install [Windows Terminal](https://aka.ms/terminal) (free, supports Unicode + 24-bit color)
 
 **2. ANSI Color Support**
 - **Issue**: cmd.exe has limited color support
@@ -188,7 +181,7 @@ All platforms run these checks automatically on every PR:
 
 - ✅ `cargo fmt --check` (formatting)
 - ✅ `cargo clippy -- -D warnings` (linting)
-- ✅ `cargo test --all` (139 tests)
+- ✅ `cargo test --all` (281 tests)
 - ✅ `cargo build --release` (release build)
 
 **CI Matrix**:
@@ -321,8 +314,8 @@ After manual testing on each platform, update this section:
 
 | Platform | Tested By | Date | Issues Found | Status |
 |----------|-----------|------|--------------|--------|
-| macOS Intel | @FlorianBruniaux | 2026-02-03 | None | ✅ Pass |
-| macOS ARM64 | @FlorianBruniaux | 2026-02-03 | None | ✅ Pass |
+| macOS Intel | @FlorianBruniaux | 2026-02-10 | None | ✅ Pass |
+| macOS ARM64 | @FlorianBruniaux | 2026-02-10 | None | ✅ Pass |
 | Linux x86_64 | - | - | - | 🟡 CI only |
 | Windows 10 | - | - | - | 🟡 CI only |
 

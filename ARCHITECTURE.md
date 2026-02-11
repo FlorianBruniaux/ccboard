@@ -1,7 +1,7 @@
 # ccboard Architecture
 
-**Version**: 0.5.0
-**Last Updated**: 2026-02-09
+**Version**: 0.5.2
+**Last Updated**: 2026-02-11
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
@@ -27,7 +27,7 @@ This document describes the technical architecture of ccboard, a unified TUI/Web
 
 ## Overview
 
-ccboard is a Rust workspace with 4 crates providing dual TUI + Web interfaces for Claude Code monitoring:
+ccboard is a Rust workspace with 5 crates providing dual TUI + Web interfaces for Claude Code monitoring:
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -54,6 +54,16 @@ ccboard is a Rust workspace with 4 crates providing dual TUI + Web interfaces fo
               │ • Cache         │
               │ • Analytics     │
               └─────────────────┘
+
+              ┌─────────────────┐
+              │ ccboard-types   │
+              │ (data types)    │
+              │                 │
+              │ • Models        │
+              │ • Analytics     │
+              │ (WASM-ready,    │
+              │  not yet wired) │
+              └─────────────────┘
 ```
 
 **Key Design Goals**:
@@ -75,6 +85,8 @@ ccboard (bin)
   │
   └─> ccboard-web (lib)
        └─> ccboard-core (lib)
+
+ccboard-types (lib) — standalone, WASM-friendly types (planned integration)
 ```
 
 **Dependency flow**: `ccboard` → `{ccboard-tui, ccboard-web}` → `ccboard-core`
@@ -87,6 +99,7 @@ ccboard (bin)
 | **ccboard-core** | Data layer, business logic | `DataStore`, `SessionMetadata`, parsers, analytics |
 | **ccboard-tui** | Ratatui frontend | `TuiApp`, `DashboardTab`, `SessionsTab`, etc. |
 | **ccboard-web** | Axum API backend | `create_router()`, `run()` |
+| **ccboard-types** | WASM-friendly shared types (planned) | `SessionMetadata`, `StatsCache`, `AnalyticsData` |
 
 ---
 
@@ -192,7 +205,7 @@ pub struct DataStore {
     event_bus: EventBus,
 
     // SQLite metadata cache (persistent)
-    metadata_cache: Option<MetadataCache>,
+    metadata_cache: Option<Arc<MetadataCache>>,
 
     // Degraded state tracking
     degraded_state: RwLock<DegradedState>,
@@ -270,12 +283,12 @@ let debouncer = Debouncer::new(
 // Broadcast events to all subscribers
 pub enum DataEvent {
     StatsUpdated,
-    SessionAdded(String),
-    SessionUpdated(String),
-    SessionRemoved(String),
-    ConfigUpdated(ConfigScope),
-    McpUpdated,
-    Error(String),
+    SessionCreated(SessionId),
+    SessionUpdated(SessionId),
+    ConfigChanged(ConfigScope),
+    AnalyticsUpdated,
+    LoadCompleted,
+    WatcherError(String),
 }
 
 // Subscribe in TUI
@@ -308,18 +321,20 @@ pub trait Parser {
 
 **Rule**: Parsers NEVER panic, always return `Option<T>`.
 
-### Parser Inventory (8 total)
+### Parser Inventory (10 modules)
 
-| Parser | Input | Strategy | Output |
+| Module | Input | Strategy | Output |
 |--------|-------|----------|--------|
 | **StatsParser** | `stats-cache.json` | serde_json + retry (3x 100ms) | `StatsCache` |
 | **SettingsParser** | 3 JSON files | Merge with priority | `MergedConfig` |
 | **SessionIndexParser** | `*.jsonl` | Streaming, metadata-only | `SessionMetadata` |
+| **SessionContentParser** | `*.jsonl` | Full parse on demand | `Vec<SessionMessage>` |
 | **HooksParser** | `*.sh` | Read file, detect type | `Vec<Hook>` |
 | **McpConfigParser** | `claude_desktop_config.json` | serde_json | `McpConfig` |
 | **RulesParser** | `CLAUDE.md` | YAML frontmatter + body | `Rules` |
 | **TaskParser** | `tasks/*.json` | serde_json | `Vec<Task>` |
 | **InvocationParser** | Scan JSONL | Regex agent/command/skill | `InvocationStats` |
+| **filters** | Message text | Pattern matching | `bool` (is_meaningful) |
 
 ### Settings Merge Logic
 
@@ -345,7 +360,7 @@ let merged = SettingsParser::merge(&[
 
 **Solution**: SQLite cache with mtime-based invalidation.
 
-#### Schema (v3)
+#### Schema (v4)
 
 ```sql
 CREATE TABLE session_metadata (
@@ -371,14 +386,15 @@ CREATE INDEX idx_mtime ON session_metadata(mtime);
 
 1. **Startup**: Compare `mtime` → if changed, rescan file
 2. **File watcher**: Delete cache entry on `Modify` event
-3. **Version mismatch**: Auto-clear on schema change (v2 → v3)
+3. **Version mismatch**: Auto-clear on schema change (v3 → v4)
 
 **Cache versioning**:
 ```rust
-const CACHE_VERSION: i32 = 3;
+const CACHE_VERSION: i32 = 4;
 // v1: Initial
 // v2: Fixed TokenUsage::total()
 // v3: Added token breakdown fields
+// v4: Added branch field to SessionMetadata
 ```
 
 **Result**: 20s → 224ms (89x speedup).
@@ -428,12 +444,12 @@ impl EventBus {
 ```rust
 pub enum DataEvent {
     StatsUpdated,                    // stats-cache.json changed
-    SessionAdded(String),            // New session file
-    SessionUpdated(String),          // Session modified
-    SessionRemoved(String),          // Session deleted
-    ConfigUpdated(ConfigScope),      // settings.json changed
-    McpUpdated,                      // MCP config changed
-    Error(String),                   // Parser error
+    SessionCreated(SessionId),       // New session file
+    SessionUpdated(SessionId),       // Session modified
+    ConfigChanged(ConfigScope),      // settings.json changed
+    AnalyticsUpdated,                // Analytics cache refreshed
+    LoadCompleted,                   // Initial load finished
+    WatcherError(String),            // File watcher error
 }
 ```
 
@@ -454,7 +470,7 @@ loop {
             match data_event {
                 SessionUpdated(id) => refresh_session_view(id),
                 StatsUpdated => refresh_stats_panel(),
-                Error(msg) => show_toast_error(msg),
+                WatcherError(msg) => show_toast_error(msg),
             }
         }
     }
@@ -563,9 +579,16 @@ TuiApp
 
 ```rust
 Router::new()
-    .route("/", get(index_handler))
     .route("/api/stats", get(stats_handler))
+    .route("/api/sessions/recent", get(recent_sessions_handler))
+    .route("/api/sessions/live", get(live_sessions_handler))
     .route("/api/sessions", get(sessions_handler))
+    .route("/api/config/merged", get(config_handler))
+    .route("/api/hooks", get(hooks_handler))
+    .route("/api/mcp", get(mcp_handler))
+    .route("/api/agents", get(agents_handler))
+    .route("/api/commands", get(commands_handler))
+    .route("/api/skills", get(skills_handler))
     .route("/api/health", get(health_handler))
     .route("/api/events", get(sse_handler))
 ```
@@ -592,7 +615,7 @@ async fn sse_handler(
 
 ### Current Status
 
-- ✅ Axum backend (4 routes + SSE)
+- ✅ Axum backend (12 routes + SSE)
 - ✅ Leptos frontend (5 pages: Dashboard, Sessions, Analytics, Config, History)
 - ✅ Full TUI/Web parity (100%) - Phase G Complete
 
@@ -822,6 +845,60 @@ When making architectural changes:
 
 ---
 
+## Glossary
+
+Standardized terminology used across ccboard documentation and codebase:
+
+| Term | Definition | Code Location |
+|------|-----------|---------------|
+| **SessionMetadata** | Lightweight metadata extracted from JSONL first+last lines (timestamps, token counts, models) | `ccboard-core/src/models/session.rs` |
+| **SessionContent** | Full parsed JSONL content loaded on-demand for detail views | `SessionContentParser` |
+| **DataStore** | Central thread-safe state shared by TUI and Web frontends | `ccboard-core/src/store.rs` |
+| **EventBus** | tokio broadcast channel for cross-frontend notifications | `ccboard-core/src/event.rs` |
+| **MetadataCache** | SQLite cache storing pre-parsed session metadata with mtime invalidation | `ccboard-core/src/cache/metadata_cache.rs` |
+| **LoadReport** | Startup diagnostic tracking which data sources loaded successfully | `ccboard-core/src/error.rs` |
+| **DegradedState** | Runtime tracking of unavailable data sources for graceful UI | `ccboard-core/src/error.rs` |
+| **MergedConfig** | Result of 4-level settings cascade (default < global < project < local) | `ccboard-core/src/models/config.rs` |
+| **BillingBlock** | 5-hour UTC window aggregating token usage for cost estimation | `ccboard-core/src/models/billing_block.rs` |
+| **SessionId** | Unique identifier for a Claude Code session (String newtype) | `ccboard-core/src/models/session.rs` |
+
+---
+
+## Testing Strategy
+
+### Test Pyramid
+
+| Level | Count | Location | Purpose |
+|-------|-------|----------|---------|
+| **Unit** | ~250 | `#[cfg(test)] mod tests` in source files | Parser logic, model validation, formatters |
+| **Integration** | ~20 | `tests/` directories | Cross-module, cache + store interactions |
+| **Platform** | CI matrix | GitHub Actions | macOS + Linux + Windows builds |
+| **Manual** | Pre-release | Checklist in CROSS_PLATFORM.md | TUI navigation, Web UI, CLI commands |
+
+### Coverage by Component
+
+| Component | Test Coverage | Notes |
+|-----------|--------------|-------|
+| **Parsers** (ccboard-core) | High | Fixtures from real sanitized data |
+| **Models** (ccboard-core) | High | Serialization round-trips, field validation |
+| **Analytics** (ccboard-types) | Medium | Forecast, anomaly detection, patterns |
+| **Cache** (ccboard-core) | Medium | mtime invalidation, version migration |
+| **CLI** (ccboard) | Medium | DateFilter, prefix matching, formatters |
+| **TUI** (ccboard-tui) | Low | Manual testing (Ratatui TestBackend planned) |
+| **Web** (ccboard-web) | Low | Manual testing (Axum TestClient planned) |
+
+### Running Tests
+
+```bash
+cargo test --all                    # All 281 tests
+cargo test -p ccboard-core          # Core crate only
+cargo test -p ccboard-types         # Types crate only
+RUST_LOG=debug cargo test           # With logging
+cargo test --all-features           # Integration tests (requires ~/.claude)
+```
+
+---
+
 ## References
 
 - [PLAN.md](claudedocs/PLAN.md) - Development phases and post-mortems
@@ -833,6 +910,6 @@ When making architectural changes:
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2026-02-04
+**Document Version**: 1.1
+**Last Updated**: 2026-02-11
 **Maintainer**: Florian Bruniaux

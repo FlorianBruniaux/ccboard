@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Migration Notes
+
+#### Cache Upgrades (Automatic)
+
+ccboard's SQLite metadata cache auto-upgrades between versions. No manual action needed — on first startup after upgrade, stale cache entries are cleared and repopulated.
+
+| From | To | Change | Action |
+|------|-----|--------|--------|
+| v1 | v2 | Fixed `TokenUsage::total()` calculation | Auto-clear |
+| v2 | v3 | Added token breakdown fields | Auto-clear |
+| v3 | v4 | Added `branch` field to SessionMetadata | Auto-clear |
+
+If you experience issues after upgrade, clear the cache manually:
+```bash
+ccboard clear-cache
+```
+
+#### Keybinding Changes (v0.3.0)
+
+- **Costs tab navigation**: Changed from `1-3` keys to `Tab`/`←→`/`h/l` to avoid conflict with main tab `1-9` navigation
+
 ## [0.5.2] - 2026-02-10
 
 ### Fixed
