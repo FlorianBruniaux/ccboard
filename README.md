@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-234_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-281_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
   <img src="https://img.shields.io/badge/Clippy-0_warnings-success?style=for-the-badge&logo=rust" alt="Clippy"/>
   <img src="https://img.shields.io/badge/Binary-5.8MB-blue?style=for-the-badge" alt="Binary Size"/>
   <img src="https://img.shields.io/badge/Cache_Speedup-89x-orange?style=for-the-badge&logo=sqlite" alt="Speedup"/>
@@ -26,147 +26,93 @@
   <img src="assets/demo.gif" alt="ccboard demo" width="800"/>
 </p>
 
-> **The only actively-maintained Rust TUI** combining Claude Code monitoring, config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 234 tests, 0 clippy warnings.
-
----
-
-## Stats
-
-| Metric | Value |
-|--------|-------|
-| **Stars** | ![GitHub stars](https://img.shields.io/github/stars/FlorianBruniaux/ccboard?style=social) |
-| **Language** | Rust 1.85+ |
-| **Binary Size** | 5.8MB (release) |
-| **Startup Time** | <300ms (warm cache) |
-| **Tests** | 234 passing |
-| **Clippy** | 0 warnings |
-| **Tabs** | 9 (TUI) + Web API |
-| **Cache Speedup** | 89x (20s → 224ms) |
-| **License** | MIT OR Apache-2.0 |
+> **The only actively-maintained Rust TUI** combining Claude Code monitoring, config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 281 tests, 0 clippy warnings.
 
 ---
 
 ## Features
 
-✨ **9 Interactive Tabs** (TUI + Web)
-- **Dashboard**: Overview stats, model usage, MCP servers, 7-day activity, **API usage estimation** with plan-based budgets
-- **Sessions**: Browse all sessions with search, **live Claude processes with CPU/RAM/Tokens** 🆕, and detail view
-- **Config**: Cascading configuration editor (global/project/local) with 4-column diff view
-- **Hooks**: Event-based hook management with bash syntax highlighting 🆕
-- **Agents**: Browse agents, commands, and skills with frontmatter YAML parsing 🆕
-- **Costs**: Token analytics with 4 tabs 🆕
-  - **Overview**: Total cost, token breakdown bar, model distribution table
-  - **By Model**: Detailed cost breakdown (input/output/cache per model)
-  - **Daily**: 14-day bar chart with cost visualization
-  - **Billing Blocks**: 5-hour billing windows with estimated costs
-- **History**: Full-text search across sessions with temporal patterns
-- **MCP**: Server management with status detection and env vars display 🆕
-- **Analytics**: Advanced analytics with 4 sub-views
-  - **Overview**: Monthly budget tracking with visual alerts (⚠️ warnings at threshold)
-  - **Trends**: Time series charts with 30-day forecasting (confidence-based coloring)
-  - **Patterns**: Activity heatmap (7 days × 24h, GitHub-style), Most Used Tools bar chart, model distribution, session duration stats
-  - **Insights**: Actionable recommendations for cost optimization
+### 9 Interactive Tabs (TUI + Web)
 
-🚀 **Performance First**
-- **89x faster startup** (20s → 224ms) with SQLite metadata cache
-- Handles 10,000+ sessions effortlessly (warm cache <300ms)
-- Lazy metadata extraction, on-demand content loading
-- Real-time file watching with 500ms debounce
-- >99% cache hit rate after first run
+| Tab | Key | Description | Highlights |
+|-----|-----|-------------|------------|
+| **Dashboard** | `1` | Overview stats, model usage, 7-day activity | API usage estimation, plan-based budgets, MCP server count |
+| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live Claude processes (CPU/RAM/Tokens), search, detail view |
+| **Config** | `3` | Cascading configuration editor | 4-column diff (default/global/project/local), edit with `e` |
+| **Hooks** | `4` | Event-based hook management | Bash syntax highlighting, test mode, badge indicators |
+| **Agents** | `5` | Agents, commands, and skills browser | Frontmatter YAML parsing, invocation stats |
+| **Costs** | `6` | Token analytics (4 sub-views) | Overview, By Model, Daily chart, Billing Blocks (5h windows) |
+| **History** | `7` | Full-text search across sessions | Temporal patterns, CSV/JSON export |
+| **MCP** | `8` | MCP server management | Status detection (running/stopped), env vars masking |
+| **Analytics** | `9` | Advanced analytics (4 sub-views) | Budget tracking, 30-day forecast, heatmap, insights |
 
-🎨 **Polished UX** (k9s/lazygit-inspired)
-- Command palette with fuzzy matching (`:` prefix)
-- Breadcrumbs navigation trail
-- Tab icons for quick identification
-- Vim keybindings (hjkl) + arrow keys
-- PgUp/PgDn page navigation
-- Scrollbar indicators on long lists
+### Platform Capabilities
 
-📊 **Live Updates**
-- File watcher monitors `~/.claude` changes
-- Auto-refresh stats, sessions, config
-- Server-Sent Events for web interface
+| Capability | Details |
+|-----------|---------|
+| **Performance** | 89x faster startup (20s → 224ms) via SQLite cache, >99% hit rate, handles 10K+ sessions |
+| **Live Updates** | File watcher (500ms debounce), auto-refresh, Server-Sent Events (Web) |
+| **UX** | Command palette (`:`), vim keybindings (hjkl), breadcrumbs, scrollbar indicators |
+| **File Operations** | Edit with `$EDITOR` (`e`), reveal in file manager (`o`), cross-platform |
+| **Zero Config** | Works out of the box with `~/.claude`, single 5.8MB binary, macOS/Linux/Windows |
 
-🔧 **File Operations**
-- Edit any file with `$EDITOR` integration (press `e`)
-- Reveal in file manager (press `o`)
-- Cross-platform support (macOS/Linux/Windows)
-
-📦 **Zero Config**
-- Works out of the box with `~/.claude`
-- Single binary, no dependencies
-- Cross-platform (macOS, Linux, Windows)
+> Missing a feature? [Request it here](https://github.com/FlorianBruniaux/ccboard/issues/new?template=feature_request.yml) | Found a bug? [Report it](https://github.com/FlorianBruniaux/ccboard/issues/new?template=bug_report.yml)
 
 ---
 
-## Why ccboard Exists
+## Installation
 
-**Problem**: Claude Code has no built-in visualization/analysis tools beyond basic CLI commands (`/history`, `/stats`). Users are left scripting with `jq`, `grep`, or manually opening JSON files.
+### Recommended: Homebrew (macOS/Linux)
 
-**Solution**: ccboard is the **only tool** dedicated to Claude Code monitoring and management:
-- **Zero direct competitors** for Claude Code dashboard (verified 2026-02-04)
-- **Not competing with LangSmith/W&B** (they trace LangChain API calls, not local Claude sessions)
-- **Fills the gap** between CLI commands and full observability
+```bash
+brew tap FlorianBruniaux/tap
+brew install ccboard
+```
 
-### Unique Position
+**Why Homebrew?** Simple one-command install, automatic updates via `brew upgrade`, no manual Rust setup required.
 
-1. **All-local**: Reads `~/.claude` files, no SaaS/API required
-2. **Unified Dashboard**: 9 tabs (config, hooks, agents, MCP, analytics) vs basic CLI
-3. **Performance**: SQLite cache (89x speedup), handles 10K+ sessions
-4. **Dual Interface**: TUI + Web in single 5.8MB binary
+### Alternative: cargo install (requires Rust 1.85+)
 
-**Risk**: Anthropic could integrate dashboard into Claude Code CLI. But currently, nothing exists.
+```bash
+cargo install ccboard
+```
+
+**Why cargo?** ccboard's target audience (Claude Code users) often has Rust installed. Ensures compatibility and always installs latest crates.io version.
+
+### Alternative: Pre-built binaries
+
+Download from [GitHub Releases](https://github.com/FlorianBruniaux/ccboard/releases/latest):
+
+| Platform | Status | Download |
+|----------|--------|----------|
+| **macOS** (x86_64/ARM64) | ✅ Fully tested | [ccboard-macos-*.tar.gz](https://github.com/FlorianBruniaux/ccboard/releases) |
+| **Linux** (x86_64/ARM64) | ⚠️ Community-tested | [ccboard-linux-*.tar.gz](https://github.com/FlorianBruniaux/ccboard/releases) |
+| **Windows** (x86_64) | 🧪 Experimental | [ccboard-windows-*.exe.zip](https://github.com/FlorianBruniaux/ccboard/releases) |
+
+**Platform support:**
+- ✅ **macOS**: Manually tested on every release
+- ⚠️ **Linux**: CI-tested, community validation welcome
+- 🧪 **Windows**: Best-effort support (feedback appreciated)
 
 ---
 
-## Competitive Landscape
+## Quick Start
 
-ccboard vs other Claude Code monitoring tools (verified 2026-02-06):
+```bash
+# TUI dashboard (default)
+ccboard
 
-| Feature | **ccboard** | agtrace | claudelytics | ccusage |
-|---------|-------------|---------|--------------|---------|
-| **Status** | ✅ Active | ✅ Active | 🔴 Stale 6m | ✅ Active |
-| **Stars** | 0 | 23 | 62 | 10,361 |
-| **Language** | Rust | Rust | Rust | TypeScript |
-| **Type** | TUI+Web | TUI | TUI | CLI |
-| | | | | |
-| **TUI Dashboard** | ✅ 9 tabs | ✅ Single view | ✅ 8 tabs | ❌ |
-| **Config Viewer (3-level merge)** | ✅ | ❌ | ❌ | ❌ |
-| **Hooks Viewer + Test** | ✅ | ❌ | ❌ | ❌ |
-| **Agents/Commands/Skills Browser** | ✅ | ❌ | ❌ | ❌ |
-| **MCP Server Status Detection** | ✅ | ❌ | ❌ | ❌ |
-| **SQLite Cache (89x speedup)** | ✅ | ✅ Pointer-based | ❌ | ❌ |
-| **Export CSV/JSON** | ✅ | ❌ | ✅ | ✅ JSON |
-| **Live File Watcher** | ✅ | ✅ Poll 1s | ❌ | ❌ |
-| **Advanced Analytics (Forecast, Budget)** | ✅ 4 views | ❌ | ⚠️ Burn rate | ❌ |
-| **Single Binary (no runtime)** | ✅ 5.8MB | ✅ Rust | ✅ Rust | ❌ npm |
-| | | | | |
-| **MCP Server Mode** | ⏳ Soon | ✅ 6 tools | ❌ | ❌ |
-| **Billing Blocks (5h)** | ⏳ Soon | ❌ | ✅ | ❌ |
-| **Conversation Viewer** | ⏳ Soon | ❌ | ✅ | ❌ |
-| **Multi-provider** | ❌ | ✅ 3 providers | ❌ | ❌ |
+# Web interface
+ccboard web --port 3333
 
-**Unique to ccboard**:
-- Only **multi-concern dashboard** (config + hooks + agents + MCP + analytics)
-- Config 3-level merge viewer (global/project/local)
-- Hooks syntax highlighting + test mode
-- Agents/Commands/Skills browser with invocation stats
-- MCP server **status** detection (vs agtrace = MCP server mode)
-- SQLite metadata cache (89x faster startup)
-- **Advanced Analytics**: 30-day forecasting, budget alerts, session duration stats, usage patterns
-- Dual TUI + Web single binary
+# Both simultaneously
+ccboard both --port 3333
 
-**References**:
-- **agtrace** (23⭐): Observability-focused, MCP self-reflection (6 tools), multi-provider
-- **claudelytics** (62⭐, STALE 6m): Feature-rich TUI (8 tabs, billing blocks, conversation viewer)
-- **ccusage** (10K⭐): CLI cost tracker (reference for pricing, no dashboard)
+# Stats only (scriptable)
+ccboard stats
+```
 
-**Complementary tools**:
-- **[xlaude](https://github.com/Xuanwo/xlaude)** (171 ⭐): Git worktree manager for Claude sessions
-  - **Complementarity**: xlaude focuses on workspace isolation (PTY sessions, branch management), ccboard on analytics/monitoring
-  - **Performance comparison**: ccboard lazy loading 15x faster (4.8s vs 72s for 3000 sessions)
-  - **Use cases**: Use xlaude for session isolation, ccboard for historical analysis and cost tracking
-  - **Learnings applied**: Environment variables (QW1), message filtering (QW2), performance validation (QW3)
+Navigate tabs with `1-9`, search with `/`, refresh with `r`, quit with `q`. Press `?` for all keybindings.
 
 ---
 
@@ -270,378 +216,74 @@ ccboard vs other Claude Code monitoring tools (verified 2026-02-06):
 
 ---
 
-## Learning Paths
+## Why ccboard Exists
 
-Choose your path based on your goal:
+**Problem**: Claude Code has no built-in visualization/analysis tools beyond basic CLI commands (`/history`, `/stats`). Users are left scripting with `jq`, `grep`, or manually opening JSON files.
 
-<details>
-<summary><strong>Quick Start</strong> — Get running in 5 minutes</summary>
+**Solution**: ccboard is the **only tool** dedicated to Claude Code monitoring and management:
+- **Zero direct competitors** for Claude Code dashboard (verified 2026-02-04)
+- **Not competing with LangSmith/W&B** (they trace LangChain API calls, not local Claude sessions)
+- **Fills the gap** between CLI commands and full observability
 
-1. **Install**: `cargo install ccboard`
-2. **Launch**: `ccboard`
-3. **Navigate tabs**: Press `1-9` to jump between tabs
-4. **Search sessions**: Press `2` (Sessions tab) then `/` to search
-5. **Check costs**: Press `6` (Costs tab) to see token costs
+### Unique Position
 
-**You're ready!** Press `?` anytime for keybindings help.
+1. **All-local**: Reads `~/.claude` files, no SaaS/API required
+2. **Unified Dashboard**: 9 tabs (config, hooks, agents, MCP, analytics) vs basic CLI
+3. **Performance**: SQLite cache (89x speedup), handles 10K+ sessions
+4. **Dual Interface**: TUI + Web in single 5.8MB binary
 
-</details>
-
-<details>
-<summary><strong>For Monitoring</strong> — Track costs and sessions (10 minutes)</summary>
-
-**Goal**: Monitor Claude Code usage and costs in real-time.
-
-1. **Dashboard overview** (Tab 1)
-   - Total tokens, sessions, costs
-   - 7-day activity sparkline
-   - API usage estimation with plan budgets
-
-2. **Live sessions** (Tab 2)
-   - Process detection (CPU, RAM, tokens)
-   - 3-pane browser (projects → sessions → detail)
-   - Search with `/`
-
-3. **Cost tracking** (Tab 6)
-   - Daily costs, cost by model, billing blocks
-   - Export CSV for accounting
-
-4. **Analytics trends** (Tab 9)
-   - **Overview**: Monthly budget tracking with visual progress bars and alerts
-   - **Trends**: Time series charts with 30-day forecasting (confidence-coded)
-   - **Patterns**: Peak hours, model distribution, session duration statistics
-   - **Insights**: Actionable cost optimization recommendations
-
-**Next**: Configure budget alerts in `.claude/settings.json` or export data with Tab 7 (History).
-
-</details>
-
-<details>
-<summary><strong>For Configuration</strong> — Manage setup and tools (15 minutes)</summary>
-
-**Goal**: View and manage Claude Code configuration.
-
-1. **Config 3-level merge** (Tab 3)
-   - See default → global → project → local cascade
-   - 4-column diff view
-   - Press `e` to edit in `$EDITOR`
-
-2. **Hooks management** (Tab 4)
-   - Syntax highlighting for `.sh` scripts
-   - Test mode: press `t` to dry-run hook
-   - Badge indicators (PreToolUse, PostSessionEnd, etc.)
-
-3. **Agents browser** (Tab 5)
-   - 3 sub-tabs: Agents / Commands / Skills
-   - Frontmatter parsing (YAML metadata)
-   - Invocation stats
-
-4. **MCP servers** (Tab 8)
-   - Process detection (running/stopped)
-   - Server descriptions from config
-   - Env vars masking (security)
-
-**Next**: Press `r` to refresh all data after config changes.
-
-</details>
-
-<details>
-<summary><strong>For Power Users</strong> — Advanced features (30 minutes)</summary>
-
-**Goal**: Master all ccboard capabilities.
-
-1. **Export workflows** (Tab 7)
-   - CSV: Sessions, billing blocks (5h UTC windows)
-   - JSON: Structured session metadata
-   - Filters: Date range, project, model
-
-2. **SQLite cache internals** (Architecture)
-   - Read `ARCHITECTURE.md` for cache strategy
-   - 89x speedup explained (WAL mode, mtime invalidation)
-   - Clear cache: `ccboard clear-cache`
-
-3. **File watcher config**
-   - Adaptive debounce (500ms default, burst detection)
-   - EventBus (7 event types, 256 capacity)
-   - See `ARCHITECTURE.md` Event System section
-
-4. **Custom hooks development**
-   - Examples: `examples/hooks/bash/`
-   - PreToolUse, PostToolUse, PostSessionEnd
-   - See `CONTRIBUTING.md` for hook patterns
-
-5. **Dual mode: TUI + Web**
-   - Run both: `ccboard both --port 3333`
-   - Web API: `http://localhost:3333/api/stats`
-   - SSE live updates: `/api/events`
-
-**Next**: Contribute! See `CONTRIBUTING.md`.
-
-</details>
+**Risk**: Anthropic could integrate dashboard into Claude Code CLI. But currently, nothing exists.
 
 ---
 
-## Installation
-
-### Recommended: Homebrew (macOS/Linux)
-
-```bash
-brew tap FlorianBruniaux/tap
-brew install ccboard
-```
-
-**Why Homebrew?** Simple one-command install, automatic updates via `brew upgrade`, no manual Rust setup required.
-
-### Alternative: cargo install (requires Rust 1.85+)
-
-```bash
-cargo install ccboard
-```
-
-**Why cargo?** ccboard's target audience (Claude Code users) often has Rust installed. Ensures compatibility and always installs latest crates.io version.
-
-### Alternative: Pre-built binaries
-
-Download from [GitHub Releases](https://github.com/FlorianBruniaux/ccboard/releases/latest):
-
-| Platform | Status | Download |
-|----------|--------|----------|
-| **macOS** (x86_64/ARM64) | ✅ Fully tested | [ccboard-macos-*.tar.gz](https://github.com/FlorianBruniaux/ccboard/releases) |
-| **Linux** (x86_64/ARM64) | ⚠️ Community-tested | [ccboard-linux-*.tar.gz](https://github.com/FlorianBruniaux/ccboard/releases) |
-| **Windows** (x86_64) | 🧪 Experimental | [ccboard-windows-*.exe.zip](https://github.com/FlorianBruniaux/ccboard/releases) |
-
-**Platform support:**
-- ✅ **macOS**: Manually tested on every release
-- ⚠️ **Linux**: CI-tested, community validation welcome
-- 🧪 **Windows**: Best-effort support (feedback appreciated)
-
----
-
-## Usage
-
-### TUI Mode (Default)
-
-```bash
-ccboard              # Launch TUI dashboard
-ccboard stats        # Print stats and exit
-ccboard search "query"   # Search sessions
-ccboard recent 10    # Show 10 most recent sessions
-```
-
-### Web Mode
-
-ccboard has **2 web workflows** depending on your use case:
-
-#### Option 1: Production (Single Command) ⭐ Recommended
-
-**For**: Running the full stack (API + Frontend) in production or for general use.
-
-```bash
-# Step 1: Compile frontend once (run in ccboard repo root)
-trunk build --release
-
-# Step 2: Start server (serves API + static frontend)
-ccboard web
-```
-
-**Output**:
-```
-⠋ Loading sessions and statistics...
-✓ Ready in 2.34s (1,247 sessions loaded)
-
-🌐 Backend API + Frontend: http://127.0.0.1:3333
-   API endpoints:          http://127.0.0.1:3333/api/*
-```
-
-**Features**:
-- ✅ Single process, single port
-- ✅ Serves backend API (`/api/*`) + frontend static files
-- ✅ Real-time data updates via Server-Sent Events (SSE)
-- ❌ No hot reload (need `trunk build` + F5 after code changes)
-
-**When to use**: Daily use, demos, production, or when you just want the web interface running.
-
----
-
-#### Option 2: Development (Hot Reload) 🔧
-
-**For**: Developing the frontend with automatic recompilation and browser refresh.
-
-```bash
-# Terminal 1: Start backend API
-ccboard web --port 8080
-
-# Terminal 2: Start frontend dev server (run in ccboard repo root)
-trunk serve --port 3333
-```
-
-**Output Terminal 1**:
-```
-🌐 Backend API only:       http://127.0.0.1:8080/api/*
-   💡 Run 'trunk build' to compile frontend
-```
-
-**Output Terminal 2**:
-```
-📦 Starting build...
-✅ Success! App is being served at: http://127.0.0.1:3333
-```
-
-**Features**:
-- ✅ Real-time data updates via SSE
-- ✅ **Hot reload**: Frontend code changes auto-recompile and refresh browser
-- ✅ Separate logs for backend and frontend
-- ❌ Two terminals required
-
-**When to use**: When developing the Leptos frontend (editing `crates/ccboard-web/src/**/*.rs`).
-
-**Note**: `trunk serve` automatically proxies `/api/*` requests to `http://localhost:8080` via Trunk.toml config.
-
----
-
-### Dual Mode (TUI + Web)
-
-Run both TUI and web server simultaneously:
-
-```bash
-ccboard both --port 3333
-```
-
-- Web server runs in background
-- TUI runs in foreground
-- Shared DataStore (same data, live updates)
-- Press `q` in TUI to exit both
-
----
-
-## Troubleshooting
-
-### "Stats not loading" or "No sessions found"
-
-Run Claude Code at least once to generate `~/.claude` directory:
-
-```bash
-claude  # Or use Claude Code via IDE
-```
-
-Then relaunch ccboard.
-
-### "WASM compilation failed" (Web mode)
-
-Ensure trunk is installed:
-
-```bash
-cargo install trunk
-trunk --version  # Should be 0.18+
-```
-
-Then rebuild:
-
-```bash
-cd ccboard-web
-trunk build --release
-```
-
-### "Connection refused" (Web mode)
-
-Check if backend port is in use:
-
-```bash
-lsof -i :8080  # macOS/Linux
-netstat -ano | findstr :8080  # Windows
-```
-
-Change port if needed:
-
-```bash
-ccboard web --port 3333
-```
-
-### Linux: "File manager not opening"
-
-Install xdg-utils:
-
-```bash
-sudo apt install xdg-utils  # Debian/Ubuntu
-sudo dnf install xdg-utils  # Fedora
-```
-
-### Windows: Terminal rendering issues
-
-Use Windows Terminal (not cmd.exe) for proper Unicode support:
-- Download: [Windows Terminal](https://aka.ms/terminal)
-- Braille spinners `⠋⠙⠹` render correctly in Windows Terminal
-
----
-
-## Quick Start
-
-### TUI (Default)
-
-```bash
-# Launch dashboard
-ccboard
-
-# Focus on specific project
-ccboard --project ~/myproject
-
-# Use custom Claude home
-ccboard --claude-home ~/custom/.claude
-```
-
-### Web Interface
-
-```bash
-# Run web server on port 3333
-ccboard web --port 3333
-
-# Open http://localhost:3333
-```
-
-**Available Pages** (100% TUI parity) ✅:
-- `/` - Dashboard with KPIs and forecast
-- `/sessions` - Sessions browser with **live CPU/RAM monitoring** 🔥
-- `/analytics` - Analytics with budget tracking
-- `/config` - 4-column configuration viewer
-- `/hooks` - Hooks with syntax highlighting
-- `/mcp` - MCP servers with status
-- `/agents` - Agents/Commands/Skills browser
-- `/costs` - 4 tabs (Overview, By Model, Daily, Billing Blocks)
-- `/history` - History search and filters
-
-### Both TUI + Web
-
-```bash
-# Run both interfaces simultaneously
-ccboard both --port 3333
-```
-
-### Stats Only
-
-```bash
-# Print stats summary and exit
-ccboard stats
-```
-
-**Output example:**
-```
-ccboard - Claude Code Statistics
-================================
-
-Total Tokens:     12.5M
-  Input:          8.2M
-  Output:         3.1M
-  Cache Read:     890K
-  Cache Write:    310K
-
-Sessions:         2,340
-Messages:         18,450
-Cache Hit Ratio:  28.7%
-
-Models:
-  claude-sonnet-4.5: 9.8M tokens (in: 6.5M, out: 2.3M)
-  claude-opus-4: 1.2M tokens (in: 800K, out: 400K)
-```
+## Competitive Landscape
+
+ccboard vs other Claude Code monitoring tools (verified 2026-02-06):
+
+| Feature | **ccboard** | agtrace | claudelytics | ccusage |
+|---------|-------------|---------|--------------|---------|
+| **Status** | ✅ Active | ✅ Active | 🔴 Stale 6m | ✅ Active |
+| **Stars** | 0 | 23 | 62 | 10,361 |
+| **Language** | Rust | Rust | Rust | TypeScript |
+| **Type** | TUI+Web | TUI | TUI | CLI |
+| | | | | |
+| **TUI Dashboard** | ✅ 9 tabs | ✅ Single view | ✅ 8 tabs | ❌ |
+| **Config Viewer (3-level merge)** | ✅ | ❌ | ❌ | ❌ |
+| **Hooks Viewer + Test** | ✅ | ❌ | ❌ | ❌ |
+| **Agents/Commands/Skills Browser** | ✅ | ❌ | ❌ | ❌ |
+| **MCP Server Status Detection** | ✅ | ❌ | ❌ | ❌ |
+| **SQLite Cache (89x speedup)** | ✅ | ✅ Pointer-based | ❌ | ❌ |
+| **Export CSV/JSON** | ✅ | ❌ | ✅ | ✅ JSON |
+| **Live File Watcher** | ✅ | ✅ Poll 1s | ❌ | ❌ |
+| **Advanced Analytics (Forecast, Budget)** | ✅ 4 views | ❌ | ⚠️ Burn rate | ❌ |
+| **Single Binary (no runtime)** | ✅ 5.8MB | ✅ Rust | ✅ Rust | ❌ npm |
+| | | | | |
+| **MCP Server Mode** | ⏳ Soon | ✅ 6 tools | ❌ | ❌ |
+| **Billing Blocks (5h)** | ⏳ Soon | ❌ | ✅ | ❌ |
+| **Conversation Viewer** | ⏳ Soon | ❌ | ✅ | ❌ |
+| **Multi-provider** | ❌ | ✅ 3 providers | ❌ | ❌ |
+
+**Unique to ccboard**:
+- Only **multi-concern dashboard** (config + hooks + agents + MCP + analytics)
+- Config 3-level merge viewer (global/project/local)
+- Hooks syntax highlighting + test mode
+- Agents/Commands/Skills browser with invocation stats
+- MCP server **status** detection (vs agtrace = MCP server mode)
+- SQLite metadata cache (89x faster startup)
+- **Advanced Analytics**: 30-day forecasting, budget alerts, session duration stats, usage patterns
+- Dual TUI + Web single binary
+
+**References**:
+- **agtrace** (23⭐): Observability-focused, MCP self-reflection (6 tools), multi-provider
+- **claudelytics** (62⭐, STALE 6m): Feature-rich TUI (8 tabs, billing blocks, conversation viewer)
+- **ccusage** (10K⭐): CLI cost tracker (reference for pricing, no dashboard)
+
+**Complementary tools**:
+- **[xlaude](https://github.com/Xuanwo/xlaude)** (171 ⭐): Git worktree manager for Claude sessions
+  - **Complementarity**: xlaude focuses on workspace isolation (PTY sessions, branch management), ccboard on analytics/monitoring
+  - **Performance comparison**: ccboard lazy loading 15x faster (4.8s vs 72s for 3000 sessions)
+  - **Use cases**: Use xlaude for session isolation, ccboard for historical analysis and cost tracking
+  - **Learnings applied**: Environment variables (QW1), message filtering (QW2), performance validation (QW3)
 
 ---
 
@@ -750,6 +392,143 @@ Configure custom monthly budgets with automatic alerts in the **Analytics tab** 
 
 ## Usage
 
+### TUI Mode (Default)
+
+```bash
+ccboard              # Launch TUI dashboard
+ccboard stats        # Print stats and exit
+ccboard search "query"   # Search sessions
+ccboard recent 10    # Show 10 most recent sessions
+```
+
+### Web Mode
+
+ccboard has **2 web workflows** depending on your use case:
+
+#### Option 1: Production (Single Command) ⭐ Recommended
+
+**For**: Running the full stack (API + Frontend) in production or for general use.
+
+```bash
+# Step 1: Compile frontend once (run in ccboard repo root)
+trunk build --release
+
+# Step 2: Start server (serves API + static frontend)
+ccboard web
+```
+
+**Output**:
+```
+⠋ Loading sessions and statistics...
+✓ Ready in 2.34s (1,247 sessions loaded)
+
+🌐 Backend API + Frontend: http://127.0.0.1:3333
+   API endpoints:          http://127.0.0.1:3333/api/*
+```
+
+**Features**:
+- ✅ Single process, single port
+- ✅ Serves backend API (`/api/*`) + frontend static files
+- ✅ Real-time data updates via Server-Sent Events (SSE)
+- ❌ No hot reload (need `trunk build` + F5 after code changes)
+
+**When to use**: Daily use, demos, production, or when you just want the web interface running.
+
+---
+
+#### Option 2: Development (Hot Reload) 🔧
+
+**For**: Developing the frontend with automatic recompilation and browser refresh.
+
+```bash
+# Terminal 1: Start backend API
+ccboard web --port 8080
+
+# Terminal 2: Start frontend dev server (run in ccboard repo root)
+trunk serve --port 3333
+```
+
+**Output Terminal 1**:
+```
+🌐 Backend API only:       http://127.0.0.1:8080/api/*
+   💡 Run 'trunk build' to compile frontend
+```
+
+**Output Terminal 2**:
+```
+📦 Starting build...
+✅ Success! App is being served at: http://127.0.0.1:3333
+```
+
+**Features**:
+- ✅ Real-time data updates via SSE
+- ✅ **Hot reload**: Frontend code changes auto-recompile and refresh browser
+- ✅ Separate logs for backend and frontend
+- ❌ Two terminals required
+
+**When to use**: When developing the Leptos frontend (editing `crates/ccboard-web/src/**/*.rs`).
+
+**Note**: `trunk serve` automatically proxies `/api/*` requests to `http://localhost:8080` via Trunk.toml config.
+
+---
+
+### Dual Mode (TUI + Web)
+
+Run both TUI and web server simultaneously:
+
+```bash
+ccboard both --port 3333
+```
+
+- Web server runs in background
+- TUI runs in foreground
+- Shared DataStore (same data, live updates)
+- Press `q` in TUI to exit both
+
+### Web Pages
+
+**Available Pages** (100% TUI parity) ✅:
+- `/` - Dashboard with KPIs and forecast
+- `/sessions` - Sessions browser with **live CPU/RAM monitoring** 🔥
+- `/analytics` - Analytics with budget tracking
+- `/config` - 4-column configuration viewer
+- `/hooks` - Hooks with syntax highlighting
+- `/mcp` - MCP servers with status
+- `/agents` - Agents/Commands/Skills browser
+- `/costs` - 4 tabs (Overview, By Model, Daily, Billing Blocks)
+- `/history` - History search and filters
+
+### Stats Only
+
+```bash
+# Print stats summary and exit
+ccboard stats
+```
+
+**Output example:**
+```
+ccboard - Claude Code Statistics
+================================
+
+Total Tokens:     12.5M
+  Input:          8.2M
+  Output:         3.1M
+  Cache Read:     890K
+  Cache Write:    310K
+
+Sessions:         2,340
+Messages:         18,450
+Cache Hit Ratio:  28.7%
+
+Models:
+  claude-sonnet-4.5: 9.8M tokens (in: 6.5M, out: 2.3M)
+  claude-opus-4: 1.2M tokens (in: 800K, out: 400K)
+```
+
+---
+
+## Keybindings & Shortcuts
+
 ### Keybindings
 
 #### Global Navigation
@@ -849,7 +628,67 @@ ccboard integrates with your configured editor:
 
 ---
 
-## Architecture
+## Troubleshooting
+
+### "Stats not loading" or "No sessions found"
+
+Run Claude Code at least once to generate `~/.claude` directory:
+
+```bash
+claude  # Or use Claude Code via IDE
+```
+
+Then relaunch ccboard.
+
+### "WASM compilation failed" (Web mode)
+
+Ensure trunk is installed:
+
+```bash
+cargo install trunk
+trunk --version  # Should be 0.18+
+```
+
+Then rebuild:
+
+```bash
+cd ccboard-web
+trunk build --release
+```
+
+### "Connection refused" (Web mode)
+
+Check if backend port is in use:
+
+```bash
+lsof -i :8080  # macOS/Linux
+netstat -ano | findstr :8080  # Windows
+```
+
+Change port if needed:
+
+```bash
+ccboard web --port 3333
+```
+
+### Linux: "File manager not opening"
+
+Install xdg-utils:
+
+```bash
+sudo apt install xdg-utils  # Debian/Ubuntu
+sudo dnf install xdg-utils  # Fedora
+```
+
+### Windows: Terminal rendering issues
+
+Use Windows Terminal (not cmd.exe) for proper Unicode support:
+- Download: [Windows Terminal](https://aka.ms/terminal)
+- Braille spinners `⠋⠙⠹` render correctly in Windows Terminal
+
+---
+
+## Development
 
 ### Stack
 
@@ -862,53 +701,9 @@ ccboard/                     # Binary CLI entry point
 
 **Dependency flow**: `ccboard` → `ccboard-tui` + `ccboard-web` → `ccboard-core`
 
-### Core Principles
+**Core principles**: Single binary with dual frontends sharing a thread-safe `DataStore`. Graceful degradation (partial data if files corrupted/missing). SQLite metadata cache (89x speedup) with lazy content loading. Arc for sessions (50x memory reduction), parking_lot::RwLock for stats/settings.
 
-1. **Single binary, dual frontends**: TUI and web share thread-safe `DataStore`
-2. **Graceful degradation**: Display partial data if files corrupted/missing
-3. **Lazy loading**: SQLite metadata cache (89x speedup), content on-demand
-4. **Concurrency**: Arc for sessions (50x memory reduction), parking_lot::RwLock for stats/settings
-
-### Data Sources
-
-ccboard reads from `~/.claude` and optional project `.claude/`:
-
-| Type | Path | Format |
-|------|------|--------|
-| Stats | `~/.claude/stats-cache.json` | JSON |
-| Global settings | `~/.claude/settings.json` | JSON |
-| Project settings | `.claude/settings.json` | JSON |
-| Local settings | `.claude/settings.local.json` | JSON (highest priority) |
-| MCP config | `~/.claude/claude_desktop_config.json` | JSON |
-| Sessions | `~/.claude/projects/<path>/<id>.jsonl` | Streaming JSONL |
-| Agents/Commands/Skills | `.claude/{agents,commands,skills}/*.md` | YAML frontmatter + Markdown |
-| Hooks | `.claude/hooks/bash/*.sh` | Shell scripts |
-
-**Settings merge priority**: local > project > global > defaults
-
-### Performance
-
-Startup performance improvements from profiling and optimization (Phases 0-3):
-
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| **Cold cache** | 20.08s | 20.08s | Baseline (first run) |
-| **Warm cache** | 20.08s | **224ms** | **89.67x faster** ✅ |
-| **Cache hit rate** | 0% | >99% | After first run |
-| **Sessions** | 3550 | 3550 | Handles 10K+ |
-
-**Optimization techniques**:
-- SQLite metadata cache with WAL mode
-- mtime-based invalidation
-- bincode serialization for compact storage
-- Concurrent directory scanning with tokio::spawn
-- Lazy session content loading (metadata-only scan)
-
-For detailed architecture documentation, see [PLAN.md](claudedocs/PLAN.md).
-
----
-
-## Development
+For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Prerequisites
 
@@ -938,7 +733,7 @@ RUST_LOG=ccboard=debug cargo run
 ### Testing
 
 ```bash
-# Run all tests (156 tests)
+# Run all tests (281 tests)
 cargo test --all
 
 # Run tests for specific crate
@@ -995,7 +790,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
-## Roadmap
+## Roadmap & Documentation
 
 **Current Status**: 🎉 **PRODUCTION-READY** (v0.5.0)
 
@@ -1008,7 +803,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ✅ **Cost Analytics**: 4 views (Overview, By Model, Daily, Billing Blocks) + budget alerts
 - ✅ **Advanced Analytics**: 30-day forecasting, usage patterns, actionable insights
 
-**Total**: 234 tests passing, 0 clippy warnings
+**Total**: 281 tests passing, 0 clippy warnings
 
 ### Coming Soon 🚧
 
@@ -1027,13 +822,19 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [PLAN.md](claudedocs/PLAN.md).
 
-**Documentation**:
-- [API Documentation](docs/API.md) - REST API and SSE endpoints for Web UI
-- [Architecture](ARCHITECTURE.md) - Technical architecture and design patterns
-- [Contributing](CONTRIBUTING.md) - Development guidelines and workflow
+### Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture, data flow, concurrency model |
+| [CHANGELOG.md](CHANGELOG.md) | Version history with detailed change descriptions |
+| [SECURITY.md](SECURITY.md) | Security policy, vulnerability reporting, best practices |
+| [CROSS_PLATFORM.md](CROSS_PLATFORM.md) | Platform-specific considerations and validation |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development guidelines and contribution workflow |
+| [API Documentation](docs/API.md) | REST API and SSE endpoints for Web UI |
+| [PLAN.md](claudedocs/PLAN.md) | Development phases and post-mortems |
 
 ---
-
 
 ## License
 
@@ -1072,7 +873,7 @@ This project was developed following Test-Driven Development (TDD) principles wi
 - **Repository**: https://github.com/FlorianBruniaux/ccboard
 - **Issues**: https://github.com/FlorianBruniaux/ccboard/issues
 - **Releases**: https://github.com/FlorianBruniaux/ccboard/releases
-- **Crates.io**: https://crates.io/crates/ccboard (coming soon)
+- **Crates.io**: https://crates.io/crates/ccboard
 - **Documentation**: [PLAN.md](claudedocs/PLAN.md) | [CHANGELOG.md](CHANGELOG.md)
 
 ### Related Projects
