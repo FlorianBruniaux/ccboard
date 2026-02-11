@@ -48,27 +48,94 @@ curl http://localhost:8080/api/health | jq
 
 ### GET `/api/stats`
 
-Returns global Claude Code statistics aggregated from `~/.claude/stats-cache.json`.
+Returns global Claude Code statistics aggregated from `~/.claude/stats-cache.json`, enriched with analytics (forecast, daily activity, model breakdown).
 
 **Response** (200 OK):
 ```json
 {
-  "total_sessions": 1234,
-  "total_tokens": 45678900,
-  "total_cost": 123.45,
-  "projects": 8,
-  "active_agents": 5,
-  "total_commands": 42
+  "version": 2,
+  "lastComputedDate": "2026-02-10",
+  "firstSessionDate": "2025-12-10T09:45:00.350Z",
+  "totalSessions": 1757,
+  "totalMessages": 512937,
+  "thisMonthCost": 11205.38,
+  "avgSessionCost": 3.06,
+  "cacheHitRatio": 0.999,
+  "mcpServersCount": 3,
+  "mostUsedModel": "claude-opus-4-6",
+  "totalSpeculationTimeSavedMs": 0,
+  "longestSession": {
+    "sessionId": "d78b55ae-...",
+    "messageCount": 10827,
+    "date": null
+  },
+  "modelUsage": {
+    "claude-opus-4-6": {
+      "inputTokens": 5000,
+      "outputTokens": 7000,
+      "cacheCreationInputTokens": 300,
+      "cacheReadInputTokens": 45,
+      "costUsd": 123.45,
+      "contextWindow": 0,
+      "maxOutputTokens": 0,
+      "webSearchRequests": 0
+    }
+  },
+  "hourCounts": { "0": 6, "1": 2, "10": 133 },
+  "dailyActivity": [
+    {
+      "date": "2026-02-10",
+      "sessionCount": 42,
+      "messageCount": 12345,
+      "toolCallCount": 3456
+    }
+  ],
+  "dailyModelTokens": [
+    {
+      "date": "2026-02-10",
+      "tokensByModel": { "claude-opus-4-6": 1332082 }
+    }
+  ],
+  "dailyTokens30d": [66938374, 45000000],
+  "forecastTokens30d": [33071759, 40000000],
+  "forecastConfidence": 0.14,
+  "forecastCost30d": 9921.53,
+  "projectsByCost": [
+    {
+      "project": "/Users/john/code/myapp",
+      "cost": 4986.04,
+      "percentage": 44.5
+    }
+  ]
 }
 ```
 
-**Fields**:
-- `total_sessions` (integer): Total number of Claude Code sessions
-- `total_tokens` (integer): Total tokens consumed across all sessions
-- `total_cost` (float): Total cost in USD (calculated from token usage)
-- `projects` (integer): Number of projects in `~/.claude/projects/`
-- `active_agents` (integer): Number of active agents across all projects
-- `total_commands` (integer): Number of commands executed
+**Top-Level Fields**:
+- `version` (integer): Stats cache format version
+- `lastComputedDate` (string): Date stats were last computed (YYYY-MM-DD)
+- `firstSessionDate` (ISO 8601): Earliest session timestamp
+- `totalSessions` (integer): Total number of sessions in stats cache
+- `totalMessages` (integer): Total messages across all sessions
+- `thisMonthCost` (float): Total cost in USD for the current month
+- `avgSessionCost` (float): Average cost per session in USD
+- `cacheHitRatio` (float): Cache read/creation ratio (0-1)
+- `mcpServersCount` (integer): Number of configured MCP servers
+- `mostUsedModel` (string|null): Most frequently used model name
+- `totalSpeculationTimeSavedMs` (integer): Speculative execution time saved in ms
+
+**Nested Objects**:
+- `longestSession` (object): Session with most messages (`sessionId`, `messageCount`, `date`)
+- `modelUsage` (object): Per-model token breakdown keyed by model ID, each containing `inputTokens`, `outputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`, `costUsd`, `contextWindow`, `maxOutputTokens`, `webSearchRequests`
+- `hourCounts` (object): Message count per hour (0-23), keyed as strings
+
+**Arrays**:
+- `dailyActivity` (array): Daily aggregates with `date`, `sessionCount`, `messageCount`, `toolCallCount`
+- `dailyModelTokens` (array): Daily token usage per model with `date` and `tokensByModel` map
+- `dailyTokens30d` (array): Daily total tokens for last 30 days (integers)
+- `forecastTokens30d` (array): Predicted daily tokens for next 30 days (integers)
+- `forecastConfidence` (float): Forecast confidence score (0-1)
+- `forecastCost30d` (float): Predicted cost for next 30 days in USD
+- `projectsByCost` (array): Top 5 projects by cost with `project`, `cost`, `percentage`
 
 **Error Codes**:
 - `500 Internal Server Error`: Stats cache failed to load
@@ -94,11 +161,18 @@ Returns the N most recent sessions across all projects (lightweight endpoint for
     {
       "id": "ea23759a-...",
       "date": "2026-02-09T10:30:00Z",
+      "first_timestamp": "2026-02-09T10:00:00Z",
       "project": "-Users-john-code-myapp",
       "model": "claude-sonnet-4-5",
       "messages": 42,
       "tokens": 12345,
+      "input_tokens": 5000,
+      "output_tokens": 7000,
+      "cache_creation_tokens": 300,
+      "cache_read_tokens": 45,
       "cost": 1.23,
+      "status": "completed",
+      "duration_seconds": null,
       "preview": "How do I implement authentication?"
     }
   ],
@@ -107,7 +181,7 @@ Returns the N most recent sessions across all projects (lightweight endpoint for
 ```
 
 **Fields**:
-- `sessions` (array): Recent sessions sorted by date descending
+- `sessions` (array): Recent sessions sorted by date descending (same object format as `/api/sessions`)
 - `total` (integer): Total number of sessions across all projects
 
 **Example**:
@@ -127,29 +201,33 @@ Returns active Claude Code processes with real-time CPU and RAM monitoring.
   "sessions": [
     {
       "pid": 12345,
-      "startTime": "2026-02-09T10:30:00Z",
+      "startTime": "2026-02-09T10:30:00+01:00",
       "workingDirectory": "/Users/john/code/myapp",
       "command": "claude",
       "cpuPercent": 15.3,
       "memoryMb": 512,
       "tokens": 1234,
       "sessionId": "ea23759a-...",
-      "sessionName": "myapp-session"
+      "sessionName": null
     }
   ],
-  "total": 1
+  "total": 3
 }
 ```
 
 **Fields**:
 - `pid` (integer): Process ID
-- `startTime` (ISO 8601): Process start time
+- `startTime` (ISO 8601): Process start time (with timezone offset)
+- `workingDirectory` (string): Current working directory of the process
+- `command` (string): Process command name (e.g., `"claude"`)
 - `cpuPercent` (float): Current CPU usage percentage
 - `memoryMb` (integer): Current memory usage in MB
 - `tokens` (integer): Tokens consumed in current session
-- `sessionId` (string): Associated session UUID (if available)
+- `sessionId` (string|null): Associated session UUID (matched from JSONL files)
+- `sessionName` (string|null): Optional session name (if set by user)
+- `total` (integer): Total number of active Claude processes
 
-**Use Case**: Live monitoring dashboard with CPU/RAM badges (bonus feature Sprint 1)
+**Use Case**: Live monitoring dashboard with CPU/RAM badges
 
 **Example**:
 ```bash
@@ -219,8 +297,8 @@ Returns session metadata with pagination, filtering, and sorting.
 - `cache_read_tokens` (integer): Tokens read from cache
 - `cost` (float): Estimated cost in USD
 - `first_timestamp` (ISO 8601): Session start time
-- `duration_seconds` (integer): Session duration
-- `preview` (string): First user message (truncated)
+- `duration_seconds` (integer|null): Session duration (null if not computed)
+- `preview` (string): First user message (truncated to ~200 chars)
 
 **Error Codes**:
 - `500 Internal Server Error`: Failed to load sessions from SQLite cache
@@ -294,30 +372,46 @@ Returns all configured hooks from merged settings (global + project + local) wit
 {
   "hooks": [
     {
-      "name": "pre-commit",
-      "event": "pre-commit",
-      "command": ".claude/hooks/bash/pre-commit.sh",
-      "description": "Run cargo fmt and clippy before commit",
+      "name": "UserPromptSubmit",
+      "event": "UserPromptSubmit",
+      "command": "current_model=$(jq -r ...) ...",
+      "description": "current_model=$(jq -r ...) ...",
       "async": false,
-      "timeout": 30,
+      "timeout": null,
       "cwd": null,
       "matcher": null,
-      "scriptPath": ".claude/hooks/bash/pre-commit.sh",
-      "scriptContent": "#!/bin/bash\n# Description: Run cargo fmt and clippy..."
+      "scriptPath": null,
+      "scriptContent": null
+    },
+    {
+      "name": "PreToolUse-0-0",
+      "event": "PreToolUse",
+      "command": "case \"$TOOL_INPUT\" in ...",
+      "description": "case \"$TOOL_INPUT\" in ...",
+      "async": false,
+      "timeout": null,
+      "cwd": null,
+      "matcher": "Bash",
+      "scriptPath": null,
+      "scriptContent": null
     }
   ],
-  "total": 1
+  "total": 5
 }
 ```
 
 **Fields**:
-- `name` (string): Hook identifier (event name or event-group-index)
-- `event` (string): Event that triggers the hook (e.g., `pre-commit`, `post-session`)
-- `command` (string): Command or script path
+- `name` (string): Hook identifier (event name or `event-group-index` for multiple hooks per event)
+- `event` (string): Event trigger (`UserPromptSubmit`, `PreToolUse`, `Custom`, etc.)
+- `command` (string): Inline command or script path
 - `description` (string): Extracted from `# Description:` comment in script, or command itself
 - `async` (boolean): Whether hook runs asynchronously
-- `timeout` (integer): Timeout in seconds
-- `scriptContent` (string): Full script content if command is a `.sh` file
+- `timeout` (integer|null): Timeout in seconds (null if not set)
+- `cwd` (string|null): Working directory override
+- `matcher` (string|null): Tool matcher pattern (e.g., `"Bash"` for PreToolUse hooks)
+- `scriptPath` (string|null): Path to external script file (if command references a `.sh` file)
+- `scriptContent` (string|null): Full script content (loaded when scriptPath is set)
+- `total` (integer): Total number of hooks
 
 **Use Case**: Hooks tab in TUI/Web, syntax highlighting for bash scripts
 
@@ -402,9 +496,10 @@ Returns agents from `~/.claude/agents/` with frontmatter metadata.
 
 **Fields**:
 - `name` (string): Agent filename (without `.md`)
-- `frontmatter` (object): YAML metadata between `---` markers
+- `frontmatter` (object): YAML metadata between `---` markers (empty `{}` if no frontmatter)
 - `body` (string): Markdown content after frontmatter
 - `path` (string): Full file path
+- `total` (integer): Total number of items
 
 **Use Case**: Agents/Capabilities tab in TUI/Web
 
@@ -573,7 +668,7 @@ Currently **no rate limiting** (local development only). Production deployment s
 ### Scalability
 
 - **Single-instance**: Designed for local `~/.claude` monitoring (1 user)
-- **Multi-user**: See Phase 13 roadmap (PostgreSQL + team server mode)
+- **Multi-user**: Not currently supported (local-only design)
 
 ---
 
@@ -715,15 +810,13 @@ wrk -t4 -c100 -d30s http://localhost:8080/api/stats
 
 ## Future API Additions
 
-See `claudedocs/ROADMAP.md` for planned endpoints:
-- `POST /api/config/update` (Phase 12: Write operations)
-- `GET /api/conversation/:session_id` (Phase F: Conversation viewer)
-- `GET /api/plan/:project` (Phase H: Plan-aware)
-- `GET /api/tokens/breakdown` (Phase 11: Token analytics)
+Planned endpoints:
+- `GET /api/conversation/:session_id` (Conversation Viewer: full JSONL content display)
+- `GET /api/plan/:project` (Plan-Aware: PLAN.md parsing and task tracking)
 
 ---
 
-**Last Updated**: 2026-02-09
-**API Version**: v0.5.0
+**Last Updated**: 2026-02-11
+**API Version**: v0.5.2
 **Backend**: Axum + Tokio
 **Frontend**: Leptos + WASM
