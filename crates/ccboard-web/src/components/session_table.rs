@@ -245,15 +245,11 @@ pub fn SessionTable(
                     class="btn btn-secondary"
                     disabled=move || current_page.get() >= total_pages.get() - 1
                     on:click=move |_| {
-                        set_current_page
-                            .update(|p| {
-                                if *p < total_pages.get() - 1 {
-                                    *p += 1
-                                }
-                            })
+                        if current_page.get() < total_pages.get() - 1 {
+                            set_current_page.update(|p| *p += 1)
+                        }
                     }
                 >
-
                     {"Next →"}
                 </button>
             </div>
