@@ -94,7 +94,12 @@ impl HooksParser {
         for entry in fs::read_dir(hooks_dir)
             .with_context(|| format!("Failed to read hooks directory: {}", hooks_dir.display()))?
         {
-            let entry = entry?;
+            let entry = entry.with_context(|| {
+                format!(
+                    "Failed to read entry in hooks directory: {}",
+                    hooks_dir.display()
+                )
+            })?;
             let path = entry.path();
 
             if path.extension().and_then(|s| s.to_str()) == Some("sh") {

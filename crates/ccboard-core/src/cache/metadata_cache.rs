@@ -341,6 +341,20 @@ impl MetadataCache {
     }
 }
 
+impl Drop for MetadataCache {
+    fn drop(&mut self) {
+        // WAL checkpoint on drop to ensure all data is flushed to main database file
+        // and WAL file doesn't grow unbounded across restarts
+        if let Ok(conn) = self.conn.lock() {
+            if let Err(e) = conn.pragma_update(None, "wal_checkpoint", "TRUNCATE") {
+                warn!("Failed to checkpoint WAL on MetadataCache drop: {}", e);
+            } else {
+                debug!("WAL checkpoint completed on MetadataCache drop");
+            }
+        }
+    }
+}
+
 /// Cache statistics
 #[derive(Debug, Clone)]
 pub struct CacheStats {

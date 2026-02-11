@@ -285,7 +285,10 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
         println!("\n🌐 Backend API + Frontend: http://localhost:{}", port);
         println!("   API endpoints:          http://localhost:{}/api/*", port);
     } else {
-        println!("\n🌐 Backend API only:       http://localhost:{}/api/*", port);
+        println!(
+            "\n🌐 Backend API only:       http://localhost:{}/api/*",
+            port
+        );
         println!("   💡 Run 'trunk build' to compile frontend");
     }
 

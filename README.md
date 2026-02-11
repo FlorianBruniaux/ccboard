@@ -22,6 +22,10 @@
   <a href="#installation"><img src="https://img.shields.io/badge/platform-macOS_|_Linux_|_Windows-lightgrey?style=flat-square" alt="Platform"/></a>
 </p>
 
+<p align="center">
+  <img src="assets/demo.gif" alt="ccboard demo" width="800"/>
+</p>
+
 > **The only actively-maintained Rust TUI** combining Claude Code monitoring, config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 234 tests, 0 clippy warnings.
 
 ---
@@ -137,9 +141,9 @@ ccboard vs other Claude Code monitoring tools (verified 2026-02-06):
 | **Advanced Analytics (Forecast, Budget)** | ✅ 4 views | ❌ | ⚠️ Burn rate | ❌ |
 | **Single Binary (no runtime)** | ✅ 5.8MB | ✅ Rust | ✅ Rust | ❌ npm |
 | | | | | |
-| **MCP Server Mode** | ⏳ Phase G | ✅ 6 tools | ❌ | ❌ |
-| **Billing Blocks (5h)** | ⏳ Phase G | ❌ | ✅ | ❌ |
-| **Conversation Viewer** | ⏳ Phase F | ❌ | ✅ | ❌ |
+| **MCP Server Mode** | ⏳ Soon | ✅ 6 tools | ❌ | ❌ |
+| **Billing Blocks (5h)** | ⏳ Soon | ❌ | ✅ | ❌ |
+| **Conversation Viewer** | ⏳ Soon | ❌ | ✅ | ❌ |
 | **Multi-provider** | ❌ | ✅ 3 providers | ❌ | ❌ |
 
 **Unique to ccboard**:
@@ -168,40 +172,99 @@ ccboard vs other Claude Code monitoring tools (verified 2026-02-06):
 
 ## Screenshots
 
-### Dashboard - Key Metrics & Model Usage
-![Dashboard](assets/screenshots/dashboard.png)
+### TUI (Terminal)
 
-### Sessions - Project Tree & Search
-![Sessions](assets/screenshots/sessions.png)
+#### Dashboard - Key Metrics & Model Usage
+![Dashboard](assets/screenshots/tui/tui-01-dashboard.png)
 
-### Search Highlighting
-![Search](assets/screenshots/recherche.png)
+#### Sessions - Project Tree & Search
+![Sessions](assets/screenshots/tui/tui-02-sessions-list.png)
 
-### Help Modal - Keybindings
-![Help](assets/screenshots/aide.png)
+#### Sessions - Detail View
+![Session Detail](assets/screenshots/tui/tui-02-sessions-detail.png)
+
+#### Sessions - Live Process Monitoring
+![Live Sessions](assets/screenshots/tui/tui-02-sessions-live.png)
 
 <details>
-<summary>📸 More Screenshots (click to expand)</summary>
+<summary>More TUI Screenshots (click to expand)</summary>
 
-#### Configuration Viewer
-![Config](assets/screenshots/config.png)
+#### Configuration - 4-Column Merge View
+![Config](assets/screenshots/tui/tui-03-config.png)
 
 #### Hooks Management
-![Hooks](assets/screenshots/hooks.png)
+![Hooks](assets/screenshots/tui/tui-04-hooks.png)
 
-#### Agents & Commands
-![Agents](assets/screenshots/agents.png)
-![Commands](assets/screenshots/commands.png)
+#### Agents, Commands & Skills
+![Agents](assets/screenshots/tui/tui-05-agents.png)
+![Commands](assets/screenshots/tui/tui-05-commands.png)
+![Skills](assets/screenshots/tui/tui-05-skills.png)
 
 #### Cost Analytics
-![Costs](assets/screenshots/costs.png)
-![Cost by Model](assets/screenshots/cost%20by%20model.png)
+![Costs Overview](assets/screenshots/tui/tui-06-costs-overview.png)
+![Costs By Model](assets/screenshots/tui/tui-06-costs-by-model.png)
+![Costs Daily](assets/screenshots/tui/tui-06-costs-daily.png)
+![Costs Billing Blocks](assets/screenshots/tui/tui-06-costs-billing-blocks.png)
+![Costs Leaderboard](assets/screenshots/tui/tui-06-costs-leaderboard.png)
 
 #### History Search
-![History](assets/screenshots/history.png)
+![History](assets/screenshots/tui/tui-07-history.png)
 
 #### MCP Servers
-![MCP](assets/screenshots/mcp.png)
+![MCP](assets/screenshots/tui/tui-08-mcp.png)
+
+#### Analytics
+![Analytics Overview](assets/screenshots/tui/tui-09-analytics-overview.png)
+![Analytics Trends](assets/screenshots/tui/tui-09-analytics-trends.png)
+![Analytics Patterns](assets/screenshots/tui/tui-09-analytics-patterns.png)
+![Analytics Insights](assets/screenshots/tui/tui-09-analytics-insights.png)
+![Analytics Anomalies](assets/screenshots/tui/tui-09-analytics-anomalies.png)
+
+</details>
+
+---
+
+### Web Interface
+
+#### Dashboard
+![Web Dashboard](assets/screenshots/web/web-01-dashboard.png)
+
+#### Sessions - Browse & Live Monitoring
+![Web Sessions](assets/screenshots/web/web-02-sessions-list.png)
+![Web Sessions Active](assets/screenshots/web/web-02-sessions-active.png)
+
+<details>
+<summary>More Web Screenshots (click to expand)</summary>
+
+#### Configuration
+![Web Config](assets/screenshots/web/web-03-config.png)
+![Web Config Modal](assets/screenshots/web/web-03-config-modal.png)
+
+#### Hooks
+![Web Hooks](assets/screenshots/web/web-04-hooks.png)
+
+#### Agents, Commands & Skills
+![Web Agents](assets/screenshots/web/web-05-agents.png)
+![Web Commands](assets/screenshots/web/web-05-commands.png)
+![Web Skills](assets/screenshots/web/web-05-skills.png)
+
+#### Cost Analytics
+![Web Costs Overview](assets/screenshots/web/web-06-costs-overview.png)
+![Web Costs By Model](assets/screenshots/web/web-06-costs-by-model.png)
+![Web Costs Daily](assets/screenshots/web/web-06-costs-daily.png)
+![Web Costs Billing Blocks](assets/screenshots/web/web-06-costs-billing-blocks.png)
+
+#### History
+![Web History](assets/screenshots/web/web-07-history.png)
+
+#### MCP Servers
+![Web MCP](assets/screenshots/web/web-08-mcp.png)
+
+#### Analytics
+![Web Analytics Overview](assets/screenshots/web/web-09-analytics-overview.png)
+![Web Analytics Trends](assets/screenshots/web/web-09-analytics-trends.png)
+![Web Analytics Patterns](assets/screenshots/web/web-09-analytics-patterns.png)
+![Web Analytics Insights](assets/screenshots/web/web-09-analytics-insights.png)
 
 </details>
 
@@ -794,7 +857,7 @@ ccboard integrates with your configured editor:
 ccboard/                     # Binary CLI entry point
 ├── ccboard-core/            # Data layer (parsers, models, store, watcher)
 ├── ccboard-tui/             # Ratatui frontend (9 tabs)
-└── ccboard-web/             # Axum API backend (Leptos frontend TODO Phase G)
+└── ccboard-web/             # Axum API backend + Leptos WASM frontend
 ```
 
 **Dependency flow**: `ccboard` → `ccboard-tui` + `ccboard-web` → `ccboard-core`
@@ -936,50 +999,31 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 **Current Status**: 🎉 **PRODUCTION-READY** (v0.5.0)
 
-### Completed Phases ✅
+### Completed ✅
 
-- ✅ **Phase I (Infrastructure)**: Stats parser, Settings merge, Session metadata, DataStore
-- ✅ **Phase D (Dashboard TUI)**: Dashboard tab with sparklines, project filters, model breakdown
-- ✅ **Phase S (Sessions TUI)**: Sessions tab with search, filters, detail view
-- ✅ **Phase C (Config TUI)**: Config tab with merge visualization, setting overrides
-- ✅ **Phase H-A (Hooks & Agents TUI)**: Hooks tab (list + detail), Agents/Capabilities tab
-- ✅ **Phase E (Economics TUI)**: Costs tab, History tab with SQLite-backed timelines
-- ✅ **Phase G (Leptos Frontend)**: Full Web UI with 100% TUI/Web parity (9 pages)
-- ✅ **Phase 0-3**: Profiling, security hardening, SQLite cache (89x speedup), UI/UX quick wins
+- ✅ **Infrastructure**: Stats parser, Settings merge, Session metadata, DataStore, SQLite cache (89x speedup)
+- ✅ **TUI Dashboard**: 9 interactive tabs (Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP, Analytics)
+- ✅ **Web Frontend**: Full Leptos/WASM UI with 100% TUI parity (9 pages)
+- ✅ **Live Monitoring**: CPU/RAM/Tokens tracking for active Claude processes
+- ✅ **Cost Analytics**: 4 views (Overview, By Model, Daily, Billing Blocks) + budget alerts
+- ✅ **Advanced Analytics**: 30-day forecasting, usage patterns, actionable insights
 
-**Total**: 156 tests passing, 0 clippy warnings
+**Total**: 234 tests passing, 0 clippy warnings
 
-### Recently Completed ✅
+### Coming Soon 🚧
 
-**Phase G (Leptos Frontend)** - 100% Complete 🎉
-- ✅ Dashboard with KPIs and 30-day forecast
-- ✅ Sessions with **live CPU/RAM monitoring** (bonus feature)
-- ✅ Config with 4-column diff view
-- ✅ Hooks with bash syntax highlighting
-- ✅ MCP servers with status and details
-- ✅ Agents/Commands/Skills with frontmatter parsing
-- ✅ Costs with 4 tabs (Overview, By Model, Daily, Billing Blocks)
-- ✅ History with search and filters
-- ✅ Analytics with 4 tabs (Overview, Trends, Patterns, Insights)
-
-**Full TUI/Web parity achieved** 🎯
-
-### In Progress 🚧
-
-**Phase A (Analytics TUI)** - Completion (2-4h remaining)
-- 🔄 A.1-A.4: Project leaderboard, session replay, trend forecasting, anomaly detection
-
-### Planned 📋
-
-**Phase F (Conversation Viewer)** (8-12h)
+**Conversation Viewer**
 - Full JSONL content display with syntax highlighting
 - Message navigation, search within conversations
 - Export selected messages
 
-**Phase H (Plan-Aware)** (6-10h)
+**Plan-Aware Dashboard**
 - PLAN.md parsing and visualization
 - Task completion tracking
-- Progress indicators per phase
+- Progress indicators
+
+**MCP Server Mode**
+- Expose ccboard data as MCP tools for Claude Code
 
 For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [PLAN.md](claudedocs/PLAN.md).
 
