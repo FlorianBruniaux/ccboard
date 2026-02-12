@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-02-12
+
+### Added
+- **LiteLLM dynamic pricing integration**: Automatic pricing updates from LiteLLM canonical source
+  - New CLI commands: `ccboard pricing update` (fetch latest prices) and `ccboard pricing clear` (clear cache)
+  - Local caching at `~/.cache/ccboard/pricing.json` with 7-day TTL
+  - Fetches 25 Claude models from https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
+  - Embedded pricing as fallback for offline usage
+  - Dynamic pricing loaded at startup and merged with embedded prices
+  - Benefits: Always up-to-date pricing without code changes, offline support, reduced network calls
+
+### Changed
+- Pricing module refactored into modular architecture: `pricing/litellm.rs` (fetch), `pricing/cache.rs` (storage), `pricing/embedded.rs` (fallback), `pricing/mod.rs` (unified API)
+- `calculate_cost()` now uses dynamic pricing from cache → embedded fallback
+- Added `reqwest` dependency for HTTP fetch from LiteLLM
+
 ## [0.6.4] - 2026-02-12
 
 ### Fixed
