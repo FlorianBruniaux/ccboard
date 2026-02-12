@@ -79,7 +79,23 @@ cargo install ccboard
 
 **Why cargo?** ccboard's target audience (Claude Code users) often has Rust installed. Ensures compatibility and always installs latest crates.io version.
 
-### Alternative: Pre-built binaries
+### Alternative: Install Script (macOS/Linux/Windows)
+
+**One-liner install** (no Rust required):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/FlorianBruniaux/ccboard/main/install.sh | bash
+```
+
+This script:
+- Auto-detects your OS and architecture
+- Downloads the latest pre-compiled binary
+- Installs to `~/.local/bin` (customizable with `INSTALL_DIR`)
+- Checks if binary is in PATH
+
+**Windows users**: Use Git Bash, WSL, or download manually from releases.
+
+### Alternative: Pre-built binaries (manual)
 
 Download from [GitHub Releases](https://github.com/FlorianBruniaux/ccboard/releases/latest):
 
@@ -88,6 +104,22 @@ Download from [GitHub Releases](https://github.com/FlorianBruniaux/ccboard/relea
 | **macOS** (x86_64/ARM64) | ✅ Fully tested | [ccboard-macos-*.tar.gz](https://github.com/FlorianBruniaux/ccboard/releases) |
 | **Linux** (x86_64/ARM64) | ⚠️ Community-tested | [ccboard-linux-*.tar.gz](https://github.com/FlorianBruniaux/ccboard/releases) |
 | **Windows** (x86_64) | 🧪 Experimental | [ccboard-windows-*.exe.zip](https://github.com/FlorianBruniaux/ccboard/releases) |
+
+**Manual installation** (macOS/Linux):
+```bash
+# Extract
+tar xzf ccboard-macos-x86_64.tar.gz  # or ccboard-linux-*
+
+# Move to PATH
+mv ccboard ~/.local/bin/
+chmod +x ~/.local/bin/ccboard
+```
+
+**Manual installation** (Windows):
+1. Download `ccboard-windows-x86_64.exe.zip`
+2. Extract `ccboard-windows-x86_64.exe`
+3. Rename to `ccboard.exe`
+4. Move to a directory in your PATH (e.g., `C:\Users\YourName\.local\bin\`)
 
 **Platform support:**
 - ✅ **macOS**: Manually tested on every release
