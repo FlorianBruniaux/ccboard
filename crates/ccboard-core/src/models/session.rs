@@ -245,6 +245,21 @@ impl<'a> From<&'a ProjectId> for Cow<'a, str> {
     }
 }
 
+/// Message role in conversation
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MessageRole {
+    User,
+    Assistant,
+    System,
+}
+
+impl Default for MessageRole {
+    fn default() -> Self {
+        Self::User
+    }
+}
+
 /// A single line from a session JSONL file
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -478,6 +493,73 @@ impl SessionMetadata {
             format!("{} B", bytes)
         }
     }
+}
+
+/// A single conversation message extracted from session JSONL
+///
+/// Simplified representation for display in conversation viewer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversationMessage {
+    /// Message role (User, Assistant, System)
+    pub role: MessageRole,
+
+    /// Text content (extracted from SessionLine.message.content)
+    pub content: String,
+
+    /// Timestamp when message was sent
+    pub timestamp: Option<DateTime<Utc>>,
+
+    /// Model used (for assistant messages)
+    pub model: Option<String>,
+
+    /// Token usage (for assistant messages)
+    pub tokens: Option<TokenUsage>,
+
+    /// Tool calls made in this message (if any)
+    #[serde(default)]
+    pub tool_calls: Vec<ToolCall>,
+
+    /// Tool results received (if any)
+    #[serde(default)]
+    pub tool_results: Vec<ToolResult>,
+}
+
+/// A tool call made by the assistant
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    /// Tool name (e.g., "Read", "Bash", "Edit")
+    pub name: String,
+
+    /// Tool call ID for matching with results
+    pub id: String,
+
+    /// Input parameters as JSON
+    pub input: serde_json::Value,
+}
+
+/// Result of a tool call execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolResult {
+    /// Tool call ID this result corresponds to
+    pub tool_call_id: String,
+
+    /// Whether the tool succeeded
+    pub is_error: bool,
+
+    /// Output content
+    pub content: String,
+}
+
+/// Full session content with metadata + messages
+///
+/// Returned by SessionContentParser for lazy-loaded session display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionContent {
+    /// Messages in chronological order
+    pub messages: Vec<ConversationMessage>,
+
+    /// Session metadata (from cache or index)
+    pub metadata: SessionMetadata,
 }
 
 #[cfg(test)]

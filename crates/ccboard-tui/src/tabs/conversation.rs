@@ -1,7 +1,9 @@
 //! Conversation viewer - Displays full session content with syntax highlighting
 
+use crate::widgets::ToolCallsViewer;
 use ccboard_core::models::{ConversationMessage, MessageRole};
 use ccboard_core::DataStore;
+use chrono::{DateTime, Utc};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -9,11 +11,100 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
     Frame,
 };
-use std::sync::Arc;
+use std::collections::HashMap;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
+
+/// Message filtering options
+#[derive(Debug, Clone)]
+pub struct MessageFilter {
+    /// Show user messages
+    pub show_user: bool,
+    /// Show assistant messages
+    pub show_assistant: bool,
+    /// Show system messages
+    pub show_system: bool,
+    /// Show only messages with tool calls
+    pub tools_only: bool,
+    /// Filter by timestamp range (optional)
+    pub start_time: Option<DateTime<Utc>>,
+    pub end_time: Option<DateTime<Utc>>,
+}
+
+impl Default for MessageFilter {
+    fn default() -> Self {
+        Self {
+            show_user: true,
+            show_assistant: true,
+            show_system: true,
+            tools_only: false,
+            start_time: None,
+            end_time: None,
+        }
+    }
+}
+
+impl MessageFilter {
+    /// Check if a message passes all active filters
+    pub fn matches(&self, msg: &ConversationMessage) -> bool {
+        // Role filter
+        let role_match = match msg.role {
+            MessageRole::User => self.show_user,
+            MessageRole::Assistant => self.show_assistant,
+            MessageRole::System => self.show_system,
+        };
+
+        if !role_match {
+            return false;
+        }
+
+        // Tools filter (only applies to assistant messages)
+        if self.tools_only {
+            // Check if content contains tool usage indicators
+            let has_tools = msg.content.contains("tool_use")
+                || msg.content.contains("<function_calls>")
+                || msg.content.contains("<invoke");
+
+            if !has_tools {
+                return false;
+            }
+        }
+
+        // Timestamp range filter
+        if let Some(ref ts) = msg.timestamp {
+            if let Some(ref start) = self.start_time {
+                if ts < start {
+                    return false;
+                }
+            }
+
+            if let Some(ref end) = self.end_time {
+                if ts > end {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
+    /// Check if any filters are active (non-default)
+    pub fn is_active(&self) -> bool {
+        !self.show_user
+            || !self.show_assistant
+            || !self.show_system
+            || self.tools_only
+            || self.start_time.is_some()
+            || self.end_time.is_some()
+    }
+
+    /// Reset all filters to default
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
 
 /// Conversation viewer state
 pub struct ConversationTab {
@@ -38,6 +129,18 @@ pub struct ConversationTab {
     /// Syntax highlighting resources
     syntax_set: SyntaxSet,
     theme_set: ThemeSet,
+
+    /// Message filtering
+    filter: MessageFilter,
+
+    /// Show filter panel
+    show_filter_panel: bool,
+
+    /// Tool call viewers per message (message_index -> viewer)
+    tool_viewers: HashMap<usize, ToolCallsViewer>,
+
+    /// Currently viewing tool calls for message index
+    viewing_tools: Option<usize>,
 }
 
 impl ConversationTab {
@@ -51,6 +154,10 @@ impl ConversationTab {
             is_loading: false,
             syntax_set: SyntaxSet::load_defaults_newlines(),
             theme_set: ThemeSet::load_defaults(),
+            filter: MessageFilter::default(),
+            show_filter_panel: false,
+            tool_viewers: HashMap::new(),
+            viewing_tools: None,
         }
     }
 
@@ -84,6 +191,8 @@ impl ConversationTab {
         self.scroll_offset = 0;
         self.error = None;
         self.is_loading = false;
+        self.tool_viewers.clear();
+        self.viewing_tools = None;
     }
 
     /// Check if a conversation is currently loaded
@@ -116,10 +225,156 @@ impl ConversationTab {
         }
     }
 
+    /// Toggle filter panel visibility
+    pub fn toggle_filter_panel(&mut self) {
+        self.show_filter_panel = !self.show_filter_panel;
+    }
+
+    /// Toggle user message filter
+    pub fn toggle_user_filter(&mut self) {
+        self.filter.show_user = !self.filter.show_user;
+        self.scroll_offset = 0; // Reset scroll when filter changes
+    }
+
+    /// Toggle assistant message filter
+    pub fn toggle_assistant_filter(&mut self) {
+        self.filter.show_assistant = !self.filter.show_assistant;
+        self.scroll_offset = 0;
+    }
+
+    /// Toggle system message filter
+    pub fn toggle_system_filter(&mut self) {
+        self.filter.show_system = !self.filter.show_system;
+        self.scroll_offset = 0;
+    }
+
+    /// Toggle tools-only filter
+    pub fn toggle_tools_filter(&mut self) {
+        self.filter.tools_only = !self.filter.tools_only;
+        self.scroll_offset = 0;
+    }
+
+    /// Reset all filters
+    pub fn reset_filters(&mut self) {
+        self.filter.reset();
+        self.scroll_offset = 0;
+    }
+
+    /// Show tool calls for current message
+    pub fn show_tool_calls_for_current(&mut self) {
+        // Get filtered messages to find the actual message at scroll_offset
+        let filtered: Vec<(usize, &ConversationMessage)> = self
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, msg)| self.filter.matches(msg))
+            .collect();
+
+        if let Some((original_idx, msg)) = filtered.get(self.scroll_offset) {
+            // Check if message has tool calls
+            if !msg.tool_calls.is_empty() || !msg.tool_results.is_empty() {
+                // Create viewer if not exists
+                if !self.tool_viewers.contains_key(original_idx) {
+                    let viewer =
+                        ToolCallsViewer::new(msg.tool_calls.clone(), msg.tool_results.clone());
+                    self.tool_viewers.insert(*original_idx, viewer);
+                }
+
+                self.viewing_tools = Some(*original_idx);
+            }
+        }
+    }
+
+    /// Close tool calls viewer
+    pub fn close_tool_calls(&mut self) {
+        self.viewing_tools = None;
+    }
+
+    /// Toggle tool call expansion (when viewing)
+    pub fn toggle_tool_call(&mut self) {
+        if let Some(msg_idx) = self.viewing_tools {
+            if let Some(viewer) = self.tool_viewers.get_mut(&msg_idx) {
+                viewer.toggle_selected();
+            }
+        }
+    }
+
+    /// Navigate tool calls
+    pub fn tool_call_up(&mut self) {
+        if let Some(msg_idx) = self.viewing_tools {
+            if let Some(viewer) = self.tool_viewers.get_mut(&msg_idx) {
+                viewer.move_up();
+            }
+        }
+    }
+
+    pub fn tool_call_down(&mut self) {
+        if let Some(msg_idx) = self.viewing_tools {
+            if let Some(viewer) = self.tool_viewers.get_mut(&msg_idx) {
+                viewer.move_down();
+            }
+        }
+    }
+
     /// Handle keyboard input
     pub fn handle_key(&mut self, key: crossterm::event::KeyCode) -> bool {
         use crossterm::event::KeyCode;
 
+        // Tool calls viewer bindings (when viewing tools)
+        if self.viewing_tools.is_some() {
+            match key {
+                KeyCode::Esc => {
+                    self.close_tool_calls();
+                    return true;
+                }
+                KeyCode::Enter => {
+                    self.toggle_tool_call();
+                    return true;
+                }
+                KeyCode::Char('j') | KeyCode::Down => {
+                    self.tool_call_down();
+                    return true;
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.tool_call_up();
+                    return true;
+                }
+                _ => return false,
+            }
+        }
+
+        // Filter panel bindings (when panel is open)
+        if self.show_filter_panel {
+            match key {
+                KeyCode::Char('f') | KeyCode::Esc => {
+                    self.toggle_filter_panel();
+                    return true;
+                }
+                KeyCode::Char('u') => {
+                    self.toggle_user_filter();
+                    return true;
+                }
+                KeyCode::Char('a') => {
+                    self.toggle_assistant_filter();
+                    return true;
+                }
+                KeyCode::Char('s') => {
+                    self.toggle_system_filter();
+                    return true;
+                }
+                KeyCode::Char('t') => {
+                    self.toggle_tools_filter();
+                    return true;
+                }
+                KeyCode::Char('r') => {
+                    self.reset_filters();
+                    return true;
+                }
+                _ => return false,
+            }
+        }
+
+        // Normal navigation bindings
         match key {
             KeyCode::Char('j') | KeyCode::Down => {
                 self.scroll_down(1);
@@ -143,6 +398,15 @@ impl ConversationTab {
             }
             KeyCode::Char('G') => {
                 self.scroll_to_bottom();
+                true
+            }
+            KeyCode::Char('f') => {
+                self.toggle_filter_panel();
+                true
+            }
+            KeyCode::Char('t') => {
+                // Show tool calls for current message
+                self.show_tool_calls_for_current();
                 true
             }
             KeyCode::PageDown => {
@@ -202,21 +466,39 @@ impl ConversationTab {
             return;
         }
 
-        // Create title with session ID
+        // Create title with session ID and filter status
+        let filtered_count = self.get_filtered_count();
+        let filter_indicator = if self.filter.is_active() {
+            format!(" [Filtered: {}/{}]", filtered_count, self.messages.len())
+        } else {
+            format!(" ({} messages)", self.messages.len())
+        };
+
         let title = format!(
-            "💬 Conversation: {} ({} messages)",
+            "💬 Conversation: {}{}",
             self.session_id.as_ref().unwrap(),
-            self.messages.len()
+            filter_indicator
         );
 
-        // Main content area
+        // Main content area (split if filter panel is shown)
+        let (content_area, filter_area) = if self.show_filter_panel {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Min(40), Constraint::Length(35)])
+                .split(area);
+            (chunks[0], Some(chunks[1]))
+        } else {
+            (area, None)
+        };
+
+        // Render main content block
         let block = Block::default()
             .borders(Borders::ALL)
             .title(title)
             .style(Style::default().fg(Color::Cyan));
 
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
+        let inner = block.inner(content_area);
+        frame.render_widget(block, content_area);
 
         // Calculate visible messages based on scroll offset
         let visible_messages = self.get_visible_messages(inner.height as usize);
@@ -240,22 +522,168 @@ impl ConversationTab {
         }
 
         // Render scrollbar
-        if self.messages.len() > visible_messages.len() {
+        let filtered_count = self.get_filtered_count();
+        if filtered_count > visible_messages.len() {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .style(Style::default().fg(Color::DarkGray));
 
             let mut scrollbar_state =
-                ScrollbarState::new(self.messages.len()).position(self.scroll_offset);
+                ScrollbarState::new(filtered_count).position(self.scroll_offset);
 
-            frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
+            frame.render_stateful_widget(scrollbar, content_area, &mut scrollbar_state);
+        }
+
+        // Render filter panel if visible
+        if let Some(filter_area) = filter_area {
+            self.render_filter_panel(frame, filter_area);
+        }
+
+        // Render tool calls viewer as overlay if viewing
+        if let Some(msg_idx) = self.viewing_tools {
+            if let Some(viewer) = self.tool_viewers.get(&msg_idx) {
+                // Create centered overlay (80% width, 80% height)
+                let overlay_width = (area.width as f32 * 0.8) as u16;
+                let overlay_height = (area.height as f32 * 0.8) as u16;
+                let overlay_x = (area.width - overlay_width) / 2;
+                let overlay_y = (area.height - overlay_height) / 2;
+
+                let overlay_area = Rect {
+                    x: area.x + overlay_x,
+                    y: area.y + overlay_y,
+                    width: overlay_width,
+                    height: overlay_height,
+                };
+
+                // Render backdrop
+                let backdrop = Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Cyan))
+                    .title(
+                        "🔧 Tool Calls [Esc to close, Enter to expand/collapse, j/k to navigate]",
+                    )
+                    .style(Style::default().bg(Color::Rgb(15, 15, 25)));
+
+                let inner = backdrop.inner(overlay_area);
+                frame.render_widget(backdrop, overlay_area);
+
+                // Render tool calls viewer
+                viewer.render(frame, inner);
+            }
         }
     }
 
-    /// Get visible messages based on scroll offset and available height
+    /// Render the filter panel
+    fn render_filter_panel(&self, frame: &mut Frame, area: Rect) {
+        let mut filter_lines = vec![
+            Line::from(Span::styled(
+                "Filters",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Role Filters:",
+                Style::default().fg(Color::Cyan),
+            )),
+            Line::from(format!(
+                "[u] User: {}",
+                if self.filter.show_user { "✓" } else { " " }
+            )),
+            Line::from(format!(
+                "[a] Assistant: {}",
+                if self.filter.show_assistant {
+                    "✓"
+                } else {
+                    " "
+                }
+            )),
+            Line::from(format!(
+                "[s] System: {}",
+                if self.filter.show_system { "✓" } else { " " }
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Content Filters:",
+                Style::default().fg(Color::Cyan),
+            )),
+            Line::from(format!(
+                "[t] Tools only: {}",
+                if self.filter.tools_only { "✓" } else { " " }
+            )),
+            Line::from(""),
+            Line::from(Span::styled("Actions:", Style::default().fg(Color::Cyan))),
+            Line::from("[r] Reset filters"),
+            Line::from("[f/Esc] Close panel"),
+            Line::from(""),
+            Line::from(Span::styled(
+                if self.filter.is_active() {
+                    "⚠ Filters active"
+                } else {
+                    "No filters"
+                },
+                Style::default().fg(if self.filter.is_active() {
+                    Color::Yellow
+                } else {
+                    Color::DarkGray
+                }),
+            )),
+        ];
+
+        // Add timestamp filter info if set
+        if self.filter.start_time.is_some() || self.filter.end_time.is_some() {
+            filter_lines.push(Line::from(""));
+            filter_lines.push(Line::from(Span::styled(
+                "Time Range:",
+                Style::default().fg(Color::Cyan),
+            )));
+            if let Some(ref start) = self.filter.start_time {
+                filter_lines.push(Line::from(format!(
+                    "From: {}",
+                    start.format("%Y-%m-%d %H:%M")
+                )));
+            }
+            if let Some(ref end) = self.filter.end_time {
+                filter_lines.push(Line::from(format!("To: {}", end.format("%Y-%m-%d %H:%M"))));
+            }
+        }
+
+        let filter_text = Paragraph::new(filter_lines)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("🔍 Filters")
+                    .style(Style::default().fg(Color::Yellow)),
+            )
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(filter_text, area);
+    }
+
+    /// Get visible messages based on scroll offset, filters, and available height
     fn get_visible_messages(&self, available_height: usize) -> Vec<&ConversationMessage> {
-        let start = self.scroll_offset;
-        let end = (start + available_height.saturating_sub(2)).min(self.messages.len());
-        self.messages[start..end].iter().collect()
+        // Apply filters first
+        let filtered_messages: Vec<&ConversationMessage> = self
+            .messages
+            .iter()
+            .filter(|msg| self.filter.matches(msg))
+            .collect();
+
+        // Then apply scroll offset
+        let start = self
+            .scroll_offset
+            .min(filtered_messages.len().saturating_sub(1));
+        let end = (start + available_height.saturating_sub(2)).min(filtered_messages.len());
+
+        filtered_messages[start..end].to_vec()
+    }
+
+    /// Get total count of filtered messages
+    fn get_filtered_count(&self) -> usize {
+        self.messages
+            .iter()
+            .filter(|msg| self.filter.matches(msg))
+            .count()
     }
 
     /// Render a single message with syntax highlighting
