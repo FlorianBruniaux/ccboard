@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-02-12
+
+### Fixed
+- **Web mode startup performance**: Fixed indefinite blocking on startup with large ~/.claude directories (1000+ sessions)
+  - Optimized FileWatcher to watch selectively instead of recursively (99% reduction: 26k → ~200 files watched)
+  - Moved analytics computation (invocations, billing blocks) to background tasks for instant startup
+  - Startup time reduced from indefinite blocking to < 1 second
+  - Memory usage reduced by 99% (FileWatcher no longer tracks 26k+ files)
+  - Tested with 26,175 files in ~/.claude and 1,825 sessions
+
 ### Migration Notes
 
 #### Cache Upgrades (Automatic)
