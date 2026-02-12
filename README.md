@@ -864,6 +864,7 @@ For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [PLAN.md](clau
 | [CROSS_PLATFORM.md](CROSS_PLATFORM.md) | Platform-specific considerations and validation |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development guidelines and contribution workflow |
 | [API Documentation](docs/API.md) | REST API and SSE endpoints for Web UI |
+| [Architecture Decision Records](docs/architecture/) | Key architectural decisions and their rationale |
 | [PLAN.md](claudedocs/PLAN.md) | Development phases and post-mortems |
 
 ---
