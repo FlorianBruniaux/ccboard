@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-02-12
+
+### Fixed
+- **CLI panic on emoji truncation**: Fixed `ccboard search` and `ccboard recent` panicking when truncating strings containing emojis or multi-byte Unicode characters
+  - Root cause: Byte-based string slicing `&s[..max-1]` panicked when max-1 fell inside a multi-byte character (emojis = 4 bytes)
+  - Solution: Character-based truncation using `.chars().take(max-1).collect()` for safe UTF-8 handling
+  - Added comprehensive test suite for ASCII, emojis (🔍🚀💡), and Unicode (café, 日本語)
+
 ## [0.6.3] - 2026-02-12
 
 ### Fixed
