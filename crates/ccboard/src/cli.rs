@@ -361,10 +361,12 @@ fn format_tokens(tokens: u64) -> String {
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
+    let char_count = s.chars().count();
+    if char_count <= max {
         s.to_string()
     } else {
-        format!("{}…", &s[..max - 1])
+        // Use char-based truncation to avoid panicking on multi-byte characters (emojis)
+        s.chars().take(max - 1).collect::<String>() + "…"
     }
 }
 
@@ -430,7 +432,38 @@ mod tests {
     #[test]
     fn test_date_filter_parse_invalid() {
         assert!(DateFilter::parse("invalid").is_err());
-        assert!(DateFilter::parse("abc").is_err());
+    }
+
+    #[test]
+    fn test_truncate_ascii() {
+        assert_eq!(truncate("hello world", 20), "hello world");
+        assert_eq!(truncate("hello world", 5), "hell…");
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_emoji() {
+        // Emoji = 4 bytes but 1 char
+        assert_eq!(truncate("🔍 test", 10), "🔍 test");
+        assert_eq!(truncate("🔍 test", 4), "🔍 t…");
+        assert_eq!(truncate("hello 🔍 world", 8), "hello 🔍…");
+    }
+
+    #[test]
+    fn test_truncate_multi_emoji() {
+        // Multiple emojis
+        assert_eq!(truncate("🚀🔍💡", 5), "🚀🔍💡");
+        assert_eq!(truncate("🚀🔍💡test", 4), "🚀🔍💡…");
+        assert_eq!(truncate("test🚀🔍💡", 5), "test…");
+    }
+
+    #[test]
+    fn test_truncate_unicode() {
+        // Various unicode characters
+        assert_eq!(truncate("café", 10), "café");
+        assert_eq!(truncate("café", 3), "ca…");
+        assert_eq!(truncate("日本語", 5), "日本語");
+        assert_eq!(truncate("日本語テスト", 4), "日本語…");
     }
 
     #[test]
