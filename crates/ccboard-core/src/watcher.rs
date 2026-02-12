@@ -67,13 +67,45 @@ impl FileWatcher {
             shutdown_tx,
         };
 
-        // Watch paths
-        file_watcher.watch_path(&claude_home, RecursiveMode::Recursive)?;
+        // Watch paths - non-recursive for performance (26k+ files in ~/.claude)
+        // Watch top-level files (stats-cache.json, settings.json)
+        file_watcher.watch_path(&claude_home, RecursiveMode::NonRecursive)?;
 
+        // Watch projects directory non-recursively to detect new projects
+        let projects_dir = claude_home.join("projects");
+        if projects_dir.exists() {
+            file_watcher.watch_path(&projects_dir, RecursiveMode::NonRecursive)?;
+
+            // Watch each project directory non-recursively to detect new sessions
+            if let Ok(entries) = std::fs::read_dir(&projects_dir) {
+                for entry in entries.flatten() {
+                    if entry.path().is_dir() {
+                        // Watch project directory non-recursively (only .jsonl files at this level)
+                        let _ = file_watcher.watch_path(&entry.path(), RecursiveMode::NonRecursive);
+                    }
+                }
+            }
+        }
+
+        // Watch cache directory for SQLite changes
+        let cache_dir = claude_home.join("cache");
+        if cache_dir.exists() {
+            file_watcher.watch_path(&cache_dir, RecursiveMode::NonRecursive)?;
+        }
+
+        // Watch project-specific .claude directory non-recursively
         if let Some(ref proj) = project_path {
             let claude_dir = proj.join(".claude");
             if claude_dir.exists() {
-                file_watcher.watch_path(&claude_dir, RecursiveMode::Recursive)?;
+                file_watcher.watch_path(&claude_dir, RecursiveMode::NonRecursive)?;
+
+                // Watch subdirectories individually (agents, commands, skills, hooks)
+                for subdir in ["agents", "commands", "skills", "hooks"].iter() {
+                    let path = claude_dir.join(subdir);
+                    if path.exists() {
+                        let _ = file_watcher.watch_path(&path, RecursiveMode::Recursive);
+                    }
+                }
             }
         }
 

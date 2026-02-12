@@ -253,19 +253,19 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
         return Ok(());
     }
 
-    // Compute invocation statistics (agents/commands/skills usage)
-    spinner.set_message("Computing invocation statistics...");
-    store.compute_invocations().await;
-
-    // Compute billing blocks (5h usage tracking)
-    spinner.set_message("Computing billing blocks...");
-    store.compute_billing_blocks().await;
+    // Compute invocation statistics and billing blocks in background (can take minutes for 1000+ sessions)
+    spinner.set_message("Starting background analytics computation...");
+    let store_clone = Arc::clone(&store);
+    tokio::spawn(async move {
+        store_clone.compute_invocations().await;
+        store_clone.compute_billing_blocks().await;
+    });
 
     // Start file watcher for live updates
     spinner.set_message("Starting file watcher...");
     let _watcher = ccboard_core::FileWatcher::start(
-        claude_home,
-        project,
+        claude_home.clone(),
+        project.clone(),
         Arc::clone(&store),
         Default::default(),
     )
