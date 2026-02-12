@@ -133,6 +133,19 @@ enum Mode {
         /// Session ID or prefix (min 8 chars)
         session_id: String,
     },
+    /// Pricing management
+    Pricing {
+        #[command(subcommand)]
+        command: PricingCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum PricingCommand {
+    /// Update pricing from LiteLLM API
+    Update,
+    /// Clear cached pricing data
+    Clear,
 }
 
 #[tokio::main]
@@ -191,6 +204,14 @@ async fn main() -> Result<()> {
         Mode::Resume { session_id } => {
             run_resume(claude_home, project, session_id).await?;
         }
+        Mode::Pricing { command } => match command {
+            PricingCommand::Update => {
+                run_pricing_update(no_color).await?;
+            }
+            PricingCommand::Clear => {
+                run_pricing_clear(no_color).await?;
+            }
+        },
     }
 
     Ok(())
@@ -690,5 +711,49 @@ async fn run_resume(
             .status()
             .context("Failed to spawn claude (is 'claude' in PATH?)")?;
         std::process::exit(status.code().unwrap_or(1));
+    }
+}
+
+async fn run_pricing_update(_no_color: bool) -> Result<()> {
+    use indicatif::{ProgressBar, ProgressStyle};
+
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+    );
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
+    spinner.set_message("Fetching pricing from LiteLLM...");
+
+    match ccboard_core::pricing::update_pricing_from_litellm().await {
+        Ok(count) => {
+            spinner.finish_and_clear();
+            println!("✓ Updated {} model prices from LiteLLM", count);
+            println!("  Cache: ~/.cache/ccboard/pricing.json (TTL: 7 days)");
+            Ok(())
+        }
+        Err(e) => {
+            spinner.finish_and_clear();
+            eprintln!("✗ Failed to update pricing: {}", e);
+            eprintln!("  Using embedded pricing as fallback");
+            Ok(())
+        }
+    }
+}
+
+async fn run_pricing_clear(_no_color: bool) -> Result<()> {
+    match ccboard_core::pricing::clear_cache() {
+        Ok(()) => {
+            println!("✓ Cleared pricing cache");
+            println!("  File: ~/.cache/ccboard/pricing.json");
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("✗ Failed to clear cache: {}", e);
+            Err(e)
+        }
     }
 }

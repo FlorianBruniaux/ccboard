@@ -24,12 +24,13 @@
 //! ```
 
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Pricing structure for a Claude model
 ///
 /// All prices are per million tokens (M). Cache multipliers are applied to input price.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelPricing {
     /// Price per million input tokens ($/M)
     pub input_price_per_million: f64,
@@ -120,6 +121,14 @@ static PRICING_TABLE: Lazy<HashMap<&'static str, ModelPricing>> = Lazy::new(|| {
     m
 });
 
+/// Public export of pricing table (for merging with cached pricing)
+pub static MODEL_PRICING: Lazy<HashMap<String, ModelPricing>> = Lazy::new(|| {
+    PRICING_TABLE
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect()
+});
+
 /// Get pricing for a specific model
 ///
 /// Returns the pricing structure for the given model ID. If the model is not recognized,
@@ -136,11 +145,17 @@ static PRICING_TABLE: Lazy<HashMap<&'static str, ModelPricing>> = Lazy::new(|| {
 /// let pricing = get_pricing("unknown-model");
 /// assert_eq!(pricing.input_price_per_million, 3.2); // Default average
 /// ```
-pub fn get_pricing(model: &str) -> ModelPricing {
+pub fn get_model_pricing(model: &str) -> ModelPricing {
     PRICING_TABLE
         .get(model)
         .cloned()
         .unwrap_or_else(ModelPricing::default_average)
+}
+
+// Legacy alias for backwards compatibility
+#[deprecated(note = "Use get_model_pricing instead")]
+pub fn get_pricing(model: &str) -> ModelPricing {
+    get_model_pricing(model)
 }
 
 /// Calculate cost for token usage with a specific model
@@ -194,7 +209,7 @@ pub fn calculate_cost(
     cache_create: u64,
     cache_read: u64,
 ) -> f64 {
-    let pricing = get_pricing(model);
+    let pricing = get_model_pricing(model);
 
     let input_cost = (input as f64 / 1_000_000.0) * pricing.input_price_per_million;
     let output_cost = (output as f64 / 1_000_000.0) * pricing.output_price_per_million;
