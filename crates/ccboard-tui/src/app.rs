@@ -21,6 +21,7 @@ pub enum Tab {
     History,
     Mcp,
     Analytics,
+    Plugins,
 }
 
 impl Tab {
@@ -35,6 +36,7 @@ impl Tab {
             Tab::History,
             Tab::Mcp,
             Tab::Analytics,
+            Tab::Plugins,
         ]
     }
 
@@ -49,6 +51,7 @@ impl Tab {
             Tab::History => 6,
             Tab::Mcp => 7,
             Tab::Analytics => 8,
+            Tab::Plugins => 9,
         }
     }
 
@@ -63,6 +66,7 @@ impl Tab {
             6 => Tab::History,
             7 => Tab::Mcp,
             8 => Tab::Analytics,
+            9 => Tab::Plugins,
             _ => Tab::Dashboard,
         }
     }
@@ -78,6 +82,7 @@ impl Tab {
             Tab::History => "History",
             Tab::Mcp => "MCP",
             Tab::Analytics => "Analytics",
+            Tab::Plugins => "Plugins",
         }
     }
 
@@ -92,6 +97,7 @@ impl Tab {
             Tab::History => '7',
             Tab::Mcp => '8',
             Tab::Analytics => '9',
+            Tab::Plugins => '0',
         }
     }
 
@@ -106,6 +112,7 @@ impl Tab {
             Tab::History => "📜",
             Tab::Mcp => "🔌",
             Tab::Analytics => "📈",
+            Tab::Plugins => "🎁", // Gift box for plugins
         }
     }
 }
@@ -291,6 +298,7 @@ impl App {
             KeyAction::JumpTab6 => self.active_tab = Tab::from_index(6),
             KeyAction::JumpTab7 => self.active_tab = Tab::from_index(7),
             KeyAction::JumpTab8 => self.active_tab = Tab::from_index(8),
+            KeyAction::JumpTab9 => self.active_tab = Tab::from_index(9),
             KeyAction::ToggleHelp => {
                 self.help_modal.toggle();
             }

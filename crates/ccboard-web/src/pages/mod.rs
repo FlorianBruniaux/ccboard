@@ -8,6 +8,7 @@ mod dashboard;
 mod history;
 mod hooks;
 mod mcp;
+mod plugins;
 mod sessions;
 
 pub use agents::Agents;
@@ -18,4 +19,5 @@ pub use dashboard::Dashboard;
 pub use history::History;
 pub use hooks::Hooks;
 pub use mcp::Mcp;
+pub use plugins::PluginsPage;
 pub use sessions::Sessions;

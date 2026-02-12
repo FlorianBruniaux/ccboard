@@ -295,6 +295,24 @@ impl HelpModal {
                     Span::raw("Recompute analytics"),
                 ]));
             }
+            Tab::Plugins => {
+                lines.push(Line::from(vec![
+                    Span::styled("  Tab         ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Cycle between columns"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Navigate within column"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  s           ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Toggle sort mode"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  r           ", Style::default().fg(Color::Cyan)),
+                    Span::raw("Refresh analytics"),
+                ]));
+            }
         }
 
         lines.push(Line::from(""));

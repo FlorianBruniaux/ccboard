@@ -4,7 +4,7 @@ use crate::app::{App, Tab};
 use crate::components::{Breadcrumb, Breadcrumbs};
 use crate::tabs::{
     AgentsTab, AnalyticsTab, ConfigTab, CostsTab, DashboardTab, HistoryTab, HooksTab, McpTab,
-    SessionsTab,
+    PluginsTab, SessionsTab,
 };
 use ccboard_core::DegradedState;
 use ratatui::{
@@ -26,6 +26,7 @@ pub struct Ui {
     history: HistoryTab,
     mcp: McpTab,
     analytics: AnalyticsTab,
+    plugins: PluginsTab,
     breadcrumbs: Breadcrumbs,
 }
 
@@ -47,6 +48,7 @@ impl Ui {
             history: HistoryTab::new(),
             mcp: McpTab::new(),
             analytics: AnalyticsTab::new(),
+            plugins: PluginsTab::new(),
             breadcrumbs: Breadcrumbs::new(),
         }
     }
@@ -159,6 +161,9 @@ impl Ui {
                     }
                     _ => {}
                 }
+            }
+            Tab::Plugins => {
+                self.plugins.handle_key(key, &app.store);
             }
         }
     }
@@ -467,6 +472,9 @@ impl Ui {
                 self.analytics
                     .render(frame, area, analytics.as_ref(), Some(&app.store), scheme);
             }
+            Tab::Plugins => {
+                self.plugins.render(frame, area, &app.store);
+            }
         }
     }
 
@@ -494,6 +502,7 @@ impl Ui {
                 Tab::Analytics => {
                     "F1-F4 period │ ←→/h/l switch views │ j/k scroll │ s sort │ o order │ r refresh"
                 }
+                Tab::Plugins => "Tab cycle columns │ j/k navigate │ s sort │ r refresh",
             };
 
             Line::from(vec![
@@ -547,6 +556,9 @@ impl Ui {
             }
             Tab::Analytics => {
                 path.push(Breadcrumb::new("Analytics").with_level(1));
+            }
+            Tab::Plugins => {
+                path.push(Breadcrumb::new("Plugins").with_level(1));
             }
         }
 

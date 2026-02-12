@@ -77,6 +77,7 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         .route("/api/agents", get(agents_handler))
         .route("/api/commands", get(commands_handler))
         .route("/api/skills", get(skills_handler))
+        .route("/api/plugins", get(plugins_handler))
         .route("/api/health", get(health_handler))
         .route("/api/events", get(sse_handler))
         // Static assets from static/ folder
@@ -444,6 +445,32 @@ fn parse_since(since: &str) -> Option<chrono::DateTime<chrono::Utc>> {
         }
     }
     None
+}
+
+/// Plugin analytics handler
+async fn plugins_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    use ccboard_core::analytics::aggregate_plugin_usage;
+    use chrono::Utc;
+
+    // Get all sessions (limit to recent 10000 for performance)
+    let sessions = store.recent_sessions(10000);
+
+    // Extract skill and command names from store
+    // TODO: Properly implement skill/command extraction from .claude/skills and .claude/commands
+    // For now, use empty lists (will be populated when DataStore exposes this data)
+    let skills: Vec<String> = vec![];
+    let commands: Vec<String> = vec![];
+
+    // Compute plugin analytics
+    let analytics = aggregate_plugin_usage(&sessions, &skills, &commands);
+
+    // Return JSON response
+    axum::Json(serde_json::json!({
+        "analytics": analytics,
+        "generated_at": Utc::now().to_rfc3339(),
+    }))
 }
 
 /// Calculate rough cost estimate for a session

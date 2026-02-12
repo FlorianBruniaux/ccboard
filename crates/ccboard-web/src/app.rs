@@ -78,6 +78,12 @@ pub fn App() -> impl IntoView {
                                         view! { <crate::pages::History /> }
                                     }
                                 />
+                                <Route
+                                    path=path!("/plugins")
+                                    view=|| {
+                                        view! { <crate::pages::PluginsPage /> }
+                                    }
+                                />
                             </Routes>
                         </main>
                     </div>

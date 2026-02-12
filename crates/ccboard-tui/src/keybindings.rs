@@ -37,6 +37,7 @@ pub enum KeyAction {
     JumpTab6,
     JumpTab7,
     JumpTab8,
+    JumpTab9,
     /// Toggle help modal
     ToggleHelp,
     /// Show command palette
@@ -65,6 +66,7 @@ impl KeyAction {
             KeyAction::JumpTab6,
             KeyAction::JumpTab7,
             KeyAction::JumpTab8,
+            KeyAction::JumpTab9,
             KeyAction::ToggleHelp,
             KeyAction::ShowCommandPalette,
             KeyAction::CloseModal,
@@ -90,6 +92,7 @@ impl KeyAction {
             KeyAction::JumpTab6 => "jump_tab_6",
             KeyAction::JumpTab7 => "jump_tab_7",
             KeyAction::JumpTab8 => "jump_tab_8",
+            KeyAction::JumpTab9 => "jump_tab_9",
             KeyAction::ToggleHelp => "toggle_help",
             KeyAction::ShowCommandPalette => "show_command_palette",
             KeyAction::CloseModal => "close_modal",
@@ -115,6 +118,7 @@ impl KeyAction {
             KeyAction::JumpTab6 => "Jump to History",
             KeyAction::JumpTab7 => "Jump to MCP",
             KeyAction::JumpTab8 => "Jump to Analytics",
+            KeyAction::JumpTab9 => "Jump to Plugins",
             KeyAction::ToggleHelp => "Toggle help modal",
             KeyAction::ShowCommandPalette => "Show command palette",
             KeyAction::CloseModal => "Close modal/dialog",
@@ -140,6 +144,7 @@ impl KeyAction {
             "jump_tab_6" => Some(KeyAction::JumpTab6),
             "jump_tab_7" => Some(KeyAction::JumpTab7),
             "jump_tab_8" => Some(KeyAction::JumpTab8),
+            "jump_tab_9" => Some(KeyAction::JumpTab9),
             "toggle_help" => Some(KeyAction::ToggleHelp),
             "show_command_palette" => Some(KeyAction::ShowCommandPalette),
             "close_modal" => Some(KeyAction::CloseModal),
@@ -300,6 +305,13 @@ impl KeyBindings {
                 modifiers: KeyModifiers::NONE,
             },
             KeyAction::JumpTab8,
+        );
+        defaults.insert(
+            KeyWithMods {
+                code: KeyCode::Char('0'),
+                modifiers: KeyModifiers::NONE,
+            },
+            KeyAction::JumpTab9,
         );
 
         // Toggle help (?)

@@ -12,6 +12,7 @@ pub mod anomalies;
 pub mod forecasting;
 pub mod insights;
 pub mod patterns;
+pub mod plugin_usage;
 pub mod trends;
 
 #[cfg(test)]
@@ -21,6 +22,7 @@ pub use anomalies::{detect_anomalies, Anomaly, AnomalyMetric, AnomalySeverity};
 pub use forecasting::{forecast_usage, ForecastData, TrendDirection};
 pub use insights::{generate_budget_alerts, generate_insights, Alert};
 pub use patterns::{detect_patterns, UsagePatterns};
+pub use plugin_usage::{aggregate_plugin_usage, PluginAnalytics, PluginType, PluginUsage};
 pub use trends::{compute_trends, SessionDurationStats, TrendsData};
 
 /// Period selection for analytics computation
