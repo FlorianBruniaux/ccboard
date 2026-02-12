@@ -11,6 +11,7 @@ An ADR captures an important architectural decision along with its context and c
 | ID | Title | Status | Date | Description |
 |----|-------|--------|------|-------------|
 | [ADR-001](./ADR-001-single-provider-focus.md) | Single Provider Focus (Claude Code Only) | Accepted | 2026-02-12 | Decision to remain Claude Code-only instead of supporting multiple AI providers |
+| [ADR-002](./ADR-002-gemini-cli-support-evaluation.md) | Gemini CLI Support Evaluation | Evaluation | 2026-02-12 | Evaluation of Gemini CLI v0.28.2 support following feature discovery - challenges ADR-001 with revised data |
 
 ## ADR Template
 

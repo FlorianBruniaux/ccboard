@@ -170,5 +170,11 @@ If multi-provider support becomes necessary, the internal abstractions (Phase 1 
 
 ---
 
+## Related Decisions
+
+- [ADR-002: Gemini CLI Support Evaluation](./ADR-002-gemini-cli-support-evaluation.md) (2026-02-12) - Evaluation of Gemini CLI v0.28.2 support following feature discovery. Confirmed ADR-001 based on technical blockers (JSON vs JSONL format, hash-based project IDs, stats recomputation overhead). Recommended export script alternative (40-60h) over full integration (500h).
+
+---
+
 **Last Updated**: 2026-02-12
 **Next Review**: 2027-02-01
