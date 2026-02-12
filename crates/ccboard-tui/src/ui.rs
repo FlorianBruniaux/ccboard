@@ -3,8 +3,8 @@
 use crate::app::{App, Tab};
 use crate::components::{Breadcrumb, Breadcrumbs};
 use crate::tabs::{
-    AgentsTab, AnalyticsTab, ConfigTab, CostsTab, DashboardTab, HistoryTab, HooksTab, McpTab,
-    PluginsTab, SessionsTab,
+    AgentsTab, AnalyticsTab, ConfigTab, ConversationTab, CostsTab, DashboardTab, HistoryTab,
+    HooksTab, McpTab, PluginsTab, SessionsTab,
 };
 use ccboard_core::DegradedState;
 use ratatui::{
@@ -27,6 +27,7 @@ pub struct Ui {
     mcp: McpTab,
     analytics: AnalyticsTab,
     plugins: PluginsTab,
+    conversation: ConversationTab,
     breadcrumbs: Breadcrumbs,
 }
 
@@ -49,6 +50,7 @@ impl Ui {
             mcp: McpTab::new(),
             analytics: AnalyticsTab::new(),
             plugins: PluginsTab::new(),
+            conversation: ConversationTab::new(),
             breadcrumbs: Breadcrumbs::new(),
         }
     }
@@ -67,12 +69,38 @@ impl Ui {
 
     /// Handle key input for the active tab
     pub fn handle_tab_key(&mut self, key: crossterm::event::KeyCode, app: &mut App) {
+        use crossterm::event::KeyCode;
+
+        // If conversation is open, handle keys there first
+        if self.conversation.is_open() {
+            match key {
+                KeyCode::Esc => {
+                    self.conversation.close();
+                }
+                _ => {
+                    self.conversation.handle_key(key);
+                }
+            }
+            return;
+        }
+
         match app.active_tab {
             Tab::Dashboard => {
                 // Dashboard has no interactive elements yet
             }
             Tab::Sessions => {
                 let sessions_by_project = app.store.sessions_by_project();
+
+                // Check if 'c' key pressed to open conversation
+                if let KeyCode::Char('c') = key {
+                    if let Some(session_id) =
+                        self.sessions.selected_session_id(&sessions_by_project)
+                    {
+                        self.conversation.load_session(session_id, &app.store);
+                        return;
+                    }
+                }
+
                 self.sessions.handle_key(key, &sessions_by_project);
             }
             Tab::Config => {
@@ -404,6 +432,13 @@ impl Ui {
 
     fn render_tab_content(&mut self, frame: &mut Frame, area: Rect, app: &App) {
         let scheme = app.color_scheme;
+
+        // If conversation is open, render it as overlay
+        if self.conversation.is_open() {
+            self.conversation.render(frame, area);
+            return;
+        }
+
         match app.active_tab {
             Tab::Dashboard => {
                 let stats = app.store.stats();

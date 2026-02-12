@@ -337,7 +337,8 @@ impl SessionsTab {
                         match tokio::runtime::Runtime::new() {
                             Ok(rt) => {
                                 let path = session.file_path.clone();
-                                match rt.block_on(SessionContentParser::parse_session(&path)) {
+                                match rt.block_on(SessionContentParser::parse_session_lines(&path))
+                                {
                                     Ok(mut messages) => {
                                         // Filter to only user/assistant/tool messages
                                         messages = SessionContentParser::filter_messages(messages);
@@ -1992,6 +1993,16 @@ impl SessionsTab {
             self.refresh_message = Some("✓ Data refreshed".to_string());
             self.notification_time = Some(Instant::now());
         }
+    }
+
+    /// Get the currently selected session ID (for conversation viewer)
+    /// Returns the session ID string needed by DataStore.load_session_content()
+    pub fn selected_session_id(
+        &self,
+        sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
+    ) -> Option<String> {
+        let selected_session = self.get_selected_session(sessions_by_project)?;
+        Some(selected_session.id.to_string())
     }
 
     /// Format time since last refresh
