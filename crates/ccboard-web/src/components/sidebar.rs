@@ -148,6 +148,20 @@ pub fn Sidebar(
                                 <span class="sidebar-link-label">"Plugins"</span>
                             </A>
                         </li>
+                        <li class="nav-item">
+                            <A href="/tasks" attr:class="sidebar-link" on:click=close_sidebar>
+                                <span class="sidebar-link-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <circle cx="12" cy="12" r="4"/>
+                                        <line x1="21.17" y1="8" x2="12" y2="8"/>
+                                        <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+                                        <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+                                    </svg>
+                                </span>
+                                <span class="sidebar-link-label">"Tasks"</span>
+                            </A>
+                        </li>
                     </ul>
                 </nav>
             </aside>

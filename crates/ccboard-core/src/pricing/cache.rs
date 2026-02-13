@@ -70,8 +70,8 @@ pub fn save_pricing_cache(models: HashMap<String, ModelPricing>) -> Result<()> {
         source: LITELLM_PRICING_URL.to_string(),
     };
 
-    let json = serde_json::to_string_pretty(&cached)
-        .context("Failed to serialize pricing cache")?;
+    let json =
+        serde_json::to_string_pretty(&cached).context("Failed to serialize pricing cache")?;
 
     std::fs::write(&path, json)
         .with_context(|| format!("Failed to write pricing cache: {}", path.display()))?;

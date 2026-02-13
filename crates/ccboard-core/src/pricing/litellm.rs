@@ -131,7 +131,10 @@ fn parse_litellm_json(json: &str) -> Result<HashMap<String, ModelPricing>> {
         );
     }
 
-    tracing::info!("Parsed {} Claude model prices from LiteLLM", pricing_map.len());
+    tracing::info!(
+        "Parsed {} Claude model prices from LiteLLM",
+        pricing_map.len()
+    );
 
     Ok(pricing_map)
 }

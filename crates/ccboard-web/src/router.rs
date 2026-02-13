@@ -78,6 +78,7 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         .route("/api/commands", get(commands_handler))
         .route("/api/skills", get(skills_handler))
         .route("/api/plugins", get(plugins_handler))
+        .route("/api/task-graph", get(task_graph_handler))
         .route("/api/health", get(health_handler))
         .route("/api/events", get(sse_handler))
         // Static assets from static/ folder
@@ -781,4 +782,168 @@ fn scan_skills_recursive(dir_path: &std::path::Path) -> Vec<serde_json::Value> {
     });
 
     items
+}
+
+/// Task graph handler - returns task dependency graph from PLAN.md
+async fn task_graph_handler(
+    axum::extract::State(_store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    use ccboard_core::graph::TaskGraph;
+    use ccboard_core::models::plan::PhaseStatus;
+    use ccboard_core::parsers::PlanParser;
+
+    // Try to load PLAN.md from claude home
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let plan_path = std::path::Path::new(&home).join(".claude/claudedocs/PLAN_PHASES_F-15.md");
+
+    let plan_result = PlanParser::parse_file(&plan_path);
+
+    match plan_result {
+        Ok(Some(plan)) => {
+            // Build task graph
+            let mut graph = TaskGraph::new();
+
+            // Add all tasks to graph
+            for phase in &plan.phases {
+                for task in &phase.tasks {
+                    graph.add_task(task.clone());
+                }
+            }
+
+            // Parse dependencies from PLAN.md content directly
+            // Read the file again to extract dependency information
+            if let Ok(plan_content) = std::fs::read_to_string(&plan_path) {
+                // Look for task sections and extract dependencies
+                for phase in &plan.phases {
+                    for task in &phase.tasks {
+                        // Find this task in the content
+                        let task_header = format!("#### Task {}:", task.id);
+                        if let Some(pos) = plan_content.find(&task_header) {
+                            // Extract content until next task or section
+                            let rest = &plan_content[pos..];
+                            let end_pos = rest[100..]
+                                .find("\n####")
+                                .map(|p| p + 100)
+                                .or_else(|| rest[100..].find("\n###").map(|p| p + 100))
+                                .or_else(|| rest[100..].find("\n##").map(|p| p + 100))
+                                .unwrap_or(rest.len());
+
+                            let task_content = &rest[..end_pos];
+
+                            // Extract dependencies
+                            let deps = extract_dependencies(task_content);
+                            for dep_id in deps {
+                                // Add dependency: dep_id blocks task_id
+                                let _ = graph.add_dependency(&dep_id, &task.id);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Convert to JSON format for D3.js
+            let nodes: Vec<_> = plan
+                .phases
+                .iter()
+                .flat_map(|phase| {
+                    phase.tasks.iter().map(move |task| {
+                        let status = match phase.status {
+                            PhaseStatus::Complete => "Complete",
+                            PhaseStatus::InProgress => "InProgress",
+                            PhaseStatus::Future => "Future",
+                        };
+
+                        serde_json::json!({
+                            "id": task.id,
+                            "label": task.title,
+                            "phase": phase.id,
+                            "status": status,
+                            "duration": task.duration,
+                        })
+                    })
+                })
+                .collect();
+
+            // Extract edges from graph
+            let mut edges = Vec::new();
+            for task in graph.tasks() {
+                let dependents = graph.dependents(&task.id);
+                for dependent in dependents {
+                    edges.push(serde_json::json!({
+                        "source": task.id,
+                        "target": dependent,
+                        "type": "blocks",
+                    }));
+                }
+            }
+
+            axum::Json(serde_json::json!({
+                "nodes": nodes,
+                "edges": edges,
+            }))
+        }
+        Ok(None) => {
+            // PLAN.md not found
+            axum::Json(serde_json::json!({
+                "nodes": [],
+                "edges": [],
+                "error": "PLAN.md not found",
+            }))
+        }
+        Err(e) => {
+            // Parse error
+            axum::Json(serde_json::json!({
+                "nodes": [],
+                "edges": [],
+                "error": format!("Failed to parse PLAN.md: {}", e),
+            }))
+        }
+    }
+}
+
+/// Extract dependency task IDs from description text
+/// Looks for patterns like "Depends on: F.1, F.2" or "Blocked by: #6, #7"
+fn extract_dependencies(description: &str) -> Vec<String> {
+    let mut deps = Vec::new();
+
+    // Pattern 1: "Depends on: F.1, F.2"
+    if let Some(start) = description.find("Depends on:") {
+        let rest = &description[start + "Depends on:".len()..];
+        // Take until newline or end
+        let dep_text = rest.lines().next().unwrap_or("");
+
+        // Extract task IDs like F.1, H.2, etc.
+        for part in dep_text.split(',') {
+            let trimmed = part.trim();
+            // Match pattern: Letter.Number (e.g., F.1, H.2)
+            if trimmed
+                .chars()
+                .next()
+                .map(|c| c.is_alphabetic())
+                .unwrap_or(false)
+            {
+                if let Some(task_id) = trimmed.split_whitespace().next() {
+                    deps.push(task_id.to_string());
+                }
+            }
+        }
+    }
+
+    // Pattern 2: "Blocked by: #6, #7" - extract task numbers
+    if let Some(start) = description.find("Blocked by:") {
+        let rest = &description[start + "Blocked by:".len()..];
+        let dep_text = rest.lines().next().unwrap_or("");
+
+        for part in dep_text.split(',') {
+            let trimmed = part.trim();
+            if let Some(task_num) = trimmed.strip_prefix('#') {
+                if let Ok(_num) = task_num.parse::<u32>() {
+                    // For now, skip numeric task IDs (would need task ID mapping)
+                    // We'll focus on letter.number format (F.1, H.2, etc.)
+                }
+            }
+        }
+    }
+
+    deps
 }

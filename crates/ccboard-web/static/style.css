@@ -4527,3 +4527,129 @@ pre code {
     font-size: 1.5rem;
   }
 }
+
+/* ============================
+   Task Graph Page Styles
+   ============================ */
+
+.task-graph-container {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.task-graph-container .subtitle {
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.graph-content {
+    margin-top: 2rem;
+}
+
+.graph-stats {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.stat-item {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.stat-value {
+    color: var(--accent-primary);
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.graph-legend {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.graph-legend h3 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.legend-items {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+}
+
+#d3-graph {
+    position: relative;
+}
+
+#d3-graph svg {
+    cursor: grab;
+}
+
+#d3-graph svg:active {
+    cursor: grabbing;
+}
+
+.graph-instructions {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border-left: 3px solid var(--accent-secondary);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.graph-instructions p {
+    margin: 0;
+}
+
+/* D3.js graph elements */
+.links line {
+    stroke-opacity: 0.6;
+}
+
+.nodes circle {
+    cursor: pointer;
+    transition: r 0.2s ease;
+}
+
+.nodes circle:hover {
+    r: 25;
+    stroke-width: 3;
+}
+
+.nodes text {
+    pointer-events: none;
+    user-select: none;
+}
+

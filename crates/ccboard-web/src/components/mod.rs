@@ -12,6 +12,7 @@ mod session_table;
 mod sidebar;
 mod sparkline;
 mod stats_card;
+mod task_graph;
 mod toast;
 
 pub use budget_status::BudgetStatus;
@@ -26,4 +27,5 @@ pub use session_table::{SessionTable, SortColumn, SortDirection};
 pub use sidebar::Sidebar;
 pub use sparkline::Sparkline;
 pub use stats_card::{CardColor, StatsCard};
+pub use task_graph::TaskDependencyGraph;
 pub use toast::{use_toast, Toast, ToastContext, ToastProvider, ToastType};

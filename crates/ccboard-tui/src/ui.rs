@@ -55,6 +55,11 @@ impl Ui {
         }
     }
 
+    /// Check if conversation viewer is currently open
+    pub fn is_conversation_open(&self) -> bool {
+        self.conversation.is_open()
+    }
+
     /// Initialize tabs that need data scan
     pub fn init(
         &mut self,
@@ -199,6 +204,9 @@ impl Ui {
     /// Render the full UI
     pub fn render(&mut self, frame: &mut Frame, app: &mut App) {
         let size = frame.area();
+
+        // Update notification timeouts every frame (even if tab not visible)
+        self.sessions.update_notification_timeout();
 
         // If loading, show loading screen
         if app.is_loading {

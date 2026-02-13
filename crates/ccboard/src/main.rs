@@ -133,6 +133,17 @@ enum Mode {
         /// Session ID or prefix (min 8 chars)
         session_id: String,
     },
+    /// Export conversation to file
+    Export {
+        /// Session ID or prefix (min 8 chars)
+        session_id: String,
+        /// Output file path
+        #[arg(short = 'o', long)]
+        output: PathBuf,
+        /// Export format: markdown, json, html
+        #[arg(short = 'f', long, default_value = "markdown", value_parser = ["markdown", "json", "html"])]
+        format: String,
+    },
     /// Pricing management
     Pricing {
         #[command(subcommand)]
@@ -203,6 +214,13 @@ async fn main() -> Result<()> {
         }
         Mode::Resume { session_id } => {
             run_resume(claude_home, project, session_id).await?;
+        }
+        Mode::Export {
+            session_id,
+            output,
+            format,
+        } => {
+            run_export(claude_home, project, session_id, output, format, no_color).await?;
         }
         Mode::Pricing { command } => match command {
             PricingCommand::Update => {
@@ -712,6 +730,85 @@ async fn run_resume(
             .context("Failed to spawn claude (is 'claude' in PATH?)")?;
         std::process::exit(status.code().unwrap_or(1));
     }
+}
+
+async fn run_export(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    session_id: String,
+    output: PathBuf,
+    format: String,
+    no_color: bool,
+) -> Result<()> {
+    use ccboard_core::export::{
+        export_conversation_to_html, export_conversation_to_json, export_conversation_to_markdown,
+    };
+
+    let store = Arc::new(DataStore::with_defaults(claude_home, project));
+
+    // Show progress
+    if !no_color {
+        eprint!("Loading sessions... ");
+    }
+
+    store.initial_load().await;
+
+    if !no_color {
+        eprintln!("✓");
+    }
+
+    // Find session
+    let all = store.recent_sessions(usize::MAX);
+    let session = cli::find_by_id_or_prefix(&all, &session_id)?;
+
+    // Load conversation content
+    if !no_color {
+        eprint!("Loading conversation... ");
+    }
+
+    let messages = store
+        .load_session_content(&session.id)
+        .await
+        .context("Failed to load session content")?;
+
+    if !no_color {
+        eprintln!("✓ {} messages", messages.len());
+    }
+
+    // Export based on format
+    if !no_color {
+        eprint!("Exporting to {}... ", output.display());
+    }
+
+    match format.as_str() {
+        "markdown" | "md" => {
+            export_conversation_to_markdown(&messages, &session, &output)
+                .context("Failed to export to Markdown")?;
+        }
+        "json" => {
+            export_conversation_to_json(&messages, &session, &output)
+                .context("Failed to export to JSON")?;
+        }
+        "html" => {
+            export_conversation_to_html(&messages, &session, &output)
+                .context("Failed to export to HTML")?;
+        }
+        _ => {
+            anyhow::bail!("Invalid format: {}. Use markdown, json, or html", format);
+        }
+    }
+
+    if !no_color {
+        eprintln!("✓");
+        println!("✅ Exported to {}", output.display());
+        println!("   Session: {}", session.id);
+        println!("   Messages: {}", messages.len());
+        println!("   Format: {}", format);
+    } else {
+        println!("{}", output.display());
+    }
+
+    Ok(())
 }
 
 async fn run_pricing_update(_no_color: bool) -> Result<()> {

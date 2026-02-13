@@ -84,6 +84,12 @@ pub fn App() -> impl IntoView {
                                         view! { <crate::pages::PluginsPage /> }
                                     }
                                 />
+                                <Route
+                                    path=path!("/tasks")
+                                    view=|| {
+                                        view! { <crate::pages::TaskGraphPage /> }
+                                    }
+                                />
                             </Routes>
                         </main>
                     </div>

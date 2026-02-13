@@ -1,4 +1,4 @@
-//! CSV/JSON export functionality for billing blocks and sessions
+//! Export functionality for billing blocks, sessions, and conversations
 //!
 //! Provides simple, testable export with proper error handling.
 
@@ -8,7 +8,7 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::models::{BillingBlockManager, SessionMetadata};
+use crate::models::{BillingBlockManager, ConversationMessage, MessageRole, SessionMetadata};
 
 /// Export billing blocks to CSV format matching TUI table display
 ///
@@ -200,6 +200,351 @@ pub fn export_sessions_to_json(sessions: &[Arc<SessionMetadata>], path: &Path) -
         .with_context(|| format!("Failed to write JSON file: {}", path.display()))?;
 
     Ok(())
+}
+
+// ============================================================================
+// Conversation Export Functions
+// ============================================================================
+
+/// Export conversation to Markdown format
+///
+/// Format:
+/// ```markdown
+/// # Session: abc123
+/// **Project**: /path/to/project
+/// **Date**: 2026-02-12 14:30:00
+/// **Messages**: 42 | **Tokens**: 15000
+///
+/// ## User
+/// Can you help me with...
+///
+/// ## Assistant (claude-sonnet-4-5)
+/// Sure! Here's how...
+/// ```
+///
+/// # Arguments
+/// * `messages` - Conversation messages to export
+/// * `metadata` - Session metadata (ID, project, timestamps)
+/// * `path` - Destination file path
+///
+/// # Errors
+/// Returns error if file creation or write operations fail
+pub fn export_conversation_to_markdown(
+    messages: &[ConversationMessage],
+    metadata: &SessionMetadata,
+    path: &Path,
+) -> Result<()> {
+    // Create parent directories if needed
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    let file = File::create(path)
+        .with_context(|| format!("Failed to create Markdown file: {}", path.display()))?;
+
+    let mut writer = BufWriter::new(file);
+
+    // Write header
+    writeln!(writer, "# Session: {}", metadata.id)?;
+    writeln!(writer, "**Project**: {}", metadata.project_path)?;
+
+    if let Some(ts) = metadata.first_timestamp {
+        writeln!(writer, "**Date**: {}", ts.format("%Y-%m-%d %H:%M:%S"))?;
+    }
+
+    writeln!(
+        writer,
+        "**Messages**: {} | **Tokens**: {}\n",
+        metadata.message_count, metadata.total_tokens
+    )?;
+
+    // Write messages
+    for msg in messages {
+        let role = match msg.role {
+            MessageRole::User => "User".to_string(),
+            MessageRole::Assistant => {
+                if let Some(ref model) = msg.model {
+                    format!("Assistant ({})", model)
+                } else {
+                    "Assistant".to_string()
+                }
+            }
+            MessageRole::System => "System".to_string(),
+        };
+
+        writeln!(writer, "## {}\n", role)?;
+
+        // Write message content with proper escaping
+        writeln!(writer, "{}\n", msg.content)?;
+
+        // Optionally add token info for assistant messages
+        if msg.role == MessageRole::Assistant {
+            if let Some(ref tokens) = msg.tokens {
+                writeln!(
+                    writer,
+                    "*Tokens: {} input, {} output*\n",
+                    tokens.input_tokens, tokens.output_tokens
+                )?;
+            }
+        }
+    }
+
+    writer.flush().context("Failed to flush Markdown writer")?;
+
+    Ok(())
+}
+
+/// Export conversation to JSON format
+///
+/// Format:
+/// ```json
+/// {
+///   "session_id": "abc123",
+///   "project_path": "/path/to/project",
+///   "metadata": {...},
+///   "messages": [
+///     {
+///       "role": "user",
+///       "content": "...",
+///       "timestamp": "2026-02-12T14:30:00Z",
+///       "model": null,
+///       "tokens": null
+///     }
+///   ]
+/// }
+/// ```
+///
+/// # Arguments
+/// * `messages` - Conversation messages to export
+/// * `metadata` - Session metadata
+/// * `path` - Destination file path
+///
+/// # Errors
+/// Returns error if serialization or file write fails
+pub fn export_conversation_to_json(
+    messages: &[ConversationMessage],
+    metadata: &SessionMetadata,
+    path: &Path,
+) -> Result<()> {
+    use serde_json::json;
+
+    // Create parent directories if needed
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    // Build structured JSON
+    let export_data = json!({
+        "session_id": metadata.id,
+        "project_path": metadata.project_path,
+        "metadata": {
+            "first_timestamp": metadata.first_timestamp,
+            "last_timestamp": metadata.last_timestamp,
+            "message_count": metadata.message_count,
+            "total_tokens": metadata.total_tokens,
+            "models_used": metadata.models_used,
+            "duration_seconds": metadata.duration_seconds,
+            "branch": metadata.branch,
+        },
+        "messages": messages,
+    });
+
+    // Serialize to JSON (pretty print)
+    let json_str =
+        serde_json::to_string_pretty(&export_data).context("Failed to serialize conversation")?;
+
+    // Write to file
+    std::fs::write(path, json_str)
+        .with_context(|| format!("Failed to write JSON file: {}", path.display()))?;
+
+    Ok(())
+}
+
+/// Export conversation to HTML format
+///
+/// Generates a styled HTML report with:
+/// - Session metadata header
+/// - Messages with role-based styling
+/// - Token usage info
+/// - Responsive design
+///
+/// # Arguments
+/// * `messages` - Conversation messages to export
+/// * `metadata` - Session metadata
+/// * `path` - Destination file path
+///
+/// # Errors
+/// Returns error if file creation or write operations fail
+pub fn export_conversation_to_html(
+    messages: &[ConversationMessage],
+    metadata: &SessionMetadata,
+    path: &Path,
+) -> Result<()> {
+    // Create parent directories if needed
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    let file = File::create(path)
+        .with_context(|| format!("Failed to create HTML file: {}", path.display()))?;
+
+    let mut writer = BufWriter::new(file);
+
+    // Write HTML header
+    writeln!(writer, "<!DOCTYPE html>")?;
+    writeln!(writer, "<html lang=\"en\">")?;
+    writeln!(writer, "<head>")?;
+    writeln!(writer, "    <meta charset=\"UTF-8\">")?;
+    writeln!(
+        writer,
+        "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+    )?;
+    writeln!(
+        writer,
+        "    <title>Session {} - ccboard</title>",
+        metadata.id
+    )?;
+    writeln!(writer, "    <style>")?;
+    writeln!(
+        writer,
+        "        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; background: #f5f5f5; }}"
+    )?;
+    writeln!(
+        writer,
+        "        .header {{ background: white; padding: 30px; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}"
+    )?;
+    writeln!(
+        writer,
+        "        .header h1 {{ margin: 0 0 20px 0; color: #333; font-size: 28px; }}"
+    )?;
+    writeln!(writer, "        .meta {{ color: #666; line-height: 1.8; }}")?;
+    writeln!(
+        writer,
+        "        .message {{ background: white; padding: 20px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}"
+    )?;
+    writeln!(
+        writer,
+        "        .role {{ font-weight: 600; margin-bottom: 10px; padding: 8px 12px; border-radius: 4px; display: inline-block; }}"
+    )?;
+    writeln!(
+        writer,
+        "        .role.user {{ background: #e3f2fd; color: #1976d2; }}"
+    )?;
+    writeln!(
+        writer,
+        "        .role.assistant {{ background: #f3e5f5; color: #7b1fa2; }}"
+    )?;
+    writeln!(
+        writer,
+        "        .role.system {{ background: #fff3e0; color: #e65100; }}"
+    )?;
+    writeln!(
+        writer,
+        "        .content {{ white-space: pre-wrap; line-height: 1.6; color: #333; }}"
+    )?;
+    writeln!(
+        writer,
+        "        .tokens {{ color: #999; font-size: 12px; margin-top: 10px; }}"
+    )?;
+    writeln!(writer, "    </style>")?;
+    writeln!(writer, "</head>")?;
+    writeln!(writer, "<body>")?;
+
+    // Write session header
+    writeln!(writer, "    <div class=\"header\">")?;
+    writeln!(
+        writer,
+        "        <h1>Session {}</h1>",
+        html_escape(&metadata.id.to_string())
+    )?;
+    writeln!(writer, "        <div class=\"meta\">")?;
+    writeln!(
+        writer,
+        "            <strong>Project:</strong> {}<br>",
+        html_escape(&metadata.project_path.to_string())
+    )?;
+
+    if let Some(ts) = metadata.first_timestamp {
+        writeln!(
+            writer,
+            "            <strong>Date:</strong> {}<br>",
+            ts.format("%Y-%m-%d %H:%M:%S")
+        )?;
+    }
+
+    writeln!(
+        writer,
+        "            <strong>Messages:</strong> {} | <strong>Tokens:</strong> {}",
+        metadata.message_count, metadata.total_tokens
+    )?;
+    writeln!(writer, "        </div>")?;
+    writeln!(writer, "    </div>")?;
+
+    // Write messages
+    for msg in messages {
+        let role_class = match msg.role {
+            MessageRole::User => "user",
+            MessageRole::Assistant => "assistant",
+            MessageRole::System => "system",
+        };
+
+        let role_label = match msg.role {
+            MessageRole::User => "User".to_string(),
+            MessageRole::Assistant => {
+                if let Some(ref model) = msg.model {
+                    format!("Assistant ({})", model)
+                } else {
+                    "Assistant".to_string()
+                }
+            }
+            MessageRole::System => "System".to_string(),
+        };
+
+        writeln!(writer, "    <div class=\"message\">")?;
+        writeln!(
+            writer,
+            "        <div class=\"role {}\">{}</div>",
+            role_class,
+            html_escape(&role_label)
+        )?;
+        writeln!(
+            writer,
+            "        <div class=\"content\">{}</div>",
+            html_escape(&msg.content)
+        )?;
+
+        // Add token info for assistant messages
+        if msg.role == MessageRole::Assistant {
+            if let Some(ref tokens) = msg.tokens {
+                writeln!(
+                    writer,
+                    "        <div class=\"tokens\">Tokens: {} input, {} output</div>",
+                    tokens.input_tokens, tokens.output_tokens
+                )?;
+            }
+        }
+
+        writeln!(writer, "    </div>")?;
+    }
+
+    writeln!(writer, "</body>")?;
+    writeln!(writer, "</html>")?;
+
+    writer.flush().context("Failed to flush HTML writer")?;
+
+    Ok(())
+}
+
+/// HTML escape for safe output
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
 }
 
 #[cfg(test)]
@@ -429,6 +774,116 @@ mod tests {
         let nested_path = temp_dir.path().join("exports/nested/sessions.csv");
 
         super::export_sessions_to_csv(&sessions, &nested_path).unwrap();
+
+        assert!(nested_path.exists());
+    }
+
+    // Conversation export tests
+    use crate::models::{ConversationMessage, MessageRole, TokenUsage};
+
+    fn create_test_messages() -> Vec<ConversationMessage> {
+        vec![
+            ConversationMessage {
+                role: MessageRole::User,
+                content: "Hello, can you help me with Rust?".to_string(),
+                timestamp: Some(Utc.with_ymd_and_hms(2026, 2, 12, 14, 30, 0).unwrap()),
+                model: None,
+                tokens: None,
+                tool_calls: Vec::new(),
+                tool_results: Vec::new(),
+            },
+            ConversationMessage {
+                role: MessageRole::Assistant,
+                content: "Sure! I'd be happy to help. What do you need?".to_string(),
+                timestamp: Some(Utc.with_ymd_and_hms(2026, 2, 12, 14, 30, 30).unwrap()),
+                model: Some("claude-sonnet-4-5-20250929".to_string()),
+                tokens: Some(TokenUsage {
+                    input_tokens: 100,
+                    output_tokens: 50,
+                    cache_read_tokens: 0,
+                    cache_write_tokens: 0,
+                }),
+                tool_calls: Vec::new(),
+                tool_results: Vec::new(),
+            },
+        ]
+    }
+
+    #[test]
+    fn test_export_conversation_markdown() {
+        let messages = create_test_messages();
+        let metadata = create_test_session("test-conv", "/test/project", 2, 150);
+        let temp_dir = TempDir::new().unwrap();
+        let md_path = temp_dir.path().join("conversation.md");
+
+        super::export_conversation_to_markdown(&messages, &metadata, &md_path).unwrap();
+
+        let contents = std::fs::read_to_string(&md_path).unwrap();
+        assert!(contents.contains("# Session: test-conv"));
+        assert!(contents.contains("**Project**: /test/project"));
+        assert!(contents.contains("## User"));
+        assert!(contents.contains("Hello, can you help me with Rust?"));
+        assert!(contents.contains("## Assistant (claude-sonnet-4-5-20250929)"));
+        assert!(contents.contains("Sure! I'd be happy to help."));
+        assert!(contents.contains("*Tokens: 100 input, 50 output*"));
+    }
+
+    #[test]
+    fn test_export_conversation_json() {
+        let messages = create_test_messages();
+        let metadata = create_test_session("test-conv", "/test/project", 2, 150);
+        let temp_dir = TempDir::new().unwrap();
+        let json_path = temp_dir.path().join("conversation.json");
+
+        super::export_conversation_to_json(&messages, &metadata, &json_path).unwrap();
+
+        let contents = std::fs::read_to_string(&json_path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&contents).unwrap();
+
+        assert_eq!(parsed["session_id"], "test-conv");
+        assert_eq!(parsed["project_path"], "/test/project");
+        assert_eq!(parsed["messages"].as_array().unwrap().len(), 2);
+        assert_eq!(parsed["messages"][0]["role"], "user");
+        assert_eq!(parsed["messages"][1]["role"], "assistant");
+    }
+
+    #[test]
+    fn test_export_conversation_html() {
+        let messages = create_test_messages();
+        let metadata = create_test_session("test-conv", "/test/project", 2, 150);
+        let temp_dir = TempDir::new().unwrap();
+        let html_path = temp_dir.path().join("conversation.html");
+
+        super::export_conversation_to_html(&messages, &metadata, &html_path).unwrap();
+
+        let contents = std::fs::read_to_string(&html_path).unwrap();
+        assert!(contents.contains("<!DOCTYPE html>"));
+        assert!(contents.contains("<title>Session test-conv - ccboard</title>"));
+        assert!(contents.contains("class=\"role user\""));
+        assert!(contents.contains("class=\"role assistant\""));
+        assert!(contents.contains("Hello, can you help me with Rust?"));
+        assert!(contents.contains("Sure! I&#x27;d be happy to help."));
+        assert!(contents.contains("Tokens: 100 input, 50 output"));
+    }
+
+    #[test]
+    fn test_html_escape() {
+        let input = "<script>alert('XSS')</script>";
+        let escaped = super::html_escape(input);
+        assert_eq!(
+            escaped,
+            "&lt;script&gt;alert(&#x27;XSS&#x27;)&lt;/script&gt;"
+        );
+    }
+
+    #[test]
+    fn test_export_creates_nested_dirs() {
+        let messages = create_test_messages();
+        let metadata = create_test_session("test", "/test", 2, 150);
+        let temp_dir = TempDir::new().unwrap();
+        let nested_path = temp_dir.path().join("exports/conversations/test.md");
+
+        super::export_conversation_to_markdown(&messages, &metadata, &nested_path).unwrap();
 
         assert!(nested_path.exists());
     }

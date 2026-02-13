@@ -7,6 +7,7 @@ pub mod cache;
 pub mod error;
 pub mod event;
 pub mod export;
+pub mod graph;
 pub mod live_monitor;
 pub mod models;
 pub mod parsers;

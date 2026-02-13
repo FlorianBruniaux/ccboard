@@ -509,11 +509,16 @@ impl ConversationTab {
         // Render messages
         let mut y_offset = 0;
         for (_idx, msg) in visible_messages.iter().enumerate() {
+            // Calculate dynamic height based on message content
+            let msg_height = self
+                .calculate_message_height(msg, inner.width as usize)
+                .min(inner.height as usize - y_offset);
+
             let msg_area = Rect {
                 x: inner.x,
                 y: inner.y + y_offset as u16,
                 width: inner.width,
-                height: (inner.height as usize - y_offset).min(10) as u16, // Max 10 lines per message preview
+                height: msg_height as u16,
             };
 
             if y_offset >= inner.height as usize {
@@ -521,7 +526,7 @@ impl ConversationTab {
             }
 
             self.render_message(frame, msg, msg_area);
-            y_offset += msg_area.height as usize + 1; // +1 for spacing
+            y_offset += msg_height + 1; // +1 for spacing between messages
         }
 
         // Render scrollbar
@@ -687,6 +692,30 @@ impl ConversationTab {
             .iter()
             .filter(|msg| self.filter.matches(msg))
             .count()
+    }
+
+    /// Calculate message height based on content
+    fn calculate_message_height(&self, msg: &ConversationMessage, width: usize) -> usize {
+        // Header takes 1 line
+        let header_height = 1;
+
+        // Count content lines with word wrapping
+        let content_lines = msg.content.lines().count();
+        let wrapped_lines: usize = msg
+            .content
+            .lines()
+            .map(|line| {
+                if line.len() > width.saturating_sub(2) {
+                    // Account for borders
+                    (line.len() / width.saturating_sub(2)) + 1
+                } else {
+                    1
+                }
+            })
+            .sum();
+
+        // Total: header + content, min 2, max 20
+        (header_height + wrapped_lines.max(content_lines)).clamp(2, 20)
     }
 
     /// Render a single message with syntax highlighting
