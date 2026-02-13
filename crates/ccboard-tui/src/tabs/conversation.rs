@@ -509,10 +509,16 @@ impl ConversationTab {
         // Render messages
         let mut y_offset = 0;
         for (_idx, msg) in visible_messages.iter().enumerate() {
-            // Calculate dynamic height based on message content
+            // Guard FIRST - prevent any operation if out of space
+            if y_offset >= inner.height as usize {
+                break;
+            }
+
+            // Safe subtraction: we know y_offset < inner.height
+            let available_height = inner.height as usize - y_offset;
             let msg_height = self
                 .calculate_message_height(msg, inner.width as usize)
-                .min(inner.height as usize - y_offset);
+                .min(available_height);
 
             let msg_area = Rect {
                 x: inner.x,
@@ -521,12 +527,10 @@ impl ConversationTab {
                 height: msg_height as u16,
             };
 
-            if y_offset >= inner.height as usize {
-                break;
-            }
-
             self.render_message(frame, msg, msg_area);
-            y_offset += msg_height + 1; // +1 for spacing between messages
+
+            // Use saturating_add to prevent overflow
+            y_offset = y_offset.saturating_add(msg_height).saturating_add(1);
         }
 
         // Render scrollbar
