@@ -333,29 +333,22 @@ impl SessionsTab {
                 // Toggle replay viewer for selected session (works from Sessions pane)
                 if self.focus == 2 && !self.show_replay {
                     if let Some(session) = self.get_selected_session(_sessions_by_project) {
-                        // Load session content asynchronously (blocking for now, will improve later)
-                        match tokio::runtime::Runtime::new() {
-                            Ok(rt) => {
-                                let path = session.file_path.clone();
-                                match rt.block_on(SessionContentParser::parse_session_lines(&path))
-                                {
-                                    Ok(mut messages) => {
-                                        // Filter to only user/assistant/tool messages
-                                        messages = SessionContentParser::filter_messages(messages);
-                                        self.replay_messages = messages;
-                                        self.replay_scroll.select(Some(0));
-                                        self.replay_expanded.clear();
-                                        self.show_replay = true;
-                                    }
-                                    Err(e) => {
-                                        self.error_message =
-                                            Some(format!("Failed to load session: {}", e));
-                                    }
-                                }
+                        // Use block_in_place to safely block within existing runtime
+                        let path = session.file_path.clone();
+                        match tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current()
+                                .block_on(SessionContentParser::parse_session_lines(&path))
+                        }) {
+                            Ok(mut messages) => {
+                                // Filter to only user/assistant/tool messages
+                                messages = SessionContentParser::filter_messages(messages);
+                                self.replay_messages = messages;
+                                self.replay_scroll.select(Some(0));
+                                self.replay_expanded.clear();
+                                self.show_replay = true;
                             }
                             Err(e) => {
-                                self.error_message =
-                                    Some(format!("Failed to create runtime: {}", e));
+                                self.error_message = Some(format!("Failed to load session: {}", e));
                             }
                         }
                     }
@@ -2161,16 +2154,18 @@ impl SessionsTab {
         frame.render_widget(hint_paragraph, hint_area);
     }
 
-    fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect) {
+    /// Update notification timeout - call this every frame regardless of active tab
+    pub fn update_notification_timeout(&mut self) {
         // Check if notification should be cleared (2.5 seconds elapsed)
         if let Some(notif_time) = self.notification_time {
             if notif_time.elapsed().as_secs_f32() > 2.5 {
                 self.refresh_message = None;
                 self.notification_time = None;
-                return;
             }
         }
+    }
 
+    fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect) {
         let Some(msg) = &self.refresh_message else {
             return;
         };

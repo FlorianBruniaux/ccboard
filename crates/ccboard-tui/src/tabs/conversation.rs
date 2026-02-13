@@ -169,9 +169,12 @@ impl ConversationTab {
         self.error = None;
         self.scroll_offset = 0;
 
-        // Block on async operation using tokio runtime
-        let runtime = tokio::runtime::Handle::current();
-        match runtime.block_on(store.load_session_content(&session_id)) {
+        // Use block_in_place to safely block within existing runtime
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(store.load_session_content(&session_id))
+        });
+
+        match result {
             Ok(messages) => {
                 self.messages = messages;
                 self.is_loading = false;
