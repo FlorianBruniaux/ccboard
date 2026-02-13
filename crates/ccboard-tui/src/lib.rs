@@ -131,8 +131,8 @@ where
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    // If conversation viewer is open, handle keys there first (highest priority)
-                    if ui.is_conversation_open() {
+                    // If any viewer is open (conversation or replay), handle keys there first (highest priority)
+                    if ui.is_conversation_open() || ui.is_replay_open() {
                         ui.handle_tab_key(key.code, app);
                     } else {
                         // Otherwise check for global keys

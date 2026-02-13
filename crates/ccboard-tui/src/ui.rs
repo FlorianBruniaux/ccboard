@@ -60,6 +60,11 @@ impl Ui {
         self.conversation.is_open()
     }
 
+    /// Check if replay viewer is currently open (in Sessions tab)
+    pub fn is_replay_open(&self) -> bool {
+        self.sessions.is_replay_open()
+    }
+
     /// Initialize tabs that need data scan
     pub fn init(
         &mut self,

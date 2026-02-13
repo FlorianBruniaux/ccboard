@@ -200,6 +200,11 @@ impl SessionsTab {
         }
     }
 
+    /// Check if replay viewer is currently open
+    pub fn is_replay_open(&self) -> bool {
+        self.show_replay
+    }
+
     /// Handle key input for this tab
     pub fn handle_key(
         &mut self,
