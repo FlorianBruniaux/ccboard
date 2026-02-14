@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "grepai": {
+      "type": "stdio",
+      "command": "grepai",
+      "args": ["mcp-serve"],
+      "env": {
+        "GREPAI_PROJECT_PATH": "${CLAUDE_PROJECT_DIR}"
+      }
+    }
+  }
+}
