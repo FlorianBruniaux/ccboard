@@ -271,6 +271,19 @@ Follow Rust-specific error handling rules from RULES.md:
 - **Don't** fail fast on parse errors → Populate LoadReport, continue loading
 - **Don't** forget `.context()` on `?` operator → Required for all error propagation
 
+## Search Strategy
+
+**Efficient code navigation**: grepai MCP for semantic search and call graph analysis
+
+For detailed search workflows and tool selection, see `.claude/rules/search-strategy.md`
+
+**Quick reference**:
+- Intent-based search → `grepai_search "description"` (example: "session JSONL parser")
+- Call graph → `grepai_trace_callers "function_name"` (example: "reload_stats")
+- Exact pattern → `Grep` tool (faster for known regex)
+
+**Setup**: Run `.claude/scripts/grepai-start.sh` to start Ollama + grepai watch
+
 ## Build Verification (Mandatory)
 
 **CRITICAL**: After ANY Rust file edits, ALWAYS run the full quality check pipeline before committing:
@@ -286,6 +299,19 @@ cargo fmt --all && cargo clippy --all-targets && cargo test --all
 - Pre-commit hook will auto-enforce this (see `.claude/settings.json`)
 
 **Why**: Buggy code was the #1 friction point (48% of issues) in usage analysis - compilation errors, type mismatches, and syntax issues requiring multiple fix rounds.
+
+### MCP Tools Setup (Optional but Recommended)
+
+**grepai (semantic search + call graph)**:
+```bash
+.claude/scripts/grepai-start.sh
+```
+
+Verify:
+```bash
+grepai status    # Check index health
+ollama list      # Check nomic-embed-text model
+```
 
 ## Testing Policy
 
