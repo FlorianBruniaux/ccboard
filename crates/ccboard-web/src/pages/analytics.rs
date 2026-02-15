@@ -420,7 +420,7 @@ fn AnalyticsInsights(data: crate::api::StatsData) -> impl IntoView {
 
     // Forecast insight
     let forecast_diff_pct = if data.this_month_cost > 0.0 {
-        ((data.forecast_cost_30d - data.this_month_cost) / data.this_month_cost * 100.0)
+        (data.forecast_cost_30d - data.this_month_cost) / data.this_month_cost * 100.0
     } else {
         0.0
     };

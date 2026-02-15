@@ -63,6 +63,8 @@ pub struct PluginUsage {
     pub name: String,
     /// Classification
     pub plugin_type: PluginType,
+    /// Icon emoji (computed from plugin_type, serialized for WASM compatibility)
+    pub icon: String,
     /// Total invocations across all sessions
     pub total_invocations: usize,
     /// Session IDs where this plugin was used
@@ -90,6 +92,7 @@ impl PluginUsage {
     ) -> Self {
         Self {
             name,
+            icon: plugin_type.icon().to_string(),
             plugin_type,
             total_invocations: invocations,
             sessions_used: vec![session_id],
@@ -101,6 +104,7 @@ impl PluginUsage {
     }
 
     /// Merge another usage record into this one
+    #[allow(dead_code)]
     fn merge(&mut self, other: &Self) {
         self.total_invocations += other.total_invocations;
         if !self.sessions_used.contains(&other.sessions_used[0]) {
@@ -258,6 +262,11 @@ pub fn aggregate_plugin_usage(
         }
 
         for (tool_name, call_count) in &session.tool_usage {
+            // Skip empty tool names (malformed session data)
+            if tool_name.is_empty() {
+                continue;
+            }
+
             let plugin_type = classify_plugin(tool_name, available_skills, available_commands);
 
             // Proportional cost attribution
@@ -356,7 +365,6 @@ pub fn aggregate_plugin_usage(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::session::SessionId;
 
     #[test]
     fn test_classify_plugin() {
@@ -383,7 +391,6 @@ mod tests {
 
     #[test]
     fn test_aggregate_plugin_usage() {
-        use crate::models::session::ProjectId;
         use std::path::PathBuf;
 
         // Create test sessions with tool_usage

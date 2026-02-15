@@ -162,6 +162,7 @@ impl InvocationParser {
     }
 
     /// Extract invocations from a content string
+    #[allow(dead_code)]
     fn extract_invocations(&self, content: &str, stats: &mut InvocationStats) {
         // Detect commands in text
         if let Some(caps) = command_regex().captures(content) {

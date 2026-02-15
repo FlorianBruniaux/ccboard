@@ -1,5 +1,6 @@
 //! Conversation viewer - Displays full session content with syntax highlighting
 
+use crate::components::highlight_matches;
 use crate::widgets::ToolCallsViewer;
 use ccboard_core::models::{ConversationMessage, MessageRole};
 use ccboard_core::DataStore;
@@ -117,8 +118,17 @@ pub struct ConversationTab {
     /// Vertical scroll offset (message index)
     scroll_offset: usize,
 
-    /// Search query (for future implementation)
+    /// Search query
     search_query: String,
+
+    /// Search is active (input mode)
+    search_active: bool,
+
+    /// Current search result index (for next/prev navigation)
+    search_result_idx: usize,
+
+    /// Cached search results (message indices matching the query)
+    search_results: Vec<usize>,
 
     /// Error message if load failed
     error: Option<String>,
@@ -150,6 +160,9 @@ impl ConversationTab {
             messages: Vec::new(),
             scroll_offset: 0,
             search_query: String::new(),
+            search_active: false,
+            search_result_idx: 0,
+            search_results: Vec::new(),
             error: None,
             is_loading: false,
             syntax_set: SyntaxSet::load_defaults_newlines(),
@@ -192,6 +205,10 @@ impl ConversationTab {
         self.session_id = None;
         self.messages.clear();
         self.scroll_offset = 0;
+        self.search_query.clear();
+        self.search_active = false;
+        self.search_result_idx = 0;
+        self.search_results.clear();
         self.error = None;
         self.is_loading = false;
         self.tool_viewers.clear();
@@ -319,9 +336,92 @@ impl ConversationTab {
         }
     }
 
+    /// Search messages for query, return matching indices
+    fn search_messages(&self, query: &str) -> Vec<usize> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+
+        let query_lower = query.to_lowercase();
+        self.messages
+            .iter()
+            .enumerate()
+            .filter(|(_, msg)| msg.content.to_lowercase().contains(&query_lower))
+            .map(|(idx, _)| idx)
+            .collect()
+    }
+
+    /// Jump to next search result
+    fn next_search_result(&mut self) {
+        if self.search_results.is_empty() {
+            return;
+        }
+        self.search_result_idx = (self.search_result_idx + 1) % self.search_results.len();
+        let msg_idx = self.search_results[self.search_result_idx];
+        // Scroll to make message visible (with some context above)
+        self.scroll_offset = msg_idx.saturating_sub(2);
+    }
+
+    /// Jump to previous search result
+    fn prev_search_result(&mut self) {
+        if self.search_results.is_empty() {
+            return;
+        }
+        if self.search_result_idx == 0 {
+            self.search_result_idx = self.search_results.len() - 1;
+        } else {
+            self.search_result_idx -= 1;
+        }
+        let msg_idx = self.search_results[self.search_result_idx];
+        self.scroll_offset = msg_idx.saturating_sub(2);
+    }
+
     /// Handle keyboard input
     pub fn handle_key(&mut self, key: crossterm::event::KeyCode) -> bool {
         use crossterm::event::KeyCode;
+
+        // Search input mode (highest priority)
+        if self.search_active {
+            match key {
+                KeyCode::Char(c) => {
+                    self.search_query.push(c);
+                    // Re-run search on each keypress
+                    self.search_results = self.search_messages(&self.search_query);
+                    self.search_result_idx = 0;
+                    // Jump to first result if any
+                    if !self.search_results.is_empty() {
+                        let msg_idx = self.search_results[0];
+                        self.scroll_offset = msg_idx.saturating_sub(2);
+                    }
+                    return true;
+                }
+                KeyCode::Backspace => {
+                    self.search_query.pop();
+                    self.search_results = self.search_messages(&self.search_query);
+                    self.search_result_idx = 0;
+                    // Jump to first result if any
+                    if !self.search_results.is_empty() {
+                        let msg_idx = self.search_results[0];
+                        self.scroll_offset = msg_idx.saturating_sub(2);
+                    }
+                    return true;
+                }
+                KeyCode::Enter => {
+                    // Keep results, exit search mode
+                    self.search_active = false;
+                    return true;
+                }
+                KeyCode::Esc => {
+                    // Clear and exit
+                    self.search_active = false;
+                    self.search_query.clear();
+                    self.search_results.clear();
+                    self.search_result_idx = 0;
+                    return true;
+                }
+                _ => return true,
+            }
+        }
 
         // Tool calls viewer bindings (when viewing tools)
         if self.viewing_tools.is_some() {
@@ -412,6 +512,21 @@ impl ConversationTab {
                 self.show_tool_calls_for_current();
                 true
             }
+            KeyCode::Char('/') => {
+                // Activate search mode
+                self.search_active = true;
+                return true;
+            }
+            KeyCode::Char('n') if !self.search_results.is_empty() => {
+                // Next search result
+                self.next_search_result();
+                return true;
+            }
+            KeyCode::Char('N') if !self.search_results.is_empty() => {
+                // Previous search result
+                self.prev_search_result();
+                return true;
+            }
             KeyCode::PageDown => {
                 self.scroll_down(20);
                 true
@@ -483,15 +598,67 @@ impl ConversationTab {
             filter_indicator
         );
 
+        // Split area vertically if search is active or has results
+        let (search_area, main_area) = if self.search_active || !self.search_query.is_empty() {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(3), // Search bar
+                    Constraint::Min(0),    // Content
+                ])
+                .split(area);
+            (Some(chunks[0]), chunks[1])
+        } else {
+            (None, area)
+        };
+
+        // Render search bar if visible
+        if let Some(search_area) = search_area {
+            let search_title = if self.search_results.is_empty() && !self.search_query.is_empty() {
+                " Search (no results) ".to_string()
+            } else if !self.search_results.is_empty() {
+                format!(
+                    " Search ({} results, {}/{}) - Press 'n' next, 'N' prev ",
+                    self.search_results.len(),
+                    self.search_result_idx + 1,
+                    self.search_results.len()
+                )
+            } else {
+                " Search ".to_string()
+            };
+
+            let border_color = if self.search_active {
+                Color::Cyan
+            } else {
+                Color::DarkGray
+            };
+
+            let search_block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(border_color))
+                .title(search_title);
+
+            let search_text = format!(
+                "🔍 /{}{}",
+                self.search_query,
+                if self.search_active { "_" } else { "" }
+            );
+            let search_widget = Paragraph::new(search_text)
+                .block(search_block)
+                .style(Style::default().fg(Color::White));
+
+            frame.render_widget(search_widget, search_area);
+        }
+
         // Main content area (split if filter panel is shown)
         let (content_area, filter_area) = if self.show_filter_panel {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Min(40), Constraint::Length(35)])
-                .split(area);
+                .split(main_area);
             (chunks[0], Some(chunks[1]))
         } else {
-            (area, None)
+            (main_area, None)
         };
 
         // Render main content block
@@ -527,7 +694,7 @@ impl ConversationTab {
                 height: msg_height as u16,
             };
 
-            self.render_message(frame, msg, msg_area);
+            self.render_message(frame, msg, msg_area, &self.search_query);
 
             // Use saturating_add to prevent overflow
             y_offset = y_offset.saturating_add(msg_height).saturating_add(1);
@@ -723,7 +890,13 @@ impl ConversationTab {
     }
 
     /// Render a single message with syntax highlighting
-    fn render_message(&self, frame: &mut Frame, msg: &ConversationMessage, area: Rect) {
+    fn render_message(
+        &self,
+        frame: &mut Frame,
+        msg: &ConversationMessage,
+        area: Rect,
+        search_query: &str,
+    ) {
         let (role_label, role_color, bg_color) = match msg.role {
             MessageRole::User => ("👤 User", Color::Blue, Color::Rgb(20, 30, 60)),
             MessageRole::Assistant => ("🤖 Assistant", Color::Green, Color::Rgb(20, 50, 30)),
@@ -773,7 +946,7 @@ impl ConversationTab {
         frame.render_widget(header, layout[0]);
 
         // Render content with syntax highlighting
-        let content_text = self.highlight_content(&msg.content);
+        let content_text = self.highlight_content(&msg.content, search_query);
         let content = Paragraph::new(content_text)
             .wrap(Wrap { trim: false })
             .style(Style::default().bg(bg_color));
@@ -782,12 +955,16 @@ impl ConversationTab {
     }
 
     /// Apply syntax highlighting to message content
-    fn highlight_content(&self, content: &str) -> Text<'static> {
+    fn highlight_content(&self, content: &str, search_query: &str) -> Text<'static> {
         // Check if content contains code blocks (```language)
         if content.contains("```") {
             self.highlight_code_blocks(content)
+        } else if !search_query.is_empty() {
+            // Plain text with search highlights
+            let spans = highlight_matches(content, search_query);
+            Text::from(Line::from(spans))
         } else {
-            // Plain text
+            // Plain text without highlights
             Text::raw(content.to_string())
         }
     }

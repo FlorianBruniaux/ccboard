@@ -271,10 +271,16 @@ async fn recent_sessions_handler(
 async fn live_sessions_handler() -> axum::Json<serde_json::Value> {
     use ccboard_core::detect_live_sessions;
 
+    const MAX_LIVE_SESSIONS: usize = 20;
+
     match detect_live_sessions() {
         Ok(live_sessions) => {
+            let total = live_sessions.len();
+            let truncated = total > MAX_LIVE_SESSIONS;
+
             let sessions: Vec<_> = live_sessions
                 .iter()
+                .take(MAX_LIVE_SESSIONS)
                 .map(|ls| {
                     serde_json::json!({
                         "pid": ls.pid,
@@ -292,7 +298,9 @@ async fn live_sessions_handler() -> axum::Json<serde_json::Value> {
 
             axum::Json(serde_json::json!({
                 "sessions": sessions,
-                "total": sessions.len(),
+                "total": total,
+                "displayed": sessions.len(),
+                "truncated": truncated,
             }))
         }
         Err(e) => axum::Json(serde_json::json!({
@@ -458,11 +466,10 @@ async fn plugins_handler(
     // Get all sessions (limit to recent 10000 for performance)
     let sessions = store.recent_sessions(10000);
 
-    // Extract skill and command names from store
-    // TODO: Properly implement skill/command extraction from .claude/skills and .claude/commands
-    // For now, use empty lists (will be populated when DataStore exposes this data)
-    let skills: Vec<String> = vec![];
-    let commands: Vec<String> = vec![];
+    // Extract skill and command names from invocation stats
+    let invocation_stats = store.invocation_stats();
+    let skills: Vec<String> = invocation_stats.skills.keys().cloned().collect();
+    let commands: Vec<String> = invocation_stats.commands.keys().cloned().collect();
 
     // Compute plugin analytics
     let analytics = aggregate_plugin_usage(&sessions, &skills, &commands);
@@ -792,9 +799,23 @@ async fn task_graph_handler(
     use ccboard_core::models::plan::PhaseStatus;
     use ccboard_core::parsers::PlanParser;
 
-    // Try to load PLAN.md from claude home
+    // Try multiple PLAN.md locations (prioritize working dir)
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let plan_path = std::path::Path::new(&home).join(".claude/claudedocs/PLAN_PHASES_F-15.md");
+    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+    let possible_paths = vec![
+        // Current project claudedocs/PLAN.md (highest priority - dev dir)
+        cwd.join("claudedocs/PLAN.md"),
+        // Current project .claude/PLAN.md
+        cwd.join(".claude/PLAN.md"),
+        // Claude home claudedocs/PLAN.md
+        std::path::PathBuf::from(&home).join(".claude/claudedocs/PLAN.md"),
+    ];
+
+    let plan_path = possible_paths
+        .into_iter()
+        .find(|p| p.exists())
+        .unwrap_or_else(|| cwd.join("PLAN.md"));
 
     let plan_result = PlanParser::parse_file(&plan_path);
 
@@ -821,11 +842,23 @@ async fn task_graph_handler(
                         if let Some(pos) = plan_content.find(&task_header) {
                             // Extract content until next task or section
                             let rest = &plan_content[pos..];
-                            let end_pos = rest[100..]
-                                .find("\n####")
-                                .map(|p| p + 100)
-                                .or_else(|| rest[100..].find("\n###").map(|p| p + 100))
-                                .or_else(|| rest[100..].find("\n##").map(|p| p + 100))
+                            // Use char boundary-safe slicing
+                            let skip_offset = rest
+                                .char_indices()
+                                .nth(100)
+                                .map(|(i, _)| i)
+                                .unwrap_or(rest.len());
+                            let end_pos = rest
+                                .get(skip_offset..)
+                                .and_then(|s| s.find("\n####").map(|p| p + skip_offset))
+                                .or_else(|| {
+                                    rest.get(skip_offset..)
+                                        .and_then(|s| s.find("\n###").map(|p| p + skip_offset))
+                                })
+                                .or_else(|| {
+                                    rest.get(skip_offset..)
+                                        .and_then(|s| s.find("\n##").map(|p| p + skip_offset))
+                                })
                                 .unwrap_or(rest.len());
 
                             let task_content = &rest[..end_pos];

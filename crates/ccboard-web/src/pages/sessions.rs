@@ -23,6 +23,7 @@ struct SessionsResponse {
 /// Live session data structure
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct LiveSessionData {
     pid: u32,
     start_time: String,
@@ -195,6 +196,16 @@ pub fn Sessions() -> impl IntoView {
         set_current_page.set(0);
     };
 
+    // Derive total_pages signal to prevent infinite reactive loop in pagination buttons
+    let total_pages = Signal::derive(move || {
+        sessions_resource
+            .get()
+            .as_ref()
+            .and_then(|r| r.as_ref().ok())
+            .map(|resp| (resp.total as f64 / resp.page_size as f64).ceil() as usize)
+            .unwrap_or(1)
+    });
+
     view! {
         <div class="page sessions-page">
             <div class="page-header">
@@ -255,10 +266,18 @@ pub fn Sessions() -> impl IntoView {
                     live_sessions_resource.get().map(|result| {
                         match result.as_ref() {
                             Ok(response) if !response.sessions.is_empty() => {
+                                let showing = response.sessions.len();
+                                let total = response.total;
+                                let title = if showing < total {
+                                    format!("🟢 Active Sessions ({} / {} total)", showing, total)
+                                } else {
+                                    format!("🟢 Active Sessions ({})", total)
+                                };
+
                                 view! {
                                     <div class="active-sessions-panel">
                                         <div class="active-sessions-header">
-                                            <h3>"🟢 Active Sessions (" {response.total.to_string()} ")"</h3>
+                                            <h3>{title}</h3>
                                             <button
                                                 class="refresh-button"
                                                 on:click=move |_| set_live_refresh.update(|v| *v += 1)
@@ -468,8 +487,7 @@ pub fn Sessions() -> impl IntoView {
 
                                 let total = response.total;
                                 let page = response.page;
-                                let page_size = response.page_size;
-                                let total_pages = (total as f64 / page_size as f64).ceil() as usize;
+                                let _page_size = response.page_size;
 
                                 // Store count AFTER filtering
                                 let sessions_count = sessions.len();
@@ -480,7 +498,7 @@ pub fn Sessions() -> impl IntoView {
                                 view! {
                                     <div class="sessions-container">
                                         <div class="sessions-stats">
-                                            <span>{format!("Showing {} sessions (page {} of {})", sessions_count, page + 1, total_pages.max(1))}</span>
+                                            <span>{format!("Showing {} sessions (page {} of {})", sessions_count, page + 1, total_pages.get().max(1))}</span>
                                             <span>{format!("Total: {}", total)}</span>
                                         </div>
 
@@ -499,17 +517,12 @@ pub fn Sessions() -> impl IntoView {
                                                 "← Previous"
                                             </button>
                                             <span class="pagination-info">
-                                                {format!("Page {} of {}", page + 1, total_pages.max(1))}
+                                                {format!("Page {} of {}", page + 1, total_pages.get().max(1))}
                                             </span>
                                             <button
                                                 class="pagination-button"
                                                 disabled=move || {
-                                                    let page = current_page.get();
-                                                    let total_pages = sessions_resource.get()
-                                                        .and_then(|r| r.as_ref().ok().cloned())
-                                                        .map(|resp| (resp.total as f64 / resp.page_size as f64).ceil() as usize)
-                                                        .unwrap_or(1);
-                                                    page >= total_pages.saturating_sub(1)
+                                                    current_page.get() >= total_pages.get().saturating_sub(1)
                                                 }
                                                 on:click=move |_| set_current_page.update(|p| *p += 1)
                                             >

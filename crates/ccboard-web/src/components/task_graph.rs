@@ -11,6 +11,8 @@ use wasm_bindgen::prelude::*;
 pub struct TaskGraphData {
     pub nodes: Vec<TaskNode>,
     pub edges: Vec<TaskEdge>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

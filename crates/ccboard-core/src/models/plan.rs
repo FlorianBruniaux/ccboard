@@ -27,8 +27,8 @@ pub struct PlanMetadata {
     /// Plan title
     pub title: String,
 
-    /// Current status (in-progress, complete, future)
-    pub status: String,
+    /// Current status (in-progress, complete, future) - optional, can be inferred from phases
+    pub status: Option<String>,
 
     /// Estimated total duration string (e.g., "82-120h")
     pub estimated_total_duration: Option<String>,
@@ -107,7 +107,7 @@ impl Default for PlanMetadata {
             last_updated: None,
             version: None,
             title: String::new(),
-            status: "future".to_string(),
+            status: Some("future".to_string()),
             estimated_total_duration: None,
         }
     }

@@ -83,9 +83,10 @@ impl PlanParser {
     fn parse_phases(body: &str) -> Result<Vec<Phase>> {
         let mut phases = Vec::new();
 
-        // Regex to match phase headers: ## Phase F: Title (rest of line)
+        // Regex to match phase headers: ## [emoji] Phase F: Title (rest of line)
+        // Emoji prefix (✅🚧⏸️❌) is optional, phase ID can contain dots (Phase 2.1)
         // Captures: 1=phase_id, 2=rest of line (contains title + optional priority)
-        let phase_re = Regex::new(r"(?m)^##\s+Phase\s+([A-Za-z0-9]+):\s+(.+)$")
+        let phase_re = Regex::new(r"(?m)^##\s+(?:[✅🚧⏸️❌]\s+)?Phase\s+([A-Za-z0-9\.]+):\s+(.+)$")
             .context("Failed to compile phase regex")?;
 
         // Regex to extract priority from line: (Priority: 🔴 HIGH)
@@ -122,7 +123,10 @@ impl PlanParser {
             let section = &body[start..end];
 
             // Parse phase metadata and tasks from section
-            let (status, estimated_duration, version_target) = Self::parse_phase_metadata(section);
+            // Pass full header line to extract status from emoji
+            let header = cap.get(0).unwrap().as_str();
+            let (status, estimated_duration, version_target) =
+                Self::parse_phase_metadata(section, header);
             let tasks = Self::parse_tasks(&phase_id, section)?;
 
             phases.push(Phase {
@@ -140,8 +144,18 @@ impl PlanParser {
     }
 
     /// Parse phase metadata from section content
-    fn parse_phase_metadata(section: &str) -> (PhaseStatus, Option<String>, Option<String>) {
-        let mut status = PhaseStatus::Future;
+    fn parse_phase_metadata(
+        section: &str,
+        header: &str,
+    ) -> (PhaseStatus, Option<String>, Option<String>) {
+        // Extract status from emoji prefix in header (✅=Complete, 🚧=InProgress, default=Future)
+        let mut status = if header.contains("✅") {
+            PhaseStatus::Complete
+        } else if header.contains("🚧") {
+            PhaseStatus::InProgress
+        } else {
+            PhaseStatus::Future
+        };
         let mut estimated_duration = None;
         let mut version_target = None;
 
@@ -189,9 +203,10 @@ impl PlanParser {
     fn parse_tasks(_phase_id: &str, section: &str) -> Result<Vec<Task>> {
         let mut tasks = Vec::new();
 
-        // Regex to match task headers: #### Task F.1: Title (P0)
+        // Regex to match task headers: #### Task F.1: Title [emoji] (P0)
+        // Emoji status (✅🚧⏸️❌) is optional after title, excluded from title capture
         let task_re =
-            Regex::new(r"(?m)^####\s+Task\s+([A-Za-z0-9\.]+):\s+([^\(]+?)(?:\s+\(([^\)]+)\))?\s*$")
+            Regex::new(r"(?m)^####\s+Task\s+([A-Za-z0-9\.]+):\s+([^\(✅🚧⏸️❌]+?)(?:\s+[✅🚧⏸️❌])?(?:\s+\(([^\)]+)\))?\s*$")
                 .context("Failed to compile task regex")?;
 
         // Find all task headers
@@ -321,7 +336,7 @@ version: 0.7.0
 
         let meta = PlanParser::parse_metadata(yaml).unwrap();
         assert_eq!(meta.title, "Test Plan");
-        assert_eq!(meta.status, "in-progress");
+        assert_eq!(meta.status, Some("in-progress".to_string()));
         assert_eq!(meta.version, Some("0.7.0".to_string()));
     }
 

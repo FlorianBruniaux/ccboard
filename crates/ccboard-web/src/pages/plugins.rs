@@ -17,17 +17,6 @@ pub enum PluginType {
 }
 
 impl PluginType {
-    /// Icon for display
-    pub fn icon(&self) -> &'static str {
-        match self {
-            Self::Skill => "🎓",
-            Self::Command => "⚡",
-            Self::Agent => "🤖",
-            Self::McpServer => "🔌",
-            Self::NativeTool => "🛠️",
-        }
-    }
-
     /// Human-readable label
     pub fn label(&self) -> &'static str {
         match self {
@@ -45,6 +34,7 @@ impl PluginType {
 pub struct PluginUsage {
     pub name: String,
     pub plugin_type: PluginType,
+    pub icon: String, // Icon emoji computed from plugin_type (backend-serialized)
     pub total_invocations: usize,
     pub sessions_used: Vec<String>,
     pub total_cost: f64,
@@ -105,35 +95,58 @@ fn StatsCard(label: &'static str, value: String, color: &'static str) -> impl In
     }
 }
 
-/// Plugin list item component
+/// Plugin list item component (usage-focused)
 #[component]
 fn PluginListItem(plugin: PluginUsage, rank: usize) -> impl IntoView {
-    let icon = plugin.plugin_type.icon();
+    let icon = plugin.icon.clone();
     let type_label = plugin.plugin_type.label();
+    let usage_display = if plugin.total_invocations >= 1000 {
+        format!("{}k", plugin.total_invocations / 1000)
+    } else {
+        plugin.total_invocations.to_string()
+    };
 
     view! {
-        <div class="plugin-list-item">
-            <div class="plugin-list-item__rank">{rank}"."</div>
-            <div class="plugin-list-item__icon">{icon}</div>
-            <div class="plugin-list-item__content">
-                <div class="plugin-list-item__name">{plugin.name.clone()}</div>
-                <div class="plugin-list-item__type">{type_label}</div>
+        <div class="plugin-item">
+            <span class="plugin-item__rank">{"#"}{rank}</span>
+            <span class="plugin-item__icon">{icon}</span>
+            <div class="plugin-item__info">
+                <span class="plugin-item__name">{plugin.name.clone()}</span>
+                <span class="plugin-item__type">{type_label}</span>
             </div>
-            <div class="plugin-list-item__stats">
-                <span class="plugin-list-item__invocations">{plugin.total_invocations}" uses"</span>
+            <div class="plugin-item__stat">
+                <span class="plugin-item__stat-value">{usage_display}</span>
+                <span class="plugin-item__stat-label">"uses"</span>
             </div>
         </div>
     }
 }
 
-/// Plugin cost item component
+/// Plugin cost item component (cost-focused)
 #[component]
 fn PluginCostItem(plugin: PluginUsage, rank: usize) -> impl IntoView {
+    let icon = plugin.icon.clone();
+    let type_label = plugin.plugin_type.label();
+    let cost_display = if plugin.total_cost >= 100.0 {
+        format!("{:.0}", plugin.total_cost)
+    } else if plugin.total_cost >= 10.0 {
+        format!("{:.1}", plugin.total_cost)
+    } else {
+        format!("{:.2}", plugin.total_cost)
+    };
+
     view! {
-        <div class="plugin-cost-item">
-            <div class="plugin-cost-item__rank">{rank}"."</div>
-            <div class="plugin-cost-item__name">{plugin.name.clone()}</div>
-            <div class="plugin-cost-item__cost">"$"{format!("{:.2}", plugin.total_cost)}</div>
+        <div class="plugin-item plugin-item--cost">
+            <span class="plugin-item__rank">{"#"}{rank}</span>
+            <span class="plugin-item__icon">{icon}</span>
+            <div class="plugin-item__info">
+                <span class="plugin-item__name">{plugin.name.clone()}</span>
+                <span class="plugin-item__type">{type_label}</span>
+            </div>
+            <div class="plugin-item__stat plugin-item__stat--cost">
+                <span class="plugin-item__stat-value">"$"{cost_display}</span>
+                <span class="plugin-item__stat-label">{plugin.total_invocations}" uses"</span>
+            </div>
         </div>
     }
 }
@@ -142,9 +155,16 @@ fn PluginCostItem(plugin: PluginUsage, rank: usize) -> impl IntoView {
 #[component]
 fn DeadCodeItem(name: String) -> impl IntoView {
     view! {
-        <div class="dead-code-item">
-            <div class="dead-code-item__icon">"⚠️"</div>
-            <div class="dead-code-item__name">{name}" (0 uses)"</div>
+        <div class="plugin-item plugin-item--dead">
+            <span class="plugin-item__icon">"⚠️"</span>
+            <div class="plugin-item__info">
+                <span class="plugin-item__name">{name}</span>
+                <span class="plugin-item__type">"Never invoked"</span>
+            </div>
+            <div class="plugin-item__stat plugin-item__stat--dead">
+                <span class="plugin-item__stat-value">"0"</span>
+                <span class="plugin-item__stat-label">"uses"</span>
+            </div>
         </div>
     }
 }
