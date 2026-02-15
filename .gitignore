@@ -26,3 +26,4 @@ claudedocs/
 *.tmp
 *.bak
 *~
+.grepai/
