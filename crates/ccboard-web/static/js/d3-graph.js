@@ -28,6 +28,24 @@ window.renderTaskGraph = function(nodes, edges) {
     }
     console.log("✅ Target element found:", target);
 
+    // Create tooltip element if it doesn't exist
+    let tooltip = document.getElementById("task-tooltip");
+    if (!tooltip) {
+        console.log("🔧 Creating tooltip element dynamically");
+        tooltip = document.createElement("div");
+        tooltip.id = "task-tooltip";
+        tooltip.className = "task-tooltip hidden";
+        tooltip.innerHTML = `
+            <div class="tooltip-header">
+                <h3 id="tooltip-title"></h3>
+                <button id="tooltip-close" class="tooltip-close-btn">×</button>
+            </div>
+            <div id="tooltip-content" class="tooltip-content"></div>
+        `;
+        document.body.appendChild(tooltip);
+        console.log("✅ Tooltip element created");
+    }
+
     const width = 1200;
     const height = 600;
 
@@ -130,8 +148,9 @@ window.renderTaskGraph = function(nodes, edges) {
         .attr("font-size", "12px")
         .attr("fill", "#ccc");
 
-    // Click handler to show tooltip
+    // Click handler to show tooltip (attached to entire node group)
     node.on("click", function(event, d) {
+        console.log("🖱️ Node clicked:", d.id);
         event.stopPropagation(); // Prevent background click
         showTooltip(d, event);
     });
@@ -190,8 +209,15 @@ window.renderTaskGraph = function(nodes, edges) {
      * Show rich HTML tooltip for task node
      */
     function showTooltip(taskData, event) {
+        console.log("📍 showTooltip called for:", taskData.id);
+
         const tooltip = document.getElementById("task-tooltip");
-        if (!tooltip) return;
+        console.log("🔍 Tooltip element:", tooltip);
+
+        if (!tooltip) {
+            console.error("❌ Tooltip element not found!");
+            return;
+        }
 
         // Populate tooltip content
         document.getElementById("tooltip-title").textContent =
@@ -200,13 +226,18 @@ window.renderTaskGraph = function(nodes, edges) {
         const content = document.getElementById("tooltip-content");
         content.innerHTML = formatTooltipContent(taskData);
 
-        // Position tooltip near cursor
-        const x = event.pageX + 15;
-        const y = event.pageY + 15;
+        // Position tooltip near cursor (use clientX/clientY for fixed positioning)
+        const x = event.clientX + 15;
+        const y = event.clientY + 15;
 
+        console.log("📐 Positioning tooltip at:", x, y);
         tooltip.style.left = `${x}px`;
         tooltip.style.top = `${y}px`;
+        tooltip.style.display = "block"; // Force display
         tooltip.classList.remove("hidden");
+
+        console.log("✅ Tooltip should be visible now");
+        console.log("📋 Tooltip content:", content.innerHTML.substring(0, 100));
     }
 
     /**

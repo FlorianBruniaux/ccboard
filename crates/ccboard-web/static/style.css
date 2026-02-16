@@ -4961,10 +4961,10 @@ pre code {
 /* ========== TASK GRAPH TOOLTIP ========== */
 
 .task-tooltip {
-  position: absolute;
-  z-index: 1000;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-light);
+  position: fixed;
+  z-index: 10000;
+  background: #2a2a2a;
+  border: 1px solid #444;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   padding: 0;
@@ -4982,8 +4982,8 @@ pre code {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-surface);
+  border-bottom: 1px solid #333;
+  background: #1e1e1e;
   border-radius: 8px 8px 0 0;
 }
 
@@ -4991,13 +4991,13 @@ pre code {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-cyan);
+  color: #00d4ff;
 }
 
 .tooltip-close-btn {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: #999;
   font-size: 24px;
   cursor: pointer;
   padding: 0;
@@ -5010,8 +5010,8 @@ pre code {
 }
 
 .tooltip-close-btn:hover {
-  background: var(--hover-bg);
-  color: var(--text-primary);
+  background: #3a3a3a;
+  color: #fff;
 }
 
 .tooltip-content {
@@ -5041,21 +5041,21 @@ pre code {
 
 .tooltip-label {
   font-weight: 600;
-  color: var(--text-secondary);
+  color: #999;
   font-size: 12px;
   margin-right: 12px;
   min-width: 80px;
 }
 
 .tooltip-value {
-  color: var(--text-primary);
+  color: #e0e0e0;
   font-size: 12px;
   text-align: right;
   flex: 1;
 }
 
 .tooltip-value code {
-  background: var(--bg-primary);
+  background: #1a1a1a;
   padding: 2px 6px;
   border-radius: 3px;
   font-family: 'SF Mono', Monaco, monospace;
@@ -5063,7 +5063,7 @@ pre code {
 }
 
 .tooltip-value a {
-  color: var(--color-cyan);
+  color: #00d4ff;
   text-decoration: none;
 }
 
@@ -5072,22 +5072,22 @@ pre code {
 }
 
 .tooltip-value.status-complete {
-  color: var(--color-green);
+  color: #4CAF50;
   font-weight: 600;
 }
 
 .tooltip-value.status-inprogress {
-  color: var(--color-yellow);
+  color: #FFC107;
   font-weight: 600;
 }
 
 .tooltip-value.status-future {
-  color: var(--text-muted);
+  color: #666;
   font-weight: 600;
 }
 
 .tooltip-description {
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid #333;
   padding-top: 12px;
   margin-top: 12px;
 }
@@ -5101,7 +5101,7 @@ pre code {
 .tooltip-description .tooltip-value {
   text-align: left;
   line-height: 1.5;
-  color: var(--text-secondary);
+  color: #999;
   white-space: pre-wrap;
 }
 
@@ -5110,16 +5110,16 @@ pre code {
 }
 
 .tooltip-content::-webkit-scrollbar-track {
-  background: var(--bg-surface);
+  background: #1e1e1e;
   border-radius: 4px;
 }
 
 .tooltip-content::-webkit-scrollbar-thumb {
-  background: var(--border-light);
+  background: #444;
   border-radius: 4px;
 }
 
 .tooltip-content::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: #666;
 }
 
