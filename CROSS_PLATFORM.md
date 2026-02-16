@@ -181,7 +181,7 @@ All platforms run these checks automatically on every PR:
 
 - ✅ `cargo fmt --check` (formatting)
 - ✅ `cargo clippy -- -D warnings` (linting)
-- ✅ `cargo test --all` (281 tests)
+- ✅ `cargo test --all` (344 tests)
 - ✅ `cargo build --release` (release build)
 
 **CI Matrix**:

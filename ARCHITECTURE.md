@@ -1,7 +1,7 @@
 # ccboard Architecture
 
-**Version**: 0.5.2
-**Last Updated**: 2026-02-11
+**Version**: 0.8.0
+**Last Updated**: 2026-02-16
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
@@ -27,7 +27,7 @@ This document describes the technical architecture of ccboard, a unified TUI/Web
 
 ## Overview
 
-ccboard is a Rust workspace with 5 crates providing dual TUI + Web interfaces for Claude Code monitoring:
+ccboard is a Rust workspace with 4 crates providing dual TUI + Web interfaces for Claude Code monitoring:
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -54,16 +54,6 @@ ccboard is a Rust workspace with 5 crates providing dual TUI + Web interfaces fo
               │ • Cache         │
               │ • Analytics     │
               └─────────────────┘
-
-              ┌─────────────────┐
-              │ ccboard-types   │
-              │ (data types)    │
-              │                 │
-              │ • Models        │
-              │ • Analytics     │
-              │ (WASM-ready,    │
-              │  not yet wired) │
-              └─────────────────┘
 ```
 
 **Key Design Goals**:
@@ -85,8 +75,6 @@ ccboard (bin)
   │
   └─> ccboard-web (lib)
        └─> ccboard-core (lib)
-
-ccboard-types (lib) — standalone, WASM-friendly types (planned integration)
 ```
 
 **Dependency flow**: `ccboard` → `{ccboard-tui, ccboard-web}` → `ccboard-core`
@@ -98,8 +86,7 @@ ccboard-types (lib) — standalone, WASM-friendly types (planned integration)
 | **ccboard** | CLI entry point, mode routing | `main()`, `Cli` struct |
 | **ccboard-core** | Data layer, business logic | `DataStore`, `SessionMetadata`, parsers, analytics |
 | **ccboard-tui** | Ratatui frontend | `TuiApp`, `DashboardTab`, `SessionsTab`, etc. |
-| **ccboard-web** | Axum API backend | `create_router()`, `run()` |
-| **ccboard-types** | WASM-friendly shared types (planned) | `SessionMetadata`, `StatsCache`, `AnalyticsData` |
+| **ccboard-web** | Axum API backend + Leptos frontend | `create_router()`, `run()` |
 
 ---
 
@@ -616,10 +603,11 @@ async fn sse_handler(
 ### Current Status
 
 - ✅ Axum backend (12 routes + SSE)
-- ✅ Leptos frontend (5 pages: Dashboard, Sessions, Analytics, Config, History)
-- ✅ Full TUI/Web parity (100%) - Phase G Complete
+- ✅ Leptos frontend (9 pages: Dashboard, Sessions, Analytics, Config, Hooks, MCP, Agents, Costs, History)
+- ✅ Full TUI/Web parity (100%)
+- ✅ Quota management integration (v0.8.0)
 
-**Architecture**: Leptos WASM frontend (port 3333) communicates with Axum backend (port 8080) via REST API + SSE for live updates. Sprint 1 UX improvements include config modal, elevation system, and responsive design.
+**Architecture**: Leptos WASM frontend (port 3333) communicates with Axum backend (port 8080) via REST API + SSE for live updates. Features include config modal, elevation system, responsive design, and budget tracking with quota gauges.
 
 ---
 
@@ -890,9 +878,8 @@ Standardized terminology used across ccboard documentation and codebase:
 ### Running Tests
 
 ```bash
-cargo test --all                    # All 281 tests
+cargo test --all                    # All 344 tests
 cargo test -p ccboard-core          # Core crate only
-cargo test -p ccboard-types         # Types crate only
 RUST_LOG=debug cargo test           # With logging
 cargo test --all-features           # Integration tests (requires ~/.claude)
 ```
@@ -910,6 +897,44 @@ cargo test --all-features           # Integration tests (requires ~/.claude)
 
 ---
 
-**Document Version**: 1.1
-**Last Updated**: 2026-02-11
+## v0.8.0 Features (Budget Tracking & Quota Management)
+
+### Quota System Integration
+
+**New DataStore method**:
+- `quota_status()` → Returns `Option<QuotaStatus>` with MTD cost, usage %, projection
+- Thread-safe via parking_lot::RwLock
+- Zero-overhead Arc clones
+
+**Budget calculation**:
+- Token-based prorata: `total_cost * (mtd_tokens / total_tokens)`
+- Monthly projection: `(MTD cost / current_day) * 30`
+- Four-level alerts: Safe (green) / Warning (yellow) / Critical (red) / Exceeded (magenta)
+
+**TUI Integration**:
+- Quota gauge in Costs tab Overview (color-coded progress bar)
+- Analytics tab budget tracking
+
+**Web Integration**:
+- REST API endpoint: `/api/quota`
+- Leptos component with Suspense
+- CSS progress bar with real-time SSE updates
+
+**Configuration** (`~/.claude/settings.json`):
+```json
+{
+  "budget": {
+    "monthlyLimit": 50.0,
+    "warningThreshold": 75.0,
+    "criticalThreshold": 90.0
+  }
+}
+```
+
+**Testing**: 4 quota module tests covering all alert levels and edge cases
+
+---
+
+**Document Version**: 1.2
+**Last Updated**: 2026-02-16
 **Maintainer**: Florian Bruniaux

@@ -239,21 +239,24 @@ Follow Rust-specific error handling rules from RULES.md:
 
 ## Implementation Phases (from PLAN.md)
 
-**Completed Phases (v0.4.0+)**:
+**Completed Phases (v0.8.0)**:
 - ✅ **Phase I (Infrastructure)**: Stats parser, Settings merge, Session metadata, DataStore, graceful degradation
 - ✅ **Phase D (Dashboard TUI)**: Dashboard tab with sparklines, project filters, model breakdown
 - ✅ **Phase S (Sessions TUI)**: Sessions tab with search, filters, detail view
 - ✅ **Phase C (Config TUI)**: Config tab with merge visualization, setting overrides
 - ✅ **Phase H-A (Hooks & Agents TUI)**: Hooks tab (list + detail), Agents/Capabilities tab (frontmatter parsing)
 - ✅ **Phase E (Economics TUI)**: Costs tab, History tab with SQLite-backed timelines
-- ✅ **Phase G (Leptos Frontend)**: Web UI with Dashboard, Sessions, Analytics, Config, History pages
+- ✅ **Phase G (Leptos Frontend)**: Web UI with 100% TUI parity (9 pages)
+- ✅ **Phase F (Conversation Viewer)**: Full JSONL content display with syntax highlighting, full-text search
+- ✅ **Budget Tracking (v0.8.0)**: MTD cost calculation, monthly projection, 4-level alerts, quota gauges
 
-**Current Phase**:
-- 🚧 **Phase F (Conversation Viewer)**: Full JSONL content display with syntax highlighting
+**Next Phase**:
+- 🎯 **Phase J (Export Features)**: Export sessions/stats/billing to CSV/JSON/Markdown
 
 **Future Phases**:
+- **Phase K (Advanced Analytics)**: Anomaly detection, usage patterns, model recommendations
+- **Phase L (Plugin System)**: Extensible architecture for community plugins
 - **Phase H (Plan-Aware)**: PLAN.md parsing, task completion tracking
-- **MCP Server Mode**: Expose ccboard data as MCP tools for Claude Code
 
 ## Important Constraints
 

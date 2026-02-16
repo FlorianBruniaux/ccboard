@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-281_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-344_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
   <img src="https://img.shields.io/badge/Clippy-0_warnings-success?style=for-the-badge&logo=rust" alt="Clippy"/>
   <img src="https://img.shields.io/badge/Binary-5.8MB-blue?style=for-the-badge" alt="Binary Size"/>
   <img src="https://img.shields.io/badge/Cache_Speedup-89x-orange?style=for-the-badge&logo=sqlite" alt="Speedup"/>
@@ -26,7 +26,7 @@
   <img src="assets/demo.gif" alt="ccboard demo" width="800"/>
 </p>
 
-> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 281 tests, 0 clippy warnings.
+> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 344 tests, 0 clippy warnings.
 
 ---
 
@@ -765,7 +765,7 @@ RUST_LOG=ccboard=debug cargo run
 ### Testing
 
 ```bash
-# Run all tests (281 tests)
+# Run all tests (344 tests)
 cargo test --all
 
 # Run tests for specific crate
@@ -824,7 +824,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap & Documentation
 
-**Current Status**: 🎉 **PRODUCTION-READY** (v0.7.0)
+**Current Status**: 🎉 **PRODUCTION-READY** (v0.8.0)
 
 ### Completed ✅
 
@@ -837,25 +837,28 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ✅ **Conversation Viewer**: Full JSONL display with full-text search (`/` to search, `n/N` to navigate), syntax highlighting, dynamic rendering
 - ✅ **TUI Stability**: Fixed runtime panics, overflow issues, and Esc key handling in viewers
 - ✅ **Dynamic Pricing**: LiteLLM integration with automatic price updates and local caching
+- ✅ **Budget Tracking** (v0.8.0): Month-to-date cost calculation, monthly projection, 4-level alerts (Safe/Warning/Critical/Exceeded)
 
-**Total**: 281 tests passing, 0 clippy warnings
+**Total**: 344 tests passing, 0 clippy warnings
 
 ### Coming Soon 🚧
 
-**v0.8.0: Quota Tracking**
-- Token quota management per project
-- Budget tracking and alerts
-- Historical quota usage analysis
+**v0.9.0: Export Features** (Phase J - NEXT)
+- Export sessions → CSV/JSON for Excel and data analysis
+- Export stats → Markdown reports for team sharing
+- Export billing blocks → CSV for accounting
+- CLI: `ccboard export sessions --format csv`
 
-**Plan-Aware Dashboard**
-- PLAN.md parsing and visualization
-- Task completion tracking
-- Progress indicators
+**v0.10.0: Advanced Analytics** (Phase K)
+- Anomaly detection (cost spikes, unusual patterns)
+- Model usage recommendations
+- Forecast accuracy tracking
 
-**MCP Server Mode**
-- Expose ccboard data as MCP tools for Claude Code
+**v0.11.0: Plugin System** (Phase L)
+- Extensible architecture for community plugins
+- Custom tabs, data sources, metrics
 
-For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [PLAN.md](claudedocs/PLAN.md).
+For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [NEXT_STEPS.md](claudedocs/NEXT_STEPS.md).
 
 ### Documentation
 
