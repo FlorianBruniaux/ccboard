@@ -472,8 +472,9 @@ pub fn Sessions() -> impl IntoView {
                                 // Store count AFTER filtering
                                 let sessions_count = sessions.len();
 
-                                // Create signals for SessionTable
-                                let sessions_signal = Signal::derive(move || Some(sessions.clone()));
+                                // Use StoredValue to avoid cloning on every render
+                                let sessions_stored = StoredValue::new(Some(sessions));
+                                let sessions_signal = Signal::derive(move || sessions_stored.get_value());
 
                                 view! {
                                     <div class="sessions-container">
