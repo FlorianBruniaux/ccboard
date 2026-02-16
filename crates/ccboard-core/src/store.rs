@@ -413,6 +413,17 @@ impl DataStore {
         self.invocation_stats.read().clone()
     }
 
+    /// Calculate current quota status from stats and budget config
+    ///
+    /// Returns None if stats are not loaded or budget is not configured.
+    pub fn quota_status(&self) -> Option<crate::quota::QuotaStatus> {
+        let stats = self.stats.read().clone()?;
+        let settings = self.settings.read();
+        let budget = settings.merged.budget.as_ref()?;
+
+        Some(crate::quota::calculate_quota_status(&stats, budget))
+    }
+
     /// Get live Claude Code sessions (running processes)
     ///
     /// Detects active Claude processes on the system and returns metadata.
