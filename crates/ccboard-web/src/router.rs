@@ -892,6 +892,11 @@ async fn task_graph_handler(
                             "phase": phase.id,
                             "status": status,
                             "duration": task.duration,
+                            "description": task.description,
+                            "priority": task.priority,
+                            "difficulty": task.difficulty,
+                            "crateName": task.crate_name,
+                            "issue": task.issue,
                         })
                     })
                 })

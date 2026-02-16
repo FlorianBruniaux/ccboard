@@ -23,6 +23,11 @@ pub struct TaskNode {
     pub phase: String,
     pub status: String,
     pub duration: Option<String>,
+    pub description: Option<String>,
+    pub priority: Option<String>,
+    pub difficulty: Option<String>,
+    pub crate_name: Option<String>,
+    pub issue: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,12 +74,39 @@ pub fn TaskDependencyGraph() -> impl IntoView {
     // Effect to render D3 graph when data is loaded
     Effect::new(move |_| {
         if let Some(Ok(data)) = graph_data.get().as_ref().map(|r| r.as_ref()) {
+            web_sys::console::log_1(
+                &format!(
+                    "Task graph data loaded: {} nodes, {} edges",
+                    data.nodes.len(),
+                    data.edges.len()
+                )
+                .into(),
+            );
+
             // Convert to JsValue for JS interop
             if let Ok(nodes_js) = serde_wasm_bindgen::to_value(&data.nodes) {
                 if let Ok(edges_js) = serde_wasm_bindgen::to_value(&data.edges) {
-                    render_task_graph(nodes_js, edges_js);
+                    web_sys::console::log_1(&"Calling renderTaskGraph()...".into());
+
+                    // Use requestAnimationFrame to ensure DOM is ready
+                    let window = web_sys::window().expect("no global window exists");
+                    let closure = wasm_bindgen::closure::Closure::once(move || {
+                        render_task_graph(nodes_js, edges_js);
+                        web_sys::console::log_1(&"renderTaskGraph() executed in next frame".into());
+                    });
+
+                    window
+                        .request_animation_frame(closure.as_ref().unchecked_ref())
+                        .expect("should register `requestAnimationFrame`");
+                    closure.forget();
+                } else {
+                    web_sys::console::error_1(&"Failed to convert edges to JsValue".into());
                 }
+            } else {
+                web_sys::console::error_1(&"Failed to convert nodes to JsValue".into());
             }
+        } else {
+            web_sys::console::log_1(&"Task graph data not ready or errored".into());
         }
     });
 
@@ -123,6 +155,14 @@ pub fn TaskDependencyGraph() -> impl IntoView {
                                 </div>
 
                                 <div id="d3-graph" style="width: 100%; height: 600px; border: 1px solid #333; background: #1a1a1a; border-radius: 8px;"></div>
+
+                                <div id="task-tooltip" class="task-tooltip hidden">
+                                    <div class="tooltip-header">
+                                        <h3 id="tooltip-title"></h3>
+                                        <button id="tooltip-close" class="tooltip-close-btn">"×"</button>
+                                    </div>
+                                    <div id="tooltip-content" class="tooltip-content"></div>
+                                </div>
 
                                 <div class="graph-instructions">
                                     <p>"💡 Tip: Drag nodes to rearrange. Zoom with mouse wheel. Pan by dragging background."</p>

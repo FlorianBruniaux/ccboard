@@ -10,11 +10,30 @@
  */
 
 window.renderTaskGraph = function(nodes, edges) {
+    console.log("🎯 renderTaskGraph called with:", { nodes, edges });
+    console.log("📊 Nodes count:", nodes.length, "Edges count:", edges.length);
+
+    // Check if D3 is loaded
+    if (typeof d3 === 'undefined') {
+        console.error("❌ D3.js is not loaded!");
+        return;
+    }
+    console.log("✅ D3.js version:", d3.version);
+
+    // Check if target element exists
+    const target = document.getElementById("d3-graph");
+    if (!target) {
+        console.error("❌ #d3-graph element not found!");
+        return;
+    }
+    console.log("✅ Target element found:", target);
+
     const width = 1200;
     const height = 600;
 
     // Clear previous graph
     d3.select("#d3-graph").selectAll("*").remove();
+    console.log("🧹 Previous graph cleared");
 
     const svg = d3.select("#d3-graph")
         .append("svg")
@@ -49,16 +68,16 @@ window.renderTaskGraph = function(nodes, edges) {
         .attr("d", "M0,-5L10,0L0,5")
         .attr("fill", "#999");
 
-    // Force simulation
+    // Force simulation (adjusted for larger nodes with labels)
     const simulation = d3.forceSimulation(nodes)
         .force("link", d3.forceLink(edges)
             .id(d => d.id)
-            .distance(150))
+            .distance(200))
         .force("charge", d3.forceManyBody()
-            .strength(-400))
+            .strength(-500))
         .force("center", d3.forceCenter(width / 2, height / 2))
         .force("collision", d3.forceCollide()
-            .radius(60));
+            .radius(100));
 
     // Render edges
     const link = g.append("g")
@@ -81,25 +100,41 @@ window.renderTaskGraph = function(nodes, edges) {
             .on("drag", dragged)
             .on("end", dragEnded));
 
-    // Node circles
+    // Node circles (bigger to accommodate labels)
     node.append("circle")
-        .attr("r", 20)
+        .attr("r", 30)
         .attr("fill", d => statusColor(d.status))
         .attr("stroke", "#fff")
         .attr("stroke-width", 2);
 
-    // Node labels
+    // Task ID inside circle
     node.append("text")
         .text(d => d.id)
-        .attr("dx", 25)
+        .attr("text-anchor", "middle")
         .attr("dy", 5)
-        .attr("font-size", "12px")
+        .attr("font-size", "11px")
         .attr("font-weight", "bold")
         .attr("fill", "#fff");
 
-    // Node title (task name) - appears on hover
-    node.append("title")
-        .text(d => `${d.id}: ${d.label}\nPhase: ${d.phase}\nStatus: ${d.status}\nDuration: ${d.duration || 'N/A'}`);
+    // Task title below circle
+    node.append("text")
+        .text(d => {
+            // Truncate long titles
+            const maxLength = 30;
+            return d.label.length > maxLength
+                ? d.label.substring(0, maxLength) + '...'
+                : d.label;
+        })
+        .attr("text-anchor", "middle")
+        .attr("dy", 45)
+        .attr("font-size", "12px")
+        .attr("fill", "#ccc");
+
+    // Click handler to show tooltip
+    node.on("click", function(event, d) {
+        event.stopPropagation(); // Prevent background click
+        showTooltip(d, event);
+    });
 
     // Update positions on each tick
     simulation.on("tick", () => {
@@ -150,4 +185,155 @@ window.renderTaskGraph = function(nodes, edges) {
         d.fx = null;
         d.fy = null;
     }
+
+    /**
+     * Show rich HTML tooltip for task node
+     */
+    function showTooltip(taskData, event) {
+        const tooltip = document.getElementById("task-tooltip");
+        if (!tooltip) return;
+
+        // Populate tooltip content
+        document.getElementById("tooltip-title").textContent =
+            `${taskData.id}: ${taskData.label}`;
+
+        const content = document.getElementById("tooltip-content");
+        content.innerHTML = formatTooltipContent(taskData);
+
+        // Position tooltip near cursor
+        const x = event.pageX + 15;
+        const y = event.pageY + 15;
+
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y}px`;
+        tooltip.classList.remove("hidden");
+    }
+
+    /**
+     * Hide tooltip
+     */
+    function hideTooltip() {
+        const tooltip = document.getElementById("task-tooltip");
+        if (tooltip) {
+            tooltip.classList.add("hidden");
+        }
+    }
+
+    /**
+     * Format tooltip HTML content with sections
+     */
+    function formatTooltipContent(task) {
+        let html = '<div class="tooltip-section">';
+
+        // Basic info: Status + Phase + Duration
+        html += `<div class="tooltip-row">
+            <span class="tooltip-label">Status:</span>
+            <span class="tooltip-value status-${task.status.toLowerCase()}">${task.status}</span>
+        </div>`;
+
+        html += `<div class="tooltip-row">
+            <span class="tooltip-label">Phase:</span>
+            <span class="tooltip-value">${task.phase}</span>
+        </div>`;
+
+        if (task.duration) {
+            html += `<div class="tooltip-row">
+                <span class="tooltip-label">Duration:</span>
+                <span class="tooltip-value">${task.duration}</span>
+            </div>`;
+        }
+
+        html += '</div>';
+
+        // Metadata: Priority + Difficulty
+        if (task.priority || task.difficulty) {
+            html += '<div class="tooltip-section">';
+
+            if (task.priority) {
+                html += `<div class="tooltip-row">
+                    <span class="tooltip-label">Priority:</span>
+                    <span class="tooltip-value">${task.priority}</span>
+                </div>`;
+            }
+
+            if (task.difficulty) {
+                html += `<div class="tooltip-row">
+                    <span class="tooltip-label">Difficulty:</span>
+                    <span class="tooltip-value">${task.difficulty}</span>
+                </div>`;
+            }
+
+            html += '</div>';
+        }
+
+        // Technical info: Crate + Issue
+        if (task.crateName || task.issue) {
+            html += '<div class="tooltip-section">';
+
+            if (task.crateName) {
+                html += `<div class="tooltip-row">
+                    <span class="tooltip-label">Crate:</span>
+                    <span class="tooltip-value"><code>${task.crateName}</code></span>
+                </div>`;
+            }
+
+            if (task.issue) {
+                html += `<div class="tooltip-row">
+                    <span class="tooltip-label">Issue:</span>
+                    <span class="tooltip-value">
+                        <a href="https://github.com/FlorianBruniaux/ccboard/issues/${task.issue}"
+                           target="_blank">#${task.issue}</a>
+                    </span>
+                </div>`;
+            }
+
+            html += '</div>';
+        }
+
+        // Description (if available)
+        if (task.description) {
+            html += '<div class="tooltip-section tooltip-description">';
+            html += `<div class="tooltip-label">Description:</div>`;
+
+            // Truncate long descriptions
+            const maxLength = 300;
+            const desc = task.description;
+            const truncated = desc.length > maxLength
+                ? desc.substring(0, maxLength) + '...'
+                : desc;
+
+            html += `<div class="tooltip-value">${escapeHtml(truncated)}</div>`;
+            html += '</div>';
+        }
+
+        return html;
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Close tooltip on background click
+    svg.on("click", function() {
+        hideTooltip();
+    });
+
+    // Close tooltip on Escape key
+    document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") {
+            hideTooltip();
+        }
+    });
+
+    // Close button handler
+    document.addEventListener("click", function(e) {
+        if (e.target && e.target.id === "tooltip-close") {
+            hideTooltip();
+        }
+    });
 };
