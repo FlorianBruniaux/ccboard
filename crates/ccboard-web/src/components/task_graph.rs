@@ -156,6 +156,8 @@ pub fn TaskDependencyGraph() -> impl IntoView {
 
                                 <div id="d3-graph" style="width: 100%; height: 600px; border: 1px solid #333; background: #1a1a1a; border-radius: 8px;"></div>
 
+                                // Tooltip container for D3 graph interactions (manipulated by d3-graph.js)
+                                // IMPORTANT: Do NOT remove #task-tooltip element, JavaScript expects it to exist
                                 <div id="task-tooltip" class="task-tooltip hidden">
                                     <div class="tooltip-header">
                                         <h3 id="tooltip-title"></h3>

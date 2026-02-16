@@ -4961,6 +4961,7 @@ pre code {
 /* ========== TASK GRAPH TOOLTIP ========== */
 
 .task-tooltip {
+  display: block;
   position: fixed;
   z-index: 10000;
   background: #2a2a2a;

@@ -28,22 +28,11 @@ window.renderTaskGraph = function(nodes, edges) {
     }
     console.log("✅ Target element found:", target);
 
-    // Create tooltip element if it doesn't exist
-    let tooltip = document.getElementById("task-tooltip");
+    // Tooltip element (created by Leptos template, see task_graph.rs:159)
+    const tooltip = document.getElementById("task-tooltip");
     if (!tooltip) {
-        console.log("🔧 Creating tooltip element dynamically");
-        tooltip = document.createElement("div");
-        tooltip.id = "task-tooltip";
-        tooltip.className = "task-tooltip hidden";
-        tooltip.innerHTML = `
-            <div class="tooltip-header">
-                <h3 id="tooltip-title"></h3>
-                <button id="tooltip-close" class="tooltip-close-btn">×</button>
-            </div>
-            <div id="tooltip-content" class="tooltip-content"></div>
-        `;
-        document.body.appendChild(tooltip);
-        console.log("✅ Tooltip element created");
+        console.error("❌ Tooltip element not found in DOM! Check task_graph.rs template.");
+        return; // Early return prevents further errors
     }
 
     const width = 1200;
