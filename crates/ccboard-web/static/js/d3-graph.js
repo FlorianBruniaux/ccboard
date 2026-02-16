@@ -232,7 +232,12 @@ window.renderTaskGraph = function(nodes, edges) {
         console.log("📐 Positioning tooltip at:", x, y);
         tooltip.style.left = `${x}px`;
         tooltip.style.top = `${y}px`;
-        tooltip.style.display = "block"; // Force display
+        tooltip.style.display = "block";
+        tooltip.style.position = "fixed";
+        tooltip.style.zIndex = "10000";
+        tooltip.style.background = "#2a2a2a";
+        tooltip.style.border = "1px solid #444";
+        tooltip.style.borderRadius = "8px";
         tooltip.classList.remove("hidden");
 
         console.log("✅ Tooltip should be visible now");
