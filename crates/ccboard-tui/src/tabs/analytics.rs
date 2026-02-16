@@ -428,13 +428,17 @@ impl AnalyticsTab {
             let alerts = generate_budget_alerts(
                 &data.trends,
                 &data.forecast,
-                Some(config.monthly_budget_usd),
-                config.alert_threshold_pct,
+                config.monthly_limit,
+                config.warning_threshold,
             );
 
             let current_cost = data.forecast.monthly_cost_estimate;
-            let budget = config.monthly_budget_usd;
-            let pct = (current_cost / budget * 100.0).min(100.0);
+            let budget = config.monthly_limit.unwrap_or(0.0);
+            let pct = if budget > 0.0 {
+                (current_cost / budget * 100.0).min(100.0)
+            } else {
+                0.0
+            };
             let remaining = (budget - current_cost).max(0.0);
 
             // Progress bar
@@ -442,7 +446,7 @@ impl AnalyticsTab {
             let bar = "━".repeat(bar_len.min(20));
 
             // Color based on percentage
-            let (bar_color, status_icon) = if pct >= config.alert_threshold_pct {
+            let (bar_color, status_icon) = if pct >= config.warning_threshold {
                 (Color::Red, "⚠️ ")
             } else if pct >= 60.0 {
                 (Color::Yellow, "")

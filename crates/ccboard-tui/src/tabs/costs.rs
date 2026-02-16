@@ -169,7 +169,7 @@ impl CostsTab {
 
         // Render content based on view mode
         match self.view_mode {
-            0 => self.render_overview(frame, chunks[1], stats),
+            0 => self.render_overview(frame, chunks[1], stats, store),
             1 => self.render_by_model(frame, chunks[1], stats),
             2 => self.render_daily(frame, chunks[1], stats),
             3 => self.render_billing_blocks(frame, chunks[1], billing_blocks),
@@ -213,12 +213,19 @@ impl CostsTab {
         }
     }
 
-    fn render_overview(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_overview(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        store: Option<&ccboard_core::store::DataStore>,
+    ) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([
                 Constraint::Length(7),  // Total cost card
+                Constraint::Length(5),  // Quota gauge (NEW)
                 Constraint::Length(10), // Token breakdown
                 Constraint::Min(0),     // Model distribution
             ])
@@ -227,11 +234,14 @@ impl CostsTab {
         // Total cost card
         self.render_total_cost(frame, chunks[0], stats);
 
+        // Quota gauge
+        self.render_quota_gauge(frame, chunks[1], store);
+
         // Token breakdown
-        self.render_token_breakdown(frame, chunks[1], stats);
+        self.render_token_breakdown(frame, chunks[2], stats);
 
         // Model distribution
-        self.render_model_distribution(frame, chunks[2], stats);
+        self.render_model_distribution(frame, chunks[3], stats);
     }
 
     fn render_total_cost(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
@@ -310,6 +320,91 @@ impl CostsTab {
 
         let top_list = Paragraph::new(top_models);
         frame.render_widget(top_list, chunks[1]);
+    }
+
+    fn render_quota_gauge(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        store: Option<&ccboard_core::store::DataStore>,
+    ) {
+        use ccboard_core::quota::AlertLevel;
+
+        // Get quota status from store
+        let quota = store.and_then(|s| s.quota_status());
+
+        let (gauge_ratio, gauge_color, gauge_label, subtitle) = if let Some(q) = quota {
+            // Calculate gauge ratio (0.0-1.0, capped at 1.0 for display)
+            let ratio = (q.usage_pct / 100.0).min(1.0);
+
+            // Determine color based on alert level
+            let color = match q.alert_level {
+                AlertLevel::Safe => Color::Green,
+                AlertLevel::Warning => Color::Yellow,
+                AlertLevel::Critical => Color::Red,
+                AlertLevel::Exceeded => Color::Magenta,
+            };
+
+            // Build label with current cost and usage %
+            let label = format!(
+                "${:.2} / {} ({:.1}%)",
+                q.current_cost,
+                q.budget_limit
+                    .map(|l| format!("${:.2}", l))
+                    .unwrap_or_else(|| "∞".to_string()),
+                q.usage_pct
+            );
+
+            // Subtitle with projection
+            let sub = if let Some(overage) = q.projected_overage {
+                format!(
+                    "Projected: ${:.2} (${:.2} over)",
+                    q.projected_monthly_cost, overage
+                )
+            } else {
+                format!("Projected: ${:.2}", q.projected_monthly_cost)
+            };
+
+            (ratio, color, label, sub)
+        } else {
+            // No quota configured
+            (
+                0.0,
+                Color::DarkGray,
+                "No budget configured".to_string(),
+                "Set monthly_limit in settings.json".to_string(),
+            )
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::DarkGray))
+            .title(Span::styled(
+                " 💰 Monthly Budget ",
+                Style::default().fg(Color::White).bold(),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        // Vertical split: gauge + subtitle
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Length(1)])
+            .split(inner);
+
+        // Gauge
+        let gauge = Gauge::default()
+            .gauge_style(Style::default().fg(gauge_color))
+            .ratio(gauge_ratio)
+            .label(gauge_label);
+        frame.render_widget(gauge, chunks[0]);
+
+        // Subtitle
+        let subtitle_widget = Paragraph::new(subtitle)
+            .style(Style::default().fg(Color::DarkGray))
+            .alignment(Alignment::Center);
+        frame.render_widget(subtitle_widget, chunks[1]);
     }
 
     fn render_token_breakdown(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
