@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-02-16
+
+### Added - Budget Tracking & Quota Management
+
+#### Core Quota System
+- **Month-to-date (MTD) cost calculation** with intelligent token-based prorata
+  - Uses `daily_model_tokens` to filter current month activity
+  - Prorates total cost based on token proportion (MTD tokens / total tokens)
+  - No pricing lookup needed - simple ratio-based calculation
+  - Graceful handling of missing daily data
+- **Monthly projection** with simple daily average
+  - Projects month-end cost: `(MTD cost / current_day) * 30`
+  - Calculates projected overage if budget limit set
+- **Four-level alert system** with configurable thresholds
+  - `Safe` (green): Usage < warning threshold (default 75%)
+  - `Warning` (yellow): Usage ≥ warning threshold
+  - `Critical` (red): Usage ≥ critical threshold (default 90%)
+  - `Exceeded` (magenta): Usage ≥ 100%
+- **BudgetConfig** in settings.json
+  - `monthlyLimit` (optional): Budget limit in USD (no limit if omitted)
+  - `warningThreshold` (default: 75.0): Warning alert trigger %
+  - `criticalThreshold` (default: 90.0): Critical alert trigger %
+
+#### TUI Integration
+- **Quota gauge in Costs tab Overview**
+  - Color-coded progress bar (green/yellow/red/magenta)
+  - Displays: MTD cost, budget limit, usage %
+  - Shows projected monthly cost and overage
+  - Graceful fallback message if budget not configured
+  - Position: Between total cost card and token breakdown
+- **Analytics tab budget fixes**
+  - Updated to use new BudgetConfig field names
+  - Fixed `monthly_budget_usd` → `monthly_limit` (Option)
+  - Fixed `alert_threshold_pct` → `warning_threshold`
+
+#### Web UI Integration
+- **REST API endpoint** `/api/quota`
+  - Returns QuotaStatus JSON with current cost, usage %, projection
+  - Serializes alert_level as string ("safe", "warning", "critical", "exceeded")
+  - Error response if budget not configured or stats unavailable
+- **Quota gauge in Costs page Overview**
+  - Leptos component with Suspense for async loading
+  - CSS progress bar with color-coded fill
+  - Displays: MTD cost, budget, usage %, projected cost, overage
+  - Graceful error handling and fallback states
+  - Real-time updates via SSE (inherited from stats)
+
+#### DataStore Integration
+- **quota_status()** method in DataStore
+  - Returns `Option<QuotaStatus>` (None if stats/budget unavailable)
+  - Follows existing pattern: `stats()`, `settings()`, etc.
+  - Zero-overhead: clones are cheap, locks released immediately
+  - Thread-safe via parking_lot::RwLock
+
+#### Testing
+- **4 quota module tests** covering:
+  - Safe, Warning, Critical, Exceeded alert levels
+  - MTD calculation with token-based prorata
+  - Monthly projection accuracy
+  - No-budget scenario (returns Safe with 0% usage)
+- **Token-ratio mocking** for predictable test data
+  - `mock_stats_with_mtd_ratio(total_cost, ratio, first_date)`
+  - Allows testing different MTD scenarios
+
+### Technical Details
+- **MVP approach chosen**: Token-based prorata vs precise daily cost aggregation
+  - Simpler implementation, no pricing lookup needed
+  - Accurate enough for budget alerts (±5% error acceptable)
+  - Future optimization: Use pricing module for exact daily costs
+- **Core exports** in ccboard-core/lib.rs:
+  - `calculate_quota_status`, `AlertLevel`, `QuotaStatus`
+- **Zero breaking changes**: Existing budget fields preserved (backward compatible)
+
 ## [0.7.0] - 2026-02-13
 
 ### Added - Conversation Viewer Enhancements

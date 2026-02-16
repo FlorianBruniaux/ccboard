@@ -137,12 +137,12 @@ pub static MODEL_PRICING: Lazy<HashMap<String, ModelPricing>> = Lazy::new(|| {
 /// # Examples
 ///
 /// ```
-/// use ccboard_core::pricing::get_pricing;
+/// use ccboard_core::pricing::get_model_pricing;
 ///
-/// let pricing = get_pricing("opus-4");
+/// let pricing = get_model_pricing("opus-4");
 /// assert_eq!(pricing.input_price_per_million, 5.0);
 ///
-/// let pricing = get_pricing("unknown-model");
+/// let pricing = get_model_pricing("unknown-model");
 /// assert_eq!(pricing.input_price_per_million, 3.2); // Default average
 /// ```
 pub fn get_model_pricing(model: &str) -> ModelPricing {

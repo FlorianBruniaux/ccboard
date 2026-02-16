@@ -28,8 +28,8 @@ fn test_parse_real_plan_file() {
         plan.metadata.title,
         "ccboard Phases F-15 - Plan de Développement Détaillé avec Agents"
     );
-    assert_eq!(plan.metadata.status, "in-progress");
-    assert_eq!(plan.metadata.version, Some("0.7.0-dev".to_string()));
+    assert_eq!(plan.metadata.status, Some("phases-f-h-complete".to_string()));
+    assert_eq!(plan.metadata.version, Some("0.8.0".to_string()));
     assert_eq!(plan.metadata.date, Some("2026-02-12".to_string()));
     assert_eq!(
         plan.metadata.estimated_total_duration,
@@ -121,7 +121,7 @@ Test task description.
     let plan = result.expect("Expected Some(PlanFile)");
 
     assert_eq!(plan.metadata.title, "Minimal Plan");
-    assert_eq!(plan.metadata.status, "future");
+    assert_eq!(plan.metadata.status, Some("future".to_string()));
 
     assert_eq!(plan.phases.len(), 1);
     let phase = &plan.phases[0];
