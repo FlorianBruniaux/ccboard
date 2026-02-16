@@ -824,25 +824,28 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap & Documentation
 
-**Current Status**: 🎉 **PRODUCTION-READY** (v0.5.0)
+**Current Status**: 🎉 **PRODUCTION-READY** (v0.7.0)
 
 ### Completed ✅
 
 - ✅ **Infrastructure**: Stats parser, Settings merge, Session metadata, DataStore, SQLite cache (89x speedup)
 - ✅ **TUI Dashboard**: 9 interactive tabs (Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP, Analytics)
-- ✅ **Web Frontend**: Full Leptos/WASM UI with 100% TUI parity (9 pages)
+- ✅ **Web Frontend**: Full Leptos/WASM UI with 100% TUI parity (9 pages) + Sessions freeze fix
 - ✅ **Live Monitoring**: CPU/RAM/Tokens tracking for active Claude processes
 - ✅ **Cost Analytics**: 4 views (Overview, By Model, Daily, Billing Blocks) + budget alerts
 - ✅ **Advanced Analytics**: 30-day forecasting, usage patterns, actionable insights
+- ✅ **Conversation Viewer**: Full JSONL display with full-text search (`/` to search, `n/N` to navigate), syntax highlighting, dynamic rendering
+- ✅ **TUI Stability**: Fixed runtime panics, overflow issues, and Esc key handling in viewers
+- ✅ **Dynamic Pricing**: LiteLLM integration with automatic price updates and local caching
 
 **Total**: 281 tests passing, 0 clippy warnings
 
 ### Coming Soon 🚧
 
-**Conversation Viewer**
-- Full JSONL content display with syntax highlighting
-- Message navigation, search within conversations
-- Export selected messages
+**v0.8.0: Quota Tracking**
+- Token quota management per project
+- Budget tracking and alerts
+- Historical quota usage analysis
 
 **Plan-Aware Dashboard**
 - PLAN.md parsing and visualization
