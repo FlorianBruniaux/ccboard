@@ -68,19 +68,27 @@ pub struct Settings {
 }
 
 /// Budget configuration for cost tracking and alerts
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BudgetConfig {
-    /// Monthly budget in USD
-    pub monthly_budget_usd: f64,
+    /// Monthly budget limit in USD (optional, no limit if None)
+    pub monthly_limit: Option<f64>,
 
-    /// Alert threshold percentage (0-100), defaults to 80%
-    #[serde(default = "default_alert_threshold")]
-    pub alert_threshold_pct: f64,
+    /// Warning threshold percentage (0-100), defaults to 75%
+    #[serde(default = "default_warning_threshold")]
+    pub warning_threshold: f64,
+
+    /// Critical threshold percentage (0-100), defaults to 90%
+    #[serde(default = "default_critical_threshold")]
+    pub critical_threshold: f64,
 }
 
-fn default_alert_threshold() -> f64 {
-    80.0
+fn default_warning_threshold() -> f64 {
+    75.0
+}
+
+fn default_critical_threshold() -> f64 {
+    90.0
 }
 
 impl Settings {
