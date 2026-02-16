@@ -68,6 +68,7 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
     Router::new()
         // API routes (must be before catch-all static files)
         .route("/api/stats", get(stats_handler))
+        .route("/api/quota", get(quota_handler))
         .route("/api/sessions/recent", get(recent_sessions_handler)) // Must be before /api/sessions
         .route("/api/sessions/live", get(live_sessions_handler)) // Live sessions with CPU/RAM
         .route("/api/sessions", get(sessions_handler))
@@ -242,6 +243,35 @@ async fn stats_handler(
             axum::Json(value)
         }
         None => axum::Json(serde_json::json!({"error": "Stats not loaded"})),
+    }
+}
+
+/// Quota status handler (budget tracking)
+async fn quota_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    match store.quota_status() {
+        Some(quota) => {
+            // Serialize QuotaStatus + add alert_level as string for easier frontend handling
+            let alert_level_str = match quota.alert_level {
+                ccboard_core::quota::AlertLevel::Safe => "safe",
+                ccboard_core::quota::AlertLevel::Warning => "warning",
+                ccboard_core::quota::AlertLevel::Critical => "critical",
+                ccboard_core::quota::AlertLevel::Exceeded => "exceeded",
+            };
+
+            axum::Json(serde_json::json!({
+                "current_cost": quota.current_cost,
+                "budget_limit": quota.budget_limit,
+                "usage_pct": quota.usage_pct,
+                "projected_monthly_cost": quota.projected_monthly_cost,
+                "projected_overage": quota.projected_overage,
+                "alert_level": alert_level_str,
+            }))
+        }
+        None => axum::Json(serde_json::json!({
+            "error": "No budget configured or stats not loaded",
+        })),
     }
 }
 

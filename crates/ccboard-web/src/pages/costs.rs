@@ -80,6 +80,9 @@ fn CostsOverview(stats: StatsData) -> impl IntoView {
     let total_cost = stats.total_cost();
     let total_tokens = stats.total_tokens();
 
+    // Fetch quota status
+    let quota_resource = LocalResource::new(move || async move { crate::api::fetch_quota().await });
+
     // Calculate token breakdown percentages
     let input_tokens: u64 = stats.model_usage.values().map(|m| m.input_tokens).sum();
     let output_tokens: u64 = stats.model_usage.values().map(|m| m.output_tokens).sum();
@@ -113,6 +116,69 @@ fn CostsOverview(stats: StatsData) -> impl IntoView {
                     <span class="costs-total__value">{format!("${:.2}", total_cost)}</span>
                 </div>
             </div>
+
+            // Quota gauge section
+            <Suspense fallback=|| view! { <div class="loading">"Loading quota..."</div> }>
+                {move || {
+                    quota_resource
+                        .get()
+                        .map(|result| {
+                            match result.as_ref() {
+                                Ok(quota) => {
+                                    if quota.error.is_some() {
+                                        view! {
+                                            <div class="costs-section">
+                                                <h3 class="costs-section__title">"💰 Monthly Budget"</h3>
+                                                <p class="quota-disabled">"No budget configured. Set monthly_limit in settings.json"</p>
+                                            </div>
+                                        }.into_any()
+                                    } else {
+                                        let usage_ratio = (quota.usage_pct / 100.0).min(1.0);
+                                        let gauge_class = match quota.alert_level.as_str() {
+                                            "safe" => "quota-gauge--safe",
+                                            "warning" => "quota-gauge--warning",
+                                            "critical" => "quota-gauge--critical",
+                                            "exceeded" => "quota-gauge--exceeded",
+                                            _ => "quota-gauge--safe",
+                                        };
+                                        let budget_str = quota.budget_limit
+                                            .map(|l| format!("${:.2}", l))
+                                            .unwrap_or_else(|| "∞".to_string());
+
+                                        view! {
+                                            <div class="costs-section">
+                                                <h3 class="costs-section__title">"💰 Monthly Budget"</h3>
+                                                <div class="quota-container">
+                                                    <div class="quota-header">
+                                                        <span class="quota-label">{format!("${:.2} / {} ({:.1}%)", quota.current_cost, budget_str, quota.usage_pct)}</span>
+                                                    </div>
+                                                    <div class="quota-gauge">
+                                                        <div class={format!("quota-gauge__fill {}", gauge_class)} style={format!("width: {}%", usage_ratio * 100.0)}></div>
+                                                    </div>
+                                                    <div class="quota-footer">
+                                                        {if let Some(overage) = quota.projected_overage {
+                                                            format!("Projected: ${:.2} (${:.2} over)", quota.projected_monthly_cost, overage)
+                                                        } else {
+                                                            format!("Projected: ${:.2}", quota.projected_monthly_cost)
+                                                        }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }.into_any()
+                                    }
+                                }
+                                Err(_e) => {
+                                    view! {
+                                        <div class="costs-section">
+                                            <h3 class="costs-section__title">"💰 Monthly Budget"</h3>
+                                            <p class="quota-error">"Failed to load quota status"</p>
+                                        </div>
+                                    }.into_any()
+                                }
+                            }
+                        })
+                }}
+            </Suspense>
 
             <div class="costs-section">
                 <h3 class="costs-section__title">"Token Breakdown"</h3>

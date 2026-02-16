@@ -66,6 +66,23 @@ pub struct MostUsedModel {
     pub count: u64,
 }
 
+/// Quota status for budget tracking
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuotaData {
+    #[serde(default)]
+    pub current_cost: f64,
+    pub budget_limit: Option<f64>,
+    #[serde(default)]
+    pub usage_pct: f64,
+    #[serde(default)]
+    pub projected_monthly_cost: f64,
+    pub projected_overage: Option<f64>,
+    #[serde(default)]
+    pub alert_level: String, // "safe" | "warning" | "critical" | "exceeded"
+    pub error: Option<String>, // Error message if quota not available
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DailyActivityEntry {
@@ -230,6 +247,26 @@ pub async fn fetch_recent_sessions(limit: u32) -> Result<RecentSessionsResponse,
         .map_err(|e| format!("Parse error: {}", e))?;
 
     Ok(sessions)
+}
+
+/// Fetch quota status from API
+pub async fn fetch_quota() -> Result<QuotaData, String> {
+    let url = format!("{}/api/quota", API_BASE_URL);
+    let response = Request::get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+
+    if !response.ok() {
+        return Err(format!("HTTP error: {}", response.status()));
+    }
+
+    let quota = response
+        .json::<QuotaData>()
+        .await
+        .map_err(|e| format!("Parse error: {}", e))?;
+
+    Ok(quota)
 }
 
 /// Format large numbers (K, M, B)
