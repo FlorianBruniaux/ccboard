@@ -1,8 +1,7 @@
 //! Sessions Explorer page component with server-side pagination
 
 use crate::api::SessionData;
-use crate::components::{use_toast, SessionDetailModal, SessionTable};
-use crate::sse_hook::{use_sse, SseEvent};
+use crate::components::{SessionDetailModal, SessionTable};
 use crate::utils::{export_as_csv, export_as_json};
 use leptos::prelude::*;
 use serde::Deserialize;
@@ -146,32 +145,13 @@ pub fn Sessions() -> impl IntoView {
     // Modal state
     let (modal_session, set_modal_session) = signal(None::<SessionData>);
 
-    // Toast notifications
-    let toast = use_toast();
-
-    // SSE setup for live updates
-    let sse_event = use_sse();
-
-    Effect::new(move |_| {
-        if let Some(event) = sse_event.get() {
-            match event {
-                SseEvent::SessionCreated { id } => {
-                    sessions_resource.refetch();
-                    toast.success(format!("New session: {}", id));
-                }
-                SseEvent::SessionUpdated { .. } => {
-                    // Don't refetch on every update - too expensive with 4000+ sessions
-                    // Don't show toast either - too many events cause UI freeze
-                    // User can manually refresh if needed
-                }
-                SseEvent::StatsUpdated => {
-                    // Don't refetch sessions list when stats change
-                    // Only dashboard needs this
-                }
-                _ => {}
-            }
-        }
-    });
+    // SSE disabled on Sessions page - too many events cause UI freeze
+    // With 4000+ sessions and active development, SessionUpdated events fire
+    // dozens of times per second, causing Effect to re-trigger constantly
+    // Use manual refresh button instead
+    //
+    // let sse_event = use_sse();
+    // Effect::new(move |_| { ... });
 
     // Handle Escape key to close modal
     leptos::leptos_dom::helpers::window_event_listener(leptos::ev::keydown, move |e| {
