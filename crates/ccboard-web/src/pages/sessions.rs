@@ -145,6 +145,29 @@ pub fn Sessions() -> impl IntoView {
     // Modal state
     let (modal_session, set_modal_session) = signal(None::<SessionData>);
 
+    // Stable signal for filtered sessions (created OUTSIDE Suspense to prevent re-creation)
+    let (sessions_data, set_sessions_data) = signal(None::<Vec<SessionData>>);
+
+    // Effect to sync sessions_resource → sessions_data with client-side filters
+    Effect::new(move |_| {
+        if let Some(result) = sessions_resource.get() {
+            // Dereference SendWrapper to access Result
+            if let Ok(response) = &*result {
+                let mut sessions = response.sessions.clone();
+
+                // Apply client-side filters
+                if let Some(min_cost) = cost_filter.get() {
+                    sessions.retain(|s| s.cost >= min_cost);
+                }
+                if let Some(min_tokens) = tokens_filter.get() {
+                    sessions.retain(|s| s.tokens >= min_tokens);
+                }
+
+                set_sessions_data.set(Some(sessions));
+            }
+        }
+    });
+
     // SSE disabled on Sessions page - too many events cause UI freeze
     // With 4000+ sessions and active development, SessionUpdated events fire
     // dozens of times per second, causing Effect to re-trigger constantly
@@ -452,29 +475,15 @@ pub fn Sessions() -> impl IntoView {
                     {move || {
                         sessions_resource.get().map(|result| match result.as_ref() {
                             Ok(response) => {
-                                // Apply client-side filters (cost, tokens)
-                                let mut sessions = response.sessions.clone();
-
-                                // Filter by cost if set
-                                if let Some(min_cost) = cost_filter.get() {
-                                    sessions.retain(|s| s.cost >= min_cost);
-                                }
-
-                                // Filter by tokens if set
-                                if let Some(min_tokens) = tokens_filter.get() {
-                                    sessions.retain(|s| s.tokens >= min_tokens);
-                                }
-
                                 let total = response.total;
                                 let page = response.page;
                                 let _page_size = response.page_size;
 
-                                // Store count AFTER filtering
-                                let sessions_count = sessions.len();
-
-                                // Use StoredValue to avoid cloning on every render
-                                let sessions_stored = StoredValue::new(Some(sessions));
-                                let sessions_signal = Signal::derive(move || sessions_stored.get_value());
+                                // Get filtered sessions count from sessions_data (set by Effect)
+                                let sessions_count = sessions_data.get()
+                                    .as_ref()
+                                    .map(|s| s.len())
+                                    .unwrap_or(0);
 
                                 view! {
                                     <div class="sessions-container">
@@ -484,7 +493,7 @@ pub fn Sessions() -> impl IntoView {
                                         </div>
 
                                         <SessionTable
-                                            sessions=sessions_signal
+                                            sessions=Signal::derive(move || sessions_data.get())
                                             on_row_click=set_modal_session
                                         />
 
