@@ -368,7 +368,8 @@ When user provides a numbered plan (QW1-QW4, Phase 1-5, sprint tasks, etc.):
 
 ## Language & Communication
 
-- **User communicates in French**: Respond in French unless explicitly writing English content (docs, code comments, READMEs)
+- **User communicates in French**: Respond in French unless explicitly writing English content
+- **ALL project artifacts MUST be in English**: commit messages, CHANGELOG, release notes, GitHub Releases, README, code comments, docs — no exceptions
 - **"reprend"**: Resume previous task where it was left off
 - **Be direct**: User prefers direct, factual communication (Bold Guy style from global CLAUDE.md)
 
