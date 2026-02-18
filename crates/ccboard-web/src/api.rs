@@ -138,8 +138,7 @@ impl StatsData {
     /// Sessions count for current month (simplified for WASM)
     pub fn this_month_sessions(&self) -> u64 {
         // Get last 30 days of activity as a proxy for "this month"
-        let len = self.daily_activity.len();
-        let start = if len > 30 { len - 30 } else { 0 };
+        let start = self.daily_activity.len().saturating_sub(30);
 
         self.daily_activity[start..]
             .iter()
@@ -150,8 +149,7 @@ impl StatsData {
     /// Token count for current week (simplified for WASM)
     pub fn this_week_tokens(&self) -> u64 {
         // Get last 7 days of activity
-        let len = self.daily_activity.len();
-        let start = if len > 7 { len - 7 } else { 0 };
+        let start = self.daily_activity.len().saturating_sub(7);
 
         self.daily_activity[start..]
             .iter()
@@ -165,8 +163,7 @@ impl StatsData {
     /// Get last 30 days of token activity for sparkline
     pub fn daily_tokens_30d(&self) -> Vec<u64> {
         let mut result = Vec::new();
-        let len = self.daily_activity.len();
-        let start = if len > 30 { len - 30 } else { 0 };
+        let start = self.daily_activity.len().saturating_sub(30);
 
         for entry in &self.daily_activity[start..] {
             // Estimate tokens from message count

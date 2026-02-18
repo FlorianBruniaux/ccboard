@@ -125,7 +125,7 @@ pub fn SessionTable(
     });
 
     let total_count = Memo::new(move |_| sorted_sessions.get().map(|s| s.len()).unwrap_or(0));
-    let total_pages = Memo::new(move |_| (total_count.get() + page_size - 1) / page_size);
+    let total_pages = Memo::new(move |_| total_count.get().div_ceil(page_size));
 
     let toggle_sort = move |column: SortColumn| {
         if sort_column.get() == column {

@@ -101,7 +101,7 @@ impl ToSql for SessionId {
 
 impl FromSql for SessionId {
     fn column_result(value: ValueRef<'_>) -> Result<Self, FromSqlError> {
-        value.as_str().map(|s| SessionId::from(s))
+        value.as_str().map(SessionId::from)
     }
 }
 
@@ -227,7 +227,7 @@ impl ToSql for ProjectId {
 
 impl FromSql for ProjectId {
     fn column_result(value: ValueRef<'_>) -> Result<Self, FromSqlError> {
-        value.as_str().map(|s| ProjectId::from(s))
+        value.as_str().map(ProjectId::from)
     }
 }
 
@@ -246,18 +246,13 @@ impl<'a> From<&'a ProjectId> for Cow<'a, str> {
 }
 
 /// Message role in conversation
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MessageRole {
+    #[default]
     User,
     Assistant,
     System,
-}
-
-impl Default for MessageRole {
-    fn default() -> Self {
-        Self::User
-    }
 }
 
 /// A single line from a session JSONL file

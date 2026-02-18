@@ -12,7 +12,7 @@ pub enum CardColor {
 }
 
 impl CardColor {
-    fn to_class(&self) -> &'static str {
+    fn to_class(self) -> &'static str {
         match self {
             CardColor::Default => "",
             CardColor::Green => "card-green",

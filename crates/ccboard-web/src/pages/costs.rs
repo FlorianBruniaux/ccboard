@@ -284,8 +284,7 @@ fn CostsByModel(stats: StatsData) -> impl IntoView {
 #[component]
 fn CostsDaily(stats: StatsData) -> impl IntoView {
     // Get last 14 days from daily_activity (clone to avoid lifetime issues)
-    let len = stats.daily_activity.len();
-    let start = if len > 14 { len - 14 } else { 0 };
+    let start = stats.daily_activity.len().saturating_sub(14);
     let daily_data: Vec<_> = stats.daily_activity[start..].to_vec();
 
     // Find max for scaling
@@ -319,8 +318,7 @@ fn CostsDaily(stats: StatsData) -> impl IntoView {
 #[component]
 fn CostsBillingBlocks(stats: StatsData) -> impl IntoView {
     // Get last 7 days from daily_activity
-    let len = stats.daily_activity.len();
-    let start = if len > 7 { len - 7 } else { 0 };
+    let start = stats.daily_activity.len().saturating_sub(7);
     let daily_data: Vec<_> = stats.daily_activity[start..].to_vec();
 
     // Calculate total daily cost (rough estimation)
@@ -329,7 +327,7 @@ fn CostsBillingBlocks(stats: StatsData) -> impl IntoView {
     let avg_daily_cost = total_cost / total_days;
 
     // Generate billing blocks (5-hour periods)
-    let time_blocks = vec![
+    let time_blocks = [
         ("00:00-05:00", "Night"),
         ("05:00-10:00", "Morning"),
         ("10:00-15:00", "Midday"),
@@ -357,12 +355,12 @@ fn CostsBillingBlocks(stats: StatsData) -> impl IntoView {
                     </tr>
                 </thead>
                 <tbody>
-                    {daily_data.into_iter().map(|day| {
+                    {daily_data.into_iter().flat_map(|day| {
                         let date = day.date.clone();
                         let daily_messages = day.message_count;
                         let day_cost = avg_daily_cost;
 
-                        time_blocks.iter().map(|(time, period)| {
+                        time_blocks.iter().map(move |(time, period)| {
                             // Clone for use in closure
                             let time = time.to_string();
                             let period = period.to_string();
@@ -409,7 +407,7 @@ fn CostsBillingBlocks(stats: StatsData) -> impl IntoView {
                                 </tr>
                             }
                         }).collect::<Vec<_>>()
-                    }).flatten().collect::<Vec<_>>()}
+                    }).collect::<Vec<_>>()}
                 </tbody>
             </table>
 

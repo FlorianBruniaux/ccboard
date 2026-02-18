@@ -319,7 +319,7 @@ pub fn Sessions() -> impl IntoView {
                                     </div>
                                 }.into_any()
                             }
-                            _ => view! {}.into_any() // Hide if no active sessions or error
+                            _ => "".into_any() // Hide if no active sessions or error
                         }
                     })
                 }}
@@ -375,23 +375,19 @@ pub fn Sessions() -> impl IntoView {
                     </button>
                     {move || {
                         // Show clear filters if any quick filter active
-                        if cost_filter.get().is_some() || tokens_filter.get().is_some() || date_filter.get().is_some() {
-                            view! {
-                                <button
-                                    class="quick-filter-btn clear-btn"
-                                    on:click=move |_| {
-                                        set_cost_filter.set(None);
-                                        set_tokens_filter.set(None);
-                                        set_date_filter.set(None);
-                                        set_current_page.set(0);
-                                    }
-                                >
-                                    "✕ Clear Filters"
-                                </button>
-                            }.into_any()
-                        } else {
-                            view! {}.into_any()
-                        }
+                        {(cost_filter.get().is_some() || tokens_filter.get().is_some() || date_filter.get().is_some()).then(|| view! {
+                            <button
+                                class="quick-filter-btn clear-btn"
+                                on:click=move |_| {
+                                    set_cost_filter.set(None);
+                                    set_tokens_filter.set(None);
+                                    set_date_filter.set(None);
+                                    set_current_page.set(0);
+                                }
+                            >
+                                "✕ Clear Filters"
+                            </button>
+                        })}
                     }}
                 </div>
 

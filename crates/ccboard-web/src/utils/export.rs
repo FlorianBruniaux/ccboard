@@ -34,7 +34,7 @@ pub fn export_as_csv(headers: Vec<String>, rows: Vec<Vec<String>>, filename: &st
     let mut csv = String::new();
 
     // UTF-8 BOM for Excel compatibility
-    csv.push_str("\u{FEFF}");
+    csv.push('\u{FEFF}');
 
     // Header row
     csv.push_str(&headers.join(","));

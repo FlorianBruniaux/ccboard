@@ -914,7 +914,7 @@ impl DataStore {
             .merged
             .subscription_plan
             .as_ref()
-            .map(|s| crate::usage_estimator::SubscriptionPlan::from_str(s))
+            .map(|s| crate::usage_estimator::SubscriptionPlan::parse(s))
             .unwrap_or_default();
 
         let billing_blocks = self.billing_blocks.read();

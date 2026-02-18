@@ -30,14 +30,9 @@ pub fn Analytics() -> impl IntoView {
     let sse_event = use_sse();
 
     Effect::new(move |_| {
-        if let Some(event) = sse_event.get() {
-            match event {
-                SseEvent::StatsUpdated | SseEvent::AnalyticsUpdated => {
-                    set_stats_version.update(|v| *v += 1);
-                    toast.info("Analytics refreshed".to_string());
-                }
-                _ => {}
-            }
+        if let Some(SseEvent::StatsUpdated | SseEvent::AnalyticsUpdated) = sse_event.get() {
+            set_stats_version.update(|v| *v += 1);
+            toast.info("Analytics refreshed".to_string());
         }
     });
 

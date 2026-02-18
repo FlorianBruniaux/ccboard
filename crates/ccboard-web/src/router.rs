@@ -216,7 +216,7 @@ async fn stats_handler(
                         )
                     })
                     .sum();
-                let avg_session_cost = if sessions.len() > 0 {
+                let avg_session_cost = if !sessions.is_empty() {
                     total_cost / sessions.len() as f64
                 } else {
                     0.0

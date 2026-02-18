@@ -107,7 +107,7 @@ fn ConfigColumn(
     #[prop(optional)]
     on_expand: Option<Box<dyn Fn(String, String) + 'static>>,
 ) -> impl IntoView {
-    let json_text = content.as_ref().map(|json| format_json_highlighted(json));
+    let json_text = content.as_ref().map(format_json_highlighted);
     let json_text_for_copy = json_text.clone();
     let json_text_for_modal = json_text.clone();
     let has_json = json_text.is_some();

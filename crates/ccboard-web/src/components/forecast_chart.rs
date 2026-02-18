@@ -81,7 +81,7 @@ pub fn ForecastChart(
     };
 
     // Budget line (horizontal red dashed)
-    let budget_y = budget.map(|b| y_scale(b));
+    let budget_y = budget.map(y_scale);
 
     // Y-axis labels (4 ticks)
     let y_ticks: Vec<_> = (0..=3)
@@ -193,50 +193,38 @@ pub fn ForecastChart(
                     }).collect::<Vec<_>>()}
 
                     // Budget line (if configured)
-                    {if let Some(by) = budget_y {
-                        view! {
-                            <line
-                                x1={MARGIN_LEFT.to_string()}
-                                y1={by.to_string()}
-                                x2={(CHART_WIDTH - MARGIN_RIGHT).to_string()}
-                                y2={by.to_string()}
-                                stroke="var(--color-danger)"
-                                stroke-width="2"
-                                stroke-dasharray="8,4"
-                            />
-                        }.into_any()
-                    } else {
-                        view! {}.into_any()
-                    }}
+                    {budget_y.map(|by| view! {
+                        <line
+                            x1={MARGIN_LEFT.to_string()}
+                            y1={by.to_string()}
+                            x2={(CHART_WIDTH - MARGIN_RIGHT).to_string()}
+                            y2={by.to_string()}
+                            stroke="var(--color-danger)"
+                            stroke-width="2"
+                            stroke-dasharray="8,4"
+                        />
+                    })}
 
                     // Historical path (blue solid)
-                    {if !historical_path.is_empty() {
-                        view! {
-                            <path
-                                d={historical_path}
-                                fill="none"
-                                stroke="var(--accent-primary)"
-                                stroke-width="3"
-                            />
-                        }.into_any()
-                    } else {
-                        view! {}.into_any()
-                    }}
+                    {(!historical_path.is_empty()).then(|| view! {
+                        <path
+                            d={historical_path}
+                            fill="none"
+                            stroke="var(--accent-primary)"
+                            stroke-width="3"
+                        />
+                    })}
 
                     // Forecast path (orange dashed)
-                    {if !forecast_path.is_empty() {
-                        view! {
-                            <path
-                                d={forecast_path}
-                                fill="none"
-                                stroke="var(--accent-secondary)"
-                                stroke-width="3"
-                                stroke-dasharray="8,4"
-                            />
-                        }.into_any()
-                    } else {
-                        view! {}.into_any()
-                    }}
+                    {(!forecast_path.is_empty()).then(|| view! {
+                        <path
+                            d={forecast_path}
+                            fill="none"
+                            stroke="var(--accent-secondary)"
+                            stroke-width="3"
+                            stroke-dasharray="8,4"
+                        />
+                    })}
 
                     // Legend
                     <g transform="translate(100, 25)">
@@ -247,17 +235,13 @@ pub fn ForecastChart(
                         <rect x="100" y="0" width="20" height="3" fill="none" stroke="var(--accent-secondary)" stroke-width="1" stroke-dasharray="4,2" />
                         <text x="125" y="5" fill="var(--text-secondary)" font-size="12">"Forecast"</text>
 
-                        {if budget.is_some() {
-                            view! {
-                                <>
-                                    <rect x="200" y="0" width="20" height="3" fill="var(--color-danger)" />
-                                    <rect x="200" y="0" width="20" height="3" fill="none" stroke="var(--color-danger)" stroke-width="1" stroke-dasharray="4,2" />
-                                    <text x="225" y="5" fill="var(--text-secondary)" font-size="12">"Budget Limit"</text>
-                                </>
-                            }.into_any()
-                        } else {
-                            view! {}.into_any()
-                        }}
+                        {budget.is_some().then(|| view! {
+                            <>
+                                <rect x="200" y="0" width="20" height="3" fill="var(--color-danger)" />
+                                <rect x="200" y="0" width="20" height="3" fill="none" stroke="var(--color-danger)" stroke-width="1" stroke-dasharray="4,2" />
+                                <text x="225" y="5" fill="var(--text-secondary)" font-size="12">"Budget Limit"</text>
+                            </>
+                        })}
                     </g>
                 </svg>
             </div>

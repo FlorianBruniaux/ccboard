@@ -14,8 +14,8 @@
 //! Cache Version History:
 //! - v1: Initial version (pre-TokenUsage fix)
 //! - v2: Fixed TokenUsage::total() to include cache_read_tokens + cache_write_tokens
-//! - v3: Added token breakdown fields (input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens)
-//!       to SessionMetadata + real pricing calculation
+//! - v3: Added token breakdown fields (input_tokens, output_tokens, cache_creation_tokens,
+//!   cache_read_tokens) to SessionMetadata + real pricing calculation
 
 use crate::models::SessionMetadata;
 use anyhow::{Context, Result};

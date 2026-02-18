@@ -42,7 +42,7 @@ impl SessionContentParser {
 
         let messages = lines
             .into_iter()
-            .filter_map(|line| Self::convert_to_message(line))
+            .filter_map(Self::convert_to_message)
             .collect();
 
         Ok(messages)
@@ -195,7 +195,7 @@ impl SessionContentParser {
             .map(|calls| {
                 calls
                     .iter()
-                    .filter_map(|call| Self::parse_tool_call(call))
+                    .filter_map(Self::parse_tool_call)
                     .collect()
             })
             .unwrap_or_default();
@@ -208,7 +208,7 @@ impl SessionContentParser {
             .map(|results| {
                 results
                     .iter()
-                    .filter_map(|result| Self::parse_tool_result(result))
+                    .filter_map(Self::parse_tool_result)
                     .collect()
             })
             .unwrap_or_default();

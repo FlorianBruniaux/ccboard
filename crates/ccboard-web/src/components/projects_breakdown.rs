@@ -10,7 +10,7 @@ pub fn ProjectsBreakdown(
     projects: Vec<ProjectCost>,
 ) -> impl IntoView {
     // Color palette for bars (cycling through accent colors)
-    let colors = vec![
+    let colors = [
         "--accent-primary",
         "--accent-secondary",
         "--accent-tertiary",
@@ -36,7 +36,7 @@ pub fn ProjectsBreakdown(
                                 let project_name = if project.project.is_empty() {
                                     "Unknown Project".to_string()
                                 } else {
-                                    project.project.split('/').last().unwrap_or(&project.project).to_string()
+                                    project.project.split('/').next_back().unwrap_or(&project.project).to_string()
                                 };
 
                                 view! {

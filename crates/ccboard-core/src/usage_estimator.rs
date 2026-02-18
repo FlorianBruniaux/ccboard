@@ -7,7 +7,7 @@ use crate::models::billing_block::BillingBlockManager;
 use chrono::{Datelike, Local, NaiveDate};
 
 /// Subscription plan types with approximate monthly budgets
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum SubscriptionPlan {
     /// Claude Pro (~$20/month)
     Pro,
@@ -18,12 +18,13 @@ pub enum SubscriptionPlan {
     /// API usage (pay-as-you-go, no fixed limit)
     Api,
     /// Unknown/unset plan
+    #[default]
     Unknown,
 }
 
 impl SubscriptionPlan {
     /// Parse plan from string (from settings.json)
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "pro" => Self::Pro,
             "max5x" | "max-5x" | "max_5x" => Self::Max5x,
@@ -95,11 +96,6 @@ impl UsageEstimate {
     }
 }
 
-impl Default for SubscriptionPlan {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
 
 /// Calculate usage estimate from billing blocks
 pub fn calculate_usage_estimate(
@@ -146,15 +142,15 @@ mod tests {
 
     #[test]
     fn test_parse_plan() {
-        assert_eq!(SubscriptionPlan::from_str("pro"), SubscriptionPlan::Pro);
-        assert_eq!(SubscriptionPlan::from_str("max5x"), SubscriptionPlan::Max5x);
+        assert_eq!(SubscriptionPlan::parse("pro"), SubscriptionPlan::Pro);
+        assert_eq!(SubscriptionPlan::parse("max5x"), SubscriptionPlan::Max5x);
         assert_eq!(
-            SubscriptionPlan::from_str("max-20x"),
+            SubscriptionPlan::parse("max-20x"),
             SubscriptionPlan::Max20x
         );
-        assert_eq!(SubscriptionPlan::from_str("api"), SubscriptionPlan::Api);
+        assert_eq!(SubscriptionPlan::parse("api"), SubscriptionPlan::Api);
         assert_eq!(
-            SubscriptionPlan::from_str("unknown"),
+            SubscriptionPlan::parse("unknown"),
             SubscriptionPlan::Unknown
         );
     }

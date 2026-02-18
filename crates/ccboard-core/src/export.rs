@@ -458,13 +458,13 @@ pub fn export_conversation_to_html(
     writeln!(
         writer,
         "        <h1>Session {}</h1>",
-        html_escape(&metadata.id.to_string())
+        html_escape(&metadata.id)
     )?;
     writeln!(writer, "        <div class=\"meta\">")?;
     writeln!(
         writer,
         "            <strong>Project:</strong> {}<br>",
-        html_escape(&metadata.project_path.to_string())
+        html_escape(&metadata.project_path)
     )?;
 
     if let Some(ts) = metadata.first_timestamp {
