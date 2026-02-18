@@ -79,6 +79,8 @@ cargo install ccboard
 
 **Why cargo?** ccboard's target audience (Claude Code users) often has Rust installed. Ensures compatibility and always installs latest crates.io version.
 
+> **Note (issue #44):** `cargo install` builds TUI-only mode. The Web UI (`ccboard web`) requires the Leptos WASM frontend which cannot be bundled via crates.io. For Web UI support, use Homebrew, the install script, or [build from source](#development).
+
 ### Alternative: Install Script (macOS/Linux/Windows)
 
 **One-liner install** (no Rust required):
