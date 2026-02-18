@@ -52,7 +52,7 @@
 |-----------|---------|
 | **Performance** | 89x faster startup (20s → 224ms) via SQLite cache, >99% hit rate, handles 10K+ sessions |
 | **Live Updates** | File watcher (500ms debounce), auto-refresh, Server-Sent Events (Web) |
-| **UX** | Command palette (`:`), vim keybindings (hjkl), breadcrumbs, scrollbar indicators |
+| **UX** | Command palette (`:`), vim keybindings (hjkl), breadcrumbs, scrollbar indicators, Light/Dark mode (`Ctrl+T`, persistent) |
 | **File Operations** | Edit with `$EDITOR` (`e`), reveal in file manager (`o`), cross-platform |
 | **Zero Config** | Works out of the box with `~/.claude`, single 5.8MB binary, macOS/Linux/Windows |
 
@@ -144,7 +144,7 @@ ccboard both --port 3333
 ccboard stats
 ```
 
-Navigate tabs with `1-9`, search with `/`, refresh with `r`, quit with `q`. Press `?` for all keybindings.
+Navigate tabs with `1-9`, search with `/`, refresh with `r`, toggle light/dark theme with `Ctrl+T`, quit with `q`. Press `?` for all keybindings.
 
 ---
 

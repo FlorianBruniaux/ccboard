@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-02-18
+
+### Added
+- **Light mode** : thème clair complet activé via `Ctrl+T` — 11 tabs + 5 components migrés vers un système de `Palette` centralisé
+- **Theme persistence** : le thème choisi est sauvegardé dans `~/.claude/cache/ccboard-preferences.json` et rechargé au démarrage
+- **`Palette` struct** dans `theme.rs` : bundle de couleurs sémantiques (`fg`, `bg`, `muted`, `border`, `focus`, `success`, `error`, `warning`, `important`) adapté au `ColorScheme`
+
+### Fixed
+- Fond de frame réinitialisé à chaque rendu (`Clear` + `Block` avec `bg(p.bg)`) — sans ce fix, le mode clair rendait le texte invisible (noir sur fond noir)
+
 ## [0.8.0] - 2026-02-16
 
 ### Added - Budget Tracking & Quota Management
