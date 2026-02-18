@@ -42,8 +42,8 @@ regex.workspace = true
 # Logging
 tracing.workspace = true
 
-# HTTP client (for pricing updates)
-reqwest = { version = "0.12", features = ["json"] }
+# HTTP client (for pricing updates) - rustls-tls avoids native-tls 0.2.17 build regression
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # Concurrency (AMENDED)
 parking_lot.workspace = true
