@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase J: Export Features
+
+- **`ccboard export` subcommands** — bulk data export CLI with 4 subcommands:
+  - `export conversation <id> --output <file> --format markdown|json|html` — single session (previously `ccboard export`)
+  - `export sessions --output <file> --format csv|json|md [--since 7d]` — sessions list with optional date filter
+  - `export stats --output <file> --format csv|json|md` — usage statistics (per-model breakdown + daily activity)
+  - `export billing --output <file> --format csv|json|md` — billing blocks (5h windows)
+- **Stats export** — 3 new functions in `ccboard-core::export`:
+  - `export_stats_to_csv(&StatsCache, path)` — per-model table (input/output/cache/cost)
+  - `export_stats_to_json(&StatsCache, path)` — full StatsCache as JSON
+  - `export_stats_to_markdown(&StatsCache, path)` — human-readable report with summary + model table + 30-day daily activity
+- **Sessions Markdown export** — `export_sessions_to_markdown(sessions, path)` — sessions as Markdown table
+- **Billing JSON/Markdown export** — `export_billing_blocks_to_json(&BillingBlockManager, path)` and `export_billing_blocks_to_markdown(&BillingBlockManager, path)`
+
 ## [0.9.0] - 2026-02-18
 
 ### Added

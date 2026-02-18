@@ -559,6 +559,46 @@ Models:
   claude-opus-4: 1.2M tokens (in: 800K, out: 400K)
 ```
 
+### Export
+
+Export data to CSV, JSON, or Markdown for external analysis, BI tools, or sharing.
+
+#### Sessions list
+
+```bash
+ccboard export sessions --output sessions.csv                     # CSV (default)
+ccboard export sessions --output sessions.json --format json      # JSON
+ccboard export sessions --output sessions.md --format md          # Markdown table
+ccboard export sessions --output recent.csv --since 7d            # Last 7 days only
+ccboard export sessions --output recent.csv --since 30d           # Last 30 days
+```
+
+#### Usage statistics
+
+```bash
+ccboard export stats --output stats.csv                           # Per-model breakdown CSV
+ccboard export stats --output stats.json --format json            # Full StatsCache JSON
+ccboard export stats --output report.md --format md               # Human-readable report
+```
+
+The Markdown report includes: totals (tokens/sessions/messages/cache ratio), per-model table, and last 30 days of daily activity.
+
+#### Billing blocks
+
+```bash
+ccboard export billing --output billing.csv                       # CSV (default)
+ccboard export billing --output billing.json --format json        # JSON with full token breakdown
+ccboard export billing --output billing.md --format md            # Markdown table
+```
+
+#### Single conversation
+
+```bash
+ccboard export conversation <session-id> --output conv.md         # Markdown (default)
+ccboard export conversation <session-id> --output conv.json --format json
+ccboard export conversation <session-id> --output conv.html --format html
+```
+
 ---
 
 ## Keybindings & Shortcuts

@@ -1,7 +1,7 @@
 # ccboard Architecture
 
-**Version**: 0.8.0
-**Last Updated**: 2026-02-16
+**Version**: 0.9.0 (Phase J done)
+**Last Updated**: 2026-02-18
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
@@ -53,6 +53,7 @@ ccboard is a Rust workspace with 4 crates providing dual TUI + Web interfaces fo
               │ • EventBus      │
               │ • Cache         │
               │ • Analytics     │
+              │ • Export        │
               └─────────────────┘
 ```
 
