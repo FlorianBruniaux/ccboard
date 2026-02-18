@@ -58,9 +58,7 @@ impl ToolCallNode {
             Span::raw(" "),
             Span::styled(
                 &self.tool_call.name,
-                Style::default()
-                    .fg(p.focus)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
             ),
             Span::raw(" "),
             Span::styled(expand_indicator, Style::default().fg(p.muted)),
@@ -196,8 +194,7 @@ impl ToolCallsViewer {
         let p = Palette::new(scheme);
 
         if self.nodes.is_empty() {
-            let placeholder =
-                Paragraph::new("No tool calls").style(Style::default().fg(p.muted));
+            let placeholder = Paragraph::new("No tool calls").style(Style::default().fg(p.muted));
             frame.render_widget(placeholder, area);
             return;
         }

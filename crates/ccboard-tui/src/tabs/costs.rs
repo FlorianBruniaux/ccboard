@@ -248,7 +248,13 @@ impl CostsTab {
         self.render_model_distribution(frame, chunks[3], stats, p);
     }
 
-    fn render_total_cost(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_total_cost(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.border))
@@ -292,9 +298,7 @@ impl CostsTab {
             Line::from(""),
             Line::from(Span::styled(
                 format!("${:.2}", total_cost),
-                Style::default()
-                    .fg(p.success)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(p.success).add_modifier(Modifier::BOLD),
             )),
             Line::from(Span::styled(
                 "estimated total",
@@ -313,10 +317,7 @@ impl CostsTab {
             .take(3)
             .map(|(model, cost)| {
                 Line::from(vec![
-                    Span::styled(
-                        Self::format_model_name(model),
-                        Style::default().fg(p.fg),
-                    ),
+                    Span::styled(Self::format_model_name(model), Style::default().fg(p.fg)),
                     Span::styled(format!(" ${:.2}", cost), Style::default().fg(p.warning)),
                 ])
             })
@@ -412,7 +413,13 @@ impl CostsTab {
         frame.render_widget(subtitle_widget, chunks[1]);
     }
 
-    fn render_token_breakdown(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_token_breakdown(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.border))
@@ -493,7 +500,13 @@ impl CostsTab {
         frame.render_widget(cache_write_gauge, chunks[3]);
     }
 
-    fn render_model_distribution(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_model_distribution(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.border))
@@ -506,8 +519,7 @@ impl CostsTab {
         frame.render_widget(block, area);
 
         let Some(stats) = stats else {
-            let empty =
-                Paragraph::new("No data available").style(Style::default().fg(p.muted));
+            let empty = Paragraph::new("No data available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -551,18 +563,21 @@ impl CostsTab {
             ],
         )
         .header(
-            Row::new(vec!["Model", "Cost", "Input", "Output"]).style(
-                Style::default()
-                    .fg(p.focus)
-                    .add_modifier(Modifier::BOLD),
-            ),
+            Row::new(vec!["Model", "Cost", "Input", "Output"])
+                .style(Style::default().fg(p.focus).add_modifier(Modifier::BOLD)),
         )
         .row_highlight_style(Style::default().bg(p.muted));
 
         frame.render_widget(table, inner);
     }
 
-    fn render_by_model(&mut self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_by_model(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let title_text = format!(
             " Cost by Model • Sort: {} (press 's') ",
             self.sort_mode.label()
@@ -570,17 +585,13 @@ impl CostsTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.border))
-            .title(Span::styled(
-                title_text,
-                Style::default().fg(p.fg).bold(),
-            ));
+            .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
         let Some(stats) = stats else {
-            let empty =
-                Paragraph::new("No data available").style(Style::default().fg(p.muted));
+            let empty = Paragraph::new("No data available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -616,9 +627,7 @@ impl CostsTab {
             .map(|(i, (model, total, input, output, cache))| {
                 let is_selected = self.model_state.selected() == Some(i);
                 let style = if is_selected {
-                    Style::default()
-                        .fg(p.focus)
-                        .add_modifier(Modifier::BOLD)
+                    Style::default().fg(p.focus).add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(p.fg)
                 };
@@ -632,19 +641,14 @@ impl CostsTab {
                         Span::styled(Self::format_model_name(model), style),
                         Span::styled(
                             format!("  ${:.2}", total),
-                            Style::default()
-                                .fg(p.success)
-                                .add_modifier(Modifier::BOLD),
+                            Style::default().fg(p.success).add_modifier(Modifier::BOLD),
                         ),
                     ]),
                     Line::from(vec![
                         Span::styled("    Input: ", Style::default().fg(p.muted)),
                         Span::styled(format!("${:.2}", input), Style::default().fg(p.focus)),
                         Span::styled("  Output: ", Style::default().fg(p.muted)),
-                        Span::styled(
-                            format!("${:.2}", output),
-                            Style::default().fg(p.important),
-                        ),
+                        Span::styled(format!("${:.2}", output), Style::default().fg(p.important)),
                         Span::styled("  Cache: ", Style::default().fg(p.muted)),
                         Span::styled(format!("${:.2}", cache), Style::default().fg(p.warning)),
                     ]),
@@ -670,8 +674,7 @@ impl CostsTab {
         frame.render_widget(block, area);
 
         let Some(stats) = stats else {
-            let empty =
-                Paragraph::new("No data available").style(Style::default().fg(p.muted));
+            let empty = Paragraph::new("No data available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -681,8 +684,8 @@ impl CostsTab {
         let recent: Vec<_> = daily.iter().rev().take(14).rev().collect();
 
         if recent.is_empty() {
-            let empty = Paragraph::new("No daily data available")
-                .style(Style::default().fg(p.muted));
+            let empty =
+                Paragraph::new("No daily data available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -702,11 +705,7 @@ impl CostsTab {
             .bar_width(3)
             .bar_gap(1)
             .bar_style(Style::default().fg(p.focus))
-            .value_style(
-                Style::default()
-                    .fg(p.fg)
-                    .add_modifier(Modifier::BOLD),
-            )
+            .value_style(Style::default().fg(p.fg).add_modifier(Modifier::BOLD))
             .label_style(Style::default().fg(p.muted));
 
         frame.render_widget(bar_chart, inner);
@@ -918,11 +917,7 @@ impl CostsTab {
 
         // Header
         let header = Row::new(vec!["Date", "Block (UTC)", "Tokens", "Sessions", "Cost"])
-            .style(
-                Style::default()
-                    .fg(p.focus)
-                    .add_modifier(Modifier::BOLD),
-            )
+            .style(Style::default().fg(p.focus).add_modifier(Modifier::BOLD))
             .height(1);
 
         // Table
@@ -1022,8 +1017,7 @@ impl CostsTab {
         let top_sessions = store.top_sessions_by_tokens(10);
 
         if top_sessions.is_empty() {
-            let empty =
-                Paragraph::new("No sessions available").style(Style::default().fg(p.muted));
+            let empty = Paragraph::new("No sessions available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -1072,11 +1066,8 @@ impl CostsTab {
             ],
         )
         .header(
-            Row::new(vec!["", "#", "Session", "Tokens"]).style(
-                Style::default()
-                    .fg(p.focus)
-                    .add_modifier(Modifier::BOLD),
-            ),
+            Row::new(vec!["", "#", "Session", "Tokens"])
+                .style(Style::default().fg(p.focus).add_modifier(Modifier::BOLD)),
         )
         .column_spacing(1);
 
@@ -1104,8 +1095,8 @@ impl CostsTab {
         let top_models = store.top_models_by_tokens();
 
         if top_models.is_empty() {
-            let empty = Paragraph::new("No model data available")
-                .style(Style::default().fg(p.muted));
+            let empty =
+                Paragraph::new("No model data available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -1140,11 +1131,8 @@ impl CostsTab {
             ],
         )
         .header(
-            Row::new(vec!["", "#", "Model", "Tokens"]).style(
-                Style::default()
-                    .fg(p.focus)
-                    .add_modifier(Modifier::BOLD),
-            ),
+            Row::new(vec!["", "#", "Model", "Tokens"])
+                .style(Style::default().fg(p.focus).add_modifier(Modifier::BOLD)),
         )
         .column_spacing(1);
 
@@ -1172,8 +1160,8 @@ impl CostsTab {
         let top_days = store.top_days_by_tokens();
 
         if top_days.is_empty() {
-            let empty = Paragraph::new("No daily data available")
-                .style(Style::default().fg(p.muted));
+            let empty =
+                Paragraph::new("No daily data available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -1208,11 +1196,8 @@ impl CostsTab {
             ],
         )
         .header(
-            Row::new(vec!["", "#", "Date", "Tokens"]).style(
-                Style::default()
-                    .fg(p.focus)
-                    .add_modifier(Modifier::BOLD),
-            ),
+            Row::new(vec!["", "#", "Date", "Tokens"])
+                .style(Style::default().fg(p.focus).add_modifier(Modifier::BOLD)),
         )
         .column_spacing(1);
 

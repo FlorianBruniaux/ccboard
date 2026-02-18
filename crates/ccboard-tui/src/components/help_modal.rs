@@ -91,9 +91,7 @@ impl HelpModal {
             .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " Help - Keybindings ",
-                Style::default()
-                    .fg(p.focus)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
             ))
             .title_alignment(Alignment::Center);
 
@@ -111,15 +109,18 @@ impl HelpModal {
     }
 
     /// Build help content based on active tab
-    fn build_help_content(&self, active_tab: Tab, keybindings: &KeyBindings, p: &Palette) -> Vec<Line<'static>> {
+    fn build_help_content(
+        &self,
+        active_tab: Tab,
+        keybindings: &KeyBindings,
+        p: &Palette,
+    ) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
 
         // Global keybindings
         lines.push(Line::from(vec![Span::styled(
             "Global:",
-            Style::default()
-                .fg(p.warning)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
         )]));
         lines.push(Line::from(""));
 
@@ -164,9 +165,7 @@ impl HelpModal {
         // Tab-specific keybindings
         lines.push(Line::from(vec![Span::styled(
             format!("{}:", active_tab.name()),
-            Style::default()
-                .fg(p.warning)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
         )]));
         lines.push(Line::from(""));
 

@@ -760,15 +760,10 @@ impl ConversationTab {
         let mut filter_lines = vec![
             Line::from(Span::styled(
                 "Filters",
-                Style::default()
-                    .fg(p.warning)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
             )),
             Line::from(""),
-            Line::from(Span::styled(
-                "Role Filters:",
-                Style::default().fg(p.focus),
-            )),
+            Line::from(Span::styled("Role Filters:", Style::default().fg(p.focus))),
             Line::from(format!(
                 "[u] User: {}",
                 if self.filter.show_user { "✓" } else { " " }

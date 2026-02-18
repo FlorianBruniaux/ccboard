@@ -110,9 +110,7 @@ impl ConfirmDialog {
             .border_style(Style::default().fg(p.warning))
             .title(Span::styled(
                 format!(" {} ", self.title),
-                Style::default()
-                    .fg(p.warning)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
             ));
 
         let inner = block.inner(dialog_area);
@@ -130,10 +128,7 @@ impl ConfirmDialog {
         // Message
         let message_lines = vec![
             Line::from(""),
-            Line::from(Span::styled(
-                &self.message,
-                Style::default().fg(p.fg),
-            )),
+            Line::from(Span::styled(&self.message, Style::default().fg(p.fg))),
             Line::from(""),
         ];
 
@@ -147,9 +142,7 @@ impl ConfirmDialog {
             Line::from(vec![
                 Span::styled(
                     "[Y] ",
-                    Style::default()
-                        .fg(p.success)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(p.success).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
                     "Yes",
@@ -175,9 +168,7 @@ impl ConfirmDialog {
                 Span::styled("  ", Style::default()),
                 Span::styled(
                     "[Esc] ",
-                    Style::default()
-                        .fg(p.muted)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(p.muted).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled("Cancel", Style::default().fg(p.muted)),
             ]),

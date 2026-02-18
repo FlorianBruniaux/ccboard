@@ -303,9 +303,7 @@ impl ConfigTab {
                 Line::from(""),
                 Line::from(Span::styled(
                     source_indicator,
-                    Style::default()
-                        .fg(p.muted)
-                        .add_modifier(Modifier::ITALIC),
+                    Style::default().fg(p.muted).add_modifier(Modifier::ITALIC),
                 )),
             ]);
             frame.render_widget(empty, inner);
@@ -321,11 +319,8 @@ impl ConfigTab {
             }
         }
 
-        let list = List::new(items).highlight_style(
-            Style::default()
-                .bg(p.muted)
-                .add_modifier(Modifier::BOLD),
-        );
+        let list = List::new(items)
+            .highlight_style(Style::default().bg(p.muted).add_modifier(Modifier::BOLD));
 
         frame.render_stateful_widget(list, inner, &mut self.scroll_states[col_index]);
     }
@@ -446,12 +441,7 @@ impl ConfigTab {
 
                 for (key, value) in env.iter().take(5) {
                     let display_val: String = value.chars().take(20).collect();
-                    items.push(self.make_item(
-                        &format!("  {}", key),
-                        &display_val,
-                        Color::Blue,
-                        p,
-                    ));
+                    items.push(self.make_item(&format!("  {}", key), &display_val, Color::Blue, p));
                 }
                 if env.len() > 5 {
                     items.push(ListItem::new(Line::from(Span::styled(
@@ -607,7 +597,13 @@ impl ConfigTab {
         items
     }
 
-    fn make_item(&self, key: &str, value: &str, value_color: Color, p: &Palette) -> ListItem<'static> {
+    fn make_item(
+        &self,
+        key: &str,
+        value: &str,
+        value_color: Color,
+        p: &Palette,
+    ) -> ListItem<'static> {
         ListItem::new(Line::from(vec![
             Span::styled(format!("{}: ", key), Style::default().fg(p.muted)),
             Span::styled(value.to_string(), Style::default().fg(value_color)),
@@ -692,10 +688,7 @@ impl ConfigTab {
                         for (key, value) in &server.env {
                             lines.push(Line::from(vec![
                                 Span::styled("    ", Style::default()),
-                                Span::styled(
-                                    format!("{}=", key),
-                                    Style::default().fg(p.warning),
-                                ),
+                                Span::styled(format!("{}=", key), Style::default().fg(p.warning)),
                                 Span::styled(value, Style::default().fg(p.fg)),
                             ]));
                         }
@@ -750,10 +743,7 @@ impl ConfigTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.error))
-            .title(Span::styled(
-                " Error ",
-                Style::default().fg(p.error).bold(),
-            ));
+            .title(Span::styled(" Error ", Style::default().fg(p.error).bold()));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);

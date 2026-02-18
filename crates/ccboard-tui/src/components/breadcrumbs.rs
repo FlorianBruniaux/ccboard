@@ -110,9 +110,7 @@ impl Breadcrumbs {
             // Add breadcrumb label
             let style = if idx == path_to_display.len() - 1 {
                 // Last breadcrumb (current location) is highlighted
-                Style::default()
-                    .fg(p.fg)
-                    .add_modifier(Modifier::BOLD)
+                Style::default().fg(p.fg).add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(p.muted)
             };

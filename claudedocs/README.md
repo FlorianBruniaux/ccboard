@@ -5,12 +5,13 @@ This directory contains active documentation for ccboard development and design 
 ## Active Documentation
 
 **Current State & Roadmap** ⭐
-- [STATUS.md](STATUS.md) - Current project state (v0.7.0) and next actions - **START HERE**
-- [ROADMAP-v0.8.md](ROADMAP-v0.8.md) - Quota tracking plan for v0.8.0
-- [ROADMAP.md](ROADMAP.md) - Long-term features and planned improvements
+- [VERSION_STATUS.md](VERSION_STATUS.md) - Current project state (v0.9.0) and known issues - **START HERE**
+- [RESUME.md](RESUME.md) - Session resume prompt (paste into new Claude Code session)
+- [ROADMAP.md](ROADMAP.md) - Long-term features (Phases J-N) and planned improvements
+- [NEXT_STEPS.md](NEXT_STEPS.md) - Phase J (Export Features) detailed plan
 
 **Architecture & Development**
-- [PLAN.md](PLAN.md) - Complete architecture phases and development history (Phase 0→E, v0.4.0)
+- [PLAN.md](PLAN.md) - ⚠️ Historical: architecture phases 0→E (v0.4.0 era, for reference only)
 
 **Performance & Benchmarks**
 - [performance-benchmark.md](performance-benchmark.md) - v0.4.0 optimization results (SQLite cache, Arc migration)
@@ -23,6 +24,7 @@ This directory contains active documentation for ccboard development and design 
 
 ## Archives
 
+**archive/v0.8/** - v0.8.0 quota tracking plan (ROADMAP-v0.8.md)
 **archive/v0.7/** - v0.7.0 full-text search feature (2026-02-13)
 - `PLAN-v0.7.0.md` - Detailed implementation plan
 - `HANDOFF-v0.7.0.md` - Session handoff document

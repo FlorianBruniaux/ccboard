@@ -194,7 +194,13 @@ impl PluginsTab {
     }
 
     /// Render the plugins tab
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, store: &Arc<DataStore>, scheme: ColorScheme) {
+    pub fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        store: &Arc<DataStore>,
+        scheme: ColorScheme,
+    ) {
         let p = Palette::new(scheme);
 
         // Lazy load analytics on first render
@@ -313,11 +319,7 @@ impl PluginsTab {
                     .title(title)
                     .border_style(border_style),
             )
-            .highlight_style(
-                Style::default()
-                    .add_modifier(Modifier::BOLD)
-                    .fg(p.focus),
-            );
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(p.focus));
 
         frame.render_stateful_widget(list, area, &mut self.top_usage_state);
     }
@@ -356,11 +358,7 @@ impl PluginsTab {
                     .title(title)
                     .border_style(border_style),
             )
-            .highlight_style(
-                Style::default()
-                    .add_modifier(Modifier::BOLD)
-                    .fg(p.focus),
-            );
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(p.focus));
 
         frame.render_stateful_widget(list, area, &mut self.top_cost_state);
     }

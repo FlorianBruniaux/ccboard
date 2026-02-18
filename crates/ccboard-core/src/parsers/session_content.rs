@@ -293,7 +293,7 @@ impl SessionContentParser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{ProjectId, SessionId};
+    use crate::models::ProjectId;
     use std::io::Write;
     use tempfile::NamedTempFile;
 

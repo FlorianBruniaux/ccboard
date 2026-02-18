@@ -115,11 +115,7 @@ impl DashboardTab {
 
         // MCP servers count
         let mcp_count = mcp_config.map(|config| config.servers.len()).unwrap_or(0);
-        let mcp_color = if mcp_count > 0 {
-            p.success
-        } else {
-            p.muted
-        };
+        let mcp_color = if mcp_count > 0 { p.success } else { p.muted };
 
         // Context window saturation
         let (context_display, context_color) = store
@@ -238,7 +234,13 @@ impl DashboardTab {
         frame.render_widget(subtitle_widget, inner_chunks[2]);
     }
 
-    fn render_activity(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_activity(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.border))
@@ -340,7 +342,13 @@ impl DashboardTab {
         }
     }
 
-    fn render_model_gauges(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_model_gauges(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.border))
@@ -375,13 +383,7 @@ impl DashboardTab {
             .constraints(constraints)
             .split(inner);
 
-        let colors = [
-            p.important,
-            p.focus,
-            p.success,
-            p.warning,
-            Color::Blue,
-        ];
+        let colors = [p.important, p.focus, p.success, p.warning, Color::Blue];
 
         for (i, ((name, usage), chunk)) in models.iter().zip(gauge_chunks.iter()).enumerate() {
             let tokens = usage.total_tokens();
@@ -459,9 +461,7 @@ impl DashboardTab {
             Span::styled("Stats look wrong? Run ", Style::default().fg(p.warning)),
             Span::styled(
                 "ccboard clear-cache",
-                Style::default()
-                    .fg(p.warning)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
             ),
             Span::styled(" to rebuild metadata.", Style::default().fg(p.warning)),
         ])];
@@ -478,7 +478,13 @@ impl DashboardTab {
         frame.render_widget(hint, area);
     }
 
-    fn render_api_usage(&self, frame: &mut Frame, area: Rect, store: Option<&Arc<DataStore>>, p: &Palette) {
+    fn render_api_usage(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        store: Option<&Arc<DataStore>>,
+        p: &Palette,
+    ) {
         let estimate = store.map(|s| s.usage_estimate());
 
         let (plan_name, cost_today, cost_week, cost_month, budget, pct_month) = estimate
@@ -553,9 +559,7 @@ impl DashboardTab {
         let block = Block::default()
             .title(Span::styled(
                 title,
-                Style::default()
-                    .fg(p.focus)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
             ))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.focus));

@@ -388,7 +388,6 @@ fn shorten_project(path: &str) -> String {
 mod tests {
     use super::*;
 
-
     #[test]
     fn test_date_filter_parse_days() {
         let filter = DateFilter::parse("7d").unwrap();

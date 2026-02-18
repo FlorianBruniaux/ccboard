@@ -462,10 +462,7 @@ impl HistoryTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
-            .title(Span::styled(
-                title_text,
-                Style::default().fg(p.fg).bold(),
-            ));
+            .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -506,11 +503,9 @@ impl HistoryTab {
         let search_widget = Paragraph::new(search_display);
         frame.render_widget(search_widget, chunks[0]);
 
-        let results_widget = Paragraph::new(Span::styled(
-            results_info,
-            Style::default().fg(p.muted),
-        ))
-        .alignment(Alignment::Right);
+        let results_widget =
+            Paragraph::new(Span::styled(results_info, Style::default().fg(p.muted)))
+                .alignment(Alignment::Right);
         frame.render_widget(results_widget, chunks[1]);
     }
 
@@ -528,10 +523,7 @@ impl HistoryTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.border))
-            .title(Span::styled(
-                title_text,
-                Style::default().fg(p.fg).bold(),
-            ));
+            .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         if self.filtered_sessions.is_empty() {
             let empty_lines = if self.search_query.is_empty() {
@@ -633,9 +625,7 @@ impl HistoryTab {
                 let project_short = Self::shorten_path(session.project_path.as_str());
 
                 let style = if is_selected {
-                    Style::default()
-                        .fg(p.focus)
-                        .add_modifier(Modifier::BOLD)
+                    Style::default().fg(p.focus).add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(p.fg)
                 };
@@ -698,7 +688,13 @@ impl HistoryTab {
         }
     }
 
-    fn render_stats_panel(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_stats_panel(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.border))
@@ -730,7 +726,13 @@ impl HistoryTab {
         self.render_recent_activity(frame, chunks[2], stats, p);
     }
 
-    fn render_summary_stats(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_summary_stats(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let (sessions, messages, tokens) = stats
             .map(|s| (s.total_sessions, s.total_messages, s.total_tokens()))
             .unwrap_or((0, 0, 0));
@@ -740,18 +742,14 @@ impl HistoryTab {
                 Span::styled("Sessions: ", Style::default().fg(p.muted)),
                 Span::styled(
                     sessions.to_string(),
-                    Style::default()
-                        .fg(p.success)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(p.success).add_modifier(Modifier::BOLD),
                 ),
             ]),
             Line::from(vec![
                 Span::styled("Messages: ", Style::default().fg(p.muted)),
                 Span::styled(
                     Self::format_number(messages),
-                    Style::default()
-                        .fg(p.focus)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
                 ),
             ]),
             Line::from(vec![
@@ -769,7 +767,13 @@ impl HistoryTab {
         frame.render_widget(widget, area);
     }
 
-    fn render_hour_distribution(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_hour_distribution(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let title = Paragraph::new(Span::styled(
             "Activity by Hour:",
             Style::default().fg(p.muted),
@@ -825,7 +829,13 @@ impl HistoryTab {
         frame.render_widget(widget, bar_area);
     }
 
-    fn render_recent_activity(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
+    fn render_recent_activity(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        stats: Option<&StatsCache>,
+        p: &Palette,
+    ) {
         let title = Paragraph::new(Span::styled(
             "Recent Activity (7 days):",
             Style::default().fg(p.muted),
@@ -888,7 +898,13 @@ impl HistoryTab {
         }
     }
 
-    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&Arc<SessionMetadata>>, p: &Palette) {
+    fn render_detail(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        session: Option<&Arc<SessionMetadata>>,
+        p: &Palette,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.focus))
@@ -901,8 +917,7 @@ impl HistoryTab {
         frame.render_widget(block, area);
 
         let Some(session) = session else {
-            let empty =
-                Paragraph::new("No session selected").style(Style::default().fg(p.muted));
+            let empty = Paragraph::new("No session selected").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -946,10 +961,7 @@ impl HistoryTab {
             ]),
             Line::from(vec![
                 Span::styled("Duration: ", Style::default().fg(p.muted)),
-                Span::styled(
-                    session.duration_display(),
-                    Style::default().fg(p.success),
-                ),
+                Span::styled(session.duration_display(), Style::default().fg(p.success)),
             ]),
             Line::from(""),
             Line::from(vec![
@@ -983,10 +995,7 @@ impl HistoryTab {
                 ),
             ]),
             Line::from(""),
-            Line::from(Span::styled(
-                "First message:",
-                Style::default().fg(p.muted),
-            )),
+            Line::from(Span::styled("First message:", Style::default().fg(p.muted))),
         ];
 
         // Add highlighted first message if searching
@@ -1026,10 +1035,7 @@ impl HistoryTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.error))
-            .title(Span::styled(
-                " Error ",
-                Style::default().fg(p.error).bold(),
-            ));
+            .title(Span::styled(" Error ", Style::default().fg(p.error).bold()));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);

@@ -364,12 +364,7 @@ impl AgentsTab {
     }
 
     /// Render the agents tab
-    pub fn render(
-        &mut self,
-        frame: &mut Frame,
-        area: Rect,
-        scheme: ColorScheme,
-    ) {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
         let p = Palette::new(scheme);
 
         // Layout: sub-tabs header (2 lines with padding) | content
@@ -465,10 +460,7 @@ impl AgentsTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.border))
-            .title(Span::styled(
-                title_text,
-                Style::default().fg(p.fg).bold(),
-            ));
+            .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         if list_len == 0 {
             let empty = Paragraph::new(vec![
@@ -548,20 +540,15 @@ impl AgentsTab {
                     ));
                 }
 
-                spans.push(Span::styled(
-                    desc_preview,
-                    Style::default().fg(p.muted),
-                ));
+                spans.push(Span::styled(desc_preview, Style::default().fg(p.muted)));
 
                 ListItem::new(Line::from(spans))
             })
             .collect();
 
-        let widget = List::new(items).block(block).highlight_style(
-            Style::default()
-                .bg(p.muted)
-                .add_modifier(Modifier::BOLD),
-        );
+        let widget = List::new(items)
+            .block(block)
+            .highlight_style(Style::default().bg(p.muted).add_modifier(Modifier::BOLD));
 
         frame.render_stateful_widget(widget, area, &mut self.list_states[self.sub_tab]);
 
@@ -592,17 +579,14 @@ impl AgentsTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.focus))
-            .title(Span::styled(
-                " Detail ",
-                Style::default().fg(p.fg).bold(),
-            ));
+            .title(Span::styled(" Detail ", Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
         let Some(entry) = selected else {
-            let empty = Paragraph::new("Select an item to see details")
-                .style(Style::default().fg(p.muted));
+            let empty =
+                Paragraph::new("Select an item to see details").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -643,10 +627,7 @@ impl AgentsTab {
                 Span::styled(&entry.file_path, Style::default().fg(p.warning)),
             ]),
             Line::from(""),
-            Line::from(Span::styled(
-                "Description:",
-                Style::default().fg(p.muted),
-            )),
+            Line::from(Span::styled("Description:", Style::default().fg(p.muted))),
             Line::from(Span::styled(
                 entry.description.as_deref().unwrap_or("No description"),
                 Style::default().fg(p.fg),
@@ -692,10 +673,7 @@ impl AgentsTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.error))
-            .title(Span::styled(
-                " Error ",
-                Style::default().fg(p.error).bold(),
-            ));
+            .title(Span::styled(" Error ", Style::default().fg(p.error).bold()));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);

@@ -309,14 +309,9 @@ impl CommandPalette {
             .map(|cmd| {
                 let shortcut = Span::styled(
                     format!(":{} ", cmd.shortcut),
-                    Style::default()
-                        .fg(p.warning)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
                 );
-                let name = Span::styled(
-                    format!("{:<15}", cmd.name),
-                    Style::default().fg(p.fg),
-                );
+                let name = Span::styled(format!("{:<15}", cmd.name), Style::default().fg(p.fg));
                 let desc = Span::styled(&cmd.description, Style::default().fg(p.muted));
 
                 ListItem::new(Line::from(vec![shortcut, name, desc]))

@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn test_opus_pricing() {
         // Opus 4.5/4.6 uses new reduced pricing
-        let pricing = get_pricing("opus-4");
+        let pricing = get_model_pricing("opus-4");
         assert_eq!(pricing.input_price_per_million, 5.0);
         assert_eq!(pricing.output_price_per_million, 25.0);
         assert_eq!(pricing.cache_read_multiplier, 0.1);
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn test_opus_legacy_pricing() {
         // Opus 4.0/4.1 uses legacy pricing
-        let pricing = get_pricing("claude-opus-4-1-20250805");
+        let pricing = get_model_pricing("claude-opus-4-1-20250805");
         assert_eq!(pricing.input_price_per_million, 15.0);
         assert_eq!(pricing.output_price_per_million, 75.0);
         assert_eq!(pricing.cache_read_multiplier, 0.1);
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn test_sonnet_pricing() {
-        let pricing = get_pricing("sonnet-4");
+        let pricing = get_model_pricing("sonnet-4");
         assert_eq!(pricing.input_price_per_million, 3.0);
         assert_eq!(pricing.output_price_per_million, 15.0);
         assert_eq!(pricing.cache_read_multiplier, 0.1);
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_haiku_pricing() {
-        let pricing = get_pricing("haiku-4");
+        let pricing = get_model_pricing("haiku-4");
         assert_eq!(pricing.input_price_per_million, 1.0);
         assert_eq!(pricing.output_price_per_million, 5.0);
         assert_eq!(pricing.cache_read_multiplier, 0.1);
@@ -267,13 +267,13 @@ mod tests {
 
     #[test]
     fn test_full_model_id() {
-        let pricing = get_pricing("claude-sonnet-4-5-20250929");
+        let pricing = get_model_pricing("claude-sonnet-4-5-20250929");
         assert_eq!(pricing.input_price_per_million, 3.0);
     }
 
     #[test]
     fn test_unknown_model_fallback() {
-        let pricing = get_pricing("unknown-model-xyz");
+        let pricing = get_model_pricing("unknown-model-xyz");
         assert_eq!(pricing.input_price_per_million, 3.2); // Default average
         assert_eq!(pricing.output_price_per_million, 16.0);
         assert_eq!(pricing.cache_write_multiplier, 1.25);

@@ -336,10 +336,7 @@ impl McpTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
-            .title(Span::styled(
-                title,
-                Style::default().fg(p.fg).bold(),
-            ));
+            .title(Span::styled(title, Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -490,10 +487,7 @@ impl McpTab {
                 };
 
                 lines.push(Line::from(vec![
-                    Span::styled(
-                        format!("  {} = ", key),
-                        Style::default().fg(p.focus).bold(),
-                    ),
+                    Span::styled(format!("  {} = ", key), Style::default().fg(p.focus).bold()),
                     Span::styled(masked_value, Style::default().fg(value_color)),
                 ]));
             }
@@ -674,10 +668,7 @@ impl McpTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.error))
-            .title(Span::styled(
-                " Error ",
-                Style::default().fg(p.error).bold(),
-            ));
+            .title(Span::styled(" Error ", Style::default().fg(p.error).bold()));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);

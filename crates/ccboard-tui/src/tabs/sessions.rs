@@ -832,20 +832,14 @@ impl SessionsTab {
             }
         }
 
-        let border_color = if is_focused {
-            p.focus
-        } else {
-            p.success
-        };
+        let border_color = if is_focused { p.focus } else { p.success };
 
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 format!(" ⚡ Live Sessions ({}) ", live_sessions.len()),
-                Style::default()
-                    .fg(p.success)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(p.success).add_modifier(Modifier::BOLD),
             ));
 
         let inner = block.inner(area);
@@ -911,11 +905,8 @@ impl SessionsTab {
             })
             .collect();
 
-        let list = List::new(items).highlight_style(
-            Style::default()
-                .bg(p.border)
-                .add_modifier(Modifier::BOLD),
-        );
+        let list = List::new(items)
+            .highlight_style(Style::default().bg(p.border).add_modifier(Modifier::BOLD));
 
         frame.render_stateful_widget(list, inner, &mut self.live_sessions_state);
 
@@ -953,11 +944,7 @@ impl SessionsTab {
         p: &Palette,
     ) {
         let is_focused = self.focus == 1; // Projects focus
-        let border_color = if is_focused {
-            p.focus
-        } else {
-            p.border
-        };
+        let border_color = if is_focused { p.focus } else { p.border };
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -977,9 +964,7 @@ impl SessionsTab {
                 let session_count = sessions_by_project.get(path).map(|v| v.len()).unwrap_or(0);
 
                 let style = if is_selected && is_focused {
-                    Style::default()
-                        .fg(p.focus)
-                        .add_modifier(Modifier::BOLD)
+                    Style::default().fg(p.focus).add_modifier(Modifier::BOLD)
                 } else if is_selected {
                     Style::default().fg(p.fg)
                 } else {
@@ -1000,11 +985,9 @@ impl SessionsTab {
             })
             .collect();
 
-        let list = List::new(items).block(block).highlight_style(
-            Style::default()
-                .bg(p.border)
-                .add_modifier(Modifier::BOLD),
-        );
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(Style::default().bg(p.border).add_modifier(Modifier::BOLD));
 
         frame.render_stateful_widget(list, area, &mut self.project_state);
     }
@@ -1017,11 +1000,7 @@ impl SessionsTab {
         p: &Palette,
     ) {
         let is_focused = self.focus == 2; // Sessions focus
-        let border_color = if is_focused {
-            p.focus
-        } else {
-            p.border
-        };
+        let border_color = if is_focused { p.focus } else { p.border };
 
         let time_ago = self.format_time_ago();
         const MAX_DISPLAY: usize = 500;
@@ -1070,10 +1049,7 @@ impl SessionsTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
-            .title(Span::styled(
-                title_text,
-                Style::default().fg(p.fg).bold(),
-            ));
+            .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         if sessions.is_empty() {
             let empty_msg = if self.search_filter.is_empty() {
@@ -1167,9 +1143,7 @@ impl SessionsTab {
                     .unwrap_or_else(|| "No preview".to_string());
 
                 let style = if is_selected && is_focused {
-                    Style::default()
-                        .fg(p.focus)
-                        .add_modifier(Modifier::BOLD)
+                    Style::default().fg(p.focus).add_modifier(Modifier::BOLD)
                 } else if is_selected {
                     Style::default().fg(p.fg)
                 } else {
@@ -1196,14 +1170,8 @@ impl SessionsTab {
 
                 preview_spans.extend(vec![
                     Span::styled(format!("{} ", date_str), Style::default().fg(p.warning)),
-                    Span::styled(
-                        format!("{:>6} ", tokens_str),
-                        Style::default().fg(p.focus),
-                    ),
-                    Span::styled(
-                        format!("{:>5} ", msgs_str),
-                        Style::default().fg(p.success),
-                    ),
+                    Span::styled(format!("{:>6} ", tokens_str), Style::default().fg(p.focus)),
+                    Span::styled(format!("{:>5} ", msgs_str), Style::default().fg(p.success)),
                 ]);
 
                 // Add branch if available
@@ -1253,7 +1221,13 @@ impl SessionsTab {
         }
     }
 
-    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&Arc<SessionMetadata>>, p: &Palette) {
+    fn render_detail(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        session: Option<&Arc<SessionMetadata>>,
+        p: &Palette,
+    ) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.focus))
@@ -1266,8 +1240,7 @@ impl SessionsTab {
         frame.render_widget(block, area);
 
         let Some(session) = session else {
-            let empty =
-                Paragraph::new("No session selected").style(Style::default().fg(p.muted));
+            let empty = Paragraph::new("No session selected").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -1322,10 +1295,7 @@ impl SessionsTab {
             ]),
             Line::from(vec![
                 Span::styled("Duration: ", Style::default().fg(p.muted)),
-                Span::styled(
-                    session.duration_display(),
-                    Style::default().fg(p.success),
-                ),
+                Span::styled(session.duration_display(), Style::default().fg(p.success)),
             ]),
             Line::from(""),
             Line::from(vec![
@@ -1432,10 +1402,7 @@ impl SessionsTab {
 
         lines.extend(vec![
             Line::from(""),
-            Line::from(Span::styled(
-                "First message:",
-                Style::default().fg(p.muted),
-            )),
+            Line::from(Span::styled("First message:", Style::default().fg(p.muted))),
             Line::from(Span::styled(
                 session
                     .first_user_message
@@ -1503,9 +1470,7 @@ impl SessionsTab {
         let mut lines = vec![
             Line::from(Span::styled(
                 "PROCESS INFORMATION",
-                Style::default()
-                    .fg(p.warning)
-                    .add_modifier(Modifier::BOLD),
+                Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
             )),
             Line::from(""),
             Line::from(vec![
@@ -1557,9 +1522,7 @@ impl SessionsTab {
             let mut session_lines = vec![
                 Line::from(Span::styled(
                     "SESSION INFORMATION",
-                    Style::default()
-                        .fg(p.focus)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
                 )),
                 Line::from(""),
                 Line::from(vec![
@@ -1611,10 +1574,7 @@ impl SessionsTab {
                     ),
                 ]),
                 Line::from(""),
-                Line::from(Span::styled(
-                    "First message:",
-                    Style::default().fg(p.muted),
-                )),
+                Line::from(Span::styled("First message:", Style::default().fg(p.muted))),
                 Line::from(Span::styled(
                     session
                         .first_user_message
@@ -1629,9 +1589,7 @@ impl SessionsTab {
             lines.extend(vec![
                 Line::from(Span::styled(
                     "SESSION INFORMATION",
-                    Style::default()
-                        .fg(p.focus)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
                 )),
                 Line::from(""),
                 Line::from(vec![
@@ -1688,17 +1646,14 @@ impl SessionsTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.important))
-            .title(Span::styled(
-                title,
-                Style::default().fg(p.important).bold(),
-            ));
+            .title(Span::styled(title, Style::default().fg(p.important).bold()));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
         if self.replay_messages.is_empty() {
-            let empty = Paragraph::new("No messages in this session")
-                .style(Style::default().fg(p.muted));
+            let empty =
+                Paragraph::new("No messages in this session").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -1854,11 +1809,8 @@ impl SessionsTab {
             })
             .collect();
 
-        let list = List::new(items).highlight_style(
-            Style::default()
-                .bg(p.border)
-                .add_modifier(Modifier::BOLD),
-        );
+        let list = List::new(items)
+            .highlight_style(Style::default().bg(p.border).add_modifier(Modifier::BOLD));
 
         frame.render_stateful_widget(list, inner, &mut self.replay_scroll);
 
@@ -1884,26 +1836,17 @@ impl SessionsTab {
 
         let hints = Line::from(vec![
             Span::raw(" ["),
-            Span::styled(
-                "j/k ↑↓",
-                Style::default().fg(p.bg).bg(p.important).bold(),
-            ),
+            Span::styled("j/k ↑↓", Style::default().fg(p.bg).bg(p.important).bold()),
             Span::raw("] "),
             Span::styled("scroll", Style::default().fg(p.fg)),
             Span::styled(" │ ", Style::default().fg(p.muted)),
             Span::raw("["),
-            Span::styled(
-                "Enter",
-                Style::default().fg(p.bg).bg(p.important).bold(),
-            ),
+            Span::styled("Enter", Style::default().fg(p.bg).bg(p.important).bold()),
             Span::raw("] "),
             Span::styled("expand/collapse", Style::default().fg(p.fg)),
             Span::styled(" │ ", Style::default().fg(p.muted)),
             Span::raw("["),
-            Span::styled(
-                "Esc",
-                Style::default().fg(p.bg).bg(p.important).bold(),
-            ),
+            Span::styled("Esc", Style::default().fg(p.bg).bg(p.important).bold()),
             Span::raw("] "),
             Span::styled("close", Style::default().fg(p.fg)),
         ]);
@@ -1955,10 +1898,7 @@ impl SessionsTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.error))
-            .title(Span::styled(
-                " Error ",
-                Style::default().fg(p.error).bold(),
-            ));
+            .title(Span::styled(" Error ", Style::default().fg(p.error).bold()));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);
@@ -2042,26 +1982,17 @@ impl SessionsTab {
                 // Live Sessions
                 vec![
                     Span::raw(" ["),
-                    Span::styled(
-                        "Tab",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("Tab", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("cycle focus", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "↑↓ j/k",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("navigate", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "Enter",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("Enter", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("detail", Style::default().fg(p.fg)),
                 ]
@@ -2070,26 +2001,17 @@ impl SessionsTab {
                 // Projects
                 vec![
                     Span::raw(" ["),
-                    Span::styled(
-                        "Tab",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("Tab", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("cycle focus", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "↑↓ j/k",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("navigate", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "h/l",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("switch pane", Style::default().fg(p.fg)),
                 ]
@@ -2098,58 +2020,37 @@ impl SessionsTab {
                 // Sessions
                 vec![
                     Span::raw(" ["),
-                    Span::styled(
-                        "Tab",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("Tab", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("cycle focus", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "↑↓ j/k",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("navigate", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "Enter",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("Enter", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("detail", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "v",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("v", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("replay", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "e",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("e", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("edit", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "r",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("r", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("resume", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled(
-                        "d",
-                        Style::default().fg(p.bg).bg(p.focus).bold(),
-                    ),
+                    Span::styled("d", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("date filter", Style::default().fg(p.fg)),
                 ]

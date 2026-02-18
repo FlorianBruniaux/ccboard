@@ -3,9 +3,16 @@ date: 2026-02-06
 last_updated: 2026-02-06
 version: 0.4.0
 title: ccboard Optimization Plan
+status: HISTORICAL - archived, do not update
 ---
 
-# Plan: Optimisation ccboard - ÉTAT ACTUEL
+> ⚠️ **DOCUMENT HISTORIQUE** — Ce fichier documente les phases 0→E jusqu'à v0.4.0.
+> Pour l'état actuel du projet, voir [VERSION_STATUS.md](VERSION_STATUS.md).
+> Pour les prochaines phases (J-N), voir [ROADMAP.md](ROADMAP.md).
+
+---
+
+# Plan: Optimisation ccboard - ÉTAT ACTUEL (v0.4.0 — ARCHIVÉ)
 
 **Dernière mise à jour**: 2026-02-06
 **Version actuelle**: v0.4.0

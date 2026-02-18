@@ -1,6 +1,5 @@
 //! Integration tests for PLAN.md parser
 
-use ccboard_core::models::plan::{PhaseStatus, PlanFile};
 use ccboard_core::parsers::PlanParser;
 use std::path::PathBuf;
 

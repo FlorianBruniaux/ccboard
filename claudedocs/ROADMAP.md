@@ -1,7 +1,7 @@
 # ccboard Roadmap
 
-**Last Updated**: 2026-02-16
-**Current Version**: v0.8.0
+**Last Updated**: 2026-02-18
+**Current Version**: v0.9.0
 **Target**: v1.0.0 (Phases J-L complete)
 
 ---
@@ -18,7 +18,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-## 📍 Current Status (v0.8.0)
+## 📍 Current Status (v0.9.0)
 
 ### ✅ Production Features
 
@@ -31,17 +31,26 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 - 50x memory reduction (Arc migration: 1.4GB → 28MB)
 - 344 tests passing, 0 clippy warnings
 
+**Light Mode & Theme Persistence** (v0.9.0):
+- Full light/dark theme toggle via `Ctrl+T`
+- Theme persisted across sessions (`~/.claude/cache/ccboard-preferences.json`)
+- Centralized `Palette` system in `theme.rs`
+
 **Budget Tracking** (v0.8.0):
 - Month-to-date cost calculation with token-based prorata
 - Monthly projection with configurable limits
 - 4-level alerts (Safe/Warning/Critical/Exceeded)
 - Visual gauges in TUI + Web UI
 
+### 🐛 Known Issues
+
+- **#44** — Web UI non-functional after `cargo install` (WASM assets not bundled in binary)
+
 ---
 
 ## 🚀 Upcoming Phases
 
-### Phase J: Export Features (v0.9.0) - **NEXT**
+### Phase J: Export Features (v0.10.0) - **NEXT**
 
 **Priority**: 🔴 HIGH
 **Duration**: 6-8h
@@ -65,7 +74,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-### Phase K: Advanced Analytics (v0.10.0)
+### Phase K: Advanced Analytics (v0.11.0)
 
 **Priority**: 🟡 MEDIUM
 **Duration**: 10-12h
@@ -86,7 +95,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-### Phase L: Plugin System (v0.11.0)
+### Phase L: Plugin System (v0.12.0)
 
 **Priority**: 🟢 LOW
 **Duration**: 12-15h
@@ -109,11 +118,12 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-### Phase M: Conversation Viewer Enhancements (v0.11.5)
+### Phase M: Conversation Viewer Enhancements (v0.12.5)
 
 **Priority**: 🟡 MEDIUM
 **Duration**: 8-10h
 **Status**: 📋 Backlog (extends Phase F)
+**GitHub Issues**: #3 (umbrella), #7 (message filtering), #8 (export conversations)
 
 **Goal**: Advanced conversation analysis and visualization.
 
@@ -127,11 +137,12 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-### Phase N: Plan-Aware Completion (v0.12.0)
+### Phase N: Plan-Aware Completion (v0.13.0)
 
 **Priority**: 🟢 LOW
 **Duration**: 10-14h
 **Status**: 📋 Backlog (extends Phase H)
+**GitHub Issues**: #4 (umbrella), #10 (PLAN.md parser), #11 (task DAG), #12 (session-to-task mapping), #13 (D3.js graph)
 
 **Goal**: Complete PLAN.md parsing with dependency graphs and progress tracking.
 
@@ -206,13 +217,13 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ## 📊 Phase Comparison
 
-| Phase | Priority | Duration | Version | Focus | Status |
-|-------|----------|----------|---------|-------|--------|
-| **J** | 🔴 HIGH | 6-8h | v0.9.0 | Export features | ⏳ Next |
-| **K** | 🟡 MEDIUM | 10-12h | v0.10.0 | Advanced analytics | 📋 Backlog |
-| **L** | 🟢 LOW | 12-15h | v0.11.0 | Plugin system | 📋 Backlog |
-| **M** | 🟡 MEDIUM | 8-10h | v0.11.5 | Conversation enhancements | 📋 Backlog |
-| **N** | 🟢 LOW | 10-14h | v0.12.0 | Plan-aware completion | 📋 Backlog |
+| Phase | Priority | Duration | Version | Focus | GitHub Issues | Status |
+|-------|----------|----------|---------|-------|---------------|--------|
+| **J** | 🔴 HIGH | 6-8h | v0.10.0 | Export features | — | ⏳ Next |
+| **K** | 🟡 MEDIUM | 10-12h | v0.11.0 | Advanced analytics | #14-21 | 📋 Backlog |
+| **L** | 🟢 LOW | 12-15h | v0.12.0 | Plugin system | — | 📋 Backlog |
+| **M** | 🟡 MEDIUM | 8-10h | v0.12.5 | Conversation enhancements | #3, #7, #8 | 📋 Backlog |
+| **N** | 🟢 LOW | 10-14h | v0.13.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
 **Total Estimated**: 46-59h for v1.0.0 completion
 
@@ -249,6 +260,6 @@ Interested in implementing a roadmap phase? See:
 
 ---
 
-**Last Updated**: 2026-02-16
+**Last Updated**: 2026-02-18
 **Maintainer**: @FlorianBruniaux
 **Repository**: https://github.com/FlorianBruniaux/ccboard

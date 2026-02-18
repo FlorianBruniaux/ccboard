@@ -38,8 +38,8 @@ impl CcboardPreferences {
         std::fs::create_dir_all(cache_dir)
             .context("Failed to create cache directory for preferences")?;
         let path = cache_dir.join("ccboard-preferences.json");
-        let content = serde_json::to_string_pretty(self)
-            .context("Failed to serialize preferences")?;
+        let content =
+            serde_json::to_string_pretty(self).context("Failed to serialize preferences")?;
         std::fs::write(&path, content)
             .with_context(|| format!("Failed to write preferences to {}", path.display()))
     }

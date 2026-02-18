@@ -424,10 +424,7 @@ impl HooksTab {
                 ListItem::new(Line::from(vec![
                     Span::styled(format!(" {} ", icon), Style::default().fg(color)),
                     Span::styled(event.clone(), style),
-                    Span::styled(
-                        format!(" ({})", hook_count),
-                        Style::default().fg(p.muted),
-                    ),
+                    Span::styled(format!(" ({})", hook_count), Style::default().fg(p.muted)),
                 ]))
             })
             .collect();
@@ -473,10 +470,7 @@ impl HooksTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
-            .title(Span::styled(
-                title,
-                Style::default().fg(p.fg).bold(),
-            ))
+            .title(Span::styled(title, Style::default().fg(p.fg).bold()))
             .title_bottom(Line::from(vec![
                 Span::styled("Tab", Style::default().fg(p.focus)),
                 Span::styled(" switch  ", Style::default().fg(p.muted)),
@@ -488,8 +482,8 @@ impl HooksTab {
         frame.render_widget(block, area);
 
         if groups.is_empty() {
-            let empty = Paragraph::new("Select an event to see hooks")
-                .style(Style::default().fg(p.muted));
+            let empty =
+                Paragraph::new("Select an event to see hooks").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -553,9 +547,7 @@ impl HooksTab {
                     Span::styled(
                         command,
                         if is_selected {
-                            Style::default()
-                                .fg(p.fg)
-                                .add_modifier(Modifier::BOLD)
+                            Style::default().fg(p.fg).add_modifier(Modifier::BOLD)
                         } else {
                             Style::default().fg(p.fg)
                         },
@@ -684,7 +676,13 @@ impl HooksTab {
         Line::from(spans)
     }
 
-    fn render_hook_content(&self, frame: &mut Frame, area: Rect, hook: &HookDefinition, p: &Palette) {
+    fn render_hook_content(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        hook: &HookDefinition,
+        p: &Palette,
+    ) {
         let is_focused = self.focus == 2;
         let border_color = if is_focused { p.focus } else { p.border };
 
@@ -699,10 +697,7 @@ impl HooksTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
-            .title(Span::styled(
-                title,
-                Style::default().fg(p.fg).bold(),
-            ));
+            .title(Span::styled(title, Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -805,10 +800,7 @@ impl HooksTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(p.error))
-            .title(Span::styled(
-                " Error ",
-                Style::default().fg(p.error).bold(),
-            ));
+            .title(Span::styled(" Error ", Style::default().fg(p.error).bold()));
 
         let inner = block.inner(popup_area);
         frame.render_widget(block, popup_area);

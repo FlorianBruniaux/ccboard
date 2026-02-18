@@ -259,8 +259,13 @@ impl Ui {
         app.command_palette.render(frame, size, app.color_scheme);
 
         // Render help modal (overlay on top of command palette)
-        app.help_modal
-            .render(frame, size, app.active_tab, &app.keybindings, app.color_scheme);
+        app.help_modal.render(
+            frame,
+            size,
+            app.active_tab,
+            &app.keybindings,
+            app.color_scheme,
+        );
 
         // Render toast notifications (overlay on top)
         app.toast_manager.render(frame, size, app.color_scheme);
@@ -421,7 +426,8 @@ impl Ui {
 
         let breadcrumbs_path = self.get_breadcrumbs_for_tab(active, app);
         self.breadcrumbs.set_path(breadcrumbs_path);
-        self.breadcrumbs.render(frame, breadcrumb_inner, app.color_scheme);
+        self.breadcrumbs
+            .render(frame, breadcrumb_inner, app.color_scheme);
     }
 
     fn render_degraded_banner(
