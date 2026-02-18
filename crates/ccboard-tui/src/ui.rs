@@ -12,7 +12,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Tabs},
+    widgets::{Block, Borders, Clear, Paragraph, Tabs},
     Frame,
 };
 
@@ -219,6 +219,14 @@ impl Ui {
             self.render_loading_screen(frame, size, app);
             return;
         }
+
+        // Fill entire frame with theme background (critical for light mode)
+        let p = Palette::new(app.color_scheme);
+        frame.render_widget(Clear, size);
+        frame.render_widget(
+            Block::default().style(Style::default().bg(p.bg).fg(p.fg)),
+            size,
+        );
 
         // Main layout
         let chunks = Layout::default()
