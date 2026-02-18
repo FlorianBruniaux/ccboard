@@ -8,7 +8,9 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::models::{BillingBlockManager, ConversationMessage, MessageRole, SessionMetadata};
+use crate::models::{
+    BillingBlockManager, ConversationMessage, MessageRole, SessionMetadata, StatsCache,
+};
 
 /// Export billing blocks to CSV format matching TUI table display
 ///
@@ -198,6 +200,363 @@ pub fn export_sessions_to_json(sessions: &[Arc<SessionMetadata>], path: &Path) -
     // Write to file
     std::fs::write(path, json)
         .with_context(|| format!("Failed to write JSON file: {}", path.display()))?;
+
+    Ok(())
+}
+
+// ============================================================================
+// Stats Export Functions
+// ============================================================================
+
+/// Format a large number with K/M/B suffix for readability
+fn fmt_num(n: u64) -> String {
+    if n >= 1_000_000_000 {
+        format!("{:.2}B", n as f64 / 1_000_000_000.0)
+    } else if n >= 1_000_000 {
+        format!("{:.2}M", n as f64 / 1_000_000.0)
+    } else if n >= 1_000 {
+        format!("{:.2}K", n as f64 / 1_000.0)
+    } else {
+        n.to_string()
+    }
+}
+
+/// Export usage statistics to CSV (per-model breakdown)
+///
+/// CSV columns: Model, Input Tokens, Output Tokens, Cache Read, Cache Write, Total Tokens, Cost (USD)
+/// Rows sorted by total token usage (highest first)
+pub fn export_stats_to_csv(stats: &StatsCache, path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    let file = File::create(path)
+        .with_context(|| format!("Failed to create CSV file: {}", path.display()))?;
+
+    let mut writer = BufWriter::new(file);
+
+    writeln!(
+        writer,
+        "Model,Input Tokens,Output Tokens,Cache Read,Cache Write,Total Tokens,Cost (USD)"
+    )
+    .context("Failed to write CSV header")?;
+
+    let mut models: Vec<_> = stats
+        .model_usage
+        .iter()
+        .filter(|(_, u)| u.total_tokens() > 0)
+        .collect();
+    models.sort_by(|a, b| b.1.total_tokens().cmp(&a.1.total_tokens()));
+
+    for (name, usage) in &models {
+        writeln!(
+            writer,
+            "\"{}\",{},{},{},{},{},\"{:.6}\"",
+            name,
+            usage.input_tokens,
+            usage.output_tokens,
+            usage.cache_read_input_tokens,
+            usage.cache_creation_input_tokens,
+            usage.total_tokens(),
+            usage.cost_usd
+        )
+        .with_context(|| format!("Failed to write row for model {}", name))?;
+    }
+
+    writer.flush().context("Failed to flush CSV writer")?;
+
+    Ok(())
+}
+
+/// Export usage statistics to JSON format (full StatsCache)
+pub fn export_stats_to_json(stats: &StatsCache, path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    let json = serde_json::to_string_pretty(stats).context("Failed to serialize stats to JSON")?;
+
+    std::fs::write(path, json)
+        .with_context(|| format!("Failed to write JSON file: {}", path.display()))?;
+
+    Ok(())
+}
+
+/// Export usage statistics to Markdown report
+///
+/// Generates a human-readable report with:
+/// - Summary totals (tokens, sessions, messages, cache ratio)
+/// - Per-model breakdown table
+/// - Daily activity for last 30 days
+pub fn export_stats_to_markdown(stats: &StatsCache, path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    let file = File::create(path)
+        .with_context(|| format!("Failed to create Markdown file: {}", path.display()))?;
+
+    let mut writer = BufWriter::new(file);
+
+    writeln!(writer, "# Claude Code Statistics Report")?;
+    writeln!(writer)?;
+
+    if let Some(date) = &stats.last_computed_date {
+        writeln!(writer, "**Generated**: {}", date)?;
+    }
+    if let Some(first) = &stats.first_session_date {
+        writeln!(writer, "**First Session**: {}", first)?;
+    }
+    writeln!(writer)?;
+
+    // Summary table
+    writeln!(writer, "## Summary")?;
+    writeln!(writer)?;
+    writeln!(writer, "| Metric | Value |")?;
+    writeln!(writer, "|--------|-------|")?;
+    writeln!(
+        writer,
+        "| Total Tokens | {} |",
+        fmt_num(stats.total_tokens())
+    )?;
+    writeln!(
+        writer,
+        "| Input Tokens | {} |",
+        fmt_num(stats.total_input_tokens())
+    )?;
+    writeln!(
+        writer,
+        "| Output Tokens | {} |",
+        fmt_num(stats.total_output_tokens())
+    )?;
+    writeln!(
+        writer,
+        "| Cache Read Tokens | {} |",
+        fmt_num(stats.total_cache_read_tokens())
+    )?;
+    writeln!(
+        writer,
+        "| Cache Write Tokens | {} |",
+        fmt_num(stats.total_cache_write_tokens())
+    )?;
+    writeln!(writer, "| Sessions | {} |", stats.total_sessions)?;
+    writeln!(writer, "| Messages | {} |", stats.total_messages)?;
+    writeln!(
+        writer,
+        "| Cache Hit Ratio | {:.1}% |",
+        stats.cache_ratio() * 100.0
+    )?;
+    writeln!(writer)?;
+
+    // Model breakdown
+    if !stats.model_usage.is_empty() {
+        writeln!(writer, "## Model Breakdown")?;
+        writeln!(writer)?;
+        writeln!(
+            writer,
+            "| Model | Input | Output | Cache Read | Cache Write | Total | Cost |"
+        )?;
+        writeln!(
+            writer,
+            "|-------|-------|--------|------------|-------------|-------|------|"
+        )?;
+
+        let mut models: Vec<_> = stats
+            .model_usage
+            .iter()
+            .filter(|(_, u)| u.total_tokens() > 0)
+            .collect();
+        models.sort_by(|a, b| b.1.total_tokens().cmp(&a.1.total_tokens()));
+
+        for (name, usage) in &models {
+            writeln!(
+                writer,
+                "| {} | {} | {} | {} | {} | {} | ${:.4} |",
+                name,
+                fmt_num(usage.input_tokens),
+                fmt_num(usage.output_tokens),
+                fmt_num(usage.cache_read_input_tokens),
+                fmt_num(usage.cache_creation_input_tokens),
+                fmt_num(usage.total_tokens()),
+                usage.cost_usd
+            )
+            .with_context(|| format!("Failed to write row for model {}", name))?;
+        }
+
+        writeln!(writer)?;
+    }
+
+    // Daily activity (last 30 days, most recent first)
+    let recent = stats.recent_daily(30);
+    if !recent.is_empty() {
+        writeln!(writer, "## Daily Activity (Last 30 Days)")?;
+        writeln!(writer)?;
+        writeln!(writer, "| Date | Sessions | Messages | Tool Calls |")?;
+        writeln!(writer, "|------|----------|----------|------------|")?;
+
+        for day in recent.iter().rev() {
+            writeln!(
+                writer,
+                "| {} | {} | {} | {} |",
+                day.date, day.session_count, day.message_count, day.tool_call_count
+            )?;
+        }
+
+        writeln!(writer)?;
+    }
+
+    writer.flush().context("Failed to flush Markdown writer")?;
+
+    Ok(())
+}
+
+// ============================================================================
+// Sessions Markdown Export
+// ============================================================================
+
+/// Export sessions list to Markdown table
+pub fn export_sessions_to_markdown(sessions: &[Arc<SessionMetadata>], path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    let file = File::create(path)
+        .with_context(|| format!("Failed to create Markdown file: {}", path.display()))?;
+
+    let mut writer = BufWriter::new(file);
+
+    writeln!(writer, "# Session List")?;
+    writeln!(writer)?;
+    writeln!(writer, "**Total**: {} sessions", sessions.len())?;
+    writeln!(writer)?;
+    writeln!(
+        writer,
+        "| Date | Time | Project | Session ID | Messages | Tokens | Duration |"
+    )?;
+    writeln!(
+        writer,
+        "|------|------|---------|------------|----------|--------|----------|"
+    )?;
+
+    for session in sessions {
+        let date = session
+            .first_timestamp
+            .map(|ts| ts.format("%Y-%m-%d").to_string())
+            .unwrap_or_else(|| "N/A".to_string());
+
+        let time = session
+            .first_timestamp
+            .map(|ts| ts.format("%H:%M").to_string())
+            .unwrap_or_else(|| "N/A".to_string());
+
+        let duration = if let (Some(first), Some(last)) =
+            (&session.first_timestamp, &session.last_timestamp)
+        {
+            let diff = last.signed_duration_since(*first);
+            format!("{}min", diff.num_minutes())
+        } else {
+            "N/A".to_string()
+        };
+
+        let short_id = &session.id[..8.min(session.id.len())];
+
+        writeln!(
+            writer,
+            "| {} | {} | {} | `{}` | {} | {} | {} |",
+            date,
+            time,
+            session.project_path,
+            short_id,
+            session.message_count,
+            fmt_num(session.total_tokens),
+            duration
+        )
+        .with_context(|| format!("Failed to write row for session {}", session.id))?;
+    }
+
+    writer.flush().context("Failed to flush Markdown writer")?;
+
+    Ok(())
+}
+
+// ============================================================================
+// Billing Blocks Additional Export Formats
+// ============================================================================
+
+/// Export billing blocks to JSON format
+pub fn export_billing_blocks_to_json(manager: &BillingBlockManager, path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    let mut blocks = manager.get_all_blocks();
+    blocks.reverse(); // Most recent first
+
+    let json_array: Vec<_> = blocks
+        .iter()
+        .map(|(block, usage)| {
+            serde_json::json!({
+                "date": block.date.format("%Y-%m-%d").to_string(),
+                "block": block.label(),
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+                "cache_creation_tokens": usage.cache_creation_tokens,
+                "cache_read_tokens": usage.cache_read_tokens,
+                "total_tokens": usage.total_tokens(),
+                "sessions": usage.session_count,
+                "cost_usd": usage.total_cost,
+            })
+        })
+        .collect();
+
+    let json = serde_json::to_string_pretty(&json_array)
+        .context("Failed to serialize billing blocks to JSON")?;
+
+    std::fs::write(path, json)
+        .with_context(|| format!("Failed to write JSON file: {}", path.display()))?;
+
+    Ok(())
+}
+
+/// Export billing blocks to Markdown table
+pub fn export_billing_blocks_to_markdown(manager: &BillingBlockManager, path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    }
+
+    let file = File::create(path)
+        .with_context(|| format!("Failed to create Markdown file: {}", path.display()))?;
+
+    let mut writer = BufWriter::new(file);
+
+    writeln!(writer, "# Billing Blocks Report")?;
+    writeln!(writer)?;
+    writeln!(writer, "| Date | Block (UTC) | Tokens | Sessions | Cost |")?;
+    writeln!(writer, "|------|-------------|--------|----------|------|")?;
+
+    let mut blocks = manager.get_all_blocks();
+    blocks.reverse(); // Most recent first
+
+    for (block, usage) in &blocks {
+        writeln!(
+            writer,
+            "| {} | {} | {} | {} | ${:.3} |",
+            block.date.format("%Y-%m-%d"),
+            block.label(),
+            fmt_num(usage.total_tokens()),
+            usage.session_count,
+            usage.total_cost
+        )
+        .with_context(|| format!("Failed to write row for block {:?}", block))?;
+    }
+
+    writer.flush().context("Failed to flush Markdown writer")?;
 
     Ok(())
 }

@@ -96,7 +96,6 @@ impl UsageEstimate {
     }
 }
 
-
 /// Calculate usage estimate from billing blocks
 pub fn calculate_usage_estimate(
     billing_blocks: &BillingBlockManager,
@@ -144,10 +143,7 @@ mod tests {
     fn test_parse_plan() {
         assert_eq!(SubscriptionPlan::parse("pro"), SubscriptionPlan::Pro);
         assert_eq!(SubscriptionPlan::parse("max5x"), SubscriptionPlan::Max5x);
-        assert_eq!(
-            SubscriptionPlan::parse("max-20x"),
-            SubscriptionPlan::Max20x
-        );
+        assert_eq!(SubscriptionPlan::parse("max-20x"), SubscriptionPlan::Max20x);
         assert_eq!(SubscriptionPlan::parse("api"), SubscriptionPlan::Api);
         assert_eq!(
             SubscriptionPlan::parse("unknown"),

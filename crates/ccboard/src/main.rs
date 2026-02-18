@@ -133,8 +133,22 @@ enum Mode {
         /// Session ID or prefix (min 8 chars)
         session_id: String,
     },
-    /// Export conversation to file
+    /// Export data to files (sessions, stats, billing, or a single conversation)
     Export {
+        #[command(subcommand)]
+        command: ExportCommand,
+    },
+    /// Pricing management
+    Pricing {
+        #[command(subcommand)]
+        command: PricingCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum ExportCommand {
+    /// Export a single conversation to file (markdown, json, or html)
+    Conversation {
         /// Session ID or prefix (min 8 chars)
         session_id: String,
         /// Output file path
@@ -144,10 +158,35 @@ enum Mode {
         #[arg(short = 'f', long, default_value = "markdown", value_parser = ["markdown", "json", "html"])]
         format: String,
     },
-    /// Pricing management
-    Pricing {
-        #[command(subcommand)]
-        command: PricingCommand,
+    /// Export sessions list to file (csv, json, or md)
+    Sessions {
+        /// Output file path
+        #[arg(short = 'o', long)]
+        output: PathBuf,
+        /// Export format: csv, json, md
+        #[arg(short = 'f', long, default_value = "csv", value_parser = ["csv", "json", "md"])]
+        format: String,
+        /// Date filter: 7d, 30d, 3m, 1y, YYYY-MM-DD
+        #[arg(long, short = 'd')]
+        since: Option<String>,
+    },
+    /// Export usage statistics to file (csv, json, or md)
+    Stats {
+        /// Output file path
+        #[arg(short = 'o', long)]
+        output: PathBuf,
+        /// Export format: csv, json, md
+        #[arg(short = 'f', long, default_value = "csv", value_parser = ["csv", "json", "md"])]
+        format: String,
+    },
+    /// Export billing blocks to file (csv, json, or md)
+    Billing {
+        /// Output file path
+        #[arg(short = 'o', long)]
+        output: PathBuf,
+        /// Export format: csv, json, md
+        #[arg(short = 'f', long, default_value = "csv", value_parser = ["csv", "json", "md"])]
+        format: String,
     },
 }
 
@@ -215,13 +254,29 @@ async fn main() -> Result<()> {
         Mode::Resume { session_id } => {
             run_resume(claude_home, project, session_id).await?;
         }
-        Mode::Export {
-            session_id,
-            output,
-            format,
-        } => {
-            run_export(claude_home, project, session_id, output, format, no_color).await?;
-        }
+        Mode::Export { command } => match command {
+            ExportCommand::Conversation {
+                session_id,
+                output,
+                format,
+            } => {
+                run_export_conversation(claude_home, project, session_id, output, format, no_color)
+                    .await?;
+            }
+            ExportCommand::Sessions {
+                output,
+                format,
+                since,
+            } => {
+                run_export_sessions(claude_home, project, output, format, since, no_color).await?;
+            }
+            ExportCommand::Stats { output, format } => {
+                run_export_stats(claude_home, project, output, format, no_color).await?;
+            }
+            ExportCommand::Billing { output, format } => {
+                run_export_billing(claude_home, project, output, format, no_color).await?;
+            }
+        },
         Mode::Pricing { command } => match command {
             PricingCommand::Update => {
                 run_pricing_update(no_color).await?;
@@ -732,7 +787,7 @@ async fn run_resume(
     }
 }
 
-async fn run_export(
+async fn run_export_conversation(
     claude_home: PathBuf,
     project: Option<PathBuf>,
     session_id: String,
@@ -803,6 +858,208 @@ async fn run_export(
         println!("✅ Exported to {}", output.display());
         println!("   Session: {}", session.id);
         println!("   Messages: {}", messages.len());
+        println!("   Format: {}", format);
+    } else {
+        println!("{}", output.display());
+    }
+
+    Ok(())
+}
+
+async fn run_export_sessions(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    output: PathBuf,
+    format: String,
+    since: Option<String>,
+    no_color: bool,
+) -> Result<()> {
+    use ccboard_core::{
+        export_sessions_to_csv, export_sessions_to_json, export_sessions_to_markdown,
+    };
+
+    let store = DataStore::with_defaults(claude_home, project);
+
+    if !no_color {
+        eprint!("Loading sessions... ");
+    }
+
+    let report = store.initial_load().await;
+
+    if !no_color {
+        eprintln!("✓ {} sessions", report.sessions_scanned);
+    }
+
+    // Parse and apply date filter
+    let date_filter = if let Some(ref s) = since {
+        Some(cli::DateFilter::parse(s).context("Invalid date filter")?)
+    } else {
+        None
+    };
+
+    let mut sessions = store.recent_sessions(usize::MAX);
+    if let Some(filter) = date_filter {
+        sessions.retain(|s| {
+            s.first_timestamp
+                .map(|ts| filter.matches(&ts))
+                .unwrap_or(false)
+        });
+    }
+
+    if !no_color {
+        eprint!(
+            "Exporting {} sessions to {}... ",
+            sessions.len(),
+            output.display()
+        );
+    }
+
+    match format.as_str() {
+        "csv" => {
+            export_sessions_to_csv(&sessions, &output)
+                .context("Failed to export sessions to CSV")?;
+        }
+        "json" => {
+            export_sessions_to_json(&sessions, &output)
+                .context("Failed to export sessions to JSON")?;
+        }
+        "md" | "markdown" => {
+            export_sessions_to_markdown(&sessions, &output)
+                .context("Failed to export sessions to Markdown")?;
+        }
+        _ => {
+            anyhow::bail!("Invalid format: {}. Use csv, json, or md", format);
+        }
+    }
+
+    if !no_color {
+        eprintln!("✓");
+        println!("✅ Exported to {}", output.display());
+        println!("   Sessions: {}", sessions.len());
+        println!("   Format: {}", format);
+    } else {
+        println!("{}", output.display());
+    }
+
+    Ok(())
+}
+
+async fn run_export_stats(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    output: PathBuf,
+    format: String,
+    no_color: bool,
+) -> Result<()> {
+    use ccboard_core::{export_stats_to_csv, export_stats_to_json, export_stats_to_markdown};
+
+    let store = DataStore::with_defaults(claude_home, project);
+
+    if !no_color {
+        eprint!("Loading statistics... ");
+    }
+
+    store.initial_load().await;
+
+    if !no_color {
+        eprintln!("✓");
+    }
+
+    let stats = store
+        .stats()
+        .ok_or_else(|| anyhow::anyhow!("No stats available (stats-cache.json not found)"))?;
+
+    if !no_color {
+        eprint!("Exporting stats to {}... ", output.display());
+    }
+
+    match format.as_str() {
+        "csv" => {
+            export_stats_to_csv(&stats, &output).context("Failed to export stats to CSV")?;
+        }
+        "json" => {
+            export_stats_to_json(&stats, &output).context("Failed to export stats to JSON")?;
+        }
+        "md" | "markdown" => {
+            export_stats_to_markdown(&stats, &output)
+                .context("Failed to export stats to Markdown")?;
+        }
+        _ => {
+            anyhow::bail!("Invalid format: {}. Use csv, json, or md", format);
+        }
+    }
+
+    if !no_color {
+        eprintln!("✓");
+        println!("✅ Exported to {}", output.display());
+        println!("   Sessions: {}", stats.total_sessions);
+        println!("   Messages: {}", stats.total_messages);
+        println!("   Format: {}", format);
+    } else {
+        println!("{}", output.display());
+    }
+
+    Ok(())
+}
+
+async fn run_export_billing(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    output: PathBuf,
+    format: String,
+    no_color: bool,
+) -> Result<()> {
+    use ccboard_core::{
+        export_billing_blocks_to_csv, export_billing_blocks_to_json,
+        export_billing_blocks_to_markdown,
+    };
+
+    let store = DataStore::with_defaults(claude_home, project);
+
+    if !no_color {
+        eprint!("Loading billing data... ");
+    }
+
+    store.initial_load().await;
+    store.compute_billing_blocks().await;
+
+    if !no_color {
+        eprintln!("✓");
+    }
+
+    let manager = store.billing_blocks();
+    let block_count = manager.get_all_blocks().len();
+
+    if !no_color {
+        eprint!(
+            "Exporting {} blocks to {}... ",
+            block_count,
+            output.display()
+        );
+    }
+
+    match format.as_str() {
+        "csv" => {
+            export_billing_blocks_to_csv(&manager, &output)
+                .context("Failed to export billing to CSV")?;
+        }
+        "json" => {
+            export_billing_blocks_to_json(&manager, &output)
+                .context("Failed to export billing to JSON")?;
+        }
+        "md" | "markdown" => {
+            export_billing_blocks_to_markdown(&manager, &output)
+                .context("Failed to export billing to Markdown")?;
+        }
+        _ => {
+            anyhow::bail!("Invalid format: {}. Use csv, json, or md", format);
+        }
+    }
+
+    if !no_color {
+        eprintln!("✓");
+        println!("✅ Exported to {}", output.display());
+        println!("   Blocks: {}", block_count);
         println!("   Format: {}", format);
     } else {
         println!("{}", output.display());

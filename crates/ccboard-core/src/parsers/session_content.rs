@@ -192,12 +192,7 @@ impl SessionContentParser {
             .message
             .as_ref()
             .and_then(|m| m.tool_calls.as_ref())
-            .map(|calls| {
-                calls
-                    .iter()
-                    .filter_map(Self::parse_tool_call)
-                    .collect()
-            })
+            .map(|calls| calls.iter().filter_map(Self::parse_tool_call).collect())
             .unwrap_or_default();
 
         // Extract tool results from message
@@ -205,12 +200,7 @@ impl SessionContentParser {
             .message
             .as_ref()
             .and_then(|m| m.tool_results.as_ref())
-            .map(|results| {
-                results
-                    .iter()
-                    .filter_map(Self::parse_tool_result)
-                    .collect()
-            })
+            .map(|results| results.iter().filter_map(Self::parse_tool_result).collect())
             .unwrap_or_default();
 
         Some(ConversationMessage {

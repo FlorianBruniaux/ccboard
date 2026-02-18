@@ -24,7 +24,11 @@ pub use analytics::{
 };
 pub use error::{CoreError, DegradedState, LoadReport};
 pub use event::{DataEvent, EventBus};
-pub use export::{export_billing_blocks_to_csv, export_sessions_to_csv, export_sessions_to_json};
+pub use export::{
+    export_billing_blocks_to_csv, export_billing_blocks_to_json, export_billing_blocks_to_markdown,
+    export_sessions_to_csv, export_sessions_to_json, export_sessions_to_markdown,
+    export_stats_to_csv, export_stats_to_json, export_stats_to_markdown,
+};
 pub use live_monitor::{detect_live_sessions, LiveSession};
 pub use quota::{calculate_quota_status, AlertLevel, QuotaStatus};
 pub use store::{DataStore, ProjectLeaderboardEntry};
