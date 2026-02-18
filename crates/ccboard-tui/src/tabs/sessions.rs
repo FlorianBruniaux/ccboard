@@ -1,12 +1,13 @@
 //! Sessions tab - Project tree + session list + detail view
 
 use crate::components::highlight_matches;
+use crate::theme::Palette;
 use ccboard_core::models::{SessionLine, SessionMetadata};
 use ccboard_core::parsers::SessionContentParser;
 use chrono::{DateTime, Duration, Utc};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
         Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
@@ -575,6 +576,8 @@ impl SessionsTab {
         live_sessions: &[ccboard_core::LiveSession],
         _scheme: ccboard_core::models::config::ColorScheme,
     ) {
+        let p = Palette::new(_scheme);
+
         // Update project cache
         self.projects = sessions_by_project.keys().cloned().collect();
         self.projects.sort();
@@ -610,9 +613,9 @@ impl SessionsTab {
             ""
         };
         let search_border_color = if self.search_active {
-            Color::Cyan
+            p.focus
         } else {
-            Color::DarkGray
+            p.border
         };
 
         let search_block = Block::default()
@@ -628,9 +631,9 @@ impl SessionsTab {
 
         let search_input = Paragraph::new(search_text).block(search_block).style(
             if self.search_filter.is_empty() {
-                Style::default().fg(Color::DarkGray)
+                Style::default().fg(p.muted)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(p.fg)
             },
         );
 
@@ -638,7 +641,7 @@ impl SessionsTab {
 
         // Render live sessions if any
         let content_chunk_idx = if live_height > 0 {
-            self.render_live_sessions(frame, main_chunks[1], live_sessions, self.focus == 0);
+            self.render_live_sessions(frame, main_chunks[1], live_sessions, self.focus == 0, &p);
             2
         } else {
             1
@@ -648,7 +651,7 @@ impl SessionsTab {
 
         // If replay is open, show it full width
         if self.show_replay {
-            self.render_replay_popup(frame, content_area);
+            self.render_replay_popup(frame, content_area, &p);
             return;
         }
 
@@ -665,12 +668,13 @@ impl SessionsTab {
                             content_area,
                             live_session,
                             Some(session_meta),
+                            &p,
                         );
                     } else {
-                        self.render_live_detail(frame, content_area, live_session, None);
+                        self.render_live_detail(frame, content_area, live_session, None, &p);
                     }
                 } else {
-                    self.render_live_detail(frame, content_area, live_session, None);
+                    self.render_live_detail(frame, content_area, live_session, None, &p);
                 }
             }
             return;
@@ -693,7 +697,7 @@ impl SessionsTab {
             .split(content_area);
 
         // Render projects tree
-        self.render_projects(frame, chunks[0], sessions_by_project);
+        self.render_projects(frame, chunks[0], sessions_by_project, &p);
 
         // Get sessions for selected project or all projects (global search)
         let selected_project = self
@@ -790,24 +794,24 @@ impl SessionsTab {
         }
 
         // Render session list
-        self.render_sessions(frame, chunks[1], &sessions);
+        self.render_sessions(frame, chunks[1], &sessions, &p);
 
         // Render detail popup if open
         if self.show_detail && chunks.len() > 2 {
             let selected_session = self.session_state.selected().and_then(|i| sessions.get(i));
-            self.render_detail(frame, chunks[2], selected_session);
+            self.render_detail(frame, chunks[2], selected_session, &p);
         }
 
         // Render keyboard hints at bottom
-        self.render_keyboard_hints(frame, area);
+        self.render_keyboard_hints(frame, area, &p);
 
         // Render error popup if present
         if self.error_message.is_some() {
-            self.render_error_popup(frame, area);
+            self.render_error_popup(frame, area, &p);
         }
 
         // Render refresh notification if present
-        self.render_refresh_notification(frame, area);
+        self.render_refresh_notification(frame, area, &p);
     }
 
     fn render_live_sessions(
@@ -816,6 +820,7 @@ impl SessionsTab {
         area: Rect,
         live_sessions: &[ccboard_core::LiveSession],
         is_focused: bool,
+        p: &Palette,
     ) {
         use chrono::Local;
 
@@ -828,9 +833,9 @@ impl SessionsTab {
         }
 
         let border_color = if is_focused {
-            Color::Cyan
+            p.focus
         } else {
-            Color::Green
+            p.success
         };
 
         let block = Block::default()
@@ -839,7 +844,7 @@ impl SessionsTab {
             .title(Span::styled(
                 format!(" ⚡ Live Sessions ({}) ", live_sessions.len()),
                 Style::default()
-                    .fg(Color::Green)
+                    .fg(p.success)
                     .add_modifier(Modifier::BOLD),
             ));
 
@@ -885,22 +890,22 @@ impl SessionsTab {
 
                 // Line 2: Session name (if available)
                 let session_name_line = s.session_name.as_ref().map(|name| {
-                    Line::from(format!("   ├─ 📝 {}", name)).style(Style::default().fg(Color::Cyan))
+                    Line::from(format!("   ├─ 📝 {}", name)).style(Style::default().fg(p.focus))
                 });
 
                 // Line 3: Performance metrics (shortened to fit)
-                let tokens_str = s.tokens.map_or("?".to_string(), |t| Self::format_short(t));
+                let tokens_str = s.tokens.map_or("?".to_string(), Self::format_short);
                 let metrics_line = format!(
                     "   ├─ CPU:{:>4.1}% RAM:{:>4}MB Tok:{:>5}",
                     s.cpu_percent, s.memory_mb, tokens_str
                 );
 
                 // Build lines vec conditionally
-                let mut lines = vec![Line::from(line1).style(Style::default().fg(Color::Green))];
+                let mut lines = vec![Line::from(line1).style(Style::default().fg(p.success))];
                 if let Some(name_line) = session_name_line {
                     lines.push(name_line);
                 }
-                lines.push(Line::from(metrics_line).style(Style::default().fg(Color::DarkGray)));
+                lines.push(Line::from(metrics_line).style(Style::default().fg(p.muted)));
 
                 ListItem::new(lines)
             })
@@ -908,7 +913,7 @@ impl SessionsTab {
 
         let list = List::new(items).highlight_style(
             Style::default()
-                .bg(Color::DarkGray)
+                .bg(p.border)
                 .add_modifier(Modifier::BOLD),
         );
 
@@ -945,12 +950,13 @@ impl SessionsTab {
         frame: &mut Frame,
         area: Rect,
         sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
+        p: &Palette,
     ) {
         let is_focused = self.focus == 1; // Projects focus
         let border_color = if is_focused {
-            Color::Cyan
+            p.focus
         } else {
-            Color::DarkGray
+            p.border
         };
 
         let block = Block::default()
@@ -958,7 +964,7 @@ impl SessionsTab {
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 format!(" Projects ({}) ", self.projects.len()),
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let items: Vec<ListItem> = self
@@ -972,18 +978,18 @@ impl SessionsTab {
 
                 let style = if is_selected && is_focused {
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(p.focus)
                         .add_modifier(Modifier::BOLD)
                 } else if is_selected {
-                    Style::default().fg(Color::White)
+                    Style::default().fg(p.fg)
                 } else {
-                    Style::default().fg(Color::DarkGray)
+                    Style::default().fg(p.muted)
                 };
 
                 let count_style = if is_selected {
-                    Style::default().fg(Color::Yellow)
+                    Style::default().fg(p.warning)
                 } else {
-                    Style::default().fg(Color::DarkGray)
+                    Style::default().fg(p.muted)
                 };
 
                 ListItem::new(Line::from(vec![
@@ -996,7 +1002,7 @@ impl SessionsTab {
 
         let list = List::new(items).block(block).highlight_style(
             Style::default()
-                .bg(Color::DarkGray)
+                .bg(p.border)
                 .add_modifier(Modifier::BOLD),
         );
 
@@ -1008,12 +1014,13 @@ impl SessionsTab {
         frame: &mut Frame,
         area: Rect,
         sessions: &[Arc<SessionMetadata>],
+        p: &Palette,
     ) {
         let is_focused = self.focus == 2; // Sessions focus
         let border_color = if is_focused {
-            Color::Cyan
+            p.focus
         } else {
-            Color::DarkGray
+            p.border
         };
 
         let time_ago = self.format_time_ago();
@@ -1065,7 +1072,7 @@ impl SessionsTab {
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 title_text,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         if sessions.is_empty() {
@@ -1075,26 +1082,26 @@ impl SessionsTab {
                     Line::from(""),
                     Line::from(Span::styled(
                         "📂 No sessions found",
-                        Style::default().fg(Color::Yellow),
+                        Style::default().fg(p.warning),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         "No Claude Code sessions in this project",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         "💡 Start a session:",
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(p.focus),
                     )),
                     Line::from(Span::styled(
                         "   cd <project-dir> && claude",
-                        Style::default().fg(Color::Green),
+                        Style::default().fg(p.success),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         "📁 Sessions stored in: ~/.claude/projects/",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                 ]
             } else {
@@ -1103,22 +1110,22 @@ impl SessionsTab {
                     Line::from(""),
                     Line::from(Span::styled(
                         "🔍 No matching sessions",
-                        Style::default().fg(Color::Yellow),
+                        Style::default().fg(p.warning),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         format!("No sessions match: \"{}\"", self.search_filter),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                     Line::from(""),
-                    Line::from(Span::styled("💡 Try:", Style::default().fg(Color::Cyan))),
+                    Line::from(Span::styled("💡 Try:", Style::default().fg(p.focus))),
                     Line::from(Span::styled(
                         "   • Shorter query or different project",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                     Line::from(Span::styled(
                         "   • Clear filter (Esc)",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                 ]
             };
@@ -1161,12 +1168,12 @@ impl SessionsTab {
 
                 let style = if is_selected && is_focused {
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(p.focus)
                         .add_modifier(Modifier::BOLD)
                 } else if is_selected {
-                    Style::default().fg(Color::White)
+                    Style::default().fg(p.fg)
                 } else {
-                    Style::default().fg(Color::Gray)
+                    Style::default().fg(p.muted)
                 };
 
                 let tokens_str = Self::format_tokens(session.total_tokens);
@@ -1183,19 +1190,19 @@ impl SessionsTab {
                     let project_short = Self::format_project_path(&session.project_path);
                     preview_spans.push(Span::styled(
                         format!("[{}] ", project_short),
-                        Style::default().fg(Color::Blue),
+                        Style::default().fg(p.focus),
                     ));
                 }
 
                 preview_spans.extend(vec![
-                    Span::styled(format!("{} ", date_str), Style::default().fg(Color::Yellow)),
+                    Span::styled(format!("{} ", date_str), Style::default().fg(p.warning)),
                     Span::styled(
                         format!("{:>6} ", tokens_str),
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(p.focus),
                     ),
                     Span::styled(
                         format!("{:>5} ", msgs_str),
-                        Style::default().fg(Color::Green),
+                        Style::default().fg(p.success),
                     ),
                 ]);
 
@@ -1208,7 +1215,7 @@ impl SessionsTab {
                     };
                     preview_spans.push(Span::styled(
                         branch_display,
-                        Style::default().fg(Color::Magenta),
+                        Style::default().fg(p.important),
                     ));
                 }
 
@@ -1246,13 +1253,13 @@ impl SessionsTab {
         }
     }
 
-    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&Arc<SessionMetadata>>) {
+    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&Arc<SessionMetadata>>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " Session Detail ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -1260,79 +1267,79 @@ impl SessionsTab {
 
         let Some(session) = session else {
             let empty =
-                Paragraph::new("No session selected").style(Style::default().fg(Color::DarkGray));
+                Paragraph::new("No session selected").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
 
         let mut lines = vec![
             Line::from(vec![
-                Span::styled("ID: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&session.id, Style::default().fg(Color::White)),
+                Span::styled("ID: ", Style::default().fg(p.muted)),
+                Span::styled(&session.id, Style::default().fg(p.fg)),
             ]),
             Line::from(vec![
-                Span::styled("File: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("File: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session.file_path.display().to_string(),
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(p.warning),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&session.project_path, Style::default().fg(Color::Yellow)),
+                Span::styled("Project: ", Style::default().fg(p.muted)),
+                Span::styled(&session.project_path, Style::default().fg(p.warning)),
             ]),
         ];
 
         // Add branch if available
         if let Some(ref branch) = session.branch {
             lines.push(Line::from(vec![
-                Span::styled("Branch: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(branch, Style::default().fg(Color::Magenta)),
+                Span::styled("Branch: ", Style::default().fg(p.muted)),
+                Span::styled(branch, Style::default().fg(p.important)),
             ]));
         }
 
         lines.extend(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled("Started: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Started: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session
                         .first_timestamp
                         .map(|ts| ts.format("%Y-%m-%d %H:%M:%S").to_string())
                         .unwrap_or_else(|| "unknown".to_string()),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(p.fg),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Ended: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Ended: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session
                         .last_timestamp
                         .map(|ts| ts.format("%Y-%m-%d %H:%M:%S").to_string())
                         .unwrap_or_else(|| "unknown".to_string()),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(p.fg),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Duration: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Duration: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session.duration_display(),
-                    Style::default().fg(Color::Green),
+                    Style::default().fg(p.success),
                 ),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("Messages: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Messages: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session.message_count.to_string(),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(p.focus),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Tokens: ", Style::default().fg(p.muted)),
                 Span::styled(
                     Self::format_tokens(session.total_tokens),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(p.focus),
                 ),
             ]),
         ]);
@@ -1340,34 +1347,34 @@ impl SessionsTab {
         // Token breakdown (if available)
         if session.input_tokens > 0 || session.output_tokens > 0 {
             lines.push(Line::from(vec![
-                Span::styled("  ├─ Input: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("  ├─ Input: ", Style::default().fg(p.muted)),
                 Span::styled(
                     Self::format_tokens(session.input_tokens),
-                    Style::default().fg(Color::Green),
+                    Style::default().fg(p.success),
                 ),
             ]));
             lines.push(Line::from(vec![
-                Span::styled("  ├─ Output: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("  ├─ Output: ", Style::default().fg(p.muted)),
                 Span::styled(
                     Self::format_tokens(session.output_tokens),
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(p.warning),
                 ),
             ]));
             if session.cache_creation_tokens > 0 {
                 lines.push(Line::from(vec![
-                    Span::styled("  ├─ Cache Write: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("  ├─ Cache Write: ", Style::default().fg(p.muted)),
                     Span::styled(
                         Self::format_tokens(session.cache_creation_tokens),
-                        Style::default().fg(Color::Magenta),
+                        Style::default().fg(p.important),
                     ),
                 ]));
             }
             if session.cache_read_tokens > 0 {
                 lines.push(Line::from(vec![
-                    Span::styled("  └─ Cache Read: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("  └─ Cache Read: ", Style::default().fg(p.muted)),
                     Span::styled(
                         Self::format_tokens(session.cache_read_tokens),
-                        Style::default().fg(Color::Blue),
+                        Style::default().fg(p.focus),
                     ),
                 ]));
             }
@@ -1375,30 +1382,30 @@ impl SessionsTab {
 
         lines.extend(vec![
             Line::from(vec![
-                Span::styled("File Size: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(session.size_display(), Style::default().fg(Color::White)),
+                Span::styled("File Size: ", Style::default().fg(p.muted)),
+                Span::styled(session.size_display(), Style::default().fg(p.fg)),
             ]),
             Line::from(vec![
-                Span::styled("Subagents: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Subagents: ", Style::default().fg(p.muted)),
                 Span::styled(
                     if session.has_subagents { "Yes" } else { "No" },
                     if session.has_subagents {
-                        Style::default().fg(Color::Green)
+                        Style::default().fg(p.success)
                     } else {
-                        Style::default().fg(Color::DarkGray)
+                        Style::default().fg(p.muted)
                     },
                 ),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("Models: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Models: ", Style::default().fg(p.muted)),
                 Span::styled(
                     if session.models_used.is_empty() {
                         "unknown".to_string()
                     } else {
                         session.models_used.join(", ")
                     },
-                    Style::default().fg(Color::Magenta),
+                    Style::default().fg(p.important),
                 ),
             ]),
         ]);
@@ -1408,7 +1415,7 @@ impl SessionsTab {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "Tool Usage (top 5):",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )));
 
             let mut tool_usage_vec: Vec<_> = session.tool_usage.iter().collect();
@@ -1416,9 +1423,9 @@ impl SessionsTab {
 
             for (tool, count) in tool_usage_vec.iter().take(5) {
                 lines.push(Line::from(vec![
-                    Span::styled("  • ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(tool.as_str(), Style::default().fg(Color::Cyan)),
-                    Span::styled(format!(" ({})", count), Style::default().fg(Color::Yellow)),
+                    Span::styled("  • ", Style::default().fg(p.muted)),
+                    Span::styled(tool.as_str(), Style::default().fg(p.focus)),
+                    Span::styled(format!(" ({})", count), Style::default().fg(p.warning)),
                 ]));
             }
         }
@@ -1427,14 +1434,14 @@ impl SessionsTab {
             Line::from(""),
             Line::from(Span::styled(
                 "First message:",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
             Line::from(Span::styled(
                 session
                     .first_user_message
                     .as_deref()
                     .unwrap_or("No preview available"),
-                Style::default().fg(Color::White),
+                Style::default().fg(p.fg),
             )),
         ]);
 
@@ -1468,15 +1475,16 @@ impl SessionsTab {
         area: Rect,
         live_session: &ccboard_core::LiveSession,
         session_meta: Option<&Arc<SessionMetadata>>,
+        p: &Palette,
     ) {
         use chrono::Local;
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Green))
+            .border_style(Style::default().fg(p.success))
             .title(Span::styled(
                 " 🟢 Live Session Detail ",
-                Style::default().fg(Color::Green).bold(),
+                Style::default().fg(p.success).bold(),
             ));
 
         let inner = block.inner(area);
@@ -1496,50 +1504,49 @@ impl SessionsTab {
             Line::from(Span::styled(
                 "PROCESS INFORMATION",
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(p.warning)
                     .add_modifier(Modifier::BOLD),
             )),
             Line::from(""),
             Line::from(vec![
-                Span::styled("PID: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("PID: ", Style::default().fg(p.muted)),
                 Span::styled(
                     live_session.pid.to_string(),
-                    Style::default().fg(Color::Cyan).bold(),
+                    Style::default().fg(p.focus).bold(),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Running: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(duration_str, Style::default().fg(Color::Green)),
+                Span::styled("Running: ", Style::default().fg(p.muted)),
+                Span::styled(duration_str, Style::default().fg(p.success)),
             ]),
             Line::from(vec![
-                Span::styled("CPU: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("CPU: ", Style::default().fg(p.muted)),
                 Span::styled(
                     format!("{:.1}%", live_session.cpu_percent),
                     Style::default().fg(if live_session.cpu_percent > 50.0 {
-                        Color::Red
+                        p.error
                     } else if live_session.cpu_percent > 20.0 {
-                        Color::Yellow
+                        p.warning
                     } else {
-                        Color::Green
+                        p.success
                     }),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Memory: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Memory: ", Style::default().fg(p.muted)),
                 Span::styled(
                     format!("{} MB", live_session.memory_mb),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(p.focus),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Working Dir: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Working Dir: ", Style::default().fg(p.muted)),
                 Span::styled(
                     live_session
                         .working_directory
-                        .as_ref()
-                        .map(|s| s.as_str())
+                        .as_deref()
                         .unwrap_or("unknown"),
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(p.warning),
                 ),
             ]),
             Line::from(""),
@@ -1551,70 +1558,69 @@ impl SessionsTab {
                 Line::from(Span::styled(
                     "SESSION INFORMATION",
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(p.focus)
                         .add_modifier(Modifier::BOLD),
                 )),
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("Session ID: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Session ID: ", Style::default().fg(p.muted)),
                     Span::styled(
                         &session.id[..8.min(session.id.len())],
-                        Style::default().fg(Color::White),
+                        Style::default().fg(p.fg),
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(&session.project_path, Style::default().fg(Color::Yellow)),
+                    Span::styled("Project: ", Style::default().fg(p.muted)),
+                    Span::styled(&session.project_path, Style::default().fg(p.warning)),
                 ]),
             ];
 
             // Add branch if available
             if let Some(ref branch) = session.branch {
                 session_lines.push(Line::from(vec![
-                    Span::styled("Branch: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(branch, Style::default().fg(Color::Magenta)),
+                    Span::styled("Branch: ", Style::default().fg(p.muted)),
+                    Span::styled(branch, Style::default().fg(p.important)),
                 ]));
             }
 
             session_lines.extend(vec![
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("Messages: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Messages: ", Style::default().fg(p.muted)),
                     Span::styled(
                         session.message_count.to_string(),
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(p.focus),
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Tokens: ", Style::default().fg(p.muted)),
                     Span::styled(
                         Self::format_tokens(live_session.tokens.unwrap_or(session.total_tokens)),
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(p.focus),
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Models: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Models: ", Style::default().fg(p.muted)),
                     Span::styled(
                         if session.models_used.is_empty() {
                             "unknown".to_string()
                         } else {
                             session.models_used.join(", ")
                         },
-                        Style::default().fg(Color::Magenta),
+                        Style::default().fg(p.important),
                     ),
                 ]),
                 Line::from(""),
                 Line::from(Span::styled(
                     "First message:",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
                 Line::from(Span::styled(
                     session
                         .first_user_message
-                        .as_ref()
-                        .map(|s| s.as_str())
+                        .as_deref()
                         .unwrap_or("(no message)"),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(p.fg),
                 )),
             ]);
 
@@ -1624,48 +1630,48 @@ impl SessionsTab {
                 Line::from(Span::styled(
                     "SESSION INFORMATION",
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(p.focus)
                         .add_modifier(Modifier::BOLD),
                 )),
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("Name: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(session_name, Style::default().fg(Color::White)),
+                    Span::styled("Name: ", Style::default().fg(p.muted)),
+                    Span::styled(session_name, Style::default().fg(p.fg)),
                 ]),
                 Line::from(vec![
-                    Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Tokens: ", Style::default().fg(p.muted)),
                     Span::styled(
                         live_session
                             .tokens
-                            .map(|t| Self::format_short(t))
+                            .map(Self::format_short)
                             .unwrap_or_else(|| "?".to_string()),
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(p.focus),
                     ),
                 ]),
                 Line::from(""),
                 Line::from(Span::styled(
                     "(Full session details not available yet)",
-                    Style::default().fg(Color::DarkGray).italic(),
+                    Style::default().fg(p.muted).italic(),
                 )),
             ]);
         } else {
             lines.extend(vec![Line::from(Span::styled(
                 "Session metadata not available",
-                Style::default().fg(Color::DarkGray).italic(),
+                Style::default().fg(p.muted).italic(),
             ))]);
         }
 
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "Press Enter to close",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         )));
 
         let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: false });
         frame.render_widget(paragraph, inner);
     }
 
-    fn render_replay_popup(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_replay_popup(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         let total_messages = self.replay_messages.len();
         let selected_idx = self.replay_scroll.selected().unwrap_or(0);
 
@@ -1681,10 +1687,10 @@ impl SessionsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Magenta))
+            .border_style(Style::default().fg(p.important))
             .title(Span::styled(
                 title,
-                Style::default().fg(Color::Magenta).bold(),
+                Style::default().fg(p.important).bold(),
             ));
 
         let inner = block.inner(area);
@@ -1692,7 +1698,7 @@ impl SessionsTab {
 
         if self.replay_messages.is_empty() {
             let empty = Paragraph::new("No messages in this session")
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -1715,11 +1721,11 @@ impl SessionsTab {
                     .unwrap_or_else(|| "??:??:??".to_string());
 
                 let (type_icon, type_color) = match msg.line_type.as_str() {
-                    "user" => ("👤", Color::Cyan),
-                    "assistant" => ("🤖", Color::Green),
-                    "tool_use" => ("🔧", Color::Yellow),
-                    "tool_result" => ("📊", Color::Blue),
-                    _ => ("•", Color::DarkGray),
+                    "user" => ("👤", p.focus),
+                    "assistant" => ("🤖", p.success),
+                    "tool_use" => ("🔧", p.warning),
+                    "tool_result" => ("📊", p.focus),
+                    _ => ("•", p.muted),
                 };
 
                 // Header line: timestamp + icon + type
@@ -1732,7 +1738,7 @@ impl SessionsTab {
                 lines.push(Line::from(vec![
                     Span::styled(
                         if is_selected { "▶ " } else { "  " },
-                        Style::default().fg(Color::White),
+                        Style::default().fg(p.fg),
                     ),
                     Span::styled(format!("[{}] ", timestamp_str), header_style),
                     Span::styled(format!("{} ", type_icon), header_style),
@@ -1751,7 +1757,7 @@ impl SessionsTab {
 
                         lines.push(Line::from(vec![Span::styled(
                             format!("  {}", preview),
-                            Style::default().fg(Color::White),
+                            Style::default().fg(p.fg),
                         )]));
                     }
 
@@ -1765,7 +1771,7 @@ impl SessionsTab {
                                     tool_calls.len(),
                                     if is_expanded { "" } else { "[Enter to expand]" }
                                 ),
-                                Style::default().fg(Color::Yellow),
+                                Style::default().fg(p.warning),
                             )]));
 
                             if is_expanded {
@@ -1776,7 +1782,7 @@ impl SessionsTab {
                                         .unwrap_or("unknown");
                                     lines.push(Line::from(vec![Span::styled(
                                         format!("    {}. {}", i + 1, tool_name),
-                                        Style::default().fg(Color::Yellow),
+                                        Style::default().fg(p.warning),
                                     )]));
                                 }
                             }
@@ -1793,7 +1799,7 @@ impl SessionsTab {
                                     tool_results.len(),
                                     if is_expanded { "" } else { "[Enter to expand]" }
                                 ),
-                                Style::default().fg(Color::Blue),
+                                Style::default().fg(p.focus),
                             )]));
 
                             if is_expanded {
@@ -1809,7 +1815,7 @@ impl SessionsTab {
                                     };
                                     lines.push(Line::from(vec![Span::styled(
                                         format!("    {}. {}", i + 1, preview),
-                                        Style::default().fg(Color::DarkGray),
+                                        Style::default().fg(p.muted),
                                     )]));
                                 }
                             }
@@ -1829,7 +1835,7 @@ impl SessionsTab {
                                     usage.cache_read_tokens,
                                     usage.cache_write_tokens
                                 ),
-                                Style::default().fg(Color::DarkGray),
+                                Style::default().fg(p.muted),
                             )]));
                         }
                     }
@@ -1837,7 +1843,7 @@ impl SessionsTab {
                     // Tool events without message wrapper (fallback)
                     lines.push(Line::from(vec![Span::styled(
                         "  (Tool event details not available)",
-                        Style::default().fg(Color::DarkGray).italic(),
+                        Style::default().fg(p.muted).italic(),
                     )]));
                 }
 
@@ -1850,7 +1856,7 @@ impl SessionsTab {
 
         let list = List::new(items).highlight_style(
             Style::default()
-                .bg(Color::DarkGray)
+                .bg(p.border)
                 .add_modifier(Modifier::BOLD),
         );
 
@@ -1880,30 +1886,30 @@ impl SessionsTab {
             Span::raw(" ["),
             Span::styled(
                 "j/k ↑↓",
-                Style::default().fg(Color::Black).bg(Color::Magenta).bold(),
+                Style::default().fg(p.bg).bg(p.important).bold(),
             ),
             Span::raw("] "),
-            Span::styled("scroll", Style::default().fg(Color::White)),
-            Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("scroll", Style::default().fg(p.fg)),
+            Span::styled(" │ ", Style::default().fg(p.muted)),
             Span::raw("["),
             Span::styled(
                 "Enter",
-                Style::default().fg(Color::Black).bg(Color::Magenta).bold(),
+                Style::default().fg(p.bg).bg(p.important).bold(),
             ),
             Span::raw("] "),
-            Span::styled("expand/collapse", Style::default().fg(Color::White)),
-            Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+            Span::styled("expand/collapse", Style::default().fg(p.fg)),
+            Span::styled(" │ ", Style::default().fg(p.muted)),
             Span::raw("["),
             Span::styled(
                 "Esc",
-                Style::default().fg(Color::Black).bg(Color::Magenta).bold(),
+                Style::default().fg(p.bg).bg(p.important).bold(),
             ),
             Span::raw("] "),
-            Span::styled("close", Style::default().fg(Color::White)),
+            Span::styled("close", Style::default().fg(p.fg)),
         ]);
 
         let hints_widget = Paragraph::new(hints)
-            .style(Style::default().bg(Color::DarkGray))
+            .style(Style::default().bg(p.border))
             .alignment(ratatui::layout::Alignment::Center);
 
         frame.render_widget(hints_widget, hints_area);
@@ -1932,7 +1938,7 @@ impl SessionsTab {
         }
     }
 
-    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         // Center popup (40% width, 30% height)
         let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
         let popup_height = (area.height as f32 * 0.3).max(8.0) as u16;
@@ -1948,10 +1954,10 @@ impl SessionsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Red))
+            .border_style(Style::default().fg(p.error))
             .title(Span::styled(
                 " Error ",
-                Style::default().fg(Color::Red).bold(),
+                Style::default().fg(p.error).bold(),
             ));
 
         let inner = block.inner(popup_area);
@@ -1960,11 +1966,11 @@ impl SessionsTab {
         let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
+            Line::from(Span::styled(error_text, Style::default().fg(p.fg))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ];
 
@@ -2022,7 +2028,7 @@ impl SessionsTab {
     }
 
     /// Render refresh notification overlay (bottom banner)
-    fn render_keyboard_hints(&self, frame: &mut Frame, area: Rect) {
+    fn render_keyboard_hints(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         // Calculate position at bottom of area
         let hint_area = Rect {
             x: area.x,
@@ -2038,26 +2044,26 @@ impl SessionsTab {
                     Span::raw(" ["),
                     Span::styled(
                         "Tab",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("cycle focus", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("cycle focus", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "↑↓ j/k",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("navigate", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("navigate", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "Enter",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("detail", Style::default().fg(Color::White)),
+                    Span::styled("detail", Style::default().fg(p.fg)),
                 ]
             }
             1 => {
@@ -2066,26 +2072,26 @@ impl SessionsTab {
                     Span::raw(" ["),
                     Span::styled(
                         "Tab",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("cycle focus", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("cycle focus", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "↑↓ j/k",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("navigate", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("navigate", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "h/l",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("switch pane", Style::default().fg(Color::White)),
+                    Span::styled("switch pane", Style::default().fg(p.fg)),
                 ]
             }
             2 => {
@@ -2094,58 +2100,58 @@ impl SessionsTab {
                     Span::raw(" ["),
                     Span::styled(
                         "Tab",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("cycle focus", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("cycle focus", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "↑↓ j/k",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("navigate", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("navigate", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "Enter",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("detail", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("detail", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "v",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("replay", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("replay", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "e",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("edit", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("edit", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "r",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("resume", Style::default().fg(Color::White)),
-                    Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("resume", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled(
                         "d",
-                        Style::default().fg(Color::Black).bg(Color::Cyan).bold(),
+                        Style::default().fg(p.bg).bg(p.focus).bold(),
                     ),
                     Span::raw("] "),
-                    Span::styled("date filter", Style::default().fg(Color::White)),
+                    Span::styled("date filter", Style::default().fg(p.fg)),
                 ]
             }
             _ => vec![],
@@ -2153,7 +2159,7 @@ impl SessionsTab {
 
         let hint_line = Line::from(hints);
         let hint_paragraph = Paragraph::new(hint_line)
-            .style(Style::default().bg(Color::DarkGray))
+            .style(Style::default().bg(p.border))
             .alignment(ratatui::layout::Alignment::Center);
 
         frame.render_widget(hint_paragraph, hint_area);
@@ -2170,7 +2176,7 @@ impl SessionsTab {
         }
     }
 
-    fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_refresh_notification(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         let Some(msg) = &self.refresh_message else {
             return;
         };
@@ -2190,13 +2196,13 @@ impl SessionsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Green));
+            .border_style(Style::default().fg(p.success));
 
         let inner = block.inner(msg_area);
         frame.render_widget(block, msg_area);
 
         let paragraph = Paragraph::new(msg.as_str())
-            .style(Style::default().fg(Color::Green))
+            .style(Style::default().fg(p.success))
             .alignment(ratatui::layout::Alignment::Center);
         frame.render_widget(paragraph, inner);
     }

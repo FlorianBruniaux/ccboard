@@ -1,184 +1,254 @@
-# ccboard Roadmap - Post v0.5.0
+# ccboard Roadmap
 
-## Current Status (2026-02-09)
-
-✅ **Phase G Complete**: Full TUI/Web parity (100%)
-- 9 TUI tabs fully functional (Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP, Analytics)
-- 5 Web pages (Dashboard, Sessions, Analytics, Config, History)
-- SSE live updates for real-time monitoring
-- Sprint 1 UX improvements (config modal, elevation system, responsive design)
-- SQLite metadata cache with 89x speedup (20s → 224ms)
-- Arc migration achieving 50x memory reduction (1.4GB → 28MB)
-
-🔄 **Phase A In Progress**: Analytics enhancements
-- Token usage forecasting with trend analysis
-- Session analytics with model breakdown
-- Project leaderboard (planned)
-- Session replay (planned)
-- Anomaly detection (planned)
+**Last Updated**: 2026-02-16
+**Current Version**: v0.8.0
+**Target**: v1.0.0 (Phases J-L complete)
 
 ---
 
-## Next Phases
+## 🎯 Vision
 
-### Phase F: Conversation Viewer (Q1 2026)
+Transform ccboard from a monitoring dashboard into a **complete Claude Code management platform** with analytics, export, advanced insights, and extensibility.
 
-**Goal**: Full JSONL content display with syntax highlighting
+**Core Principles**:
+- ✅ Read-only by default (monitoring focus)
+- ✅ Performance first (<2s startup maintained)
+- ✅ Claude Code-only (no multi-provider scope creep)
+- ✅ Graceful degradation (partial data > crashes)
+
+---
+
+## 📍 Current Status (v0.8.0)
+
+### ✅ Production Features
+
+**TUI + Web UI** (9 tabs, 100% parity):
+- Dashboard, Sessions (live monitoring), Config, Hooks, Agents
+- Costs (4 views + quota), History (search + export), MCP, Analytics
+
+**Performance**:
+- 89x faster startup (SQLite cache: 20s → 33ms)
+- 50x memory reduction (Arc migration: 1.4GB → 28MB)
+- 344 tests passing, 0 clippy warnings
+
+**Budget Tracking** (v0.8.0):
+- Month-to-date cost calculation with token-based prorata
+- Monthly projection with configurable limits
+- 4-level alerts (Safe/Warning/Critical/Exceeded)
+- Visual gauges in TUI + Web UI
+
+---
+
+## 🚀 Upcoming Phases
+
+### Phase J: Export Features (v0.9.0) - **NEXT**
+
+**Priority**: 🔴 HIGH
+**Duration**: 6-8h
+**Status**: ⏳ Planned
+
+**Goal**: Export sessions, stats, and billing data to external formats for reporting and analysis.
 
 **Features**:
-- Display complete session conversations with message threading
-- Syntax highlighting for code blocks (Rust, Python, JS, etc.)
-- Message filtering (by role, tool usage, timestamps)
-- Export conversations (Markdown, JSON, PDF)
-- Search within conversation content
-- Tool call visualization with input/output display
+- Export sessions → CSV/JSON (for Excel, data analysis)
+- Export stats → Markdown reports (for team sharing)
+- Export billing blocks → CSV (for accounting)
+- CLI: `ccboard export sessions --format csv --output sessions.csv`
 
-**Technical**:
-- Streaming JSONL parser for large sessions (>100MB)
-- Syntax highlighting via `syntect` or `tree-sitter`
-- Export pipeline (Markdown → Pandoc → PDF)
+**Value**:
+- ✅ Share data with non-technical stakeholders
+- ✅ Integrate with external reporting tools
+- ✅ Backup session metadata
+- ✅ Quick win with immediate ROI
+
+**See**: [NEXT_STEPS.md](NEXT_STEPS.md) for detailed Phase J plan.
 
 ---
 
-### Phase H: Plan-Aware (Q2 2026)
+### Phase K: Advanced Analytics (v0.10.0)
 
-**Goal**: Parse and track PLAN.md progress across sessions
+**Priority**: 🟡 MEDIUM
+**Duration**: 10-12h
+**Status**: 📋 Backlog
+
+**Goal**: AI-powered insights, anomaly detection, and usage pattern analysis.
 
 **Features**:
-- PLAN.md frontmatter parsing (phases, tasks, blockers)
-- Task completion tracking across sessions
-- Dependency visualization (task graphs)
-- Timeline view (planned vs actual completion)
-- Phase progress indicators in TUI/Web
+- **Anomaly Detection**: Cost spikes > 2x average, unusual activity hours
+- **Usage Patterns**: Peak hours, day-of-week trends, model switching patterns
+- **Model Recommendations**: Suggest Opus ↔ Sonnet switches based on usage
+- **Forecast Accuracy Tracking**: Compare projections vs actual costs
 
-**Technical**:
-- YAML frontmatter parser for plan metadata
-- Task dependency resolution (DAG construction)
-- Session-to-task mapping via TodoWrite events
-- D3.js integration for web dependency graphs
+**Value**:
+- ✅ Proactive cost management
+- ✅ Identify optimization opportunities
+- ✅ Understand team productivity patterns
 
 ---
 
-### Phase 11: Tokens & Invocations (Q2 2026)
+### Phase L: Plugin System (v0.11.0)
 
-**Goal**: Deep analytics for token usage and tool invocations
+**Priority**: 🟢 LOW
+**Duration**: 12-15h
+**Status**: 📋 Backlog
+
+**Goal**: Extensible architecture for community plugins and custom integrations.
 
 **Features**:
-- Token usage per tool (Read, Write, Bash, etc.)
-- Token usage per agent (explore, plan, test-runner)
-- Invocation patterns analysis (most used tools, chains)
-- Cost optimization suggestions (detect expensive patterns)
-- Token heatmap per session/project
-- Tool efficiency metrics (tokens per invocation)
+- **Plugin API**: Hooks for custom tabs, data sources, metrics
+- **Dynamic Loading**: .so/.dylib plugin discovery and loading
+- **Example Plugins**:
+  - Slack notifications for budget alerts
+  - GitHub issue creation for anomalies
+  - Custom cost allocation rules
 
-**Technical**:
-- JSONL parser enhancement for `usage` object extraction
-- Tool invocation counting via message role analysis
-- Cost calculation per tool (using Claude pricing)
-- Heatmap visualization (TUI: ratatui charts, Web: Chart.js)
+**Value**:
+- ✅ Community contributions
+- ✅ Team-specific customizations
+- ✅ Future-proof architecture
 
 ---
 
-### Phase 12: Write Operations (Q3 2026)
+### Phase M: Conversation Viewer Enhancements (v0.11.5)
 
-**Goal**: Enable configuration editing from TUI/Web
+**Priority**: 🟡 MEDIUM
+**Duration**: 8-10h
+**Status**: 📋 Backlog (extends Phase F)
 
-**⚠️ Safety-First Design**:
-- Backup before any write operation (`~/.claude/.backups/`)
-- Dry-run mode showing diff before applying
-- Rollback capability (restore from backup)
-- Audit log for all config changes
+**Goal**: Advanced conversation analysis and visualization.
 
 **Features**:
-- Edit settings.json from Config tab (global, project, local)
-- Create/edit/delete hooks from Hooks tab
-- Create/edit agents/commands/skills from Agents tab
-- Toggle MCP servers from MCP tab
-- Settings validation before write (JSON schema)
+- **Tool Call Visualization**: Expandable nodes with input/output
+- **Message Threading**: Conversation flow graphs
+- **Export Enhancements**: HTML reports with syntax highlighting
+- **Full-Text Search**: Regex support, multi-session search
 
-**Technical**:
-- JSON schema validation via `jsonschema` crate
-- YAML frontmatter validation for agents/commands/skills
-- Atomic writes (temp file → rename pattern)
-- File watching integration for live reload after edit
+**Depends on**: Phase F (Conversation Viewer) completed in v0.7.0
 
 ---
 
-### Phase 13: Team & Collaboration (Q3 2026)
+### Phase N: Plan-Aware Completion (v0.12.0)
 
-**Goal**: Multi-user ccboard for team Claude Code monitoring
+**Priority**: 🟢 LOW
+**Duration**: 10-14h
+**Status**: 📋 Backlog (extends Phase H)
+
+**Goal**: Complete PLAN.md parsing with dependency graphs and progress tracking.
 
 **Features**:
-- Central server aggregating multiple `~/.claude` directories
-- Team dashboard (all members' stats aggregated)
-- Project sharing (multiple devs working on same project)
-- Cost allocation per developer
-- Leaderboard (tokens, sessions, projects)
+- **Task Dependency DAG**: Visual dependency graphs (D3.js)
+- **Progress Tracking**: Phase completion % across sessions
+- **TodoWrite Mapping**: Link sessions to tasks automatically
+- **Timeline View**: Gantt-like visualization of planned vs actual
 
-**Technical**:
-- Server mode: `ccboard server --port 8080 --team-config team.toml`
-- Agent-based directory sync (poll each dev's `~/.claude`)
-- User authentication (token-based, no passwords)
-- PostgreSQL backend for multi-user data
+**Depends on**: Phase H (Plan-Aware basics) partially implemented in v0.8.0
 
 ---
 
-### Phase 14: IDE Integrations (Q4 2026)
+## 🏁 Milestone: v1.0.0
 
-**Goal**: Launch ccboard from IDEs (VS Code, Neovim, JetBrains)
+**Target**: After Phase J, K, L complete
+**Criteria**:
+- ✅ All major use cases covered (monitoring, export, analytics, plugins)
+- ✅ Production stability (>1000 sessions tested, <2% error rate)
+- ✅ Documentation complete (user guide, API docs, plugin tutorial)
+- ✅ 500+ tests passing, 0 critical bugs
 
-**Features**:
-- VS Code extension: Show session stats in sidebar
-- Neovim plugin: Floating window with dashboard
-- JetBrains plugin: Tool window with config viewer
-- Quick actions: Resume session, search history, open config
-
-**Technical**:
-- VS Code: TypeScript extension + Webview API
-- Neovim: Lua plugin + terminal buffer
-- JetBrains: Kotlin plugin + Tool Window API
-- IPC via `ccboard --json` commands (JSON RPC)
+**Timeline**: Q2 2026 (estimated)
 
 ---
 
-### Phase 15: CI/CD Integration (Q4 2026)
+## 🔄 Future Considerations (Post v1.0.0)
 
-**Goal**: Generate reports for CI pipelines
+### Write Operations (Safety-Critical)
 
-**Features**:
-- CLI report generation: `ccboard report --format json --since 1d`
-- Token budget enforcement (fail CI if budget exceeded)
-- Session quality gates (fail if error rate > 10%)
-- Cost tracking per PR/branch
-- GitHub Actions integration (automatic reports on PRs)
+**Status**: Deprioritized indefinitely
+**Reason**: Read-only is safer, simpler, and covers 95% of use cases
 
-**Technical**:
-- `ccboard report` command with JSON/Markdown/HTML output
-- Exit codes for CI failures (non-zero if budget exceeded)
-- GitHub Action manifest (`action.yml`)
-- Artifact upload for report storage
+**If implemented**:
+- JSON schema validation
+- Backup/rollback system
+- Audit logging
+- External code review mandatory
+
+### Team & Collaboration
+
+**Status**: Low priority
+**Reason**: Single-user dashboard is core use case
+
+**If implemented**:
+- Multi-user server mode
+- PostgreSQL backend
+- User authentication
+- Team cost allocation
+
+### IDE Integrations
+
+**Status**: Low priority
+**Reason**: Standalone TUI/Web UI sufficient
+
+**If implemented**:
+- VS Code extension
+- Neovim plugin
+- JetBrains plugin
+
+### CI/CD Integration
+
+**Status**: Low priority
+**Reason**: `ccboard stats` CLI already supports automation
+
+**If implemented**:
+- GitHub Actions integration
+- Token budget enforcement in CI
+- Automated reports on PRs
 
 ---
 
-## Archived/Completed Phases
+## 📊 Phase Comparison
 
-For historical phases (Phase I-VI, Phase G), see:
-- `claudedocs/archive/roadmap-phase-i.md` (original roadmap)
-- `CHANGELOG.md` (detailed release history)
+| Phase | Priority | Duration | Version | Focus | Status |
+|-------|----------|----------|---------|-------|--------|
+| **J** | 🔴 HIGH | 6-8h | v0.9.0 | Export features | ⏳ Next |
+| **K** | 🟡 MEDIUM | 10-12h | v0.10.0 | Advanced analytics | 📋 Backlog |
+| **L** | 🟢 LOW | 12-15h | v0.11.0 | Plugin system | 📋 Backlog |
+| **M** | 🟡 MEDIUM | 8-10h | v0.11.5 | Conversation enhancements | 📋 Backlog |
+| **N** | 🟢 LOW | 10-14h | v0.12.0 | Plan-aware completion | 📋 Backlog |
 
----
-
-## Contributing to Roadmap
-
-Have ideas for new features? Open a [GitHub Discussion](https://github.com/FlorianBruniaux/ccboard/discussions) or [Issue](https://github.com/FlorianBruniaux/ccboard/issues) with:
-- **Use case**: What problem does it solve?
-- **Priority**: How critical is it?
-- **Complexity**: Rough estimate (hours/days/weeks)
-- **Alternatives**: Any existing solutions?
-
-Maintainer will review and potentially add to roadmap with priority/phase assignment.
+**Total Estimated**: 46-59h for v1.0.0 completion
 
 ---
 
-**Last Updated**: 2026-02-09
-**Current Version**: v0.5.0
+## 🎯 Success Metrics
+
+| Metric | Baseline (v0.8.0) | Target (v1.0.0) |
+|--------|-------------------|-----------------|
+| **Startup Time** | 33ms | <50ms |
+| **Memory Usage** | 28MB | <50MB |
+| **Session Render** | <500ms (1000 msgs) | <500ms |
+| **Export Speed** | N/A | <2s for 1000 sessions |
+| **Test Coverage** | 344 tests | 500+ tests |
+| **Bug Reports** | 0 critical | <5% error rate |
+
+---
+
+## 🤝 Contributing
+
+Interested in implementing a roadmap phase? See:
+- [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
+- [NEXT_STEPS.md](NEXT_STEPS.md) - Current phase details
+- [CLAUDE.md](../CLAUDE.md) - Development setup
+
+---
+
+## 📚 Related Documentation
+
+- [VERSION_STATUS.md](VERSION_STATUS.md) - Current version details
+- [CHANGELOG.md](../CHANGELOG.md) - Complete version history
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Technical design
+- [API.md](../docs/API.md) - Web API documentation
+
+---
+
+**Last Updated**: 2026-02-16
+**Maintainer**: @FlorianBruniaux
+**Repository**: https://github.com/FlorianBruniaux/ccboard

@@ -1,5 +1,7 @@
 //! Config tab - 3-column view with global/project/local + merged result
 
+use crate::theme::Palette;
+use ccboard_core::models::config::ColorScheme;
 use ccboard_core::models::{MergedConfig, Settings};
 use ccboard_core::parsers::{McpConfig, Rules};
 use ratatui::{
@@ -170,8 +172,10 @@ impl ConfigTab {
         config: &MergedConfig,
         mcp_config: Option<&McpConfig>,
         rules: &Rules,
-        _scheme: ccboard_core::models::config::ColorScheme,
+        scheme: ColorScheme,
     ) {
+        let p = Palette::new(scheme);
+
         // Layout: [Help header (2 lines), Content columns]
         let main_chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -184,7 +188,7 @@ impl ConfigTab {
         // Render help header
         let help_text = "Claude Code uses cascading configuration: Local > Project > Global. Merged shows final active configuration.";
         let help = Paragraph::new(help_text)
-            .style(Style::default().fg(Color::Gray))
+            .style(Style::default().fg(p.muted))
             .wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(help, main_chunks[0]);
 
@@ -207,6 +211,7 @@ impl ConfigTab {
             0,
             None,
             rules,
+            &p,
         );
         self.render_config_column(
             frame,
@@ -216,6 +221,7 @@ impl ConfigTab {
             1,
             None,
             rules,
+            &p,
         );
         self.render_config_column(
             frame,
@@ -225,6 +231,7 @@ impl ConfigTab {
             2,
             None,
             rules,
+            &p,
         );
         self.render_config_column(
             frame,
@@ -234,16 +241,17 @@ impl ConfigTab {
             3,
             mcp_config,
             rules,
+            &p,
         );
 
         // Render MCP detail modal if requested
         if self.show_mcp_detail {
-            self.render_mcp_detail_modal(frame, area, mcp_config);
+            self.render_mcp_detail_modal(frame, area, mcp_config, &p);
         }
 
         // Render error popup if present
         if self.error_message.is_some() {
-            self.render_error_popup(frame, area);
+            self.render_error_popup(frame, area, &p);
         }
     }
 
@@ -257,13 +265,10 @@ impl ConfigTab {
         col_index: usize,
         mcp_config: Option<&McpConfig>,
         rules: &Rules,
+        p: &Palette,
     ) {
         let is_focused = self.focus == col_index;
-        let border_color = if is_focused {
-            Color::Cyan
-        } else {
-            Color::DarkGray
-        };
+        let border_color = if is_focused { p.focus } else { p.border };
 
         let source_indicator = match col_index {
             0 => "~/.claude/settings.json",
@@ -279,11 +284,7 @@ impl ConfigTab {
             .title(Span::styled(
                 format!(" {} ", title),
                 Style::default()
-                    .fg(if is_focused {
-                        Color::Cyan
-                    } else {
-                        Color::White
-                    })
+                    .fg(if is_focused { p.focus } else { p.fg })
                     .bold(),
             ));
 
@@ -292,20 +293,18 @@ impl ConfigTab {
 
         let Some(settings) = settings else {
             let message = if col_index == 3 {
-                // Merged column should never be empty
                 "Using defaults"
             } else {
-                // Global/Project/Local can be missing
                 "Using defaults ✓"
             };
 
             let empty = Paragraph::new(vec![
-                Line::from(Span::styled(message, Style::default().fg(Color::Green))),
+                Line::from(Span::styled(message, Style::default().fg(p.success))),
                 Line::from(""),
                 Line::from(Span::styled(
                     source_indicator,
                     Style::default()
-                        .fg(Color::DarkGray)
+                        .fg(p.muted)
                         .add_modifier(Modifier::ITALIC),
                 )),
             ]);
@@ -313,7 +312,7 @@ impl ConfigTab {
             return;
         };
 
-        let items = self.settings_to_items(settings, col_index == 3, mcp_config, rules);
+        let items = self.settings_to_items(settings, col_index == 3, mcp_config, rules, p);
 
         // Clamp scroll state
         if let Some(sel) = self.scroll_states[col_index].selected() {
@@ -324,7 +323,7 @@ impl ConfigTab {
 
         let list = List::new(items).highlight_style(
             Style::default()
-                .bg(Color::DarkGray)
+                .bg(p.muted)
                 .add_modifier(Modifier::BOLD),
         );
 
@@ -337,22 +336,23 @@ impl ConfigTab {
         is_merged: bool,
         mcp_config: Option<&McpConfig>,
         rules: &Rules,
+        p: &Palette,
     ) -> Vec<ListItem<'static>> {
         let mut items = Vec::new();
 
         // Model
         if let Some(ref model) = settings.model {
-            items.push(self.make_item("model", model, Color::Cyan));
+            items.push(self.make_item("model", model, p.focus, p));
         }
 
         // Theme
         if let Some(ref theme) = settings.theme {
-            items.push(self.make_item("theme", theme, Color::Magenta));
+            items.push(self.make_item("theme", theme, p.important, p));
         }
 
         // API Key (masked)
         if settings.api_key.is_some() {
-            items.push(self.make_item("apiKey", "••••••••", Color::Red));
+            items.push(self.make_item("apiKey", "••••••••", p.error, p));
         }
 
         // Custom instructions
@@ -363,52 +363,57 @@ impl ConfigTab {
             } else {
                 preview
             };
-            items.push(self.make_item("customInstructions", &display, Color::Yellow));
+            items.push(self.make_item("customInstructions", &display, p.warning, p));
         }
 
         // Permissions section
         if let Some(ref perms) = settings.permissions {
             items.push(ListItem::new(Line::from(Span::styled(
                 "─── Permissions ───",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             ))));
 
             if let Some(ref allow) = perms.allow {
                 items.push(self.make_item(
                     "  allow",
                     &format!("[{}]", allow.join(", ")),
-                    Color::Green,
+                    p.success,
+                    p,
                 ));
             }
             if let Some(ref deny) = perms.deny {
-                items.push(self.make_item("  deny", &format!("[{}]", deny.join(", ")), Color::Red));
+                items.push(self.make_item("  deny", &format!("[{}]", deny.join(", ")), p.error, p));
             }
             if let Some(ref allow_bash) = perms.allow_bash {
                 items.push(self.make_item(
                     "  allowBash",
                     &format!("{} rules", allow_bash.len()),
-                    Color::Green,
+                    p.success,
+                    p,
                 ));
             }
             if let Some(ref deny_bash) = perms.deny_bash {
                 items.push(self.make_item(
                     "  denyBash",
                     &format!("{} rules", deny_bash.len()),
-                    Color::Red,
+                    p.error,
+                    p,
                 ));
             }
             if let Some(auto) = perms.auto_approve {
                 items.push(self.make_item(
                     "  autoApprove",
                     if auto { "true" } else { "false" },
-                    if auto { Color::Green } else { Color::Yellow },
+                    if auto { p.success } else { p.warning },
+                    p,
                 ));
             }
             if let Some(trust) = perms.trust_project {
                 items.push(self.make_item(
                     "  trustProject",
                     if trust { "true" } else { "false" },
-                    if trust { Color::Green } else { Color::Yellow },
+                    if trust { p.success } else { p.warning },
+                    p,
                 ));
             }
         }
@@ -417,7 +422,7 @@ impl ConfigTab {
         if let Some(ref hooks) = settings.hooks {
             items.push(ListItem::new(Line::from(Span::styled(
                 "─── Hooks ───",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             ))));
 
             for (event, groups) in hooks {
@@ -425,7 +430,8 @@ impl ConfigTab {
                 items.push(self.make_item(
                     &format!("  {}", event),
                     &format!("{} hooks", hook_count),
-                    Color::Yellow,
+                    p.warning,
+                    p,
                 ));
             }
         }
@@ -435,17 +441,22 @@ impl ConfigTab {
             if !env.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "─── Environment ───",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ))));
 
                 for (key, value) in env.iter().take(5) {
                     let display_val: String = value.chars().take(20).collect();
-                    items.push(self.make_item(&format!("  {}", key), &display_val, Color::Blue));
+                    items.push(self.make_item(
+                        &format!("  {}", key),
+                        &display_val,
+                        Color::Blue,
+                        p,
+                    ));
                 }
                 if env.len() > 5 {
                     items.push(ListItem::new(Line::from(Span::styled(
                         format!("  ... and {} more", env.len() - 5),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     ))));
                 }
             }
@@ -456,13 +467,13 @@ impl ConfigTab {
             if !plugins.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "─── Plugins ───",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ))));
 
                 for (name, enabled) in plugins {
-                    let color = if *enabled { Color::Green } else { Color::Red };
+                    let color = if *enabled { p.success } else { p.error };
                     let status = if *enabled { "enabled" } else { "disabled" };
-                    items.push(self.make_item(&format!("  {}", name), status, color));
+                    items.push(self.make_item(&format!("  {}", name), status, color, p));
                 }
             }
         }
@@ -471,41 +482,37 @@ impl ConfigTab {
         if is_merged {
             items.push(ListItem::new(Line::from(Span::styled(
                 "─── MCP Servers ───",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             ))));
 
             if let Some(mcp) = mcp_config {
                 if mcp.servers.is_empty() {
                     items.push(ListItem::new(Line::from(Span::styled(
                         "  (No MCP servers configured)",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     ))));
                 } else {
                     for (name, server) in &mcp.servers {
                         let cmd_display = server.display_command();
-                        // Truncate if too long (increased from 40 to 60)
                         let cmd_short: String = if cmd_display.len() > 60 {
                             cmd_display.chars().take(57).collect::<String>() + "..."
                         } else {
                             cmd_display
                         };
 
-                        // Line 1: Name with green bullet (configured)
                         items.push(ListItem::new(Line::from(vec![
-                            Span::styled("  ● ", Style::default().fg(Color::Green)),
+                            Span::styled("  ● ", Style::default().fg(p.success)),
                             Span::styled(
                                 format!("{} (configured)", name),
-                                Style::default().fg(Color::Cyan).bold(),
+                                Style::default().fg(p.focus).bold(),
                             ),
                         ])));
 
-                        // Line 2: Command
                         items.push(ListItem::new(Line::from(Span::styled(
                             format!("    {}", cmd_short),
-                            Style::default().fg(Color::White),
+                            Style::default().fg(p.fg),
                         ))));
 
-                        // Line 3: Env vars count (if present)
                         let env_info = if server.env.is_empty() {
                             "Env: (none)".to_string()
                         } else {
@@ -513,14 +520,14 @@ impl ConfigTab {
                         };
                         items.push(ListItem::new(Line::from(Span::styled(
                             format!("    {}", env_info),
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(p.muted),
                         ))));
                     }
                 }
             } else {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  (No MCP config found)",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ))));
             }
         }
@@ -529,20 +536,19 @@ impl ConfigTab {
         if is_merged {
             items.push(ListItem::new(Line::from(Span::styled(
                 "─── Rules (CLAUDE.md) ───",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             ))));
 
             if let Some(ref global) = rules.global {
                 let size_kb = global.size as f64 / 1024.0;
                 items.push(ListItem::new(Line::from(vec![
-                    Span::styled("  Global: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("  Global: ", Style::default().fg(p.muted)),
                     Span::styled(
                         format!("~/.claude/CLAUDE.md ({:.1}KB)", size_kb),
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(p.focus),
                     ),
                 ])));
 
-                // Preview first 3 lines
                 let preview = Rules::preview(global, 3);
                 for line in preview {
                     let display_line: String = if line.len() > 50 {
@@ -552,29 +558,29 @@ impl ConfigTab {
                     };
                     items.push(ListItem::new(Line::from(Span::styled(
                         format!("    > {}", display_line),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     ))));
                 }
             } else {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Global: (not found)",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ))));
             }
 
             if let Some(ref project) = rules.project {
                 let size_kb = project.size as f64 / 1024.0;
                 items.push(ListItem::new(Line::from(vec![
-                    Span::styled("  Project: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("  Project: ", Style::default().fg(p.muted)),
                     Span::styled(
                         format!(".claude/CLAUDE.md ({:.1}KB)", size_kb),
-                        Style::default().fg(Color::Magenta),
+                        Style::default().fg(p.important),
                     ),
                 ])));
             } else {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Project: (not found)",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ))));
             }
         }
@@ -583,27 +589,27 @@ impl ConfigTab {
         if !settings.extra.is_empty() && is_merged {
             items.push(ListItem::new(Line::from(Span::styled(
                 "─── Extra ───",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             ))));
 
             for (key, _value) in settings.extra.iter().take(5) {
-                items.push(self.make_item(&format!("  {}", key), "...", Color::DarkGray));
+                items.push(self.make_item(&format!("  {}", key), "...", p.muted, p));
             }
         }
 
         if items.is_empty() {
             items.push(ListItem::new(Line::from(Span::styled(
                 "Empty configuration",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             ))));
         }
 
         items
     }
 
-    fn make_item(&self, key: &str, value: &str, value_color: Color) -> ListItem<'static> {
+    fn make_item(&self, key: &str, value: &str, value_color: Color, p: &Palette) -> ListItem<'static> {
         ListItem::new(Line::from(vec![
-            Span::styled(format!("{}: ", key), Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{}: ", key), Style::default().fg(p.muted)),
             Span::styled(value.to_string(), Style::default().fg(value_color)),
         ]))
     }
@@ -613,6 +619,7 @@ impl ConfigTab {
         frame: &mut Frame,
         area: Rect,
         mcp_config: Option<&McpConfig>,
+        p: &Palette,
     ) {
         // Center modal (70% width, 70% height)
         let modal_width = (area.width as f32 * 0.7).max(60.0) as u16;
@@ -629,10 +636,10 @@ impl ConfigTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " MCP Servers Detail ",
-                Style::default().fg(Color::Cyan).bold(),
+                Style::default().fg(p.focus).bold(),
             ));
 
         let inner = block.inner(modal_area);
@@ -644,55 +651,52 @@ impl ConfigTab {
             if mcp.servers.is_empty() {
                 lines.push(Line::from(Span::styled(
                     "No MCP servers configured",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )));
             } else {
                 let config_path = self
                     .claude_home
                     .as_ref()
-                    .map(|p| p.join("claude_desktop_config.json"))
-                    .map(|p| p.display().to_string())
+                    .map(|ch| ch.join("claude_desktop_config.json"))
+                    .map(|ch| ch.display().to_string())
                     .unwrap_or_else(|| "~/.claude/claude_desktop_config.json".to_string());
 
                 lines.push(Line::from(Span::styled(
                     format!("Config: {}", config_path),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )));
                 lines.push(Line::from(""));
 
                 for (name, server) in &mcp.servers {
-                    // Server name
                     lines.push(Line::from(Span::styled(
                         format!("● {}", name),
-                        Style::default().fg(Color::Green).bold(),
+                        Style::default().fg(p.success).bold(),
                     )));
 
-                    // Full command
                     let full_cmd = server.display_command();
                     lines.push(Line::from(vec![
-                        Span::styled("  Command: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(full_cmd, Style::default().fg(Color::White)),
+                        Span::styled("  Command: ", Style::default().fg(p.muted)),
+                        Span::styled(full_cmd, Style::default().fg(p.fg)),
                     ]));
 
-                    // Environment variables
                     if server.env.is_empty() {
                         lines.push(Line::from(Span::styled(
                             "  Env: (none)",
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(p.muted),
                         )));
                     } else {
                         lines.push(Line::from(Span::styled(
                             format!("  Env: {} variables", server.env.len()),
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(p.muted),
                         )));
                         for (key, value) in &server.env {
                             lines.push(Line::from(vec![
                                 Span::styled("    ", Style::default()),
                                 Span::styled(
                                     format!("{}=", key),
-                                    Style::default().fg(Color::Yellow),
+                                    Style::default().fg(p.warning),
                                 ),
-                                Span::styled(value, Style::default().fg(Color::White)),
+                                Span::styled(value, Style::default().fg(p.fg)),
                             ]));
                         }
                     }
@@ -700,7 +704,6 @@ impl ConfigTab {
                     lines.push(Line::from(""));
                 }
 
-                // Remove last empty line
                 if !lines.is_empty() {
                     lines.pop();
                 }
@@ -708,20 +711,19 @@ impl ConfigTab {
         } else {
             lines.push(Line::from(Span::styled(
                 "MCP config not found",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )));
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "Expected at: ~/.claude/claude_desktop_config.json",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )));
         }
 
-        // Footer with help
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "[Esc: close | e: edit config]",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         )));
 
         let paragraph = Paragraph::new(lines)
@@ -731,7 +733,7 @@ impl ConfigTab {
         frame.render_widget(paragraph, inner);
     }
 
-    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         // Center popup (40% width, 30% height)
         let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
         let popup_height = (area.height as f32 * 0.3).max(8.0) as u16;
@@ -747,10 +749,10 @@ impl ConfigTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Red))
+            .border_style(Style::default().fg(p.error))
             .title(Span::styled(
                 " Error ",
-                Style::default().fg(Color::Red).bold(),
+                Style::default().fg(p.error).bold(),
             ));
 
         let inner = block.inner(popup_area);
@@ -759,11 +761,11 @@ impl ConfigTab {
         let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
+            Line::from(Span::styled(error_text, Style::default().fg(p.fg))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ];
 

@@ -1,8 +1,10 @@
 use crate::app::Tab;
+use crate::theme::Palette;
+use ccboard_core::models::config::ColorScheme;
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
@@ -269,10 +271,12 @@ impl CommandPalette {
     }
 
     /// Render the command palette as a centered overlay
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
         if !self.visible {
             return;
         }
+
+        let p = Palette::new(scheme);
 
         // Create centered overlay (60% width, 50% height)
         let popup_area = Self::centered_rect(60, 50, area);
@@ -289,12 +293,12 @@ impl CommandPalette {
         // Render input box
         let input_text = format!(":{}", self.query);
         let input = Paragraph::new(input_text)
-            .style(Style::default().fg(Color::Cyan))
+            .style(Style::default().fg(p.focus))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .title("Command Palette")
-                    .border_style(Style::default().fg(Color::Cyan)),
+                    .border_style(Style::default().fg(p.focus)),
             );
         frame.render_widget(input, chunks[0]);
 
@@ -306,14 +310,14 @@ impl CommandPalette {
                 let shortcut = Span::styled(
                     format!(":{} ", cmd.shortcut),
                     Style::default()
-                        .fg(Color::Yellow)
+                        .fg(p.warning)
                         .add_modifier(Modifier::BOLD),
                 );
                 let name = Span::styled(
                     format!("{:<15}", cmd.name),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(p.fg),
                 );
-                let desc = Span::styled(&cmd.description, Style::default().fg(Color::Gray));
+                let desc = Span::styled(&cmd.description, Style::default().fg(p.muted));
 
                 ListItem::new(Line::from(vec![shortcut, name, desc]))
             })
@@ -324,12 +328,12 @@ impl CommandPalette {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(format!("{} commands", self.results.len()))
-                    .border_style(Style::default().fg(Color::Cyan)),
+                    .border_style(Style::default().fg(p.focus)),
             )
             .highlight_style(
                 Style::default()
-                    .bg(Color::Cyan)
-                    .fg(Color::Black)
+                    .bg(p.focus)
+                    .fg(p.bg)
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol("▶ ");

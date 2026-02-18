@@ -2,9 +2,11 @@
 
 use crate::app::Tab;
 use crate::keybindings::{KeyAction, KeyBindings};
+use crate::theme::Palette;
+use ccboard_core::models::config::ColorScheme;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
     Frame,
@@ -48,6 +50,7 @@ impl HelpModal {
         area: Rect,
         active_tab: Tab,
         keybindings: &KeyBindings,
+        scheme: ColorScheme,
     ) {
         if !self.visible {
             return;
@@ -77,17 +80,19 @@ impl HelpModal {
 
         let modal_area = horizontal[1];
 
+        let p = Palette::new(scheme);
+
         // Clear the area behind the modal
         frame.render_widget(Clear, modal_area);
 
         // Create modal block
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " Help - Keybindings ",
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD),
             ))
             .title_alignment(Alignment::Center);
@@ -96,7 +101,7 @@ impl HelpModal {
         frame.render_widget(block, modal_area);
 
         // Build help content
-        let help_lines = self.build_help_content(active_tab, keybindings);
+        let help_lines = self.build_help_content(active_tab, keybindings, &p);
 
         let help_text = Paragraph::new(help_lines)
             .wrap(Wrap { trim: false })
@@ -106,18 +111,19 @@ impl HelpModal {
     }
 
     /// Build help content based on active tab
-    fn build_help_content(&self, active_tab: Tab, keybindings: &KeyBindings) -> Vec<Line<'static>> {
+    fn build_help_content(&self, active_tab: Tab, keybindings: &KeyBindings, p: &Palette) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
 
         // Global keybindings
         lines.push(Line::from(vec![Span::styled(
             "Global:",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(p.warning)
                 .add_modifier(Modifier::BOLD),
         )]));
         lines.push(Line::from(""));
 
+        let focus_color = p.focus;
         // Helper function to add keybinding line
         let add_key_line =
             |lines: &mut Vec<Line<'static>>, action: KeyAction, keybindings: &KeyBindings| {
@@ -125,7 +131,7 @@ impl HelpModal {
                     lines.push(Line::from(vec![
                         Span::styled(
                             format!("  {:12}", key_str),
-                            Style::default().fg(Color::Cyan),
+                            Style::default().fg(focus_color),
                         ),
                         Span::raw(action.description()),
                     ]));
@@ -147,7 +153,7 @@ impl HelpModal {
             lines.push(Line::from(vec![
                 Span::styled(
                     format!("  {}-...      ", key_str.chars().next().unwrap_or('1')),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(p.focus),
                 ),
                 Span::raw("Jump to tab (1=Dashboard, 2=Sessions, ...)"),
             ]));
@@ -159,7 +165,7 @@ impl HelpModal {
         lines.push(Line::from(vec![Span::styled(
             format!("{}:", active_tab.name()),
             Style::default()
-                .fg(Color::Yellow)
+                .fg(p.warning)
                 .add_modifier(Modifier::BOLD),
         )]));
         lines.push(Line::from(""));
@@ -167,149 +173,149 @@ impl HelpModal {
         match active_tab {
             Tab::Dashboard => {
                 lines.push(Line::from(vec![
-                    Span::styled("  F5          ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  F5          ", Style::default().fg(focus_color)),
                     Span::raw("Refresh dashboard"),
                 ]));
             }
             Tab::Sessions => {
                 lines.push(Line::from(vec![
-                    Span::styled("  ←/→         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  ←/→         ", Style::default().fg(focus_color)),
                     Span::raw("Navigate between projects and sessions"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  Enter       ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  Enter       ", Style::default().fg(focus_color)),
                     Span::raw("View session details"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  /           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  /           ", Style::default().fg(focus_color)),
                     Span::raw("Search sessions"),
                 ]));
             }
             Tab::Config => {
                 lines.push(Line::from(vec![
-                    Span::styled("  ←/→         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  ←/→         ", Style::default().fg(focus_color)),
                     Span::raw("Switch between columns"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  ↑/↓         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  ↑/↓         ", Style::default().fg(focus_color)),
                     Span::raw("Scroll configuration"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  e           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  e           ", Style::default().fg(focus_color)),
                     Span::raw("Edit configuration file"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  o           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  o           ", Style::default().fg(focus_color)),
                     Span::raw("Reveal file in finder"),
                 ]));
             }
             Tab::Hooks => {
                 lines.push(Line::from(vec![
-                    Span::styled("  ←/→         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  ←/→         ", Style::default().fg(focus_color)),
                     Span::raw("Navigate hook types"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  ↑/↓         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  ↑/↓         ", Style::default().fg(focus_color)),
                     Span::raw("Select hook script"),
                 ]));
             }
             Tab::Agents => {
                 lines.push(Line::from(vec![
-                    Span::styled("  Tab         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  Tab         ", Style::default().fg(focus_color)),
                     Span::raw("Switch between Agents/Commands/Skills"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  Enter       ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  Enter       ", Style::default().fg(focus_color)),
                     Span::raw("View details"),
                 ]));
             }
             Tab::Costs => {
                 lines.push(Line::from(vec![
-                    Span::styled("  Tab/←/→/h/l ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  Tab/←/→/h/l ", Style::default().fg(focus_color)),
                     Span::raw("Switch between Overview/Billing/Models"),
                 ]));
             }
             Tab::History => {
                 lines.push(Line::from(vec![
-                    Span::styled("  Enter       ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  Enter       ", Style::default().fg(focus_color)),
                     Span::raw("View session details"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  /           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  /           ", Style::default().fg(focus_color)),
                     Span::raw("Search history"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  Tab         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  Tab         ", Style::default().fg(focus_color)),
                     Span::raw("Toggle stats view"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  c           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  c           ", Style::default().fg(focus_color)),
                     Span::raw("Clear search"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  x           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  x           ", Style::default().fg(focus_color)),
                     Span::raw("Export filtered sessions (CSV/JSON)"),
                 ]));
             }
             Tab::Mcp => {
                 lines.push(Line::from(vec![
-                    Span::styled("  ←/→         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  ←/→         ", Style::default().fg(focus_color)),
                     Span::raw("Focus server/detail panes"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  ↑/↓         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  ↑/↓         ", Style::default().fg(focus_color)),
                     Span::raw("Select server"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  y           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  y           ", Style::default().fg(focus_color)),
                     Span::raw("Copy command to clipboard"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  e           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  e           ", Style::default().fg(focus_color)),
                     Span::raw("Edit MCP config"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  o           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  o           ", Style::default().fg(focus_color)),
                     Span::raw("Reveal config file"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  r           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  r           ", Style::default().fg(focus_color)),
                     Span::raw("Refresh server status"),
                 ]));
             }
             Tab::Analytics => {
                 lines.push(Line::from(vec![
-                    Span::styled("  F1-F4       ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  F1-F4       ", Style::default().fg(focus_color)),
                     Span::raw("Select period (7d/30d/90d/All)"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  ←→ or h/l   ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  ←→ or h/l   ", Style::default().fg(focus_color)),
                     Span::raw("Switch between sub-views"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(focus_color)),
                     Span::raw("Scroll insights list"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  r           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  r           ", Style::default().fg(focus_color)),
                     Span::raw("Recompute analytics"),
                 ]));
             }
             Tab::Plugins => {
                 lines.push(Line::from(vec![
-                    Span::styled("  Tab         ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  Tab         ", Style::default().fg(focus_color)),
                     Span::raw("Cycle between columns"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(focus_color)),
                     Span::raw("Navigate within column"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  s           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  s           ", Style::default().fg(focus_color)),
                     Span::raw("Toggle sort mode"),
                 ]));
                 lines.push(Line::from(vec![
-                    Span::styled("  r           ", Style::default().fg(Color::Cyan)),
+                    Span::styled("  r           ", Style::default().fg(focus_color)),
                     Span::raw("Refresh analytics"),
                 ]));
             }
@@ -318,21 +324,21 @@ impl HelpModal {
         lines.push(Line::from(""));
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
-            Span::styled("Press ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Press ", Style::default().fg(p.muted)),
             Span::styled(
                 "?",
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(focus_color)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" or ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" or ", Style::default().fg(p.muted)),
             Span::styled(
                 "ESC",
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(focus_color)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" to close", Style::default().fg(Color::DarkGray)),
+            Span::styled(" to close", Style::default().fg(p.muted)),
         ]));
 
         lines

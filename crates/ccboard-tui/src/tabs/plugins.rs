@@ -13,12 +13,14 @@
 //! - r: Refresh analytics
 
 use crate::empty_state::EmptyState;
+use crate::theme::Palette;
 use ccboard_core::analytics::{aggregate_plugin_usage, PluginAnalytics};
+use ccboard_core::models::config::ColorScheme;
 use ccboard_core::DataStore;
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
@@ -192,7 +194,9 @@ impl PluginsTab {
     }
 
     /// Render the plugins tab
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, store: &Arc<DataStore>) {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, store: &Arc<DataStore>, scheme: ColorScheme) {
+        let p = Palette::new(scheme);
+
         // Lazy load analytics on first render
         if self.analytics.is_none() {
             self.refresh_analytics(store);
@@ -220,7 +224,7 @@ impl PluginsTab {
         self.render_header(frame, chunks[0]);
 
         // Render three-column layout
-        self.render_columns(frame, chunks[1]);
+        self.render_columns(frame, chunks[1], &p);
     }
 
     /// Render stats header
@@ -253,7 +257,7 @@ impl PluginsTab {
     }
 
     /// Render three-column layout
-    fn render_columns(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_columns(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         let chunks = Layout::default()
             .direction(ratatui::layout::Direction::Horizontal)
             .constraints([
@@ -263,13 +267,13 @@ impl PluginsTab {
             ])
             .split(area);
 
-        self.render_top_usage(frame, chunks[0]);
-        self.render_top_cost(frame, chunks[1]);
-        self.render_dead_code(frame, chunks[2]);
+        self.render_top_usage(frame, chunks[0], p);
+        self.render_top_cost(frame, chunks[1], p);
+        self.render_dead_code(frame, chunks[2], p);
     }
 
     /// Render top usage column
-    fn render_top_usage(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_top_usage(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         let analytics = self.analytics.as_ref().unwrap();
         let focused = self.focus == Focus::TopUsage;
 
@@ -297,9 +301,9 @@ impl PluginsTab {
         };
 
         let border_style = if focused {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(p.focus)
         } else {
-            Style::default()
+            Style::default().fg(p.border)
         };
 
         let list = List::new(items)
@@ -312,14 +316,14 @@ impl PluginsTab {
             .highlight_style(
                 Style::default()
                     .add_modifier(Modifier::BOLD)
-                    .fg(Color::Cyan),
+                    .fg(p.focus),
             );
 
         frame.render_stateful_widget(list, area, &mut self.top_usage_state);
     }
 
     /// Render top cost column
-    fn render_top_cost(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_top_cost(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         let analytics = self.analytics.as_ref().unwrap();
         let focused = self.focus == Focus::TopCost;
 
@@ -340,9 +344,9 @@ impl PluginsTab {
         };
 
         let border_style = if focused {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(p.focus)
         } else {
-            Style::default()
+            Style::default().fg(p.border)
         };
 
         let list = List::new(items)
@@ -355,14 +359,14 @@ impl PluginsTab {
             .highlight_style(
                 Style::default()
                     .add_modifier(Modifier::BOLD)
-                    .fg(Color::Cyan),
+                    .fg(p.focus),
             );
 
         frame.render_stateful_widget(list, area, &mut self.top_cost_state);
     }
 
     /// Render dead code column
-    fn render_dead_code(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_dead_code(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         let analytics = self.analytics.as_ref().unwrap();
         let focused = self.focus == Focus::DeadCode;
 
@@ -383,7 +387,7 @@ impl PluginsTab {
             .iter()
             .map(|name| {
                 let text = format!("• {} (0 uses)", name);
-                ListItem::new(text).style(Style::default().fg(Color::DarkGray))
+                ListItem::new(text).style(Style::default().fg(p.muted))
             })
             .collect();
 
@@ -394,9 +398,9 @@ impl PluginsTab {
         };
 
         let border_style = if focused {
-            Style::default().fg(Color::Cyan)
+            Style::default().fg(p.focus)
         } else {
-            Style::default()
+            Style::default().fg(p.border)
         };
 
         let list = List::new(items)
@@ -406,7 +410,7 @@ impl PluginsTab {
                     .title(title)
                     .border_style(border_style),
             )
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(Color::Red));
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD).fg(p.error));
 
         frame.render_stateful_widget(list, area, &mut self.dead_code_state);
     }

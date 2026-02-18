@@ -1,6 +1,6 @@
 //! Dashboard tab - Overview with sparkline, stats, model gauges, activity
 
-use crate::theme::ContextSaturationColor;
+use crate::theme::{ContextSaturationColor, Palette};
 use ccboard_core::models::StatsCache;
 use ccboard_core::parsers::McpConfig;
 use ccboard_core::store::DataStore;
@@ -32,6 +32,8 @@ impl DashboardTab {
         store: Option<&Arc<DataStore>>,
         scheme: ccboard_core::models::config::ColorScheme,
     ) {
+        let p = Palette::new(scheme);
+
         // Check if we should show cache hint
         let show_hint = stats
             .map(|s| s.total_tokens() == 0 && s.session_count() > 0)
@@ -57,26 +59,27 @@ impl DashboardTab {
             .split(area);
 
         // Stats cards (6 columns now)
-        self.render_stats_row(frame, chunks[0], stats, mcp_config, store, scheme);
+        self.render_stats_row(frame, chunks[0], stats, mcp_config, store, scheme, &p);
 
         // Activity sparkline
-        self.render_activity(frame, chunks[1], stats);
+        self.render_activity(frame, chunks[1], stats, &p);
 
         // Cache hint (if needed)
         let mut idx = 2;
         if show_hint {
-            self.render_cache_hint(frame, chunks[idx]);
+            self.render_cache_hint(frame, chunks[idx], &p);
             idx += 1;
         }
 
         // API Usage estimate
-        self.render_api_usage(frame, chunks[idx], store);
+        self.render_api_usage(frame, chunks[idx], store, &p);
         idx += 1;
 
         // Model distribution as gauges
-        self.render_model_gauges(frame, chunks[idx], stats);
+        self.render_model_gauges(frame, chunks[idx], stats, &p);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_stats_row(
         &self,
         frame: &mut Frame,
@@ -85,6 +88,7 @@ impl DashboardTab {
         mcp_config: Option<&McpConfig>,
         store: Option<&Arc<DataStore>>,
         scheme: ccboard_core::models::config::ColorScheme,
+        p: &Palette,
     ) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -112,9 +116,9 @@ impl DashboardTab {
         // MCP servers count
         let mcp_count = mcp_config.map(|config| config.servers.len()).unwrap_or(0);
         let mcp_color = if mcp_count > 0 {
-            Color::Green
+            p.success
         } else {
-            Color::DarkGray
+            p.muted
         };
 
         // Context window saturation
@@ -134,32 +138,35 @@ impl DashboardTab {
 
                 (display, color_theme.to_color(scheme))
             })
-            .unwrap_or_else(|| ("—".into(), Color::DarkGray));
+            .unwrap_or_else(|| ("—".into(), p.muted));
 
-        self.render_stat_card(frame, chunks[0], "◆ Tokens", &tokens, Color::Cyan, "total");
+        self.render_stat_card(frame, chunks[0], "◆ Tokens", &tokens, p.focus, "total", p);
         self.render_stat_card(
             frame,
             chunks[1],
             "● Sessions",
             &sessions,
-            Color::Green,
+            p.success,
             "tracked",
+            p,
         );
         self.render_stat_card(
             frame,
             chunks[2],
             "▶ Messages",
             &messages,
-            Color::Yellow,
+            p.warning,
             "sent",
+            p,
         );
         self.render_stat_card(
             frame,
             chunks[3],
             "% Cache Hit",
             &cache,
-            Color::Magenta,
+            p.important,
             "ratio",
+            p,
         );
         self.render_stat_card(
             frame,
@@ -168,6 +175,7 @@ impl DashboardTab {
             &mcp_count.to_string(),
             mcp_color,
             "servers",
+            p,
         );
         self.render_stat_card(
             frame,
@@ -176,9 +184,11 @@ impl DashboardTab {
             &context_display,
             context_color,
             "avg 30d",
+            p,
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_stat_card(
         &self,
         frame: &mut Frame,
@@ -187,10 +197,11 @@ impl DashboardTab {
         value: &str,
         color: Color,
         subtitle: &str,
+        p: &Palette,
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 format!(" {} ", title),
                 Style::default().fg(color).bold(),
@@ -221,19 +232,19 @@ impl DashboardTab {
         // Subtitle
         let subtitle_widget = Paragraph::new(Line::from(Span::styled(
             subtitle,
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         )))
         .alignment(Alignment::Center);
         frame.render_widget(subtitle_widget, inner_chunks[2]);
     }
 
-    fn render_activity(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_activity(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 " ≡ 7-Day Activity ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -281,7 +292,7 @@ impl DashboardTab {
 
         // Add max value label at top-right for Y-axis context (Task I.1 Option A)
         let max_label = Paragraph::new(format!("↑ {}", Self::format_short(max_val)))
-            .style(Style::default().fg(Color::DarkGray))
+            .style(Style::default().fg(p.muted))
             .alignment(Alignment::Right);
         let max_label_area = Rect {
             x: inner_chunks[0].x,
@@ -304,7 +315,7 @@ impl DashboardTab {
         let sparkline = Sparkline::default()
             .data(&expanded_data)
             .max(max_val)
-            .style(Style::default().fg(Color::Cyan))
+            .style(Style::default().fg(p.focus))
             .bar_set(symbols::bar::NINE_LEVELS);
         frame.render_widget(sparkline, sparkline_area);
 
@@ -322,20 +333,20 @@ impl DashboardTab {
             };
             let label_widget = Paragraph::new(Line::from(Span::styled(
                 display,
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )))
             .alignment(Alignment::Center);
             frame.render_widget(label_widget, label_chunks[i]);
         }
     }
 
-    fn render_model_gauges(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_model_gauges(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 " ◈ Model Usage ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -346,7 +357,7 @@ impl DashboardTab {
         if models.is_empty() {
             let no_data = Paragraph::new("No model data available")
                 .alignment(Alignment::Center)
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
             frame.render_widget(no_data, inner);
             return;
         }
@@ -365,10 +376,10 @@ impl DashboardTab {
             .split(inner);
 
         let colors = [
-            Color::Magenta,
-            Color::Cyan,
-            Color::Green,
-            Color::Yellow,
+            p.important,
+            p.focus,
+            p.success,
+            p.warning,
             Color::Blue,
         ];
 
@@ -383,14 +394,14 @@ impl DashboardTab {
 
             let gauge = Gauge::default()
                 .block(Block::default())
-                .gauge_style(Style::default().fg(color).bg(Color::DarkGray))
+                .gauge_style(Style::default().fg(color).bg(p.muted))
                 .percent(pct.min(100))
                 .label(Span::styled(
                     format!(
                         "{:<20} {:>10}  ({:>5.1}%)",
                         display_name, token_str, pct as f64
                     ),
-                    Style::default().fg(Color::White).bold(),
+                    Style::default().fg(p.fg).bold(),
                 ));
 
             frame.render_widget(gauge, *chunk);
@@ -442,17 +453,17 @@ impl DashboardTab {
         expanded
     }
 
-    fn render_cache_hint(&self, frame: &mut Frame, area: Rect) {
+    fn render_cache_hint(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let hint_text = vec![Line::from(vec![
-            Span::styled("💡 ", Style::default().fg(Color::Yellow)),
-            Span::styled("Stats look wrong? Run ", Style::default().fg(Color::Yellow)),
+            Span::styled("💡 ", Style::default().fg(p.warning)),
+            Span::styled("Stats look wrong? Run ", Style::default().fg(p.warning)),
             Span::styled(
                 "ccboard clear-cache",
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(p.warning)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" to rebuild metadata.", Style::default().fg(Color::Yellow)),
+            Span::styled(" to rebuild metadata.", Style::default().fg(p.warning)),
         ])];
 
         let hint = Paragraph::new(hint_text)
@@ -460,14 +471,14 @@ impl DashboardTab {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Yellow))
-                    .style(Style::default().bg(Color::Black)),
+                    .border_style(Style::default().fg(p.warning))
+                    .style(Style::default().bg(p.bg)),
             );
 
         frame.render_widget(hint, area);
     }
 
-    fn render_api_usage(&self, frame: &mut Frame, area: Rect, store: Option<&Arc<DataStore>>) {
+    fn render_api_usage(&self, frame: &mut Frame, area: Rect, store: Option<&Arc<DataStore>>, p: &Palette) {
         let estimate = store.map(|s| s.usage_estimate());
 
         let (plan_name, cost_today, cost_week, cost_month, budget, pct_month) = estimate
@@ -509,11 +520,11 @@ impl DashboardTab {
 
         let month_line = if let Some(budget) = budget {
             let color = if pct_month.unwrap_or(0.0) > 80.0 {
-                Color::Red
+                p.error
             } else if pct_month.unwrap_or(0.0) > 60.0 {
-                Color::Yellow
+                p.warning
             } else {
-                Color::Green
+                p.success
             };
             vec![
                 Span::raw("This month: "),
@@ -543,16 +554,16 @@ impl DashboardTab {
             .title(Span::styled(
                 title,
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD),
             ))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan));
+            .border_style(Style::default().fg(p.focus));
 
         let paragraph = Paragraph::new(text)
             .block(block)
             .alignment(Alignment::Left)
-            .style(Style::default().fg(Color::White));
+            .style(Style::default().fg(p.fg));
 
         frame.render_widget(paragraph, area);
     }

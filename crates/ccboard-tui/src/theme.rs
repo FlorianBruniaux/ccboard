@@ -11,6 +11,64 @@
 use ccboard_core::models::config::ColorScheme;
 use ratatui::style::Color;
 
+/// Unified color palette bundle for a given color scheme.
+///
+/// Usage in render functions:
+/// ```ignore
+/// let p = Palette::new(scheme);
+/// style.fg(p.fg).bg(p.bg)
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct Palette {
+    /// Primary background (Black / White)
+    pub bg: Color,
+    /// Primary foreground text (White / Black)
+    pub fg: Color,
+    /// Muted/secondary text (DarkGray / Gray)
+    pub muted: Color,
+    /// Unfocused border color
+    pub border: Color,
+    /// Focus/accent color (Cyan / dark cyan)
+    pub focus: Color,
+    /// Success/healthy color (Green / dark green)
+    pub success: Color,
+    /// Error/critical color (Red / dark red)
+    pub error: Color,
+    /// Warning/pending color (Yellow / dark amber)
+    pub warning: Color,
+    /// Important/cost alert color (Magenta / dark magenta)
+    pub important: Color,
+}
+
+impl Palette {
+    pub fn new(scheme: ColorScheme) -> Self {
+        match scheme {
+            ColorScheme::Dark => Self {
+                bg: Color::Black,
+                fg: Color::White,
+                muted: Color::DarkGray,
+                border: Color::DarkGray,
+                focus: Color::Cyan,
+                success: Color::Green,
+                error: Color::Red,
+                warning: Color::Yellow,
+                important: Color::Magenta,
+            },
+            ColorScheme::Light => Self {
+                bg: Color::White,
+                fg: Color::Black,
+                muted: Color::Gray,
+                border: Color::Gray,
+                focus: Color::Rgb(0, 128, 128),
+                success: Color::Rgb(0, 128, 0),
+                error: Color::Rgb(200, 0, 0),
+                warning: Color::Rgb(180, 120, 0),
+                important: Color::Rgb(128, 0, 128),
+            },
+        }
+    }
+}
+
 /// Status color palette following k9s/lazygit conventions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatusColor {

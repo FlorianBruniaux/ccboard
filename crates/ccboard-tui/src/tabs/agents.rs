@@ -1,5 +1,7 @@
 //! Agents tab - Browse agents, commands, and skills from .claude directory
 
+use crate::theme::Palette;
+use ccboard_core::models::config::ColorScheme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -366,8 +368,10 @@ impl AgentsTab {
         &mut self,
         frame: &mut Frame,
         area: Rect,
-        _scheme: ccboard_core::models::config::ColorScheme,
+        scheme: ColorScheme,
     ) {
+        let p = Palette::new(scheme);
+
         // Layout: sub-tabs header (2 lines with padding) | content
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -375,7 +379,7 @@ impl AgentsTab {
             .split(area);
 
         // Render sub-tabs
-        self.render_sub_tabs(frame, chunks[0]);
+        self.render_sub_tabs(frame, chunks[0], &p);
 
         // Content area
         let content_constraints = if self.show_detail {
@@ -390,20 +394,20 @@ impl AgentsTab {
             .split(chunks[1]);
 
         // Render list
-        self.render_list(frame, content_chunks[0]);
+        self.render_list(frame, content_chunks[0], &p);
 
         // Render detail if open
         if self.show_detail && content_chunks.len() > 1 {
-            self.render_detail(frame, content_chunks[1]);
+            self.render_detail(frame, content_chunks[1], &p);
         }
 
         // Render error popup if present
         if self.error_message.is_some() {
-            self.render_error_popup(frame, area);
+            self.render_error_popup(frame, area, &p);
         }
     }
 
-    fn render_sub_tabs(&self, frame: &mut Frame, area: Rect) {
+    fn render_sub_tabs(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let titles: Vec<Line> = [
             (AgentType::Agent, self.agents.len()),
             (AgentType::Command, self.commands.len()),
@@ -417,7 +421,7 @@ impl AgentsTab {
                     .fg(t.color())
                     .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
             } else {
-                Style::default().fg(Color::DarkGray)
+                Style::default().fg(p.muted)
             };
             Line::from(Span::styled(
                 format!(" {} {} ({}) ", t.icon(), t.label(), count),
@@ -428,17 +432,17 @@ impl AgentsTab {
 
         let tabs = Tabs::new(titles)
             .select(self.sub_tab)
-            .divider(Span::styled("│", Style::default().fg(Color::DarkGray)))
+            .divider(Span::styled("│", Style::default().fg(p.muted)))
             .block(
                 Block::default()
                     .borders(Borders::BOTTOM)
-                    .border_style(Style::default().fg(Color::DarkGray)),
+                    .border_style(Style::default().fg(p.muted)),
             );
 
         frame.render_widget(tabs, area);
     }
 
-    fn render_list(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_list(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         let entry_type = match self.sub_tab {
             0 => AgentType::Agent,
             1 => AgentType::Command,
@@ -460,10 +464,10 @@ impl AgentsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 title_text,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         if list_len == 0 {
@@ -471,7 +475,7 @@ impl AgentsTab {
                 Line::from(""),
                 Line::from(Span::styled(
                     format!("No {} found", entry_type.label().to_lowercase()),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
@@ -483,7 +487,7 @@ impl AgentsTab {
                             AgentType::Skill => "skills",
                         }
                     ),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
             ])
             .block(block);
@@ -511,7 +515,7 @@ impl AgentsTab {
                         .fg(entry_type.color())
                         .add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::Gray)
+                    Style::default().fg(p.muted)
                 };
 
                 let desc_preview = entry
@@ -540,13 +544,13 @@ impl AgentsTab {
                 if entry.invocation_count > 0 {
                     spans.push(Span::styled(
                         format!(" (× {})", entry.invocation_count),
-                        Style::default().fg(Color::Yellow),
+                        Style::default().fg(p.warning),
                     ));
                 }
 
                 spans.push(Span::styled(
                     desc_preview,
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ));
 
                 ListItem::new(Line::from(spans))
@@ -555,7 +559,7 @@ impl AgentsTab {
 
         let widget = List::new(items).block(block).highlight_style(
             Style::default()
-                .bg(Color::DarkGray)
+                .bg(p.muted)
                 .add_modifier(Modifier::BOLD),
         );
 
@@ -579,7 +583,7 @@ impl AgentsTab {
         }
     }
 
-    fn render_detail(&self, frame: &mut Frame, area: Rect) {
+    fn render_detail(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let list = self.current_list();
         let selected = self.list_states[self.sub_tab]
             .selected()
@@ -587,10 +591,10 @@ impl AgentsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " Detail ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -598,7 +602,7 @@ impl AgentsTab {
 
         let Some(entry) = selected else {
             let empty = Paragraph::new("Select an item to see details")
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -624,33 +628,33 @@ impl AgentsTab {
 
         let lines = vec![
             Line::from(vec![
-                Span::styled("Name: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Name: ", Style::default().fg(p.muted)),
                 Span::styled(
                     &entry.name,
                     Style::default().fg(entry.entry_type.color()).bold(),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Type: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(entry.entry_type.label(), Style::default().fg(Color::White)),
+                Span::styled("Type: ", Style::default().fg(p.muted)),
+                Span::styled(entry.entry_type.label(), Style::default().fg(p.fg)),
             ]),
             Line::from(vec![
-                Span::styled("Path: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&entry.file_path, Style::default().fg(Color::Yellow)),
+                Span::styled("Path: ", Style::default().fg(p.muted)),
+                Span::styled(&entry.file_path, Style::default().fg(p.warning)),
             ]),
             Line::from(""),
             Line::from(Span::styled(
                 "Description:",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
             Line::from(Span::styled(
                 entry.description.as_deref().unwrap_or("No description"),
-                Style::default().fg(Color::White),
+                Style::default().fg(p.fg),
             )),
             Line::from(""),
             Line::from(Span::styled(
                 "Content preview:",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
             Line::from(Span::styled(
                 if content_preview.len() >= 500 {
@@ -658,7 +662,7 @@ impl AgentsTab {
                 } else {
                     content_preview
                 },
-                Style::default().fg(Color::Gray),
+                Style::default().fg(p.muted),
             )),
         ];
 
@@ -666,7 +670,7 @@ impl AgentsTab {
         frame.render_widget(detail, inner);
     }
 
-    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         use ratatui::widgets::Clear;
 
         // Center popup (40% width, 30% height)
@@ -687,10 +691,10 @@ impl AgentsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Red))
+            .border_style(Style::default().fg(p.error))
             .title(Span::styled(
                 " Error ",
-                Style::default().fg(Color::Red).bold(),
+                Style::default().fg(p.error).bold(),
             ));
 
         let inner = block.inner(popup_area);
@@ -699,11 +703,11 @@ impl AgentsTab {
         let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
+            Line::from(Span::styled(error_text, Style::default().fg(p.fg))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ];
 

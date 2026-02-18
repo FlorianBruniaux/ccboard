@@ -920,6 +920,18 @@ impl DataStore {
         let billing_blocks = self.billing_blocks.read();
         crate::usage_estimator::calculate_usage_estimate(&billing_blocks, plan)
     }
+
+    /// Load ccboard user preferences from the cache directory.
+    pub fn load_preferences(&self) -> crate::preferences::CcboardPreferences {
+        let cache_dir = self.claude_home.join("cache");
+        crate::preferences::CcboardPreferences::load(&cache_dir)
+    }
+
+    /// Save ccboard user preferences to the cache directory.
+    pub fn save_preferences(&self, prefs: &crate::preferences::CcboardPreferences) -> anyhow::Result<()> {
+        let cache_dir = self.claude_home.join("cache");
+        prefs.save(&cache_dir)
+    }
 }
 
 #[cfg(test)]

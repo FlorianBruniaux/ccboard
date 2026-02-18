@@ -1,9 +1,11 @@
 //! Confirmation dialog component
 
+use crate::theme::Palette;
+use ccboard_core::models::config::ColorScheme;
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -80,10 +82,12 @@ impl ConfirmDialog {
         }
     }
 
-    pub fn render(&self, frame: &mut Frame, area: Rect) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
         if !self.visible {
             return;
         }
+
+        let p = Palette::new(scheme);
 
         // Center dialog (50% width, auto height)
         let dialog_width = (area.width as f32 * 0.5).max(40.0) as u16;
@@ -103,11 +107,11 @@ impl ConfirmDialog {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow))
+            .border_style(Style::default().fg(p.warning))
             .title(Span::styled(
                 format!(" {} ", self.title),
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(p.warning)
                     .add_modifier(Modifier::BOLD),
             ));
 
@@ -128,7 +132,7 @@ impl ConfirmDialog {
             Line::from(""),
             Line::from(Span::styled(
                 &self.message,
-                Style::default().fg(Color::White),
+                Style::default().fg(p.fg),
             )),
             Line::from(""),
         ];
@@ -144,38 +148,38 @@ impl ConfirmDialog {
                 Span::styled(
                     "[Y] ",
                     Style::default()
-                        .fg(Color::Green)
+                        .fg(p.success)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
                     "Yes",
                     Style::default().fg(if matches!(self.default_option, ConfirmResult::Yes) {
-                        Color::Green
+                        p.success
                     } else {
-                        Color::White
+                        p.fg
                     }),
                 ),
                 Span::styled("  ", Style::default()),
                 Span::styled(
                     "[N] ",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    Style::default().fg(p.error).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
                     "No",
                     Style::default().fg(if matches!(self.default_option, ConfirmResult::No) {
-                        Color::Red
+                        p.error
                     } else {
-                        Color::White
+                        p.fg
                     }),
                 ),
                 Span::styled("  ", Style::default()),
                 Span::styled(
                     "[Esc] ",
                     Style::default()
-                        .fg(Color::DarkGray)
+                        .fg(p.muted)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled("Cancel", Style::default().fg(Color::DarkGray)),
+                Span::styled("Cancel", Style::default().fg(p.muted)),
             ]),
             Line::from(""),
             Line::from(Span::styled(
@@ -187,7 +191,7 @@ impl ConfirmDialog {
                         ConfirmResult::Cancel => "Cancel",
                     }
                 ),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ];
 

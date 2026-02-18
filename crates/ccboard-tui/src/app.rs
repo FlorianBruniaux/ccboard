@@ -185,6 +185,9 @@ impl App {
             keybindings.load_custom(custom_keybindings);
         }
 
+        // Load persisted color scheme (fallback to Dark if missing)
+        let prefs = store.load_preferences();
+
         Self {
             store,
             event_rx,
@@ -202,7 +205,7 @@ impl App {
             live_sessions_cache: Vec::new(),
             last_live_refresh: std::time::Instant::now(),
             search_history: VecDeque::with_capacity(50),
-            color_scheme: ColorScheme::default(), // Dark by default
+            color_scheme: prefs.color_scheme,
             keybindings,
         }
     }
@@ -281,6 +284,13 @@ impl App {
                     ColorScheme::Dark => "Dark",
                     ColorScheme::Light => "Light",
                 };
+                // Persist the new color scheme
+                let prefs = ccboard_core::preferences::CcboardPreferences {
+                    color_scheme: self.color_scheme,
+                };
+                if let Err(e) = self.store.save_preferences(&prefs) {
+                    tracing::warn!(error = %e, "Failed to persist color scheme preference");
+                }
                 self.info_toast(format!("Theme: {}", theme_name));
             }
             KeyAction::NextTab => {

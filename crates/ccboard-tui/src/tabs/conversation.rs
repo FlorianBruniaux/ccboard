@@ -1,7 +1,9 @@
 //! Conversation viewer - Displays full session content with syntax highlighting
 
 use crate::components::highlight_matches;
+use crate::theme::Palette;
 use crate::widgets::ToolCallsViewer;
+use ccboard_core::models::config::ColorScheme;
 use ccboard_core::models::{ConversationMessage, MessageRole};
 use ccboard_core::DataStore;
 use chrono::{DateTime, Utc};
@@ -515,17 +517,17 @@ impl ConversationTab {
             KeyCode::Char('/') => {
                 // Activate search mode
                 self.search_active = true;
-                return true;
+                true
             }
             KeyCode::Char('n') if !self.search_results.is_empty() => {
                 // Next search result
                 self.next_search_result();
-                return true;
+                true
             }
             KeyCode::Char('N') if !self.search_results.is_empty() => {
                 // Previous search result
                 self.prev_search_result();
-                return true;
+                true
             }
             KeyCode::PageDown => {
                 self.scroll_down(20);
@@ -540,7 +542,9 @@ impl ConversationTab {
     }
 
     /// Render the conversation view
-    pub fn render(&self, frame: &mut Frame, area: Rect) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
+        let p = Palette::new(scheme);
+
         // If loading, show loading message
         if self.is_loading {
             let loading_text = Paragraph::new("Loading conversation...\n\nPlease wait...")
@@ -548,9 +552,9 @@ impl ConversationTab {
                     Block::default()
                         .borders(Borders::ALL)
                         .title("💬 Conversation")
-                        .style(Style::default().fg(Color::Cyan)),
+                        .style(Style::default().fg(p.focus)),
                 )
-                .style(Style::default().fg(Color::DarkGray))
+                .style(Style::default().fg(p.muted))
                 .wrap(Wrap { trim: true });
             frame.render_widget(loading_text, area);
             return;
@@ -563,7 +567,7 @@ impl ConversationTab {
                     Block::default()
                         .borders(Borders::ALL)
                         .title("❌ Error")
-                        .style(Style::default().fg(Color::Red)),
+                        .style(Style::default().fg(p.error)),
                 )
                 .wrap(Wrap { trim: true });
             frame.render_widget(error_text, area);
@@ -578,7 +582,7 @@ impl ConversationTab {
                         .borders(Borders::ALL)
                         .title("💬 Conversation")
                 )
-                .style(Style::default().fg(Color::DarkGray))
+                .style(Style::default().fg(p.muted))
                 .wrap(Wrap { trim: true });
             frame.render_widget(placeholder, area);
             return;
@@ -628,9 +632,9 @@ impl ConversationTab {
             };
 
             let border_color = if self.search_active {
-                Color::Cyan
+                p.focus
             } else {
-                Color::DarkGray
+                p.border
             };
 
             let search_block = Block::default()
@@ -645,7 +649,7 @@ impl ConversationTab {
             );
             let search_widget = Paragraph::new(search_text)
                 .block(search_block)
-                .style(Style::default().fg(Color::White));
+                .style(Style::default().fg(p.fg));
 
             frame.render_widget(search_widget, search_area);
         }
@@ -665,7 +669,7 @@ impl ConversationTab {
         let block = Block::default()
             .borders(Borders::ALL)
             .title(title)
-            .style(Style::default().fg(Color::Cyan));
+            .style(Style::default().fg(p.focus));
 
         let inner = block.inner(content_area);
         frame.render_widget(block, content_area);
@@ -675,7 +679,7 @@ impl ConversationTab {
 
         // Render messages
         let mut y_offset = 0;
-        for (_idx, msg) in visible_messages.iter().enumerate() {
+        for msg in visible_messages.iter() {
             // Guard FIRST - prevent any operation if out of space
             if y_offset >= inner.height as usize {
                 break;
@@ -704,7 +708,7 @@ impl ConversationTab {
         let filtered_count = self.get_filtered_count();
         if filtered_count > visible_messages.len() {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
 
             let mut scrollbar_state =
                 ScrollbarState::new(filtered_count).position(self.scroll_offset);
@@ -714,7 +718,7 @@ impl ConversationTab {
 
         // Render filter panel if visible
         if let Some(filter_area) = filter_area {
-            self.render_filter_panel(frame, filter_area);
+            self.render_filter_panel(frame, filter_area, &p);
         }
 
         // Render tool calls viewer as overlay if viewing
@@ -736,7 +740,7 @@ impl ConversationTab {
                 // Render backdrop
                 let backdrop = Block::default()
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::Cyan))
+                    .border_style(Style::default().fg(p.focus))
                     .title(
                         "🔧 Tool Calls [Esc to close, Enter to expand/collapse, j/k to navigate]",
                     )
@@ -746,24 +750,24 @@ impl ConversationTab {
                 frame.render_widget(backdrop, overlay_area);
 
                 // Render tool calls viewer
-                viewer.render(frame, inner);
+                viewer.render(frame, inner, scheme);
             }
         }
     }
 
     /// Render the filter panel
-    fn render_filter_panel(&self, frame: &mut Frame, area: Rect) {
+    fn render_filter_panel(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let mut filter_lines = vec![
             Line::from(Span::styled(
                 "Filters",
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(p.warning)
                     .add_modifier(Modifier::BOLD),
             )),
             Line::from(""),
             Line::from(Span::styled(
                 "Role Filters:",
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(p.focus),
             )),
             Line::from(format!(
                 "[u] User: {}",
@@ -791,7 +795,7 @@ impl ConversationTab {
                 if self.filter.tools_only { "✓" } else { " " }
             )),
             Line::from(""),
-            Line::from(Span::styled("Actions:", Style::default().fg(Color::Cyan))),
+            Line::from(Span::styled("Actions:", Style::default().fg(p.focus))),
             Line::from("[r] Reset filters"),
             Line::from("[f/Esc] Close panel"),
             Line::from(""),
@@ -802,9 +806,9 @@ impl ConversationTab {
                     "No filters"
                 },
                 Style::default().fg(if self.filter.is_active() {
-                    Color::Yellow
+                    p.warning
                 } else {
-                    Color::DarkGray
+                    p.muted
                 }),
             )),
         ];
@@ -814,7 +818,7 @@ impl ConversationTab {
             filter_lines.push(Line::from(""));
             filter_lines.push(Line::from(Span::styled(
                 "Time Range:",
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(p.focus),
             )));
             if let Some(ref start) = self.filter.start_time {
                 filter_lines.push(Line::from(format!(
@@ -832,7 +836,7 @@ impl ConversationTab {
                 Block::default()
                     .borders(Borders::ALL)
                     .title("🔍 Filters")
-                    .style(Style::default().fg(Color::Yellow)),
+                    .style(Style::default().fg(p.warning)),
             )
             .wrap(Wrap { trim: false });
 
@@ -977,7 +981,7 @@ impl ConversationTab {
         let mut code_lines = Vec::new();
 
         for line in content.lines() {
-            if line.starts_with("```") {
+            if let Some(rest) = line.strip_prefix("```") {
                 if in_code_block {
                     // End of code block - apply highlighting
                     let highlighted = self.highlight_code(&code_lines.join("\n"), &current_lang);
@@ -986,7 +990,7 @@ impl ConversationTab {
                     in_code_block = false;
                 } else {
                     // Start of code block
-                    current_lang = line[3..].trim().to_string();
+                    current_lang = rest.trim().to_string();
                     in_code_block = true;
                 }
             } else if in_code_block {

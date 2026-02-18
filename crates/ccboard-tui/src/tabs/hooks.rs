@@ -1,5 +1,7 @@
 //! Hooks tab - View hooks by event type
 
+use crate::theme::Palette;
+use ccboard_core::models::config::ColorScheme;
 use ccboard_core::models::{HookDefinition, HookGroup, Settings};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -295,8 +297,9 @@ impl HooksTab {
         frame: &mut Frame,
         area: Rect,
         settings: &Settings,
-        _scheme: ccboard_core::models::config::ColorScheme,
+        scheme: ColorScheme,
     ) {
+        let p = Palette::new(scheme);
         let hooks = settings.hooks.as_ref();
 
         // Update event names cache
@@ -318,7 +321,7 @@ impl HooksTab {
             ])
             .split(area);
 
-        self.render_events(frame, chunks[0], hooks);
+        self.render_events(frame, chunks[0], hooks, &p);
 
         // Get hooks for selected event
         let selected_event = self
@@ -333,23 +336,23 @@ impl HooksTab {
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
 
-        self.render_hook_list(frame, chunks[1], &selected_event, hook_groups);
+        self.render_hook_list(frame, chunks[1], &selected_event, hook_groups, &p);
 
         // Render hook content
         if let Some(hook) = self.get_selected_hook(hooks.unwrap_or(&HashMap::new())) {
-            self.render_hook_content(frame, chunks[2], hook);
+            self.render_hook_content(frame, chunks[2], hook, &p);
         } else {
-            self.render_empty_content(frame, chunks[2]);
+            self.render_empty_content(frame, chunks[2], &p);
         }
 
         // Render error popup if present
         if self.error_message.is_some() {
-            self.render_error_popup(frame, area);
+            self.render_error_popup(frame, area, &p);
         }
 
         // Render test result popup if present
         if self.test_result.is_some() {
-            self.render_test_result_popup(frame, area);
+            self.render_test_result_popup(frame, area, &p);
         }
     }
 
@@ -358,20 +361,17 @@ impl HooksTab {
         frame: &mut Frame,
         area: Rect,
         hooks: Option<&HashMap<String, Vec<HookGroup>>>,
+        p: &Palette,
     ) {
         let is_focused = self.focus == 0;
-        let border_color = if is_focused {
-            Color::Cyan
-        } else {
-            Color::DarkGray
-        };
+        let border_color = if is_focused { p.focus } else { p.border };
 
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 format!(" Events ({}) ", self.event_names.len()),
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         if self.event_names.is_empty() {
@@ -379,22 +379,22 @@ impl HooksTab {
                 Line::from(""),
                 Line::from(Span::styled(
                     "No hooks configured",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
                     "Add hooks in settings.json:",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
                 Line::from(Span::styled(
                     "  \"hooks\": {",
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(p.warning),
                 )),
                 Line::from(Span::styled(
                     "    \"PreToolUse\": [...]",
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(p.warning),
                 )),
-                Line::from(Span::styled("  }", Style::default().fg(Color::Yellow))),
+                Line::from(Span::styled("  }", Style::default().fg(p.warning))),
             ])
             .block(block);
             frame.render_widget(empty, area);
@@ -416,7 +416,7 @@ impl HooksTab {
                 let style = if is_selected && is_focused {
                     Style::default().fg(color).add_modifier(Modifier::BOLD)
                 } else if is_selected {
-                    Style::default().fg(Color::White)
+                    Style::default().fg(p.fg)
                 } else {
                     Style::default().fg(Color::Gray)
                 };
@@ -426,7 +426,7 @@ impl HooksTab {
                     Span::styled(event.clone(), style),
                     Span::styled(
                         format!(" ({})", hook_count),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     ),
                 ]))
             })
@@ -460,13 +460,10 @@ impl HooksTab {
         area: Rect,
         event: &Option<String>,
         groups: &[HookGroup],
+        p: &Palette,
     ) {
         let is_focused = self.focus == 1;
-        let border_color = if is_focused {
-            Color::Cyan
-        } else {
-            Color::DarkGray
-        };
+        let border_color = if is_focused { p.focus } else { p.border };
 
         let title = event
             .as_ref()
@@ -478,13 +475,13 @@ impl HooksTab {
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 title,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ))
             .title_bottom(Line::from(vec![
-                Span::styled("Tab", Style::default().fg(Color::Cyan)),
-                Span::styled(" switch  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("↑↓", Style::default().fg(Color::Cyan)),
-                Span::styled(" navigate", Style::default().fg(Color::DarkGray)),
+                Span::styled("Tab", Style::default().fg(p.focus)),
+                Span::styled(" switch  ", Style::default().fg(p.muted)),
+                Span::styled("↑↓", Style::default().fg(p.focus)),
+                Span::styled(" navigate", Style::default().fg(p.muted)),
             ]));
 
         let inner = block.inner(area);
@@ -492,7 +489,7 @@ impl HooksTab {
 
         if groups.is_empty() {
             let empty = Paragraph::new("Select an event to see hooks")
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -521,19 +518,19 @@ impl HooksTab {
                 // Build badges
                 let mut badges = Vec::new();
                 if hook.r#async.unwrap_or(false) {
-                    badges.push(Span::styled(" async ", Style::default().fg(Color::Cyan)));
+                    badges.push(Span::styled(" async ", Style::default().fg(p.focus)));
                 }
                 if let Some(timeout) = hook.timeout {
                     badges.push(Span::styled(
                         format!(" ⏱{}s ", timeout),
-                        Style::default().fg(Color::Yellow),
+                        Style::default().fg(p.warning),
                     ));
                 }
                 if let Some(ref env) = hook.env {
                     if !env.is_empty() {
                         badges.push(Span::styled(
                             format!(" env:{} ", env.len()),
-                            Style::default().fg(Color::Magenta),
+                            Style::default().fg(p.important),
                         ));
                     }
                 }
@@ -550,17 +547,17 @@ impl HooksTab {
                 let mut spans = vec![
                     Span::styled(
                         if is_selected { "▶ " } else { "  " },
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(p.focus),
                     ),
-                    Span::styled("$ ", Style::default().fg(Color::Green)),
+                    Span::styled("$ ", Style::default().fg(p.success)),
                     Span::styled(
                         command,
                         if is_selected {
                             Style::default()
-                                .fg(Color::White)
+                                .fg(p.fg)
                                 .add_modifier(Modifier::BOLD)
                         } else {
-                            Style::default().fg(Color::White)
+                            Style::default().fg(p.fg)
                         },
                     ),
                 ];
@@ -687,13 +684,9 @@ impl HooksTab {
         Line::from(spans)
     }
 
-    fn render_hook_content(&self, frame: &mut Frame, area: Rect, hook: &HookDefinition) {
+    fn render_hook_content(&self, frame: &mut Frame, area: Rect, hook: &HookDefinition, p: &Palette) {
         let is_focused = self.focus == 2;
-        let border_color = if is_focused {
-            Color::Cyan
-        } else {
-            Color::DarkGray
-        };
+        let border_color = if is_focused { p.focus } else { p.border };
 
         let title = hook
             .file_path
@@ -708,7 +701,7 @@ impl HooksTab {
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 title,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -748,39 +741,35 @@ impl HooksTab {
                 ..inner
             };
             let hint = Paragraph::new(Line::from(vec![
-                Span::styled("↑↓", Style::default().fg(Color::Cyan)),
-                Span::styled(" scroll  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("Enter", Style::default().fg(Color::Cyan)),
-                Span::styled(" open  ", Style::default().fg(Color::DarkGray)),
-                Span::styled("o", Style::default().fg(Color::Cyan)),
-                Span::styled(" reveal", Style::default().fg(Color::DarkGray)),
+                Span::styled("↑↓", Style::default().fg(p.focus)),
+                Span::styled(" scroll  ", Style::default().fg(p.muted)),
+                Span::styled("Enter", Style::default().fg(p.focus)),
+                Span::styled(" open  ", Style::default().fg(p.muted)),
+                Span::styled("o", Style::default().fg(p.focus)),
+                Span::styled(" reveal", Style::default().fg(p.muted)),
             ]))
-            .style(Style::default().fg(Color::DarkGray));
+            .style(Style::default().fg(p.muted));
             frame.render_widget(hint, hint_area);
         }
     }
 
-    fn render_empty_content(&self, frame: &mut Frame, area: Rect) {
+    fn render_empty_content(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let is_focused = self.focus == 2;
-        let border_color = if is_focused {
-            Color::Cyan
-        } else {
-            Color::DarkGray
-        };
+        let border_color = if is_focused { p.focus } else { p.border };
 
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 " Hook Content ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let empty = Paragraph::new(vec![
             Line::from(""),
             Line::from(Span::styled(
                 "Select a hook to view its content",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ])
         .block(block);
@@ -800,8 +789,7 @@ impl HooksTab {
         }
     }
 
-    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
-        // Center popup (40% width, 30% height)
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
         let popup_height = (area.height as f32 * 0.3).max(8.0) as u16;
         let popup_x = (area.width.saturating_sub(popup_width)) / 2;
@@ -816,10 +804,10 @@ impl HooksTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Red))
+            .border_style(Style::default().fg(p.error))
             .title(Span::styled(
                 " Error ",
-                Style::default().fg(Color::Red).bold(),
+                Style::default().fg(p.error).bold(),
             ));
 
         let inner = block.inner(popup_area);
@@ -828,11 +816,11 @@ impl HooksTab {
         let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
+            Line::from(Span::styled(error_text, Style::default().fg(p.fg))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ];
 
@@ -840,7 +828,7 @@ impl HooksTab {
         frame.render_widget(paragraph, inner);
     }
 
-    fn render_test_result_popup(&self, frame: &mut Frame, area: Rect) {
+    fn render_test_result_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         use ratatui::widgets::Clear;
 
         // Larger popup for test results (60% width, 50% height)
@@ -861,7 +849,7 @@ impl HooksTab {
 
         let test_text = self.test_result.as_deref().unwrap_or("No result");
         let is_success = test_text.starts_with('✓');
-        let border_color = if is_success { Color::Green } else { Color::Red };
+        let border_color = if is_success { p.success } else { p.error };
         let title = if is_success {
             " Test Result - Success "
         } else {
@@ -886,7 +874,7 @@ impl HooksTab {
                 if line.starts_with('✓') || line.starts_with('✗') {
                     Line::from(Span::styled(line, Style::default().fg(border_color).bold()))
                 } else {
-                    Line::from(Span::styled(line, Style::default().fg(Color::White)))
+                    Line::from(Span::styled(line, Style::default().fg(p.fg)))
                 }
             })
             .collect();
@@ -895,7 +883,7 @@ impl HooksTab {
         final_lines.push(Line::from(""));
         final_lines.push(Line::from(Span::styled(
             "Press Esc to close",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         )));
 
         let paragraph = Paragraph::new(final_lines)

@@ -1,11 +1,12 @@
 //! History tab - Search and filter prompt history
 
 use crate::components::highlight_matches;
+use crate::theme::Palette;
 use ccboard_core::models::{SessionMetadata, StatsCache};
 use chrono::Local;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
         Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
@@ -373,6 +374,8 @@ impl HistoryTab {
         stats: Option<&StatsCache>,
         _scheme: ccboard_core::models::config::ColorScheme,
     ) {
+        let p = Palette::new(_scheme);
+
         // Ensure filtered sessions are initialized
         if self.filtered_sessions.is_empty() && !sessions.is_empty() && self.search_query.is_empty()
         {
@@ -389,7 +392,7 @@ impl HistoryTab {
             .split(area);
 
         // Search bar
-        self.render_search(frame, chunks[0]);
+        self.render_search(frame, chunks[0], &p);
 
         // Content layout: results | detail (optional) | stats (optional)
         let content_constraints = match (self.show_detail, self.show_stats) {
@@ -409,7 +412,7 @@ impl HistoryTab {
             .split(chunks[1]);
 
         // Results list
-        self.render_results(frame, content_chunks[0]);
+        self.render_results(frame, content_chunks[0], &p);
 
         // Detail popup if open
         let mut chunk_idx = 1;
@@ -418,36 +421,36 @@ impl HistoryTab {
                 .results_state
                 .selected()
                 .and_then(|i| self.filtered_sessions.get(i));
-            self.render_detail(frame, content_chunks[chunk_idx], selected_session);
+            self.render_detail(frame, content_chunks[chunk_idx], selected_session, &p);
             chunk_idx += 1;
         }
 
         // Stats panel
         if self.show_stats && content_chunks.len() > chunk_idx {
-            self.render_stats_panel(frame, content_chunks[chunk_idx], stats);
+            self.render_stats_panel(frame, content_chunks[chunk_idx], stats, &p);
         }
 
         // Render export dialog if open
         if self.show_export_dialog {
-            self.render_export_dialog(frame, area);
+            self.render_export_dialog(frame, area, &p);
         }
 
         // Render export message if present
         if self.export_message.is_some() {
-            self.render_export_message(frame, area);
+            self.render_export_message(frame, area, &p);
         }
 
         // Render error popup if present
         if self.error_message.is_some() {
-            self.render_error_popup(frame, area);
+            self.render_error_popup(frame, area, &p);
         }
     }
 
-    fn render_search(&self, frame: &mut Frame, area: Rect) {
+    fn render_search(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let border_color = if self.search_focused {
-            Color::Cyan
+            p.focus
         } else {
-            Color::DarkGray
+            p.border
         };
 
         let title_text = if self.search_query.is_empty() {
@@ -461,7 +464,7 @@ impl HistoryTab {
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 title_text,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -471,19 +474,19 @@ impl HistoryTab {
             if self.search_focused {
                 Line::from(Span::styled(
                     "Type to search across all sessions...",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ))
             } else {
                 Line::from(Span::styled(
                     "Search all messages across sessions",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ))
             }
         } else {
             Line::from(vec![
-                Span::styled(&self.search_query, Style::default().fg(Color::White)),
+                Span::styled(&self.search_query, Style::default().fg(p.fg)),
                 if self.search_focused {
-                    Span::styled("▌", Style::default().fg(Color::Cyan))
+                    Span::styled("▌", Style::default().fg(p.focus))
                 } else {
                     Span::raw("")
                 },
@@ -505,13 +508,13 @@ impl HistoryTab {
 
         let results_widget = Paragraph::new(Span::styled(
             results_info,
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         ))
         .alignment(Alignment::Right);
         frame.render_widget(results_widget, chunks[1]);
     }
 
-    fn render_results(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_results(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         const MAX_DISPLAY: usize = 500;
         let total_count = self.filtered_sessions.len();
         let display_count = total_count.min(MAX_DISPLAY);
@@ -524,10 +527,10 @@ impl HistoryTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 title_text,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         if self.filtered_sessions.is_empty() {
@@ -536,26 +539,26 @@ impl HistoryTab {
                     Line::from(""),
                     Line::from(Span::styled(
                         "📂 No sessions found",
-                        Style::default().fg(Color::Yellow),
+                        Style::default().fg(p.warning),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         "No Claude Code sessions detected across all projects",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         "💡 Start a new session:",
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(p.focus),
                     )),
                     Line::from(Span::styled(
                         "   cd <project-dir> && claude",
-                        Style::default().fg(Color::Green),
+                        Style::default().fg(p.success),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         "📁 Sessions stored in: ~/.claude/projects/",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                 ]
             } else {
@@ -563,26 +566,26 @@ impl HistoryTab {
                     Line::from(""),
                     Line::from(Span::styled(
                         "🔍 No matching sessions",
-                        Style::default().fg(Color::Yellow),
+                        Style::default().fg(p.warning),
                     )),
                     Line::from(""),
                     Line::from(Span::styled(
                         format!("No results for: \"{}\"", self.search_query),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                     Line::from(""),
-                    Line::from(Span::styled("💡 Try:", Style::default().fg(Color::Cyan))),
+                    Line::from(Span::styled("💡 Try:", Style::default().fg(p.focus))),
                     Line::from(Span::styled(
                         "   • Shorter query (single word)",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                     Line::from(Span::styled(
                         "   • Different keywords (project, model, message)",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                     Line::from(Span::styled(
                         "   • Clear filter (press 'c')",
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                 ]
             };
@@ -631,10 +634,10 @@ impl HistoryTab {
 
                 let style = if is_selected {
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(p.focus)
                         .add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::White)
+                    Style::default().fg(p.fg)
                 };
 
                 // Build preview line with optional highlighting
@@ -650,11 +653,11 @@ impl HistoryTab {
                     Line::from(vec![
                         Span::styled(
                             if is_selected { "▶ " } else { "  " },
-                            Style::default().fg(Color::Cyan),
+                            Style::default().fg(p.focus),
                         ),
-                        Span::styled(date_str, Style::default().fg(Color::Yellow)),
-                        Span::styled(" │ ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(project_short, Style::default().fg(Color::Green)),
+                        Span::styled(date_str, Style::default().fg(p.warning)),
+                        Span::styled(" │ ", Style::default().fg(p.muted)),
+                        Span::styled(project_short, Style::default().fg(p.success)),
                     ]),
                     Line::from(preview_line),
                     Line::from(vec![
@@ -666,7 +669,7 @@ impl HistoryTab {
                                 Self::format_tokens(session.total_tokens),
                                 session.duration_display()
                             ),
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(p.muted),
                         ),
                     ]),
                     Line::from(""), // spacing
@@ -695,13 +698,13 @@ impl HistoryTab {
         }
     }
 
-    fn render_stats_panel(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_stats_panel(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 " Activity Overview ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -718,45 +721,45 @@ impl HistoryTab {
             .split(inner);
 
         // Summary stats
-        self.render_summary_stats(frame, chunks[0], stats);
+        self.render_summary_stats(frame, chunks[0], stats, p);
 
         // Hour distribution
-        self.render_hour_distribution(frame, chunks[1], stats);
+        self.render_hour_distribution(frame, chunks[1], stats, p);
 
         // Recent activity
-        self.render_recent_activity(frame, chunks[2], stats);
+        self.render_recent_activity(frame, chunks[2], stats, p);
     }
 
-    fn render_summary_stats(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_summary_stats(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let (sessions, messages, tokens) = stats
             .map(|s| (s.total_sessions, s.total_messages, s.total_tokens()))
             .unwrap_or((0, 0, 0));
 
         let lines = vec![
             Line::from(vec![
-                Span::styled("Sessions: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Sessions: ", Style::default().fg(p.muted)),
                 Span::styled(
                     sessions.to_string(),
                     Style::default()
-                        .fg(Color::Green)
+                        .fg(p.success)
                         .add_modifier(Modifier::BOLD),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Messages: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Messages: ", Style::default().fg(p.muted)),
                 Span::styled(
                     Self::format_number(messages),
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(p.focus)
                         .add_modifier(Modifier::BOLD),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Tokens: ", Style::default().fg(p.muted)),
                 Span::styled(
                     Self::format_tokens(tokens),
                     Style::default()
-                        .fg(Color::Magenta)
+                        .fg(p.important)
                         .add_modifier(Modifier::BOLD),
                 ),
             ]),
@@ -766,10 +769,10 @@ impl HistoryTab {
         frame.render_widget(widget, area);
     }
 
-    fn render_hour_distribution(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_hour_distribution(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let title = Paragraph::new(Span::styled(
             "Activity by Hour:",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         ));
         frame.render_widget(title, area);
 
@@ -813,19 +816,19 @@ impl HistoryTab {
             .collect();
 
         let widget = Paragraph::new(vec![
-            Line::from(Span::styled(bars, Style::default().fg(Color::Cyan))),
+            Line::from(Span::styled(bars, Style::default().fg(p.focus))),
             Line::from(Span::styled(
                 "0    6    12   18   23",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ]);
         frame.render_widget(widget, bar_area);
     }
 
-    fn render_recent_activity(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_recent_activity(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let title = Paragraph::new(Span::styled(
             "Recent Activity (7 days):",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         ));
         frame.render_widget(title, area);
 
@@ -851,7 +854,7 @@ impl HistoryTab {
         let sparkline = Sparkline::default()
             .data(&data)
             .max(max_val)
-            .style(Style::default().fg(Color::Green));
+            .style(Style::default().fg(p.success));
 
         frame.render_widget(sparkline, sparkline_area);
     }
@@ -885,13 +888,13 @@ impl HistoryTab {
         }
     }
 
-    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&Arc<SessionMetadata>>) {
+    fn render_detail(&self, frame: &mut Frame, area: Rect, session: Option<&Arc<SessionMetadata>>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " Session Detail ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -899,90 +902,90 @@ impl HistoryTab {
 
         let Some(session) = session else {
             let empty =
-                Paragraph::new("No session selected").style(Style::default().fg(Color::DarkGray));
+                Paragraph::new("No session selected").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
 
         let mut lines = vec![
             Line::from(vec![
-                Span::styled("ID: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(session.id.as_str(), Style::default().fg(Color::White)),
+                Span::styled("ID: ", Style::default().fg(p.muted)),
+                Span::styled(session.id.as_str(), Style::default().fg(p.fg)),
             ]),
             Line::from(vec![
-                Span::styled("File: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("File: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session.file_path.display().to_string(),
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(p.warning),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&session.project_path, Style::default().fg(Color::Yellow)),
+                Span::styled("Project: ", Style::default().fg(p.muted)),
+                Span::styled(&session.project_path, Style::default().fg(p.warning)),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("Started: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Started: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session
                         .first_timestamp
                         .map(|ts| ts.format("%Y-%m-%d %H:%M:%S").to_string())
                         .unwrap_or_else(|| "unknown".to_string()),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(p.fg),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Ended: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Ended: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session
                         .last_timestamp
                         .map(|ts| ts.format("%Y-%m-%d %H:%M:%S").to_string())
                         .unwrap_or_else(|| "unknown".to_string()),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(p.fg),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Duration: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Duration: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session.duration_display(),
-                    Style::default().fg(Color::Green),
+                    Style::default().fg(p.success),
                 ),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("Messages: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Messages: ", Style::default().fg(p.muted)),
                 Span::styled(
                     session.message_count.to_string(),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(p.focus),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Tokens: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Tokens: ", Style::default().fg(p.muted)),
                 Span::styled(
                     Self::format_tokens(session.total_tokens),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(p.focus),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("File Size: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(session.size_display(), Style::default().fg(Color::White)),
+                Span::styled("File Size: ", Style::default().fg(p.muted)),
+                Span::styled(session.size_display(), Style::default().fg(p.fg)),
             ]),
             Line::from(""),
             Line::from(vec![
-                Span::styled("Models: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Models: ", Style::default().fg(p.muted)),
                 Span::styled(
                     if session.models_used.is_empty() {
                         "unknown".to_string()
                     } else {
                         session.models_used.join(", ")
                     },
-                    Style::default().fg(Color::Magenta),
+                    Style::default().fg(p.important),
                 ),
             ]),
             Line::from(""),
             Line::from(Span::styled(
                 "First message:",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ];
 
@@ -998,7 +1001,7 @@ impl HistoryTab {
         } else {
             lines.push(Line::from(Span::styled(
                 first_msg,
-                Style::default().fg(Color::White),
+                Style::default().fg(p.fg),
             )));
         }
 
@@ -1006,7 +1009,7 @@ impl HistoryTab {
         frame.render_widget(detail, inner);
     }
 
-    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         // Center popup (40% width, 30% height)
         let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
         let popup_height = (area.height as f32 * 0.3).max(8.0) as u16;
@@ -1022,10 +1025,10 @@ impl HistoryTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Red))
+            .border_style(Style::default().fg(p.error))
             .title(Span::styled(
                 " Error ",
-                Style::default().fg(Color::Red).bold(),
+                Style::default().fg(p.error).bold(),
             ));
 
         let inner = block.inner(popup_area);
@@ -1034,11 +1037,11 @@ impl HistoryTab {
         let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
 
         let lines = vec![
-            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
+            Line::from(Span::styled(error_text, Style::default().fg(p.fg))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ];
 
@@ -1046,7 +1049,7 @@ impl HistoryTab {
         frame.render_widget(paragraph, inner);
     }
 
-    fn render_export_dialog(&self, frame: &mut Frame, area: Rect) {
+    fn render_export_dialog(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         use ratatui::widgets::Clear;
 
         // Center dialog (40% width, 30% height)
@@ -1064,10 +1067,10 @@ impl HistoryTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " Export Sessions ",
-                Style::default().fg(Color::Cyan).bold(),
+                Style::default().fg(p.focus).bold(),
             ));
 
         let inner = block.inner(dialog_area);
@@ -1080,30 +1083,30 @@ impl HistoryTab {
             Line::from(""),
             Line::from(Span::styled(
                 "Select export format:",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             )),
             Line::from(""),
             Line::from(vec![
-                Span::styled("  1. ", Style::default().fg(Color::Cyan).bold()),
-                Span::styled("CSV format", Style::default().fg(Color::White).bold()),
+                Span::styled("  1. ", Style::default().fg(p.focus).bold()),
+                Span::styled("CSV format", Style::default().fg(p.fg).bold()),
             ]),
             Line::from(Span::styled(
                 "     Date, Time, Project, Messages, Tokens",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
             Line::from(""),
             Line::from(vec![
-                Span::styled("  2. ", Style::default().fg(Color::Cyan).bold()),
-                Span::styled("JSON format", Style::default().fg(Color::White).bold()),
+                Span::styled("  2. ", Style::default().fg(p.focus).bold()),
+                Span::styled("JSON format", Style::default().fg(p.fg).bold()),
             ]),
             Line::from(Span::styled(
                 "     Full session metadata",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
             Line::from(""),
             Line::from(Span::styled(
                 "Press ESC to cancel",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ];
 
@@ -1111,7 +1114,7 @@ impl HistoryTab {
         frame.render_widget(paragraph, inner);
     }
 
-    fn render_export_message(&mut self, frame: &mut Frame, area: Rect) {
+    fn render_export_message(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         let Some(msg) = &self.export_message else {
             return;
         };
@@ -1126,8 +1129,8 @@ impl HistoryTab {
         };
 
         let is_success = msg.starts_with('✓');
-        let border_color = if is_success { Color::Green } else { Color::Red };
-        let text_color = if is_success { Color::Green } else { Color::Red };
+        let border_color = if is_success { p.success } else { p.error };
+        let text_color = if is_success { p.success } else { p.error };
 
         let block = Block::default()
             .borders(Borders::ALL)

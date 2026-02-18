@@ -6,10 +6,11 @@ use crate::tabs::{
     AgentsTab, AnalyticsTab, ConfigTab, ConversationTab, CostsTab, DashboardTab, HistoryTab,
     HooksTab, McpTab, PluginsTab, SessionsTab,
 };
+use crate::theme::Palette;
 use ccboard_core::DegradedState;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Tabs},
     Frame,
@@ -233,8 +234,12 @@ impl Ui {
         self.render_header(frame, chunks[0], app.active_tab, app);
 
         // Render degraded state warning if needed
-        let content_area =
-            self.render_degraded_banner(frame, chunks[1], &app.store.degraded_state());
+        let content_area = self.render_degraded_banner(
+            frame,
+            chunks[1],
+            &app.store.degraded_state(),
+            app.color_scheme,
+        );
 
         // Render active tab content
         self.render_tab_content(frame, content_area, app);
@@ -243,20 +248,21 @@ impl Ui {
         self.render_status_bar(frame, chunks[2], app);
 
         // Render command palette (overlay on top of everything)
-        app.command_palette.render(frame, size);
+        app.command_palette.render(frame, size, app.color_scheme);
 
         // Render help modal (overlay on top of command palette)
         app.help_modal
-            .render(frame, size, app.active_tab, &app.keybindings);
+            .render(frame, size, app.active_tab, &app.keybindings, app.color_scheme);
 
         // Render toast notifications (overlay on top)
-        app.toast_manager.render(frame, size);
+        app.toast_manager.render(frame, size, app.color_scheme);
 
         // Render confirmation dialog (overlay on top of toasts)
-        app.confirm_dialog.render(frame, size);
+        app.confirm_dialog.render(frame, size, app.color_scheme);
     }
 
     fn render_loading_screen(&mut self, frame: &mut Frame, area: Rect, app: &mut App) {
+        let p = Palette::new(app.color_scheme);
         // Tick spinner animation
         app.spinner.tick();
 
@@ -284,10 +290,11 @@ impl Ui {
         // Create loading box
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
+            .style(Style::default().bg(p.bg))
             .title(Span::styled(
                 " ccboard ",
-                Style::default().fg(Color::Cyan).bold(),
+                Style::default().fg(p.focus).bold(),
             ));
 
         let inner = block.inner(loading_area);
@@ -312,7 +319,7 @@ impl Ui {
             Span::raw("  "),
             app.spinner.render(),
             Span::raw("  "),
-            Span::styled(message, Style::default().fg(Color::White)),
+            Span::styled(message, Style::default().fg(p.fg)),
         ]);
 
         let spinner_widget = Paragraph::new(spinner_line);
@@ -321,7 +328,7 @@ impl Ui {
         // Render hint
         let hint = Paragraph::new(Line::from(vec![Span::styled(
             "Press 'q' to quit",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         )]))
         .alignment(ratatui::layout::Alignment::Center);
 
@@ -329,9 +336,11 @@ impl Ui {
     }
 
     fn render_header(&mut self, frame: &mut Frame, area: Rect, active: Tab, app: &App) {
+        let p = Palette::new(app.color_scheme);
+
         let block = Block::default()
             .borders(Borders::BOTTOM)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(p.muted));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -365,8 +374,8 @@ impl Ui {
 
         // Logo
         let logo = Paragraph::new(Line::from(vec![
-            Span::styled("◈ ", Style::default().fg(Color::Cyan)),
-            Span::styled("ccboard", Style::default().fg(Color::White).bold()),
+            Span::styled("◈ ", Style::default().fg(p.focus)),
+            Span::styled("ccboard", Style::default().fg(p.fg).bold()),
         ]));
         frame.render_widget(logo, tab_bar_chunks[0]);
 
@@ -376,10 +385,10 @@ impl Ui {
             .map(|t| {
                 let style = if *t == active {
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(p.focus)
                         .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
                 } else {
-                    Style::default().fg(Color::DarkGray)
+                    Style::default().fg(p.muted)
                 };
                 Line::from(Span::styled(
                     format!(" {} {} {} ", t.icon(), t.shortcut(), t.name()),
@@ -390,24 +399,31 @@ impl Ui {
 
         let tabs = Tabs::new(titles)
             .select(active.index())
-            .divider(Span::styled("│", Style::default().fg(Color::DarkGray)));
+            .divider(Span::styled("│", Style::default().fg(p.muted)));
 
         frame.render_widget(tabs, tab_bar_chunks[1]);
 
         // Breadcrumbs (second row with top border)
         let breadcrumb_block = Block::default()
             .borders(Borders::TOP)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(p.muted));
 
         let breadcrumb_inner = breadcrumb_block.inner(header_rows[1]);
         frame.render_widget(breadcrumb_block, header_rows[1]);
 
         let breadcrumbs_path = self.get_breadcrumbs_for_tab(active, app);
         self.breadcrumbs.set_path(breadcrumbs_path);
-        self.breadcrumbs.render(frame, breadcrumb_inner);
+        self.breadcrumbs.render(frame, breadcrumb_inner, app.color_scheme);
     }
 
-    fn render_degraded_banner(&self, frame: &mut Frame, area: Rect, state: &DegradedState) -> Rect {
+    fn render_degraded_banner(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        state: &DegradedState,
+        scheme: ccboard_core::models::config::ColorScheme,
+    ) -> Rect {
+        let p = Palette::new(scheme);
         match state {
             DegradedState::Healthy => area,
             DegradedState::PartialData { reason, .. } => {
@@ -417,10 +433,10 @@ impl Ui {
                     .split(area);
 
                 let banner = Paragraph::new(Line::from(vec![
-                    Span::styled(" ⚠ ", Style::default().fg(Color::Yellow).bold()),
-                    Span::styled(reason, Style::default().fg(Color::Yellow)),
+                    Span::styled(" ⚠ ", Style::default().fg(p.warning).bold()),
+                    Span::styled(reason, Style::default().fg(p.warning)),
                 ]))
-                .style(Style::default().bg(Color::DarkGray));
+                .style(Style::default().bg(p.muted));
 
                 frame.render_widget(banner, chunks[0]);
                 chunks[1]
@@ -432,10 +448,10 @@ impl Ui {
                     .split(area);
 
                 let banner = Paragraph::new(Line::from(vec![
-                    Span::styled(" ⊘ READ-ONLY ", Style::default().fg(Color::Red).bold()),
-                    Span::styled(reason, Style::default().fg(Color::Red)),
+                    Span::styled(" ⊘ READ-ONLY ", Style::default().fg(p.error).bold()),
+                    Span::styled(reason, Style::default().fg(p.error)),
                 ]))
-                .style(Style::default().bg(Color::DarkGray));
+                .style(Style::default().bg(p.muted));
 
                 frame.render_widget(banner, chunks[0]);
                 chunks[1]
@@ -448,7 +464,7 @@ impl Ui {
 
         // If conversation is open, render it as overlay
         if self.conversation.is_open() {
-            self.conversation.render(frame, area);
+            self.conversation.render(frame, area, scheme);
             return;
         }
 
@@ -521,18 +537,19 @@ impl Ui {
                     .render(frame, area, analytics.as_ref(), Some(&app.store), scheme);
             }
             Tab::Plugins => {
-                self.plugins.render(frame, area, &app.store);
+                self.plugins.render(frame, area, &app.store, scheme);
             }
         }
     }
 
     fn render_status_bar(&self, frame: &mut Frame, area: Rect, app: &App) {
+        let p = Palette::new(app.color_scheme);
         let session_count = app.store.session_count();
 
         let status = if let Some(ref msg) = app.status_message {
             Line::from(vec![
-                Span::styled(" ⚠ ", Style::default().fg(Color::Yellow).bold()),
-                Span::styled(msg.as_str(), Style::default().fg(Color::Yellow)),
+                Span::styled(" ⚠ ", Style::default().fg(p.warning).bold()),
+                Span::styled(msg.as_str(), Style::default().fg(p.warning)),
             ])
         } else {
             // Tab-specific hints
@@ -556,17 +573,17 @@ impl Ui {
             Line::from(vec![
                 Span::styled(
                     format!(" ● {} sessions ", session_count),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ),
-                Span::styled("│", Style::default().fg(Color::DarkGray)),
-                Span::styled(" q", Style::default().fg(Color::Cyan).bold()),
-                Span::styled(" quit ", Style::default().fg(Color::DarkGray)),
-                Span::styled("│", Style::default().fg(Color::DarkGray)),
-                Span::styled(format!(" {}", hint), Style::default().fg(Color::DarkGray)),
+                Span::styled("│", Style::default().fg(p.muted)),
+                Span::styled(" q", Style::default().fg(p.focus).bold()),
+                Span::styled(" quit ", Style::default().fg(p.muted)),
+                Span::styled("│", Style::default().fg(p.muted)),
+                Span::styled(format!(" {}", hint), Style::default().fg(p.muted)),
             ])
         };
 
-        let bar = Paragraph::new(status).style(Style::default().bg(Color::DarkGray));
+        let bar = Paragraph::new(status).style(Style::default().bg(p.muted));
         frame.render_widget(bar, area);
     }
 

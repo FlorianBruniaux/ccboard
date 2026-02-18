@@ -16,7 +16,7 @@
 //! - Esc: Close error popup
 
 use crate::empty_state;
-use crate::theme::ServerStatusColor;
+use crate::theme::{Palette, ServerStatusColor};
 use ccboard_core::parsers::mcp_config::{McpConfig, McpServer};
 use crossterm::event::KeyCode;
 use ratatui::{
@@ -189,6 +189,8 @@ impl McpTab {
         mcp_config: Option<&McpConfig>,
         scheme: ccboard_core::models::config::ColorScheme,
     ) {
+        let p = Palette::new(scheme);
+
         // Dual-pane layout: 35% list | 65% details
         let chunks = Layout::default()
             .direction(ratatui::layout::Direction::Horizontal)
@@ -196,19 +198,19 @@ impl McpTab {
             .split(area);
 
         // Render server list
-        self.render_server_list(frame, chunks[0], mcp_config, scheme);
+        self.render_server_list(frame, chunks[0], mcp_config, scheme, &p);
 
         // Render server detail
-        self.render_server_detail(frame, chunks[1], mcp_config, scheme);
+        self.render_server_detail(frame, chunks[1], mcp_config, scheme, &p);
 
         // Render copy message if present (overlay)
         if self.copy_message.is_some() {
-            self.render_copy_message(frame, area);
+            self.render_copy_message(frame, area, &p);
         }
 
         // Render error popup if present (overlay)
         if self.error_message.is_some() {
-            self.render_error_popup(frame, area);
+            self.render_error_popup(frame, area, &p);
         }
     }
 
@@ -219,13 +221,10 @@ impl McpTab {
         area: Rect,
         mcp_config: Option<&McpConfig>,
         scheme: ccboard_core::models::config::ColorScheme,
+        p: &Palette,
     ) {
         let is_focused = matches!(self.focus, Focus::List);
-        let border_color = if is_focused {
-            Color::Cyan
-        } else {
-            Color::DarkGray
-        };
+        let border_color = if is_focused { p.focus } else { p.border };
 
         // Handle no config case
         if mcp_config.is_none() {
@@ -234,7 +233,7 @@ impl McpTab {
                 .border_style(Style::default().fg(border_color))
                 .title(Span::styled(
                     " MCP Servers (0) ",
-                    Style::default().fg(Color::White).bold(),
+                    Style::default().fg(p.fg).bold(),
                 ));
 
             let inner = block.inner(area);
@@ -255,7 +254,7 @@ impl McpTab {
                 .border_style(Style::default().fg(border_color))
                 .title(Span::styled(
                     " MCP Servers (0) ",
-                    Style::default().fg(Color::White).bold(),
+                    Style::default().fg(p.fg).bold(),
                 ));
 
             let inner = block.inner(area);
@@ -289,11 +288,11 @@ impl McpTab {
                 ListItem::new(vec![
                     Line::from(vec![
                         Span::styled(format!(" {} ", icon), Style::default().fg(color)),
-                        Span::styled(name.to_string(), Style::default().fg(Color::White).bold()),
+                        Span::styled(name.to_string(), Style::default().fg(p.fg).bold()),
                     ]),
                     Line::from(Span::styled(
                         format!("   {}", cmd_short),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     )),
                 ])
             })
@@ -304,12 +303,12 @@ impl McpTab {
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 format!(" MCP Servers ({}) ", server_count),
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let list = List::new(items)
             .block(block)
-            .highlight_style(Style::default().bg(Color::DarkGray));
+            .highlight_style(Style::default().bg(p.muted));
 
         frame.render_stateful_widget(list, area, &mut self.server_list_state);
     }
@@ -321,13 +320,10 @@ impl McpTab {
         area: Rect,
         mcp_config: Option<&McpConfig>,
         scheme: ccboard_core::models::config::ColorScheme,
+        p: &Palette,
     ) {
         let is_focused = matches!(self.focus, Focus::Detail);
-        let border_color = if is_focused {
-            Color::Cyan
-        } else {
-            Color::DarkGray
-        };
+        let border_color = if is_focused { p.focus } else { p.border };
 
         let selected_server = self.get_selected_server(mcp_config);
 
@@ -342,7 +338,7 @@ impl McpTab {
             .border_style(Style::default().fg(border_color))
             .title(Span::styled(
                 title,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -350,7 +346,7 @@ impl McpTab {
 
         if selected_server.is_none() {
             let empty = Paragraph::new("Select a server to view details")
-                .style(Style::default().fg(Color::DarkGray))
+                .style(Style::default().fg(p.muted))
                 .alignment(Alignment::Center);
             frame.render_widget(empty, inner);
             return;
@@ -369,7 +365,7 @@ impl McpTab {
         if let Some(desc) = Self::get_server_description(name, server) {
             lines.push(Line::from(Span::styled(
                 desc,
-                Style::default().fg(Color::DarkGray).italic(),
+                Style::default().fg(p.muted).italic(),
             )));
             lines.push(Line::from(""));
         }
@@ -378,7 +374,7 @@ impl McpTab {
         let (status_icon, status_color) = status.icon(scheme);
         let status_text = status.text();
         lines.push(Line::from(vec![
-            Span::styled("Status: ", Style::default().fg(Color::Yellow).bold()),
+            Span::styled("Status: ", Style::default().fg(p.warning).bold()),
             Span::styled(
                 format!("{} ", status_icon),
                 Style::default().fg(status_color).bold(),
@@ -391,21 +387,21 @@ impl McpTab {
         if server.is_http() {
             lines.push(Line::from(Span::styled(
                 "Type:",
-                Style::default().fg(Color::Yellow).bold(),
+                Style::default().fg(p.warning).bold(),
             )));
             lines.push(Line::from(Span::styled(
                 "  HTTP Server",
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(p.focus),
             )));
             lines.push(Line::from(""));
 
             lines.push(Line::from(Span::styled(
                 "URL:",
-                Style::default().fg(Color::Yellow).bold(),
+                Style::default().fg(p.warning).bold(),
             )));
             lines.push(Line::from(Span::styled(
                 format!("  {}", server.url.as_deref().unwrap_or("(unknown)")),
-                Style::default().fg(Color::White),
+                Style::default().fg(p.fg),
             )));
             lines.push(Line::from(""));
 
@@ -414,15 +410,15 @@ impl McpTab {
                 if !headers.is_empty() {
                     lines.push(Line::from(Span::styled(
                         "Headers:",
-                        Style::default().fg(Color::Yellow).bold(),
+                        Style::default().fg(p.warning).bold(),
                     )));
                     for (key, value) in headers {
                         lines.push(Line::from(vec![
                             Span::styled(
                                 format!("  {} = ", key),
-                                Style::default().fg(Color::Cyan).bold(),
+                                Style::default().fg(p.focus).bold(),
                             ),
-                            Span::styled(value.clone(), Style::default().fg(Color::White)),
+                            Span::styled(value.clone(), Style::default().fg(p.fg)),
                         ]));
                     }
                     lines.push(Line::from(""));
@@ -431,17 +427,17 @@ impl McpTab {
         } else {
             lines.push(Line::from(Span::styled(
                 "Type:",
-                Style::default().fg(Color::Yellow).bold(),
+                Style::default().fg(p.warning).bold(),
             )));
             lines.push(Line::from(Span::styled(
                 "  Stdio Server",
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(p.focus),
             )));
             lines.push(Line::from(""));
 
             lines.push(Line::from(Span::styled(
                 "Command:",
-                Style::default().fg(Color::Yellow).bold(),
+                Style::default().fg(p.warning).bold(),
             )));
             lines.push(Line::from(Span::styled(
                 format!(
@@ -452,7 +448,7 @@ impl McpTab {
                         &server.command
                     }
                 ),
-                Style::default().fg(Color::White),
+                Style::default().fg(p.fg),
             )));
             lines.push(Line::from(""));
         }
@@ -461,7 +457,7 @@ impl McpTab {
         if !server.is_http() && !server.args.is_empty() {
             lines.push(Line::from(Span::styled(
                 "Arguments:",
-                Style::default().fg(Color::Yellow).bold(),
+                Style::default().fg(p.warning).bold(),
             )));
             for arg in &server.args {
                 let spans = Self::highlight_arg(arg);
@@ -473,12 +469,12 @@ impl McpTab {
         // Environment variables with masking for sensitive values
         lines.push(Line::from(Span::styled(
             "Environment:",
-            Style::default().fg(Color::Yellow).bold(),
+            Style::default().fg(p.warning).bold(),
         )));
         if server.env.is_empty() {
             lines.push(Line::from(Span::styled(
                 "  (none)",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )));
         } else {
             // Sort env vars for consistent display
@@ -488,15 +484,15 @@ impl McpTab {
             for (key, value) in env_vars {
                 let masked_value = Self::mask_sensitive_env(key, value);
                 let value_color = if masked_value.contains("••••") {
-                    Color::DarkGray // Masked values in gray
+                    p.muted // Masked values in muted
                 } else {
-                    Color::White
+                    p.fg
                 };
 
                 lines.push(Line::from(vec![
                     Span::styled(
                         format!("  {} = ", key),
-                        Style::default().fg(Color::Cyan).bold(),
+                        Style::default().fg(p.focus).bold(),
                     ),
                     Span::styled(masked_value, Style::default().fg(value_color)),
                 ]));
@@ -510,22 +506,22 @@ impl McpTab {
             .unwrap_or_else(|| std::path::PathBuf::from("~/.claude/claude_desktop_config.json"));
         lines.push(Line::from(Span::styled(
             "Config File:",
-            Style::default().fg(Color::Yellow).bold(),
+            Style::default().fg(p.warning).bold(),
         )));
         lines.push(Line::from(Span::styled(
             format!("  {}", config_path.display()),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         )));
         lines.push(Line::from(""));
 
         // Actions
         lines.push(Line::from(Span::styled(
             "Actions:",
-            Style::default().fg(Color::Yellow).bold(),
+            Style::default().fg(p.warning).bold(),
         )));
         lines.push(Line::from(Span::styled(
             "  [y] Copy command  [e] Edit config  [o] Reveal file  [r] Refresh",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(p.muted),
         )));
 
         let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: false });
@@ -657,7 +653,7 @@ impl McpTab {
     }
 
     /// Render error popup overlay
-    fn render_error_popup(&self, frame: &mut Frame, area: Rect) {
+    fn render_error_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         if self.error_message.is_none() {
             return;
         }
@@ -677,10 +673,10 @@ impl McpTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Red))
+            .border_style(Style::default().fg(p.error))
             .title(Span::styled(
                 " Error ",
-                Style::default().fg(Color::Red).bold(),
+                Style::default().fg(p.error).bold(),
             ));
 
         let inner = block.inner(popup_area);
@@ -688,11 +684,11 @@ impl McpTab {
 
         let error_text = self.error_message.as_deref().unwrap_or("Unknown error");
         let lines = vec![
-            Line::from(Span::styled(error_text, Style::default().fg(Color::White))),
+            Line::from(Span::styled(error_text, Style::default().fg(p.fg))),
             Line::from(""),
             Line::from(Span::styled(
                 "Press Esc to close",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ];
 
@@ -701,7 +697,7 @@ impl McpTab {
     }
 
     /// Render copy success message overlay
-    fn render_copy_message(&self, frame: &mut Frame, area: Rect) {
+    fn render_copy_message(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         if self.copy_message.is_none() {
             return;
         }
@@ -721,14 +717,14 @@ impl McpTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Green));
+            .border_style(Style::default().fg(p.success));
 
         let inner = block.inner(msg_area);
         frame.render_widget(block, msg_area);
 
         let msg_text = self.copy_message.as_deref().unwrap_or("");
         let paragraph = Paragraph::new(msg_text)
-            .style(Style::default().fg(Color::Green))
+            .style(Style::default().fg(p.success))
             .alignment(Alignment::Center);
         frame.render_widget(paragraph, inner);
     }

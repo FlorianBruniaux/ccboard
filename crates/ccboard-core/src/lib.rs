@@ -11,6 +11,7 @@ pub mod graph;
 pub mod live_monitor;
 pub mod models;
 pub mod parsers;
+pub mod preferences;
 pub mod pricing;
 pub mod quota;
 pub mod store;

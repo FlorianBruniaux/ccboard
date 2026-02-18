@@ -1,6 +1,8 @@
+use crate::theme::Palette;
+use ccboard_core::models::config::ColorScheme;
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
@@ -76,24 +78,25 @@ impl Breadcrumbs {
     }
 
     /// Render the breadcrumbs as a paragraph
-    pub fn render(&self, frame: &mut Frame, area: Rect) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
         if self.path.is_empty() {
             return;
         }
 
-        let spans = self.build_spans();
+        let p = Palette::new(scheme);
+        let spans = self.build_spans(p);
         let breadcrumb_line = Line::from(spans);
-        let paragraph = Paragraph::new(breadcrumb_line).style(Style::default().fg(Color::DarkGray));
+        let paragraph = Paragraph::new(breadcrumb_line).style(Style::default().fg(p.muted));
 
         frame.render_widget(paragraph, area);
     }
 
     /// Build the display spans for breadcrumbs
-    fn build_spans(&self) -> Vec<Span<'static>> {
+    fn build_spans(&self, p: Palette) -> Vec<Span<'static>> {
         let mut spans = Vec::new();
 
         // Add location pin icon
-        spans.push(Span::styled("📍 ", Style::default().fg(Color::Cyan)));
+        spans.push(Span::styled("📍 ", Style::default().fg(p.focus)));
 
         // Determine if we need to truncate
         let path_to_display = if self.path.len() > self.max_display {
@@ -108,17 +111,17 @@ impl Breadcrumbs {
             let style = if idx == path_to_display.len() - 1 {
                 // Last breadcrumb (current location) is highlighted
                 Style::default()
-                    .fg(Color::White)
+                    .fg(p.fg)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::Gray)
+                Style::default().fg(p.muted)
             };
 
             spans.push(Span::styled(crumb.label.clone(), style));
 
             // Add separator (except after last item)
             if idx < path_to_display.len() - 1 {
-                spans.push(Span::styled(" > ", Style::default().fg(Color::DarkGray)));
+                spans.push(Span::styled(" > ", Style::default().fg(p.muted)));
             }
         }
 
@@ -149,6 +152,8 @@ impl Breadcrumbs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::theme::Palette;
+    use ccboard_core::models::config::ColorScheme;
 
     #[test]
     fn test_breadcrumb_creation() {
@@ -203,7 +208,7 @@ mod tests {
 
         breadcrumbs.set_path(path.clone());
 
-        let spans = breadcrumbs.build_spans();
+        let spans = breadcrumbs.build_spans(Palette::new(ColorScheme::Dark));
 
         // Should contain all 3 labels (plus icon and separators)
         // 📍 Dashboard > Config > Hooks

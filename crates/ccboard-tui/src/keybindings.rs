@@ -536,7 +536,7 @@ fn format_key(code: KeyCode, modifiers: KeyModifiers) -> String {
 
     // Add key
     let key_str = match code {
-        KeyCode::Char(c) if c == ' ' => "Space".to_string(),
+        KeyCode::Char(' ') => "Space".to_string(),
         KeyCode::Char(c) => c.to_uppercase().to_string(),
         KeyCode::F(n) => format!("F{}", n),
         KeyCode::Tab => "Tab".to_string(),

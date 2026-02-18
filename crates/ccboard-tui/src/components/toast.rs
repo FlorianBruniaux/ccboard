@@ -1,5 +1,7 @@
 //! Toast notification component
 
+use crate::theme::Palette;
+use ccboard_core::models::config::ColorScheme;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -102,13 +104,15 @@ impl ToastManager {
         self.toasts.retain(|t| !t.is_expired());
     }
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
         // Clear expired toasts
         self.clear_expired();
 
         if self.toasts.is_empty() {
             return;
         }
+
+        let p = Palette::new(scheme);
 
         // Stack toasts from bottom up (max 5 visible)
         let max_visible = 5;
@@ -130,14 +134,14 @@ impl ToastManager {
                 height: toast_height,
             };
 
-            render_single_toast(frame, toast_area, toast);
+            render_single_toast(frame, toast_area, toast, &p);
 
             y_offset += toast_height;
         }
     }
 }
 
-fn render_single_toast(frame: &mut Frame, area: Rect, toast: &Toast) {
+fn render_single_toast(frame: &mut Frame, area: Rect, toast: &Toast, p: &Palette) {
     let color = toast.toast_type.color();
     let icon = toast.toast_type.icon();
 
@@ -153,7 +157,7 @@ fn render_single_toast(frame: &mut Frame, area: Rect, toast: &Toast) {
             format!("{} ", icon),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(&toast.message, Style::default().fg(Color::White)),
+        Span::styled(&toast.message, Style::default().fg(p.fg)),
     ]);
 
     let paragraph = Paragraph::new(content).alignment(Alignment::Center);

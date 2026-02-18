@@ -1,5 +1,6 @@
 //! Analytics tab - Trends, forecasting, patterns, insights, anomalies with 5 sub-views
 
+use crate::theme::Palette;
 use ccboard_core::analytics::{detect_anomalies, AnalyticsData, Period};
 use ccboard_core::models::session::SessionMetadata;
 use ccboard_core::store::DataStore;
@@ -183,6 +184,8 @@ impl AnalyticsTab {
     ) {
         use tracing::debug;
 
+        let p = Palette::new(_scheme);
+
         debug!(
             has_analytics = analytics.is_some(),
             "AnalyticsTab::render() called"
@@ -197,7 +200,7 @@ impl AnalyticsTab {
             ])
             .split(area);
 
-        self.render_header(frame, chunks[0], analytics, store);
+        self.render_header(frame, chunks[0], analytics, store, &p);
 
         match analytics {
             Some(data) => {
@@ -206,16 +209,16 @@ impl AnalyticsTab {
                     "Rendering analytics data"
                 );
                 match self.current_view {
-                    AnalyticsView::Overview => self.render_overview(frame, chunks[1], data, store),
-                    AnalyticsView::Trends => self.render_trends(frame, chunks[1], data),
-                    AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data),
-                    AnalyticsView::Insights => self.render_insights(frame, chunks[1], data),
-                    AnalyticsView::Anomalies => self.render_anomalies(frame, chunks[1], store),
+                    AnalyticsView::Overview => self.render_overview(frame, chunks[1], data, store, &p),
+                    AnalyticsView::Trends => self.render_trends(frame, chunks[1], data, &p),
+                    AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data, &p),
+                    AnalyticsView::Insights => self.render_insights(frame, chunks[1], data, &p),
+                    AnalyticsView::Anomalies => self.render_anomalies(frame, chunks[1], store, &p),
                 }
             }
             None => {
                 debug!("No analytics data available, showing loading");
-                self.render_loading(frame, chunks[1])
+                self.render_loading(frame, chunks[1], &p)
             }
         }
     }
@@ -227,6 +230,7 @@ impl AnalyticsTab {
         area: Rect,
         _analytics: Option<&AnalyticsData>,
         store: Option<&Arc<DataStore>>,
+        p: &Palette,
     ) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -241,13 +245,13 @@ impl AnalyticsTab {
             Span::styled(
                 period_display,
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(" "),
             Span::styled(
                 "[F1:7d F2:30d F3:90d F4:All]",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             ),
         ];
         let period_para = Paragraph::new(Line::from(period_text))
@@ -269,10 +273,10 @@ impl AnalyticsTab {
                 let is_active = *view == self.current_view;
                 let style = if is_active {
                     Style::default()
-                        .fg(Color::Yellow)
+                        .fg(p.warning)
                         .add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::DarkGray)
+                    Style::default().fg(p.muted)
                 };
                 vec![Span::styled(view.name(), style), Span::raw(" | ")]
             })
@@ -285,11 +289,11 @@ impl AnalyticsTab {
     }
 
     /// Render loading state
-    fn render_loading(&self, frame: &mut Frame, area: Rect) {
+    fn render_loading(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title("Analytics")
-            .style(Style::default().fg(Color::Gray));
+            .style(Style::default().fg(p.muted));
 
         let para = Paragraph::new(vec![
             Line::from(""),
@@ -297,7 +301,7 @@ impl AnalyticsTab {
             Line::from(""),
             Line::from(Span::styled(
                 "Press 'r' to compute or wait for auto-computation",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ])
         .block(block)
@@ -313,6 +317,7 @@ impl AnalyticsTab {
         area: Rect,
         data: &AnalyticsData,
         store: Option<&Arc<DataStore>>,
+        p: &Palette,
     ) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -327,27 +332,27 @@ impl AnalyticsTab {
             .split(area);
 
         // Summary cards
-        self.render_summary_cards(frame, chunks[0], data);
+        self.render_summary_cards(frame, chunks[0], data, p);
 
         // Budget status (if configured)
         if let Some(store) = store {
-            self.render_budget_status(frame, chunks[1], data, store);
+            self.render_budget_status(frame, chunks[1], data, store, p);
         }
 
         // Token sparkline
-        self.render_token_sparkline(frame, chunks[2], data);
+        self.render_token_sparkline(frame, chunks[2], data, p);
 
         // Project leaderboard
         if let Some(store) = store {
-            self.render_project_leaderboard(frame, chunks[3], store);
+            self.render_project_leaderboard(frame, chunks[3], store, p);
         }
 
         // Top insights preview
-        self.render_insights_preview(frame, chunks[4], data);
+        self.render_insights_preview(frame, chunks[4], data, p);
     }
 
     /// Render summary cards
-    fn render_summary_cards(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_summary_cards(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -366,8 +371,9 @@ impl AnalyticsTab {
             chunks[0],
             "◆ Tokens",
             &tokens_display,
-            Color::Cyan,
+            p.focus,
             "total",
+            p,
         );
 
         // Total sessions
@@ -377,8 +383,9 @@ impl AnalyticsTab {
             chunks[1],
             "● Sessions",
             &total_sessions.to_string(),
-            Color::Green,
+            p.success,
             "count",
+            p,
         );
 
         // Monthly cost estimate
@@ -388,18 +395,19 @@ impl AnalyticsTab {
             chunks[2],
             "$ Cost Est",
             &cost_display,
-            Color::Yellow,
+            p.warning,
             "monthly",
+            p,
         );
 
         // Forecast confidence
         let confidence_display = format!("{:.0}%", data.forecast.confidence * 100.0);
         let confidence_color = if data.forecast.confidence > 0.7 {
-            Color::Green
+            p.success
         } else if data.forecast.confidence > 0.4 {
-            Color::Yellow
+            p.warning
         } else {
-            Color::Red
+            p.error
         };
         self.render_stat_card(
             frame,
@@ -408,6 +416,7 @@ impl AnalyticsTab {
             &confidence_display,
             confidence_color,
             "forecast",
+            p,
         );
     }
 
@@ -418,6 +427,7 @@ impl AnalyticsTab {
         area: Rect,
         data: &AnalyticsData,
         store: &Arc<DataStore>,
+        p: &Palette,
     ) {
         use ccboard_core::analytics::generate_budget_alerts;
 
@@ -447,24 +457,24 @@ impl AnalyticsTab {
 
             // Color based on percentage
             let (bar_color, status_icon) = if pct >= config.warning_threshold {
-                (Color::Red, "⚠️ ")
+                (p.error, "⚠️ ")
             } else if pct >= 60.0 {
-                (Color::Yellow, "")
+                (p.warning, "")
             } else {
-                (Color::Green, "")
+                (p.success, "")
             };
 
             let mut lines = vec![
                 Line::from(vec![
-                    Span::styled("Monthly Est: ", Style::default().fg(Color::Gray)),
+                    Span::styled("Monthly Est: ", Style::default().fg(p.muted)),
                     Span::styled(
                         format!("${:.2}", current_cost),
-                        Style::default().fg(Color::Cyan).bold(),
+                        Style::default().fg(p.focus).bold(),
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Budget:      ", Style::default().fg(Color::Gray)),
-                    Span::styled(format!("${:.2}", budget), Style::default().fg(Color::White)),
+                    Span::styled("Budget:      ", Style::default().fg(p.muted)),
+                    Span::styled(format!("${:.2}", budget), Style::default().fg(p.fg)),
                     Span::raw(" "),
                     Span::styled(bar, Style::default().fg(bar_color)),
                     Span::raw(" "),
@@ -474,10 +484,10 @@ impl AnalyticsTab {
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Remaining:   ", Style::default().fg(Color::Gray)),
+                    Span::styled("Remaining:   ", Style::default().fg(p.muted)),
                     Span::styled(
                         format!("${:.2} ({:.0}%)", remaining, 100.0 - pct),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(p.fg),
                     ),
                 ]),
             ];
@@ -493,7 +503,7 @@ impl AnalyticsTab {
                                 "{}WARNING: Approaching budget limit ({:.0}%)",
                                 status_icon, pct
                             ),
-                            Style::default().fg(Color::Red).bold(),
+                            Style::default().fg(p.error).bold(),
                         )]));
                     }
                     Alert::ProjectedOverage { overage, .. } => {
@@ -502,7 +512,7 @@ impl AnalyticsTab {
                                 "💡 TIP: Projected overage: ${:.2} if trend continues",
                                 overage
                             ),
-                            Style::default().fg(Color::Yellow),
+                            Style::default().fg(p.warning),
                         )]));
                     }
                     _ => {}
@@ -523,11 +533,11 @@ impl AnalyticsTab {
             let text = vec![
                 Line::from(Span::styled(
                     "No budget configured",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
                 Line::from(Span::styled(
                     "Add \"budget\": {\"monthlyBudgetUsd\": 50} to settings.json",
-                    Style::default().fg(Color::DarkGray).italic(),
+                    Style::default().fg(p.muted).italic(),
                 )),
             ];
 
@@ -544,6 +554,7 @@ impl AnalyticsTab {
     }
 
     /// Render stat card (reused from dashboard)
+    #[allow(clippy::too_many_arguments)]
     fn render_stat_card(
         &self,
         frame: &mut Frame,
@@ -552,6 +563,7 @@ impl AnalyticsTab {
         value: &str,
         color: Color,
         subtitle: &str,
+        p: &Palette,
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
@@ -566,10 +578,10 @@ impl AnalyticsTab {
             Line::from(Span::styled(
                 value,
                 Style::default()
-                    .fg(Color::White)
+                    .fg(p.fg)
                     .add_modifier(Modifier::BOLD),
             )),
-            Line::from(Span::styled(subtitle, Style::default().fg(Color::DarkGray))),
+            Line::from(Span::styled(subtitle, Style::default().fg(p.muted))),
         ];
 
         let para = Paragraph::new(text)
@@ -593,7 +605,7 @@ impl AnalyticsTab {
     }
 
     /// Render token sparkline
-    fn render_token_sparkline(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_token_sparkline(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let sparkline_data: Vec<u64> = data.trends.daily_tokens.to_vec();
         let max_val = sparkline_data.iter().max().copied().unwrap_or(1);
 
@@ -641,20 +653,20 @@ impl AnalyticsTab {
 
         let y_axis_widget = Paragraph::new(y_labels.join("\n"))
             .alignment(ratatui::layout::Alignment::Right)
-            .style(Style::default().fg(Color::DarkGray));
+            .style(Style::default().fg(p.muted));
         frame.render_widget(y_axis_widget, chart_layout[0]);
 
         // Sparkline in remaining area
         let sparkline = Sparkline::default()
             .data(&sparkline_data)
-            .style(Style::default().fg(Color::Cyan))
+            .style(Style::default().fg(p.focus))
             .max(max_val);
 
         frame.render_widget(sparkline, chart_layout[1]);
     }
 
     /// Render insights preview (top 3)
-    fn render_insights_preview(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_insights_preview(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let insights: Vec<ListItem> = data
             .insights
             .iter()
@@ -679,13 +691,13 @@ impl AnalyticsTab {
                     .borders(Borders::ALL)
                     .title("Top Insights (Tab to Insights view for all)"),
             )
-            .style(Style::default().fg(Color::White));
+            .style(Style::default().fg(p.fg));
 
         frame.render_widget(list, area);
     }
 
     /// Render trends sub-view (time series charts)
-    fn render_trends(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_trends(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
             .title("Trends - Token & Session Activity Over Time");
@@ -747,24 +759,22 @@ impl AnalyticsTab {
                 .name("Historical Tokens")
                 .marker(symbols::Marker::Braille)
                 .graph_type(GraphType::Line)
-                .style(Style::default().fg(Color::Cyan))
+                .style(Style::default().fg(p.focus))
                 .data(&token_data),
             Dataset::default()
                 .name("Sessions (×100)")
                 .marker(symbols::Marker::Braille)
                 .graph_type(GraphType::Line)
-                .style(Style::default().fg(Color::Green))
+                .style(Style::default().fg(p.success))
                 .data(&session_data),
         ];
 
         // Add 30d forecast dataset (orange dashed line)
         if !forecast_data.is_empty() {
-            let forecast_color = if data.forecast.confidence > 0.7 {
-                Color::LightYellow // High confidence: bright
-            } else if data.forecast.confidence > 0.4 {
-                Color::Yellow // Medium confidence
+            let forecast_color = if data.forecast.confidence > 0.4 {
+                p.warning // Medium/high confidence
             } else {
-                Color::LightRed // Low confidence: red warning
+                p.error // Low confidence
             };
 
             datasets.push(
@@ -794,7 +804,7 @@ impl AnalyticsTab {
             Span::styled(
                 "+30d",
                 Style::default()
-                    .fg(Color::DarkGray)
+                    .fg(p.muted)
                     .add_modifier(Modifier::ITALIC),
             ),
         ];
@@ -810,14 +820,14 @@ impl AnalyticsTab {
             .x_axis(
                 Axis::default()
                     .title("Days")
-                    .style(Style::default().fg(Color::Gray))
+                    .style(Style::default().fg(p.muted))
                     .labels(x_labels)
                     .bounds([0.0, x_max]),
             )
             .y_axis(
                 Axis::default()
                     .title("Tokens")
-                    .style(Style::default().fg(Color::Gray))
+                    .style(Style::default().fg(p.muted))
                     .labels(y_labels)
                     .bounds([0.0, max_with_forecast * 1.1]),
             );
@@ -826,7 +836,7 @@ impl AnalyticsTab {
     }
 
     /// Render patterns sub-view (bar charts)
-    fn render_patterns(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_patterns(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
@@ -838,10 +848,10 @@ impl AnalyticsTab {
             .split(area);
 
         // Activity Heatmap (GitHub-style)
-        self.render_activity_heatmap(frame, chunks[0], data);
+        self.render_activity_heatmap(frame, chunks[0], data, p);
 
         // Most Used Tools (horizontal bar chart)
-        self.render_most_used_tools(frame, chunks[1], data);
+        self.render_most_used_tools(frame, chunks[1], data, p);
 
         // Model distribution & duration stats (side by side)
         let bottom_chunks = Layout::default()
@@ -849,12 +859,12 @@ impl AnalyticsTab {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(chunks[2]);
 
-        self.render_model_distribution(frame, bottom_chunks[0], data);
-        self.render_duration_stats(frame, bottom_chunks[1], data);
+        self.render_model_distribution(frame, bottom_chunks[0], data, p);
+        self.render_duration_stats(frame, bottom_chunks[1], data, p);
     }
 
     /// Render activity heatmap (GitHub-style 7 days x 24 hours)
-    fn render_activity_heatmap(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_activity_heatmap(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let heatmap = &data.patterns.activity_heatmap;
 
         // Find max value for color scaling
@@ -872,17 +882,17 @@ impl AnalyticsTab {
         // Header: hour labels (every 4 hours)
         let header = Line::from(vec![
             Span::raw("    "),
-            Span::styled("00", Style::default().fg(Color::DarkGray)),
+            Span::styled("00", Style::default().fg(p.muted)),
             Span::raw("   "),
-            Span::styled("04", Style::default().fg(Color::DarkGray)),
+            Span::styled("04", Style::default().fg(p.muted)),
             Span::raw("   "),
-            Span::styled("08", Style::default().fg(Color::DarkGray)),
+            Span::styled("08", Style::default().fg(p.muted)),
             Span::raw("   "),
-            Span::styled("12", Style::default().fg(Color::DarkGray)),
+            Span::styled("12", Style::default().fg(p.muted)),
             Span::raw("   "),
-            Span::styled("16", Style::default().fg(Color::DarkGray)),
+            Span::styled("16", Style::default().fg(p.muted)),
             Span::raw("   "),
-            Span::styled("20", Style::default().fg(Color::DarkGray)),
+            Span::styled("20", Style::default().fg(p.muted)),
         ]);
         lines.push(header);
 
@@ -890,11 +900,10 @@ impl AnalyticsTab {
         for (day_idx, day_label) in weekday_labels.iter().enumerate() {
             let mut row_spans = vec![Span::styled(
                 format!("{:<3} ", day_label),
-                Style::default().fg(Color::Gray),
+                Style::default().fg(p.muted),
             )];
 
-            for hour in 0..24 {
-                let activity = heatmap[day_idx][hour];
+            for &activity in &heatmap[day_idx] {
                 let intensity = if max_activity > 0 {
                     (activity as f64 / max_activity as f64 * 4.0) as u8
                 } else {
@@ -903,11 +912,11 @@ impl AnalyticsTab {
 
                 // Color scale: None -> DarkGray -> Green -> Cyan -> Yellow
                 let color = match intensity {
-                    0 => Color::DarkGray,
-                    1 => Color::Green,
-                    2 => Color::Cyan,
-                    3 => Color::Yellow,
-                    _ => Color::Magenta,
+                    0 => p.muted,
+                    1 => p.success,
+                    2 => p.focus,
+                    3 => p.warning,
+                    _ => p.important,
                 };
 
                 row_spans.push(Span::styled("█", Style::default().fg(color)));
@@ -919,15 +928,15 @@ impl AnalyticsTab {
         // Legend
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
-            Span::styled("█", Style::default().fg(Color::DarkGray)),
+            Span::styled("█", Style::default().fg(p.muted)),
             Span::raw(" Less  "),
-            Span::styled("█", Style::default().fg(Color::Green)),
+            Span::styled("█", Style::default().fg(p.success)),
             Span::raw(" "),
-            Span::styled("█", Style::default().fg(Color::Cyan)),
+            Span::styled("█", Style::default().fg(p.focus)),
             Span::raw(" "),
-            Span::styled("█", Style::default().fg(Color::Yellow)),
+            Span::styled("█", Style::default().fg(p.warning)),
             Span::raw(" "),
-            Span::styled("█", Style::default().fg(Color::Magenta)),
+            Span::styled("█", Style::default().fg(p.important)),
             Span::raw(" More"),
         ]));
 
@@ -943,7 +952,7 @@ impl AnalyticsTab {
     }
 
     /// Render most used tools (horizontal bar chart)
-    fn render_most_used_tools(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_most_used_tools(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         // Sort tools by usage count (descending)
         let mut tools: Vec<(&String, &usize)> = data.patterns.tool_usage.iter().collect();
         tools.sort_by(|a, b| b.1.cmp(a.1));
@@ -959,7 +968,7 @@ impl AnalyticsTab {
             // No tool data available
             let text = vec![Line::from(Span::styled(
                 "No tool usage data available",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             ))];
             let paragraph = Paragraph::new(text)
                 .block(
@@ -978,12 +987,12 @@ impl AnalyticsTab {
 
         let mut lines = vec![];
         let colors = [
-            Color::Blue,
-            Color::Green,
-            Color::Cyan,
-            Color::Magenta,
-            Color::Yellow,
-            Color::Red,
+            p.focus,
+            p.success,
+            p.focus,
+            p.important,
+            p.warning,
+            p.error,
         ];
 
         for (i, (tool_name, count)) in top_tools.iter().enumerate() {
@@ -1002,12 +1011,12 @@ impl AnalyticsTab {
             lines.push(Line::from(vec![
                 Span::styled(
                     format!("{:<15}", tool_name),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(p.fg),
                 ),
                 Span::styled(bar, Style::default().fg(color)),
                 Span::raw(" "),
                 Span::styled(format!("{} ", count), Style::default().fg(color).bold()),
-                Span::styled(format!("{:.1}%", pct), Style::default().fg(Color::DarkGray)),
+                Span::styled(format!("{:.1}%", pct), Style::default().fg(p.muted)),
             ]));
         }
 
@@ -1023,7 +1032,7 @@ impl AnalyticsTab {
     }
 
     /// Render hourly distribution bar chart
-    fn _render_hourly_distribution(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn _render_hourly_distribution(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         // Group hours into 6 blocks (4-hour chunks)
         let mut hour_blocks = [0; 6];
         for (hour, count) in data.patterns.hourly_distribution.iter().enumerate() {
@@ -1049,14 +1058,14 @@ impl AnalyticsTab {
             .data(&bar_data)
             .bar_width(9)
             .bar_gap(2)
-            .bar_style(Style::default().fg(Color::Cyan))
-            .value_style(Style::default().fg(Color::White).bg(Color::Cyan));
+            .bar_style(Style::default().fg(p.focus))
+            .value_style(Style::default().fg(p.bg).bg(p.focus));
 
         frame.render_widget(barchart, area);
     }
 
     /// Render model distribution
-    fn render_model_distribution(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_model_distribution(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let mut model_data: Vec<(&str, u64)> = data
             .patterns
             .model_distribution
@@ -1076,14 +1085,14 @@ impl AnalyticsTab {
             .data(&model_data)
             .bar_width(12)
             .bar_gap(2)
-            .bar_style(Style::default().fg(Color::Green))
-            .value_style(Style::default().fg(Color::White).bg(Color::Green));
+            .bar_style(Style::default().fg(p.success))
+            .value_style(Style::default().fg(p.bg).bg(p.success));
 
         frame.render_widget(barchart, area);
     }
 
     /// Render session duration statistics
-    fn render_duration_stats(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_duration_stats(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let stats = &data.trends.duration_stats;
 
         // Format duration as minutes/seconds
@@ -1099,45 +1108,45 @@ impl AnalyticsTab {
 
         let text = vec![
             Line::from(vec![
-                Span::styled("Avg: ", Style::default().fg(Color::Gray)),
+                Span::styled("Avg: ", Style::default().fg(p.muted)),
                 Span::styled(
                     format_duration(stats.avg_duration_secs),
-                    Style::default().fg(Color::Cyan).bold(),
+                    Style::default().fg(p.focus).bold(),
                 ),
-                Span::styled("  (median: ", Style::default().fg(Color::Gray)),
+                Span::styled("  (median: ", Style::default().fg(p.muted)),
                 Span::styled(
                     format_duration(stats.median_duration_secs),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(p.focus),
                 ),
-                Span::styled(")", Style::default().fg(Color::Gray)),
+                Span::styled(")", Style::default().fg(p.muted)),
             ]),
             Line::from(vec![
-                Span::styled("P95: ", Style::default().fg(Color::Gray)),
+                Span::styled("P95: ", Style::default().fg(p.muted)),
                 Span::styled(
                     format_duration(stats.p95_duration_secs),
-                    Style::default().fg(Color::Yellow).bold(),
+                    Style::default().fg(p.warning).bold(),
                 ),
                 Span::styled(
                     "  (95% sessions < this)",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 ),
             ]),
             Line::from(vec![
-                Span::styled("Range: ", Style::default().fg(Color::Gray)),
+                Span::styled("Range: ", Style::default().fg(p.muted)),
                 Span::styled(
                     format_duration(stats.shortest_session_secs as f64),
-                    Style::default().fg(Color::Green),
+                    Style::default().fg(p.success),
                 ),
-                Span::styled(" → ", Style::default().fg(Color::Gray)),
+                Span::styled(" → ", Style::default().fg(p.muted)),
                 Span::styled(
                     format_duration(stats.longest_session_secs as f64),
-                    Style::default().fg(Color::Red),
+                    Style::default().fg(p.error),
                 ),
             ]),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Distribution:",
-                Style::default().fg(Color::Gray).bold(),
+                Style::default().fg(p.muted).bold(),
             )]),
         ];
 
@@ -1151,11 +1160,11 @@ impl AnalyticsTab {
                 let bar_len = (pct / 5).min(20); // Max 20 chars
                 let bar = "█".repeat(bar_len);
                 distrib_lines.push(Line::from(vec![
-                    Span::styled(format!("{:6}", labels[i]), Style::default().fg(Color::Gray)),
+                    Span::styled(format!("{:6}", labels[i]), Style::default().fg(p.muted)),
                     Span::raw(" "),
-                    Span::styled(bar, Style::default().fg(Color::Cyan)),
+                    Span::styled(bar, Style::default().fg(p.focus)),
                     Span::raw(" "),
-                    Span::styled(format!("{}%", pct), Style::default().fg(Color::White)),
+                    Span::styled(format!("{}%", pct), Style::default().fg(p.fg)),
                 ]));
             }
         }
@@ -1174,24 +1183,24 @@ impl AnalyticsTab {
     }
 
     /// Render insights sub-view (scrollable list)
-    fn render_insights(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData) {
+    fn render_insights(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let insights: Vec<ListItem> = data
             .insights
             .iter()
             .skip(self.scroll_offset)
             .map(|insight| {
                 let (icon, color) = if insight.contains("Peak hours") {
-                    ("⏰", Color::Yellow)
+                    ("⏰", p.warning)
                 } else if insight.contains("Opus") {
-                    ("💰", Color::Red)
+                    ("💰", p.error)
                 } else if insight.contains("Cost") || insight.contains("premium") {
-                    ("💸", Color::Magenta)
+                    ("💸", p.important)
                 } else if insight.contains("Weekend") {
-                    ("📅", Color::Cyan)
+                    ("📅", p.focus)
                 } else if insight.contains("confidence") {
-                    ("⚠️", Color::Yellow)
+                    ("⚠️", p.warning)
                 } else {
-                    ("💡", Color::Green)
+                    ("💡", p.success)
                 };
 
                 ListItem::new(Line::from(vec![
@@ -1218,7 +1227,7 @@ impl AnalyticsTab {
                     .borders(Borders::ALL)
                     .title(format!("Actionable Insights{}", scroll_indicator)),
             )
-            .style(Style::default().fg(Color::White));
+            .style(Style::default().fg(p.fg));
 
         frame.render_widget(list, area);
     }
@@ -1237,7 +1246,7 @@ impl AnalyticsTab {
     }
 
     /// Render project leaderboard table
-    fn render_project_leaderboard(&self, frame: &mut Frame, area: Rect, store: &Arc<DataStore>) {
+    fn render_project_leaderboard(&self, frame: &mut Frame, area: Rect, store: &Arc<DataStore>, p: &Palette) {
         // Get leaderboard data
         let mut entries = store.projects_leaderboard();
 
@@ -1322,7 +1331,7 @@ impl AnalyticsTab {
 
             Cell::from(header).style(
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(p.warning)
                     .add_modifier(Modifier::BOLD),
             )
         });
@@ -1337,10 +1346,10 @@ impl AnalyticsTab {
             .map(|(idx, entry)| {
                 // Highlight top 3 with different colors
                 let row_color = match idx {
-                    0 => Color::LightGreen,
-                    1 => Color::LightCyan,
-                    2 => Color::LightYellow,
-                    _ => Color::White,
+                    0 => p.success,
+                    1 => p.focus,
+                    2 => p.warning,
+                    _ => p.fg,
                 };
 
                 let cells = vec![
@@ -1380,9 +1389,9 @@ impl AnalyticsTab {
     }
 
     /// Render anomalies sub-view (Z-score based anomaly detection)
-    fn render_anomalies(&self, frame: &mut Frame, area: Rect, store: Option<&Arc<DataStore>>) {
+    fn render_anomalies(&self, frame: &mut Frame, area: Rect, store: Option<&Arc<DataStore>>, p: &Palette) {
         let Some(store) = store else {
-            self.render_loading(frame, area);
+            self.render_loading(frame, area, p);
             return;
         };
 
@@ -1413,21 +1422,21 @@ impl AnalyticsTab {
                 Line::from(""),
                 Line::from(Span::styled(
                     "Insufficient data for anomaly detection",
-                    Style::default().fg(Color::Yellow).bold(),
+                    Style::default().fg(p.warning).bold(),
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
                     format!("Found {} sessions (minimum 10 required)", sessions.len()),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
                     "Anomaly detection uses Z-score statistical analysis",
-                    Style::default().fg(Color::DarkGray).italic(),
+                    Style::default().fg(p.muted).italic(),
                 )),
                 Line::from(Span::styled(
                     "to identify sessions with unusual token usage or costs.",
-                    Style::default().fg(Color::DarkGray).italic(),
+                    Style::default().fg(p.muted).italic(),
                 )),
             ];
 
@@ -1449,7 +1458,7 @@ impl AnalyticsTab {
                 Line::from(""),
                 Line::from(Span::styled(
                     "✅ No anomalies detected",
-                    Style::default().fg(Color::Green).bold(),
+                    Style::default().fg(p.success).bold(),
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
@@ -1457,12 +1466,12 @@ impl AnalyticsTab {
                         "Analyzed {} sessions - All within normal range",
                         sessions.len()
                     ),
-                    Style::default().fg(Color::Gray),
+                    Style::default().fg(p.muted),
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
                     "Anomalies are flagged when tokens or cost exceed 2σ from mean",
-                    Style::default().fg(Color::DarkGray).italic(),
+                    Style::default().fg(p.muted).italic(),
                 )),
             ];
 
@@ -1488,7 +1497,7 @@ impl AnalyticsTab {
             Cell::from(Span::styled("Z-Score", Style::default().bold())),
             Cell::from(Span::styled("Deviation", Style::default().bold())),
         ])
-        .style(Style::default().fg(Color::Yellow))
+        .style(Style::default().fg(p.warning))
         .height(1);
 
         // Take top 10 anomalies (they're already sorted by severity)
@@ -1501,8 +1510,8 @@ impl AnalyticsTab {
 
                 // Severity column with emoji and color
                 let (severity_color, severity_icon) = match anomaly.severity {
-                    AnomalySeverity::Critical => (Color::Red, "🚨"),
-                    AnomalySeverity::Warning => (Color::Yellow, "⚠️"),
+                    AnomalySeverity::Critical => (p.error, "🚨"),
+                    AnomalySeverity::Warning => (p.warning, "⚠️"),
                 };
 
                 let cells = vec![
@@ -1513,7 +1522,7 @@ impl AnalyticsTab {
                     Cell::from(anomaly.date.clone()),
                     Cell::from(Span::styled(
                         &anomaly.session_id.as_str()[..8.min(anomaly.session_id.len())],
-                        Style::default().fg(Color::Cyan),
+                        Style::default().fg(p.focus),
                     )),
                     Cell::from(anomaly.metric.name()),
                     Cell::from(Span::styled(
@@ -1522,7 +1531,7 @@ impl AnalyticsTab {
                     )),
                     Cell::from(Span::styled(
                         format!("{:.2}", anomaly.z_score),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(p.fg),
                     )),
                     Cell::from(Span::styled(
                         anomaly.format_deviation(),

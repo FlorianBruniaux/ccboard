@@ -1,9 +1,10 @@
 //! Costs tab - Token usage and estimated costs by model
 
+use crate::theme::Palette;
 use ccboard_core::models::{BillingBlockManager, StatsCache};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{BarChart, Block, Borders, Gauge, List, ListItem, ListState, Paragraph, Row, Table},
     Frame,
@@ -155,6 +156,8 @@ impl CostsTab {
         _scheme: ccboard_core::models::config::ColorScheme,
         store: Option<&ccboard_core::store::DataStore>,
     ) {
+        let p = Palette::new(_scheme);
+
         // Main layout
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -165,20 +168,20 @@ impl CostsTab {
             .split(area);
 
         // Render view mode selector
-        self.render_view_tabs(frame, chunks[0]);
+        self.render_view_tabs(frame, chunks[0], &p);
 
         // Render content based on view mode
         match self.view_mode {
-            0 => self.render_overview(frame, chunks[1], stats, store),
-            1 => self.render_by_model(frame, chunks[1], stats),
-            2 => self.render_daily(frame, chunks[1], stats),
-            3 => self.render_billing_blocks(frame, chunks[1], billing_blocks),
-            4 => self.render_leaderboard(frame, chunks[1], store),
+            0 => self.render_overview(frame, chunks[1], stats, store, &p),
+            1 => self.render_by_model(frame, chunks[1], stats, &p),
+            2 => self.render_daily(frame, chunks[1], stats, &p),
+            3 => self.render_billing_blocks(frame, chunks[1], billing_blocks, &p),
+            4 => self.render_leaderboard(frame, chunks[1], store, &p),
             _ => {}
         }
     }
 
-    fn render_view_tabs(&self, frame: &mut Frame, area: Rect) {
+    fn render_view_tabs(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let tabs = [
             "1. Overview",
             "2. By Model",
@@ -189,7 +192,7 @@ impl CostsTab {
 
         let block = Block::default()
             .borders(Borders::BOTTOM)
-            .border_style(Style::default().fg(Color::DarkGray));
+            .border_style(Style::default().fg(p.border));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -202,10 +205,10 @@ impl CostsTab {
         for (i, (tab, chunk)) in tabs.iter().zip(chunks.iter()).enumerate() {
             let style = if i == self.view_mode {
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
             } else {
-                Style::default().fg(Color::DarkGray)
+                Style::default().fg(p.muted)
             };
 
             let label = Paragraph::new(Span::styled(*tab, style)).alignment(Alignment::Center);
@@ -219,6 +222,7 @@ impl CostsTab {
         area: Rect,
         stats: Option<&StatsCache>,
         store: Option<&ccboard_core::store::DataStore>,
+        p: &Palette,
     ) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -232,25 +236,25 @@ impl CostsTab {
             .split(area);
 
         // Total cost card
-        self.render_total_cost(frame, chunks[0], stats);
+        self.render_total_cost(frame, chunks[0], stats, p);
 
         // Quota gauge
-        self.render_quota_gauge(frame, chunks[1], store);
+        self.render_quota_gauge(frame, chunks[1], store, p);
 
         // Token breakdown
-        self.render_token_breakdown(frame, chunks[2], stats);
+        self.render_token_breakdown(frame, chunks[2], stats, p);
 
         // Model distribution
-        self.render_model_distribution(frame, chunks[3], stats);
+        self.render_model_distribution(frame, chunks[3], stats, p);
     }
 
-    fn render_total_cost(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_total_cost(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 " $ Total Estimated Cost ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -289,12 +293,12 @@ impl CostsTab {
             Line::from(Span::styled(
                 format!("${:.2}", total_cost),
                 Style::default()
-                    .fg(Color::Green)
+                    .fg(p.success)
                     .add_modifier(Modifier::BOLD),
             )),
             Line::from(Span::styled(
                 "estimated total",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(p.muted),
             )),
         ])
         .alignment(Alignment::Center);
@@ -311,9 +315,9 @@ impl CostsTab {
                 Line::from(vec![
                     Span::styled(
                         Self::format_model_name(model),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(p.fg),
                     ),
-                    Span::styled(format!(" ${:.2}", cost), Style::default().fg(Color::Yellow)),
+                    Span::styled(format!(" ${:.2}", cost), Style::default().fg(p.warning)),
                 ])
             })
             .collect();
@@ -327,6 +331,7 @@ impl CostsTab {
         frame: &mut Frame,
         area: Rect,
         store: Option<&ccboard_core::store::DataStore>,
+        p: &Palette,
     ) {
         use ccboard_core::quota::AlertLevel;
 
@@ -339,10 +344,10 @@ impl CostsTab {
 
             // Determine color based on alert level
             let color = match q.alert_level {
-                AlertLevel::Safe => Color::Green,
-                AlertLevel::Warning => Color::Yellow,
-                AlertLevel::Critical => Color::Red,
-                AlertLevel::Exceeded => Color::Magenta,
+                AlertLevel::Safe => p.success,
+                AlertLevel::Warning => p.warning,
+                AlertLevel::Critical => p.error,
+                AlertLevel::Exceeded => p.important,
             };
 
             // Build label with current cost and usage %
@@ -370,7 +375,7 @@ impl CostsTab {
             // No quota configured
             (
                 0.0,
-                Color::DarkGray,
+                p.muted,
                 "No budget configured".to_string(),
                 "Set monthly_limit in settings.json".to_string(),
             )
@@ -378,10 +383,10 @@ impl CostsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 " 💰 Monthly Budget ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -402,18 +407,18 @@ impl CostsTab {
 
         // Subtitle
         let subtitle_widget = Paragraph::new(subtitle)
-            .style(Style::default().fg(Color::DarkGray))
+            .style(Style::default().fg(p.muted))
             .alignment(Alignment::Center);
         frame.render_widget(subtitle_widget, chunks[1]);
     }
 
-    fn render_token_breakdown(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_token_breakdown(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 " Token Breakdown ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -452,7 +457,7 @@ impl CostsTab {
         // Input tokens gauge
         let input_pct = (input as f64 / total as f64 * 100.0) as u16;
         let input_gauge = Gauge::default()
-            .gauge_style(Style::default().fg(Color::Cyan).bg(Color::DarkGray))
+            .gauge_style(Style::default().fg(p.focus).bg(p.muted))
             .percent(input_pct.min(100))
             .label(format!(
                 "Input: {} ({:.1}%)",
@@ -464,7 +469,7 @@ impl CostsTab {
         // Output tokens gauge
         let output_pct = (output as f64 / total as f64 * 100.0) as u16;
         let output_gauge = Gauge::default()
-            .gauge_style(Style::default().fg(Color::Magenta).bg(Color::DarkGray))
+            .gauge_style(Style::default().fg(p.important).bg(p.muted))
             .percent(output_pct.min(100))
             .label(format!(
                 "Output: {} ({:.1}%)",
@@ -475,26 +480,26 @@ impl CostsTab {
 
         // Cache read gauge
         let cache_gauge = Gauge::default()
-            .gauge_style(Style::default().fg(Color::Green).bg(Color::DarkGray))
+            .gauge_style(Style::default().fg(p.success).bg(p.muted))
             .percent(50) // Visual only
             .label(format!("Cache Read: {}", Self::format_tokens(cache_read)));
         frame.render_widget(cache_gauge, chunks[2]);
 
         // Cache write gauge
         let cache_write_gauge = Gauge::default()
-            .gauge_style(Style::default().fg(Color::Yellow).bg(Color::DarkGray))
+            .gauge_style(Style::default().fg(p.warning).bg(p.muted))
             .percent(20) // Visual only
             .label(format!("Cache Write: {}", Self::format_tokens(cache_write)));
         frame.render_widget(cache_write_gauge, chunks[3]);
     }
 
-    fn render_model_distribution(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_model_distribution(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 " Model Cost Distribution ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -502,7 +507,7 @@ impl CostsTab {
 
         let Some(stats) = stats else {
             let empty =
-                Paragraph::new("No data available").style(Style::default().fg(Color::DarkGray));
+                Paragraph::new("No data available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -548,26 +553,26 @@ impl CostsTab {
         .header(
             Row::new(vec!["Model", "Cost", "Input", "Output"]).style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD),
             ),
         )
-        .row_highlight_style(Style::default().bg(Color::DarkGray));
+        .row_highlight_style(Style::default().bg(p.muted));
 
         frame.render_widget(table, inner);
     }
 
-    fn render_by_model(&mut self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_by_model(&mut self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let title_text = format!(
             " Cost by Model • Sort: {} (press 's') ",
             self.sort_mode.label()
         );
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 title_text,
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -575,7 +580,7 @@ impl CostsTab {
 
         let Some(stats) = stats else {
             let empty =
-                Paragraph::new("No data available").style(Style::default().fg(Color::DarkGray));
+                Paragraph::new("No data available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -612,36 +617,36 @@ impl CostsTab {
                 let is_selected = self.model_state.selected() == Some(i);
                 let style = if is_selected {
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(p.focus)
                         .add_modifier(Modifier::BOLD)
                 } else {
-                    Style::default().fg(Color::White)
+                    Style::default().fg(p.fg)
                 };
 
                 ListItem::new(vec![
                     Line::from(vec![
                         Span::styled(
                             format!("{} ", if is_selected { "▶" } else { " " }),
-                            Style::default().fg(Color::Cyan),
+                            Style::default().fg(p.focus),
                         ),
                         Span::styled(Self::format_model_name(model), style),
                         Span::styled(
                             format!("  ${:.2}", total),
                             Style::default()
-                                .fg(Color::Green)
+                                .fg(p.success)
                                 .add_modifier(Modifier::BOLD),
                         ),
                     ]),
                     Line::from(vec![
-                        Span::styled("    Input: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(format!("${:.2}", input), Style::default().fg(Color::Cyan)),
-                        Span::styled("  Output: ", Style::default().fg(Color::DarkGray)),
+                        Span::styled("    Input: ", Style::default().fg(p.muted)),
+                        Span::styled(format!("${:.2}", input), Style::default().fg(p.focus)),
+                        Span::styled("  Output: ", Style::default().fg(p.muted)),
                         Span::styled(
                             format!("${:.2}", output),
-                            Style::default().fg(Color::Magenta),
+                            Style::default().fg(p.important),
                         ),
-                        Span::styled("  Cache: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(format!("${:.2}", cache), Style::default().fg(Color::Yellow)),
+                        Span::styled("  Cache: ", Style::default().fg(p.muted)),
+                        Span::styled(format!("${:.2}", cache), Style::default().fg(p.warning)),
                     ]),
                     Line::from(""), // spacing
                 ])
@@ -652,13 +657,13 @@ impl CostsTab {
         frame.render_stateful_widget(list, inner, &mut self.model_state);
     }
 
-    fn render_daily(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>) {
+    fn render_daily(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
+            .border_style(Style::default().fg(p.border))
             .title(Span::styled(
                 " Daily Token Usage (Last 14 Days) ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -666,7 +671,7 @@ impl CostsTab {
 
         let Some(stats) = stats else {
             let empty =
-                Paragraph::new("No data available").style(Style::default().fg(Color::DarkGray));
+                Paragraph::new("No data available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         };
@@ -677,7 +682,7 @@ impl CostsTab {
 
         if recent.is_empty() {
             let empty = Paragraph::new("No daily data available")
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -696,13 +701,13 @@ impl CostsTab {
             .data(&data)
             .bar_width(3)
             .bar_gap(1)
-            .bar_style(Style::default().fg(Color::Cyan))
+            .bar_style(Style::default().fg(p.focus))
             .value_style(
                 Style::default()
-                    .fg(Color::White)
+                    .fg(p.fg)
                     .add_modifier(Modifier::BOLD),
             )
-            .label_style(Style::default().fg(Color::DarkGray));
+            .label_style(Style::default().fg(p.muted));
 
         frame.render_widget(bar_chart, inner);
     }
@@ -815,6 +820,7 @@ impl CostsTab {
         frame: &mut Frame,
         area: Rect,
         billing_blocks: Option<&BillingBlockManager>,
+        p: &Palette,
     ) {
         let Some(blocks_manager) = billing_blocks else {
             let no_data = Paragraph::new("No billing block data available")
@@ -823,7 +829,7 @@ impl CostsTab {
                         .title("Billing Blocks (5h)")
                         .borders(Borders::ALL),
                 )
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
             frame.render_widget(no_data, area);
             return;
         };
@@ -835,25 +841,25 @@ impl CostsTab {
                 Line::from(""),
                 Line::from(Span::styled(
                     "📊 No cost data available",
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(p.warning),
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
                     "No sessions with timestamps found",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
                     "💡 Costs are calculated from session timestamps:",
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(p.focus),
                 )),
                 Line::from(Span::styled(
                     "   • Sessions must have first_timestamp",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
                 Line::from(Span::styled(
                     "   • Grouped in 5-hour billing blocks",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
             ];
             let no_data = Paragraph::new(empty_msg)
@@ -887,10 +893,10 @@ impl CostsTab {
             if let Some(blocks) = by_date.get(date) {
                 for (block, usage) in blocks {
                     let color = match BillingBlockManager::get_color_for_cost(usage.total_cost) {
-                        "green" => Color::Green,
-                        "yellow" => Color::Yellow,
-                        "red" => Color::Red,
-                        _ => Color::White,
+                        "green" => p.success,
+                        "yellow" => p.warning,
+                        "red" => p.error,
+                        _ => p.fg,
                     };
 
                     let row_data = vec![
@@ -914,7 +920,7 @@ impl CostsTab {
         let header = Row::new(vec!["Date", "Block (UTC)", "Tokens", "Sessions", "Cost"])
             .style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD),
             )
             .height(1);
@@ -935,7 +941,7 @@ impl CostsTab {
             Block::default()
                 .title("Billing Blocks (5h UTC) — Last 10 Days")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Cyan)),
+                .border_style(Style::default().fg(p.focus)),
         )
         .column_spacing(2);
 
@@ -960,6 +966,7 @@ impl CostsTab {
         frame: &mut Frame,
         area: Rect,
         store: Option<&ccboard_core::store::DataStore>,
+        p: &Palette,
     ) {
         let Some(store) = store else {
             let no_data = Paragraph::new("No data available for leaderboard")
@@ -968,7 +975,7 @@ impl CostsTab {
                         .title("Token Leaderboard")
                         .borders(Borders::ALL),
                 )
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
             frame.render_widget(no_data, area);
             return;
         };
@@ -985,13 +992,13 @@ impl CostsTab {
             .split(area);
 
         // Section 1: Top 10 Sessions by tokens
-        self.render_top_sessions(frame, chunks[0], store);
+        self.render_top_sessions(frame, chunks[0], store, p);
 
         // Section 2: Top 10 Models by tokens
-        self.render_top_models(frame, chunks[1], store);
+        self.render_top_models(frame, chunks[1], store, p);
 
         // Section 3: Top 10 Days by tokens
-        self.render_top_days(frame, chunks[2], store);
+        self.render_top_days(frame, chunks[2], store, p);
     }
 
     fn render_top_sessions(
@@ -999,13 +1006,14 @@ impl CostsTab {
         frame: &mut Frame,
         area: Rect,
         store: &ccboard_core::store::DataStore,
+        p: &Palette,
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " Top 10 Sessions by Tokens ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -1015,7 +1023,7 @@ impl CostsTab {
 
         if top_sessions.is_empty() {
             let empty =
-                Paragraph::new("No sessions available").style(Style::default().fg(Color::DarkGray));
+                Paragraph::new("No sessions available").style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -1066,7 +1074,7 @@ impl CostsTab {
         .header(
             Row::new(vec!["", "#", "Session", "Tokens"]).style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD),
             ),
         )
@@ -1080,13 +1088,14 @@ impl CostsTab {
         frame: &mut Frame,
         area: Rect,
         store: &ccboard_core::store::DataStore,
+        p: &Palette,
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " Top 10 Models by Tokens ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -1096,7 +1105,7 @@ impl CostsTab {
 
         if top_models.is_empty() {
             let empty = Paragraph::new("No model data available")
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -1133,7 +1142,7 @@ impl CostsTab {
         .header(
             Row::new(vec!["", "#", "Model", "Tokens"]).style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD),
             ),
         )
@@ -1147,13 +1156,14 @@ impl CostsTab {
         frame: &mut Frame,
         area: Rect,
         store: &ccboard_core::store::DataStore,
+        p: &Palette,
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(p.focus))
             .title(Span::styled(
                 " Top 10 Days by Tokens ",
-                Style::default().fg(Color::White).bold(),
+                Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
@@ -1163,7 +1173,7 @@ impl CostsTab {
 
         if top_days.is_empty() {
             let empty = Paragraph::new("No daily data available")
-                .style(Style::default().fg(Color::DarkGray));
+                .style(Style::default().fg(p.muted));
             frame.render_widget(empty, inner);
             return;
         }
@@ -1200,7 +1210,7 @@ impl CostsTab {
         .header(
             Row::new(vec!["", "#", "Date", "Tokens"]).style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD),
             ),
         )
