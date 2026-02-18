@@ -1,5 +1,7 @@
 //! Tool call widget - Expandable display for tool calls and results
 
+use crate::theme::Palette;
+use ccboard_core::models::config::ColorScheme;
 use ccboard_core::models::{ToolCall, ToolResult};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -46,7 +48,7 @@ impl ToolCallNode {
     }
 
     /// Render the tool call node
-    pub fn render(&self, frame: &mut Frame, area: Rect) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let (status_icon, status_color) = self.status();
 
         // Header line: status + tool name + expand indicator
@@ -57,11 +59,11 @@ impl ToolCallNode {
             Span::styled(
                 &self.tool_call.name,
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(p.focus)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::raw(" "),
-            Span::styled(expand_indicator, Style::default().fg(Color::DarkGray)),
+            Span::styled(expand_indicator, Style::default().fg(p.muted)),
         ];
 
         if !self.expanded {
@@ -190,10 +192,12 @@ impl ToolCallsViewer {
     }
 
     /// Render all tool call nodes
-    pub fn render(&self, frame: &mut Frame, area: Rect) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
+        let p = Palette::new(scheme);
+
         if self.nodes.is_empty() {
             let placeholder =
-                Paragraph::new("No tool calls").style(Style::default().fg(Color::DarkGray));
+                Paragraph::new("No tool calls").style(Style::default().fg(p.muted));
             frame.render_widget(placeholder, area);
             return;
         }
@@ -218,11 +222,11 @@ impl ToolCallsViewer {
             if idx == self.selected {
                 let highlight = Block::default()
                     .borders(Borders::LEFT)
-                    .border_style(Style::default().fg(Color::Yellow));
+                    .border_style(Style::default().fg(p.warning));
                 frame.render_widget(highlight, node_area);
             }
 
-            node.render(frame, node_area);
+            node.render(frame, node_area, &p);
             y_offset += node_height as usize + 1; // +1 for spacing
         }
     }
