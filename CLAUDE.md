@@ -397,3 +397,17 @@ let entry = parse_entry(line)?; // Panics on first malformed entry
 ```
 
 **Rationale**: ccboard must display partial data if some files are corrupted. Only fatal errors (missing ~/.claude directory, permission denied) should prevent UI launch.
+
+---
+
+## Code Search Strategy
+
+Pour naviguer dans le code, utiliser les outils dans cet ordre :
+
+1. **Symbol connu** → Serena `get_symbols_overview` puis `find_symbol`
+2. **Recherche par intention** → `grepai_search` (semantic)
+3. **Pattern regex exact** → Grep natif
+4. **Call graph** → `grepai trace_callers` / `trace_callees`
+
+**Règle** : `get_symbols_overview` AVANT `find_symbol` (éviter lecture complète).
+**Interdit** : `Read` de fichier complet si Serena/grepai peut extraire le snippet.

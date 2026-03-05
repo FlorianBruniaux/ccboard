@@ -1,7 +1,7 @@
 # ccboard Architecture
 
-**Version**: 0.9.0 (Phase J done)
-**Last Updated**: 2026-02-18
+**Version**: 0.11.0
+**Last Updated**: 2026-03-05
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
@@ -38,7 +38,7 @@ ccboard is a Rust workspace with 4 crates providing dual TUI + Web interfaces fo
         ┌───────▼──────┐  ┌───▼─────────────┐
         │ ccboard-tui  │  │ ccboard-web     │
         │ (Ratatui)    │  │ (Leptos+Axum)   │
-        │ 9 tabs       │  │ API backend     │
+        │ 11 tabs      │  │ API backend     │
         └───────┬──────┘  └───┬─────────────┘
                 │              │
                 └──────┬───────┘
@@ -195,6 +195,10 @@ pub struct DataStore {
     // SQLite metadata cache (persistent)
     metadata_cache: Option<Arc<MetadataCache>>,
 
+    // Activity audit results (session_id → ActivitySummary)
+    // Populated on-demand by analyze_session(); persisted to SQLite via MetadataCache
+    activity_results: DashMap<String, ActivitySummary>,
+
     // Degraded state tracking
     degraded_state: RwLock<DegradedState>,
 }
@@ -309,7 +313,7 @@ pub trait Parser {
 
 **Rule**: Parsers NEVER panic, always return `Option<T>`.
 
-### Parser Inventory (10 modules)
+### Parser Inventory (11 modules)
 
 | Module | Input | Strategy | Output |
 |--------|-------|----------|--------|
@@ -322,6 +326,7 @@ pub trait Parser {
 | **RulesParser** | `CLAUDE.md` | YAML frontmatter + body | `Rules` |
 | **TaskParser** | `tasks/*.json` | serde_json | `Vec<Task>` |
 | **InvocationParser** | Scan JSONL | Regex agent/command/skill | `InvocationStats` |
+| **ActivityParser** | `*.jsonl` | Single-pass tool_use extraction | `ActivitySummary` (FileAccess, BashCommand, NetworkCall, Alert) |
 | **filters** | Message text | Pattern matching | `bool` (is_meaningful) |
 
 ### Settings Merge Logic
@@ -348,7 +353,7 @@ let merged = SettingsParser::merge(&[
 
 **Solution**: SQLite cache with mtime-based invalidation.
 
-#### Schema (v4)
+#### Schema (v5)
 
 ```sql
 CREATE TABLE session_metadata (
@@ -366,23 +371,47 @@ CREATE TABLE session_metadata (
     data BLOB NOT NULL                -- bincode serialized SessionMetadata
 );
 
+-- Activity audit cache (Phase K)
+CREATE TABLE activity_cache (
+    session_path TEXT PRIMARY KEY,
+    mtime INTEGER NOT NULL,           -- mtime at analysis time (invalidation)
+    session_id TEXT NOT NULL,
+    tool_call_count INTEGER NOT NULL,
+    alert_count INTEGER NOT NULL,
+    data BLOB NOT NULL                -- bincode serialized ActivitySummary
+);
+
+-- Denormalized alert store for cross-session queries
+CREATE TABLE activity_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_path TEXT NOT NULL,
+    severity TEXT NOT NULL,           -- "Critical" | "Warning" | "Info"
+    category TEXT NOT NULL,           -- "CredentialAccess" | "DestructiveCommand" | ...
+    timestamp TEXT NOT NULL,          -- RFC 3339
+    detail TEXT NOT NULL
+);
+
 CREATE INDEX idx_project ON session_metadata(project);
 CREATE INDEX idx_mtime ON session_metadata(mtime);
+CREATE INDEX idx_activity_alerts_severity ON activity_alerts(severity);
+CREATE INDEX idx_activity_alerts_session ON activity_alerts(session_path);
 ```
 
 #### Invalidation Strategy
 
 1. **Startup**: Compare `mtime` → if changed, rescan file
 2. **File watcher**: Delete cache entry on `Modify` event
-3. **Version mismatch**: Auto-clear on schema change (v3 → v4)
+3. **Version mismatch**: Auto-clear on schema change
+4. **Activity cache**: Same mtime-based strategy; single `tokio::fs::metadata()` call reused for both check and write (TOCTOU-free)
 
 **Cache versioning**:
 ```rust
-const CACHE_VERSION: i32 = 4;
+const CACHE_VERSION: i32 = 5;
 // v1: Initial
 // v2: Fixed TokenUsage::total()
 // v3: Added token breakdown fields
 // v4: Added branch field to SessionMetadata
+// v5: Added activity_cache + activity_alerts tables (Phase K)
 ```
 
 **Result**: 20s → 224ms (89x speedup).
@@ -399,6 +428,97 @@ let cache = Cache::builder()
 **Strategy**: Full JSONL content loaded on-demand, cached 5min idle.
 
 **Use case**: Session detail view → load once, cache for subsequent views.
+
+---
+
+## Activity Audit System
+
+### Overview
+
+The Activity module provides on-demand security auditing of Claude Code sessions. It reads the same JSONL files as the session parser but focuses on `tool_use` / `tool_result` pairs to build an audit trail.
+
+```
+Session JSONL
+    │
+    ▼
+ActivityParser::parse_tool_calls()      ← single-pass, async streaming
+    │
+    ├─> ToolCall[] (id, name, input, duration_ms)
+    │
+    ▼
+ActivityParser::classify_tool_calls()   ← fan-out by tool_name
+    │
+    ├─> FileAccess[]  (Read/Write/Edit/Glob/Grep)
+    ├─> BashCommand[] (command, is_destructive, output_preview)
+    ├─> NetworkCall[] (WebFetch/WebSearch/mcp__*)
+    └─> Alert[]       (via generate_alerts)
+    │
+    ▼
+ActivitySummary
+    │
+    ├─> DashMap<session_id, ActivitySummary>   (in-memory, fresh)
+    └─> MetadataCache::put_activity()          (SQLite persistence)
+```
+
+### Alert Rules
+
+| Trigger | Severity | Category |
+|---------|----------|----------|
+| Read a sensitive file (`.env`, `id_rsa`, …) | Warning | CredentialAccess |
+| Bash output contains API key pattern | Critical | CredentialAccess |
+| `rm -rf`, `DROP TABLE`, `git reset --hard` | Critical | DestructiveCommand |
+| `git push --force` / `git push -f` | Critical | ForcePush |
+| WebFetch to external domain | Info | ExternalExfil |
+| Write/Edit outside project root | Warning | ScopeViolation |
+
+### Violations Merge Strategy
+
+`DataStore::all_violations()` aggregates alerts from two sources with clear priority:
+
+```rust
+// 1. DashMap first (in-memory, freshest — just analyzed)
+for entry in self.activity_results.iter() {
+    seen_sessions.insert(entry.key().clone());
+    alerts.extend(entry.value().alerts.clone());
+}
+
+// 2. SQLite fills gaps (sessions analyzed in a previous run)
+if let Some(cache) = &self.metadata_cache {
+    for stored_alert in cache.get_all_alerts(None)? {
+        if seen_sessions.contains(&session_id) { continue; } // DashMap wins
+        alerts.push(Alert::from(stored_alert));
+    }
+}
+
+// 3. Sort: Critical > Warning > Info, newest-first within severity
+alerts.sort_by(severity_desc_then_timestamp_desc);
+```
+
+**Key invariant**: If a session exists in both DashMap and SQLite, the DashMap version is always used — it represents the most recent analysis.
+
+### Concurrency Model (Batch Scan)
+
+```rust
+let semaphore = Arc::new(Semaphore::new(4));   // max 4 concurrent analyses
+let scanning_count = Arc::new(AtomicUsize::new(0));
+let failed_ids = Arc::new(Mutex::new(HashSet::new()));
+
+for session in sessions {
+    let permit = semaphore.clone().acquire_owned().await?;
+    scanning_count.fetch_add(1, Ordering::Relaxed);
+
+    tokio::spawn(async move {
+        let _permit = permit;   // released on drop
+        match analyze_session(session).await {
+            Ok(summary) => store.activity_results.insert(id, summary),
+            Err(_) => failed_ids.lock().insert(id),
+        }
+        scanning_count.fetch_sub(1, Ordering::Relaxed);
+    });
+}
+```
+
+**4 permits chosen**: balances I/O throughput vs memory pressure. Each analysis reads a full JSONL file (~1MB average).
 
 ---
 
@@ -478,22 +598,19 @@ loop {
 ### Tab System
 
 ```rust
-pub enum ActiveTab {
-    Dashboard,
-    Sessions,
-    Config,
-    Hooks,
-    Agents,
-    Costs,
-    History,
-    Mcp,
-    Analytics,
-}
-
-pub struct TuiApp {
-    active_tab: ActiveTab,
-    tabs: [Box<dyn Tab>; 9],
-    store: Arc<DataStore>,
+pub enum Tab {
+    Dashboard,  // 1
+    Sessions,   // 2
+    Config,     // 3
+    Hooks,      // 4
+    Agents,     // 5
+    Costs,      // 6
+    History,    // 7
+    Mcp,        // 8
+    Analytics,  // 9
+    Plugins,    // 10 (Tab cycle only)
+    Activity,   // 11 (Tab cycle only) — security audit
+    Search,     // 12 (Tab cycle only) — FTS5 search
 }
 ```
 
@@ -578,6 +695,9 @@ Router::new()
     .route("/api/commands", get(commands_handler))
     .route("/api/skills", get(skills_handler))
     .route("/api/health", get(health_handler))
+    .route("/api/search", get(search_handler))            // FTS5 full-text search
+    .route("/api/activity/violations", get(activity_violations_handler)) // cross-session alerts
+    .route("/api/activity/{session_id}", get(activity_session_handler))  // on-demand analysis
     .route("/api/events", get(sse_handler))
 ```
 
@@ -603,10 +723,12 @@ async fn sse_handler(
 
 ### Current Status
 
-- ✅ Axum backend (12 routes + SSE)
-- ✅ Leptos frontend (9 pages: Dashboard, Sessions, Analytics, Config, Hooks, MCP, Agents, Costs, History)
+- ✅ Axum backend (15 routes + SSE)
+- ✅ Leptos frontend (11 pages: Dashboard, Sessions, Analytics, Config, Hooks, MCP, Agents, Costs, History, Activity, Search)
 - ✅ Full TUI/Web parity (100%)
 - ✅ Quota management integration (v0.8.0)
+- ✅ Activity Security Audit (v0.11.0)
+- ✅ FTS5 full-text search (v0.11.0)
 
 **Architecture**: Leptos WASM frontend (port 3333) communicates with Axum backend (port 8080) via REST API + SSE for live updates. Features include config modal, elevation system, responsive design, and budget tracking with quota gauges.
 
@@ -859,8 +981,8 @@ Standardized terminology used across ccboard documentation and codebase:
 
 | Level | Count | Location | Purpose |
 |-------|-------|----------|---------|
-| **Unit** | ~250 | `#[cfg(test)] mod tests` in source files | Parser logic, model validation, formatters |
-| **Integration** | ~20 | `tests/` directories | Cross-module, cache + store interactions |
+| **Unit** | ~340 | `#[cfg(test)] mod tests` in source files | Parser logic, model validation, formatters |
+| **Integration** | ~37 | `tests/` directories | Cross-module, cache + store interactions |
 | **Platform** | CI matrix | GitHub Actions | macOS + Linux + Windows builds |
 | **Manual** | Pre-release | Checklist in CROSS_PLATFORM.md | TUI navigation, Web UI, CLI commands |
 
@@ -879,7 +1001,7 @@ Standardized terminology used across ccboard documentation and codebase:
 ### Running Tests
 
 ```bash
-cargo test --all                    # All 344 tests
+cargo test --all                    # All 377 tests
 cargo test -p ccboard-core          # Core crate only
 RUST_LOG=debug cargo test           # With logging
 cargo test --all-features           # Integration tests (requires ~/.claude)
@@ -936,6 +1058,6 @@ cargo test --all-features           # Integration tests (requires ~/.claude)
 
 ---
 
-**Document Version**: 1.2
-**Last Updated**: 2026-02-16
+**Document Version**: 1.3
+**Last Updated**: 2026-03-05
 **Maintainer**: Florian Bruniaux

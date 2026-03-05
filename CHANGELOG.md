@@ -5,6 +5,64 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-03-05
+
+### Added — Activity Security Audit + Search Tab
+
+- **Activity tab** (press `a` from any tab) — on-demand per-session security audit with two views toggled via `Tab`:
+  - **Sessions view**: list of all sessions with security badges (`✓ OK` / `⚠ N alerts` / `⟳ scanning`). Press `Enter` to analyze one session individually, `r` to batch-scan all sessions (4 concurrent via Semaphore).
+  - **Violations view**: consolidated cross-session alert feed, sorted Critical → Warning → Info then newest first within severity. Each item shows: severity icon, category, truncated detail, session + timestamp context, and a per-category remediation hint. Press `j/k` to navigate.
+
+- **`ccboard-core/src/parsers/activity.rs`** — streaming JSONL security audit engine:
+  - Single-pass tool_use extraction with duration computation (tool_use → matching tool_result delta)
+  - Classification fan-out: `Read/Write/Edit/Glob/Grep` → FileAccess; `Bash` → BashCommand; `WebFetch/WebSearch` → NetworkCall; `mcp__*` → McpCall
+  - `is_destructive_command()`: detects `rm -rf`, `git push --force/-f`, `git reset --hard`, `git clean -f`, `DROP TABLE/DATABASE`, `pkill`, `kill -9`. Multi-command aware — splits on `;`, `|`, `&` to avoid false positives across chained commands.
+  - `is_sensitive_file()`: matches `.env`, `.pem`, `id_rsa`, `id_ed25519`, `secrets.json`, `credentials.json`, `.npmrc`, `.netrc`. Public key files (`.pub`) excluded.
+  - Credential leak detection in bash output: `sk-` (≥20 alphanum chars), `ghp_`, `ghu_`, `ghs_`, `glpat-`, `AKIA`, `xoxb-`, `xoxp-`
+  - Scope violation detection via `Path::starts_with()` (component-based, avoids path prefix false positives)
+  - 6 alert generation rules across 5 categories: CredentialAccess, DestructiveCommand, ExternalExfil, ScopeViolation, ForcePush
+
+- **`ccboard-core/src/models/activity.rs`** — activity data model:
+  - `AlertCategory::action_hint()` — exhaustive match (compile-time enforcement: adding a variant without a hint is a compile error, no `_` fallback)
+  - `AlertSeverity` with `PartialOrd` for sort-by-severity across the violations feed
+  - Types: `ToolCall`, `FileAccess`, `BashCommand`, `NetworkCall`, `Alert`, `ActivitySummary`
+
+- **SQLite activity tables** in `session-metadata.db`:
+  - `activity_cache` — bincode-serialized `ActivitySummary` per session with mtime for invalidation
+  - `activity_alerts` — denormalized queryable alerts (severity, category, timestamp, detail) for cross-session queries
+  - Atomic writes: `BEGIN IMMEDIATE / COMMIT / ROLLBACK` — no partial state on crash
+  - TOCTOU-free: single `tokio::fs::metadata()` call reused for both cache check and write decision
+
+- **`DataStore::all_violations()`** — merge strategy for cross-session alert aggregation:
+  - DashMap (in-memory, freshest data) takes priority; SQLite fills gaps for sessions not yet analyzed in-memory
+  - Deduplicates by session_id; sorts Critical → Warning → Info, then newest-first within same severity
+  - Used by Violations view for zero-SQLite-during-render display (cached per-frame)
+
+- **Concurrency model** for batch scan:
+  - `Arc<Semaphore>` with 4 permits — limits concurrent session analysis, avoids I/O saturation
+  - `Arc<AtomicUsize>` for live scanning count displayed in Violations stats bar (`⟳ Scanning N sessions…`)
+  - `Arc<Mutex<HashSet<String>>>` for failed session tracking shared across async tasks
+
+#### Testing
+
+- **29 unit tests** in `parsers/activity.rs` covering `is_destructive_command`, `is_sensitive_file`, parse fixtures (3 JSONL scenarios: simple, destructive, credential), classify fan-out, alert generation (6 rules), duration computation
+- **C1** `test_action_hint_all_variants_non_empty` — verifies exhaustive hint coverage for all `AlertCategory` variants (in `models/activity.rs`)
+- **C3** `test_all_violations_dashmap_priority_over_sqlite` — verifies DashMap wins over SQLite for the same session_id; SQLite-only sessions still appear to fill gaps (in `store.rs`)
+
+### Added — Search Tab
+
+- **Search tab** (TUI index 11, accessible via Tab/Shift+Tab) — FTS5 full-text search across all sessions
+  - `crates/ccboard-tui/src/tabs/search.rs` — TUI search interface with ranked results and highlighted snippets
+  - `crates/ccboard-web/src/pages/search.rs` — Web search page, identical UX
+  - `/api/search?q=<query>&limit=N` — backend endpoint backed by SQLite FTS5 index
+
+### Fixed
+
+- Pricing alias `claude-opus-4-5` and `claude-opus-4-6` (without date suffix) missing from embedded pricing table — fell back to default average (3.2) instead of correct price (5.0). Added short-form aliases alongside full versioned keys.
+- Axum route syntax: `/api/activity/:session_id` → `/api/activity/{session_id}` (Axum v0.7+ capture group syntax).
+
+---
+
 ## [0.10.0] - 2026-02-18
 
 ### Added — Phase J: Export Features

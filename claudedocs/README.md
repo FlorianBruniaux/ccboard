@@ -5,10 +5,13 @@ This directory contains active documentation for ccboard development and design 
 ## Active Documentation
 
 **Current State & Roadmap** ⭐
-- [VERSION_STATUS.md](VERSION_STATUS.md) - Current project state (v0.9.0) and known issues - **START HERE**
-- [RESUME.md](RESUME.md) - Session resume prompt (paste into new Claude Code session)
-- [ROADMAP.md](ROADMAP.md) - Long-term features (Phases J-N) and planned improvements
-- [NEXT_STEPS.md](NEXT_STEPS.md) - Phase J (Export Features) detailed plan
+- [RESUME.md](RESUME.md) - Session resume prompt (paste into new Claude Code session) — **START HERE**
+- [ROADMAP.md](ROADMAP.md) - Long-term features (Phases K-N) and planned improvements
+- [ROADMAP-post-0.9.md](ROADMAP-post-0.9.md) - Detailed phase breakdown with GitHub issues mapping
+
+**Archived** (already shipped):
+- `VERSION_STATUS.md` - v0.9.0 state (archived, superseded by RESUME.md)
+- `NEXT_STEPS.md` - Phase J Export Features plan (✅ released in v0.10.0)
 
 **Architecture & Development**
 - [PLAN.md](PLAN.md) - ⚠️ Historical: architecture phases 0→E (v0.4.0 era, for reference only)

@@ -1,8 +1,8 @@
 # ccboard Roadmap
 
-**Last Updated**: 2026-02-18
-**Current Version**: v0.9.0
-**Target**: v1.0.0 (Phases J-L complete)
+**Last Updated**: 2026-03-05
+**Current Version**: v0.11.0
+**Target**: v1.0.0 (Phases K-L complete)
 
 ---
 
@@ -18,18 +18,26 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-## 📍 Current Status (v0.9.0)
+## 📍 Current Status (v0.11.0)
 
 ### ✅ Production Features
 
-**TUI + Web UI** (9 tabs, 100% parity):
+**TUI + Web UI** (11 tabs, 100% parity):
 - Dashboard, Sessions (live monitoring), Config, Hooks, Agents
 - Costs (4 views + quota), History (search + export), MCP, Analytics
+- **Activity** — security audit, violations feed, on-demand session analysis, batch scan (4 concurrent)
+- **Search** — FTS5 full-text search across all sessions with ranked snippets
 
 **Performance**:
 - 89x faster startup (SQLite cache: 20s → 33ms)
 - 50x memory reduction (Arc migration: 1.4GB → 28MB)
-- 344 tests passing, 0 clippy warnings
+- 377 tests passing, 0 clippy warnings
+
+**Export Features** (v0.10.0):
+- `ccboard export sessions/stats/billing --format csv|json|md`
+- Export conversation to markdown/json/html
+- Date filter `--since 7d/30d/...`
+- 6 new export functions in `ccboard-core::export`
 
 **Light Mode & Theme Persistence** (v0.9.0):
 - Full light/dark theme toggle via `Ctrl+T`
@@ -50,31 +58,37 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ## 🚀 Upcoming Phases
 
-### Phase J: Export Features (v0.10.0) - **NEXT**
+### ✅ Phase J: Export Features (v0.10.0) - **DONE**
 
 **Priority**: 🔴 HIGH
-**Duration**: 6-8h
-**Status**: ⏳ Planned
+**Status**: ✅ Released 2026-02-18
 
-**Goal**: Export sessions, stats, and billing data to external formats for reporting and analysis.
-
-**Features**:
-- Export sessions → CSV/JSON (for Excel, data analysis)
-- Export stats → Markdown reports (for team sharing)
-- Export billing blocks → CSV (for accounting)
-- CLI: `ccboard export sessions --format csv --output sessions.csv`
-
-**Value**:
-- ✅ Share data with non-technical stakeholders
-- ✅ Integrate with external reporting tools
-- ✅ Backup session metadata
-- ✅ Quick win with immediate ROI
-
-**See**: [NEXT_STEPS.md](NEXT_STEPS.md) for detailed Phase J plan.
+**Delivered**:
+- `ccboard export sessions/stats/billing --format csv|json|md`
+- `ccboard export conversation <id> --format markdown|json|html`
+- Date filter `--since 7d/30d/...` on sessions export
+- 6 new functions in `ccboard-core::export`
 
 ---
 
-### Phase K: Advanced Analytics (v0.11.0)
+### ✅ Phase K-Activity: Activity Security Audit + Search (v0.11.0) - **DONE**
+
+**Priority**: 🔴 HIGH
+**Status**: ✅ Released 2026-03-05
+
+**Delivered**:
+- Activity tab (TUI) + `/activity` page (Web): per-session security audit
+- `parse_tool_calls()` + `classify_tool_calls()` — single-pass JSONL streaming engine
+- 6 alert rules: CredentialAccess, DestructiveCommand, ForcePush, ExternalExfil, ScopeViolation
+- Violations feed: cross-session, sorted Critical → Warning → Info, with remediation hints
+- Batch scan: `Arc<Semaphore>` 4 permits, live counter, SQLite persistence
+- Search tab (TUI) + `/search` page (Web): FTS5 full-text search with ranked snippets
+- SQLite activity tables: `activity_cache` + `activity_alerts` (cache v5)
+- 29 new unit tests in `parsers/activity.rs`, 1 in `models/activity.rs`
+
+---
+
+### Phase K-Analytics: Advanced Analytics (v0.12.0) - **NEXT**
 
 **Priority**: 🟡 MEDIUM
 **Duration**: 10-12h
@@ -219,11 +233,12 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 | Phase | Priority | Duration | Version | Focus | GitHub Issues | Status |
 |-------|----------|----------|---------|-------|---------------|--------|
-| **J** | 🔴 HIGH | 6-8h | v0.10.0 | Export features | — | ⏳ Next |
-| **K** | 🟡 MEDIUM | 10-12h | v0.11.0 | Advanced analytics | #14-21 | 📋 Backlog |
-| **L** | 🟢 LOW | 12-15h | v0.12.0 | Plugin system | — | 📋 Backlog |
-| **M** | 🟡 MEDIUM | 8-10h | v0.12.5 | Conversation enhancements | #3, #7, #8 | 📋 Backlog |
-| **N** | 🟢 LOW | 10-14h | v0.13.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
+| **J** | 🔴 HIGH | 6-8h | v0.10.0 | Export features | — | ✅ Done |
+| **K-Activity** | 🔴 HIGH | 8-10h | v0.11.0 | Activity security audit + Search | — | ✅ Done |
+| **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.12.0 | Advanced analytics | #14-21 | ⏳ Next |
+| **L** | 🟢 LOW | 12-15h | v0.13.0 | Plugin system | — | 📋 Backlog |
+| **M** | 🟡 MEDIUM | 8-10h | v0.13.5 | Conversation enhancements | #3, #7, #8 | 📋 Backlog |
+| **N** | 🟢 LOW | 10-14h | v0.14.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
 **Total Estimated**: 46-59h for v1.0.0 completion
 
@@ -260,6 +275,6 @@ Interested in implementing a roadmap phase? See:
 
 ---
 
-**Last Updated**: 2026-02-18
+**Last Updated**: 2026-03-05
 **Maintainer**: @FlorianBruniaux
 **Repository**: https://github.com/FlorianBruniaux/ccboard

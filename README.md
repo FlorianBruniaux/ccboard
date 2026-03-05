@@ -1,7 +1,6 @@
 # ccboard
 
 **A free, open-source TUI/Web dashboard for Claude Code session monitoring, cost tracking & config management**
-
 <p align="center">
   <a href="https://github.com/FlorianBruniaux/ccboard/stargazers"><img src="https://img.shields.io/github/stars/FlorianBruniaux/ccboard?style=for-the-badge" alt="GitHub stars"/></a>
   <a href="https://crates.io/crates/ccboard"><img src="https://img.shields.io/crates/v/ccboard?style=for-the-badge&logo=rust" alt="crates.io"/></a>
@@ -9,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-344_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-377_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
   <img src="https://img.shields.io/badge/Clippy-0_warnings-success?style=for-the-badge&logo=rust" alt="Clippy"/>
   <img src="https://img.shields.io/badge/Binary-5.8MB-blue?style=for-the-badge" alt="Binary Size"/>
   <img src="https://img.shields.io/badge/Cache_Speedup-89x-orange?style=for-the-badge&logo=sqlite" alt="Speedup"/>
@@ -26,13 +25,13 @@
   <img src="assets/demo.gif" alt="ccboard demo" width="800"/>
 </p>
 
-> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 344 tests, 0 clippy warnings.
+> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 377 tests, 0 clippy warnings.
 
 ---
 
 ## Features
 
-### 9 Interactive Tabs (TUI + Web)
+### 11 Interactive Tabs (TUI + Web)
 
 | Tab | Key | Description | Highlights |
 |-----|-----|-------------|------------|
@@ -45,6 +44,8 @@
 | **History** | `7` | Full-text search across sessions | Temporal patterns, CSV/JSON export |
 | **MCP** | `8` | MCP server management | Status detection (running/stopped), env vars masking |
 | **Analytics** | `9` | Advanced analytics (4 sub-views) | Budget tracking, 30-day forecast, heatmap, insights |
+| **Activity** | `Tab` | Security audit & violations feed | Credential detection, destructive command alerts, cross-session violations with remediation hints |
+| **Search** | `Tab` | Full-text search across all sessions | FTS5-powered, ranked results with snippets, query history |
 
 ### Platform Capabilities
 
@@ -293,18 +294,21 @@ ccboard vs ccusage vs agtrace vs claudelytics — Claude Code monitoring tools c
 | **Single Binary (no runtime)** | ✅ 5.8MB | ✅ Rust | ✅ Rust | ❌ npm |
 | | | | | |
 | **MCP Server Mode** | ⏳ Soon | ✅ 6 tools | ❌ | ❌ |
-| **Billing Blocks (5h)** | ⏳ Soon | ❌ | ✅ | ❌ |
-| **Conversation Viewer** | ⏳ Soon | ❌ | ✅ | ❌ |
+| **Billing Blocks (5h)** | ✅ | ❌ | ✅ | ❌ |
+| **Conversation Viewer** | ✅ | ❌ | ✅ | ❌ |
+| **Activity Security Audit** | ✅ | ❌ | ❌ | ❌ |
 | **Multi-provider** | ❌ | ✅ 3 providers | ❌ | ❌ |
 
 **Unique to ccboard**:
-- Only **multi-concern dashboard** (config + hooks + agents + MCP + analytics)
+- Only **multi-concern dashboard** (config + hooks + agents + MCP + analytics + security audit)
 - Config 3-level merge viewer (global/project/local)
 - Hooks syntax highlighting + test mode
 - Agents/Commands/Skills browser with invocation stats
 - MCP server **status** detection (vs agtrace = MCP server mode)
 - SQLite metadata cache (89x faster startup)
 - **Advanced Analytics**: 30-day forecasting, budget alerts, session duration stats, usage patterns
+- **Activity Security Audit**: credential access detection, destructive command alerts, cross-session violations feed with remediation hints
+- **FTS5 Search**: full-text search across all sessions with ranked snippets
 - Dual TUI + Web single binary
 
 **References**:
@@ -531,6 +535,8 @@ ccboard both --port 3333
 - `/agents` - Agents/Commands/Skills browser
 - `/costs` - 4 tabs (Overview, By Model, Daily, Billing Blocks)
 - `/history` - History search and filters
+- `/activity` - Security audit & violations feed
+- `/search` - Full-text session search
 
 ### Stats Only
 
@@ -649,6 +655,16 @@ ccboard export conversation <session-id> --output conv.html --format html
 
 **Costs**
 - `Tab` / `←` / `→` - Switch cost views (Overview/By Model/Daily)
+
+**Activity** (Tab/Shift+Tab to reach)
+- `r` - Batch-scan all sessions (4 concurrent)
+- `Enter` - Analyze selected session individually
+- `Tab` - Toggle Sessions ↔ Violations view
+- `j/k` - Navigate sessions or violations list
+
+**Search** (Tab/Shift+Tab to reach)
+- Type to search — FTS5 full-text search across all sessions
+- Results ranked by relevance with highlighted snippets
 
 ### Environment Variables
 
@@ -807,7 +823,7 @@ RUST_LOG=ccboard=debug cargo run
 ### Testing
 
 ```bash
-# Run all tests (344 tests)
+# Run all tests (377 tests)
 cargo test --all
 
 # Run tests for specific crate
@@ -866,37 +882,33 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap & Documentation
 
-**Current Status**: 🎉 **PRODUCTION-READY** (v0.8.0)
+**Current Status**: 🎉 **PRODUCTION-READY** (v0.11.0)
 
 ### Completed ✅
 
 - ✅ **Infrastructure**: Stats parser, Settings merge, Session metadata, DataStore, SQLite cache (89x speedup)
-- ✅ **TUI Dashboard**: 9 interactive tabs (Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP, Analytics)
-- ✅ **Web Frontend**: Full Leptos/WASM UI with 100% TUI parity (9 pages) + Sessions freeze fix
+- ✅ **TUI Dashboard**: 11 interactive tabs (Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP, Analytics, Activity, Search)
+- ✅ **Web Frontend**: Full Leptos/WASM UI with 100% TUI parity (11 pages)
 - ✅ **Live Monitoring**: CPU/RAM/Tokens tracking for active Claude processes
 - ✅ **Cost Analytics**: 4 views (Overview, By Model, Daily, Billing Blocks) + budget alerts
 - ✅ **Advanced Analytics**: 30-day forecasting, usage patterns, actionable insights
 - ✅ **Conversation Viewer**: Full JSONL display with full-text search (`/` to search, `n/N` to navigate), syntax highlighting, dynamic rendering
-- ✅ **TUI Stability**: Fixed runtime panics, overflow issues, and Esc key handling in viewers
 - ✅ **Dynamic Pricing**: LiteLLM integration with automatic price updates and local caching
 - ✅ **Budget Tracking** (v0.8.0): Month-to-date cost calculation, monthly projection, 4-level alerts (Safe/Warning/Critical/Exceeded)
+- ✅ **Export Features** (v0.10.0): CSV/JSON/Markdown export for sessions, stats, billing, conversations
+- ✅ **Activity Security Audit** (v0.11.0): Per-session tool audit, credential detection, destructive command alerts, cross-session violations feed with remediation hints
+- ✅ **Search Tab** (v0.11.0): FTS5-powered full-text search across all sessions with ranked snippets
 
-**Total**: 344 tests passing, 0 clippy warnings
+**Total**: 377 tests passing, 0 clippy warnings
 
-### Coming Soon 🚧
+### Coming Soon
 
-**v0.9.0: Export Features** (Phase J - NEXT)
-- Export sessions → CSV/JSON for Excel and data analysis
-- Export stats → Markdown reports for team sharing
-- Export billing blocks → CSV for accounting
-- CLI: `ccboard export sessions --format csv`
+**v0.12.0: Advanced Analytics** (Phase K)
+- Anomaly detection: cost spikes, unusual activity hours
+- Usage pattern analysis: peak hours, day-of-week trends
+- Model recommendations: Opus ↔ Sonnet switches based on usage
 
-**v0.10.0: Advanced Analytics** (Phase K)
-- Anomaly detection (cost spikes, unusual patterns)
-- Model usage recommendations
-- Forecast accuracy tracking
-
-**v0.11.0: Plugin System** (Phase L)
+**v0.13.0: Plugin System** (Phase L)
 - Extensible architecture for community plugins
 - Custom tabs, data sources, metrics
 
