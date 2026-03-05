@@ -4,4 +4,6 @@
 
 pub mod metadata_cache;
 
-pub use metadata_cache::{CacheStats, MetadataCache};
+pub use metadata_cache::{
+    ActivityCacheStats, AggregateStats, CacheStats, MetadataCache, SearchResult, StoredAlert,
+};

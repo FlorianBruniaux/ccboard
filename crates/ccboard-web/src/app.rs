@@ -90,6 +90,18 @@ pub fn App() -> impl IntoView {
                                         view! { <crate::pages::TaskGraphPage /> }
                                     }
                                 />
+                                <Route
+                                    path=path!("/activity")
+                                    view=|| {
+                                        view! { <crate::pages::ActivityPage /> }
+                                    }
+                                />
+                                <Route
+                                    path=path!("/search")
+                                    view=|| {
+                                        view! { <crate::pages::SearchPage /> }
+                                    }
+                                />
                             </Routes>
                         </main>
                     </div>

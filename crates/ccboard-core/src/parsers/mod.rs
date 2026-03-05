@@ -1,5 +1,6 @@
 //! Parsers for Claude Code data files
 
+pub mod activity;
 pub mod filters;
 pub mod hooks;
 pub mod invocations;
@@ -13,6 +14,9 @@ pub mod stats;
 pub mod task;
 pub mod todowrite;
 
+pub use activity::{
+    classify_tool_calls, is_destructive_command, is_sensitive_file, parse_tool_calls,
+};
 pub use filters::is_meaningful_user_message;
 pub use hooks::{Hook, HookType, HooksParser};
 pub use invocations::InvocationParser;

@@ -162,6 +162,27 @@ pub fn Sidebar(
                                 <span class="sidebar-link-label">"Tasks"</span>
                             </A>
                         </li>
+                        <li class="nav-item">
+                            <A href="/activity" attr:class="sidebar-link" on:click=close_sidebar>
+                                <span class="sidebar-link-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                    </svg>
+                                </span>
+                                <span class="sidebar-link-label">"Security"</span>
+                            </A>
+                        </li>
+                        <li class="nav-item">
+                            <A href="/search" attr:class="sidebar-link" on:click=close_sidebar>
+                                <span class="sidebar-link-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="11" cy="11" r="8"/>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                    </svg>
+                                </span>
+                                <span class="sidebar-link-label">"Search"</span>
+                            </A>
+                        </li>
                     </ul>
                 </nav>
             </aside>

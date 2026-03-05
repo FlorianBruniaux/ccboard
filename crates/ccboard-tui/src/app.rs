@@ -22,6 +22,10 @@ pub enum Tab {
     Mcp,
     Analytics,
     Plugins,
+    /// Activity/audit tab — no number shortcut, accessible via Tab/Shift+Tab only
+    Activity,
+    /// Full-text search tab — accessible via Tab/Shift+Tab
+    Search,
 }
 
 impl Tab {
@@ -37,6 +41,8 @@ impl Tab {
             Tab::Mcp,
             Tab::Analytics,
             Tab::Plugins,
+            Tab::Activity,
+            Tab::Search,
         ]
     }
 
@@ -52,6 +58,8 @@ impl Tab {
             Tab::Mcp => 7,
             Tab::Analytics => 8,
             Tab::Plugins => 9,
+            Tab::Activity => 10,
+            Tab::Search => 11,
         }
     }
 
@@ -67,6 +75,8 @@ impl Tab {
             7 => Tab::Mcp,
             8 => Tab::Analytics,
             9 => Tab::Plugins,
+            10 => Tab::Activity,
+            11 => Tab::Search,
             _ => Tab::Dashboard,
         }
     }
@@ -77,12 +87,14 @@ impl Tab {
             Tab::Sessions => "Sessions",
             Tab::Config => "Config",
             Tab::Hooks => "Hooks",
-            Tab::Agents => "Capabilities", // Changed from "Agents"
+            Tab::Agents => "Capabilities",
             Tab::Costs => "Costs",
             Tab::History => "History",
             Tab::Mcp => "MCP",
             Tab::Analytics => "Analytics",
             Tab::Plugins => "Plugins",
+            Tab::Activity => "Activity",
+            Tab::Search => "Search",
         }
     }
 
@@ -98,6 +110,8 @@ impl Tab {
             Tab::Mcp => '8',
             Tab::Analytics => '9',
             Tab::Plugins => '0',
+            Tab::Activity => 'a', // decorative — no JumpTab action wired
+            Tab::Search => 's',   // decorative — no JumpTab action wired
         }
     }
 
@@ -112,7 +126,9 @@ impl Tab {
             Tab::History => "📜",
             Tab::Mcp => "🔌",
             Tab::Analytics => "📈",
-            Tab::Plugins => "🎁", // Gift box for plugins
+            Tab::Plugins => "🎁",
+            Tab::Activity => "🔍",
+            Tab::Search => "🔎",
         }
     }
 }
@@ -172,6 +188,9 @@ pub struct App {
 
     /// Custom keybindings
     pub keybindings: KeyBindings,
+
+    /// Search tab state (FTS5 full-text search)
+    pub search_tab: crate::tabs::SearchTab,
 }
 
 impl App {
@@ -207,6 +226,7 @@ impl App {
             search_history: VecDeque::with_capacity(50),
             color_scheme: prefs.color_scheme,
             keybindings,
+            search_tab: crate::tabs::SearchTab::new(),
         }
     }
 
@@ -248,6 +268,15 @@ impl App {
                     }
                 }
             }
+            return true;
+        }
+
+        // Let Search tab handle ESC when in input mode (before global keybindings)
+        if self.active_tab == Tab::Search
+            && self.search_tab.input_mode
+            && key == crossterm::event::KeyCode::Esc
+        {
+            self.search_tab.toggle_input();
             return true;
         }
 

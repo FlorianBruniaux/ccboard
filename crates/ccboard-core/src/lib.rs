@@ -22,6 +22,7 @@ pub use analytics::{
     compute_trends, detect_patterns, forecast_usage, generate_insights, AnalyticsData,
     ForecastData, Period, TrendDirection, TrendsData, UsagePatterns,
 };
+pub use cache::{AggregateStats, SearchResult, StoredAlert};
 pub use error::{CoreError, DegradedState, LoadReport};
 pub use event::{DataEvent, EventBus};
 pub use export::{
@@ -30,6 +31,10 @@ pub use export::{
     export_stats_to_csv, export_stats_to_json, export_stats_to_markdown,
 };
 pub use live_monitor::{detect_live_sessions, LiveSession};
+pub use models::activity::{
+    ActivitySummary, Alert, AlertCategory, AlertSeverity, BashCommand, FileAccess, FileOperation,
+    NetworkCall, NetworkTool, ToolCall as ActivityToolCall,
+};
 pub use quota::{calculate_quota_status, AlertLevel, QuotaStatus};
 pub use store::{DataStore, ProjectLeaderboardEntry};
 pub use usage_estimator::{calculate_usage_estimate, SubscriptionPlan, UsageEstimate};

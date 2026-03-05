@@ -4,15 +4,16 @@
 //! for stats/settings (better fairness than std::sync::RwLock).
 
 use crate::analytics::{AnalyticsData, Period};
-use crate::cache::MetadataCache;
+use crate::cache::{MetadataCache, StoredAlert};
 use crate::error::{CoreError, DegradedState, LoadReport};
 use crate::event::{ConfigScope, DataEvent, EventBus};
+use crate::models::activity::ActivitySummary;
 use crate::models::{
     BillingBlockManager, InvocationStats, MergedConfig, SessionId, SessionMetadata, StatsCache,
 };
 use crate::parsers::{
-    InvocationParser, McpConfig, Rules, SessionContentParser, SessionIndexParser, SettingsParser,
-    StatsParser,
+    classify_tool_calls, parse_tool_calls, InvocationParser, McpConfig, Rules,
+    SessionContentParser, SessionIndexParser, SettingsParser, StatsParser,
 };
 use dashmap::DashMap;
 use moka::future::Cache;
@@ -108,6 +109,9 @@ pub struct DataStore {
 
     /// Metadata cache for 90% startup speedup (optional)
     metadata_cache: Option<Arc<MetadataCache>>,
+
+    /// In-memory activity analysis results (populated by analyze_session)
+    activity_results: DashMap<String, ActivitySummary>,
 }
 
 /// Project leaderboard entry with aggregated metrics
@@ -163,6 +167,7 @@ impl DataStore {
             event_bus: EventBus::default_capacity(),
             degraded_state: RwLock::new(DegradedState::Healthy),
             metadata_cache,
+            activity_results: DashMap::new(),
         }
     }
 
@@ -608,6 +613,172 @@ impl DataStore {
         sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
         sessions.truncate(limit);
         sessions
+    }
+
+    /// Search sessions using FTS5 full-text search.
+    ///
+    /// Returns relevance-ranked results. Returns empty vec if FTS5 not initialized.
+    pub fn search_sessions(&self, query: &str, limit: usize) -> Vec<crate::cache::SearchResult> {
+        if let Some(ref cache) = self.metadata_cache {
+            match cache.search_sessions(query, limit) {
+                Ok(results) => results,
+                Err(e) => {
+                    warn!("FTS5 search failed: {}", e);
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Analyze a session's tool calls and generate activity summary + alerts.
+    ///
+    /// Results are stored in the in-memory DashMap and the SQLite cache.
+    /// Publishes DataEvent::AnalyticsUpdated on completion so the TUI re-renders.
+    pub async fn analyze_session(&self, session_id: &str) -> anyhow::Result<ActivitySummary> {
+        use std::time::SystemTime;
+
+        let metadata = self
+            .get_session(session_id)
+            .ok_or_else(|| anyhow::anyhow!("Session not found: {}", session_id))?;
+
+        let path = &metadata.file_path;
+
+        // Read mtime once — used for both cache check and cache write to avoid TOCTOU.
+        // Use tokio::fs to avoid blocking the executor thread.
+        let mtime = tokio::fs::metadata(path)
+            .await
+            .and_then(|m| m.modified())
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+
+        // Check SQLite cache first (avoids re-parsing unchanged files)
+        if let Some(cache) = &self.metadata_cache {
+            if let Ok(Some(cached)) = cache.get_activity(path, mtime) {
+                self.activity_results
+                    .insert(session_id.to_string(), cached.clone());
+                self.event_bus.publish(DataEvent::AnalyticsUpdated);
+                return Ok(cached);
+            }
+        }
+
+        // Cache miss: parse JSONL
+        let calls = parse_tool_calls(path, session_id).await?;
+
+        let project_root = path
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.to_string_lossy().into_owned());
+
+        let summary = classify_tool_calls(calls, session_id, project_root.as_deref());
+
+        // Persist to SQLite cache — same mtime as used for cache check (no TOCTOU)
+        if let Some(cache) = &self.metadata_cache {
+            if let Err(e) = cache.put_activity(path, session_id, &summary, mtime) {
+                warn!(session_id, error = %e, "Failed to cache activity — will re-parse on restart");
+            }
+        }
+
+        // Store in memory + notify TUI
+        self.activity_results
+            .insert(session_id.to_string(), summary.clone());
+        self.event_bus.publish(DataEvent::AnalyticsUpdated);
+
+        Ok(summary)
+    }
+
+    /// Get the cached activity summary for a session (returns None if not yet analyzed).
+    pub fn get_session_activity(&self, session_id: &str) -> Option<ActivitySummary> {
+        self.activity_results
+            .get(session_id)
+            .map(|r| r.value().clone())
+    }
+
+    /// Get all stored security alerts from the SQLite cache.
+    ///
+    /// `min_severity`: optional filter — "Warning" or "Critical"
+    pub fn get_all_stored_alerts(&self, min_severity: Option<&str>) -> Vec<StoredAlert> {
+        if let Some(cache) = &self.metadata_cache {
+            cache.get_all_alerts(min_severity).unwrap_or_default()
+        } else {
+            vec![]
+        }
+    }
+
+    /// Consolidated violations feed: merges in-memory DashMap results (freshest) with
+    /// SQLite-persisted alerts. DashMap takes priority for sessions analyzed this run.
+    ///
+    /// Returns alerts sorted Critical → Warning → Info, then by timestamp descending.
+    pub fn all_violations(&self) -> Vec<crate::models::activity::Alert> {
+        use crate::models::activity::{Alert, AlertSeverity};
+        use std::collections::HashSet;
+
+        // Collect session_ids already covered by the DashMap (in-memory, freshest data)
+        let mut seen_sessions: HashSet<String> = HashSet::new();
+        let mut alerts: Vec<Alert> = Vec::new();
+
+        for entry in self.activity_results.iter() {
+            seen_sessions.insert(entry.key().clone());
+            alerts.extend(entry.value().alerts.clone());
+        }
+
+        // Supplement with SQLite alerts for sessions NOT in the DashMap
+        if let Some(cache) = &self.metadata_cache {
+            if let Ok(stored) = cache.get_all_alerts(None) {
+                for sa in stored {
+                    // Derive session_id from session_path (filename without extension)
+                    let session_id = std::path::Path::new(&sa.session_path)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or(&sa.session_path)
+                        .to_string();
+
+                    if seen_sessions.contains(&session_id) {
+                        continue; // DashMap version is fresher, skip SQLite duplicate
+                    }
+
+                    // Parse severity and category from stored strings
+                    let severity = match sa.severity.as_str() {
+                        "Critical" => AlertSeverity::Critical,
+                        "Warning" => AlertSeverity::Warning,
+                        _ => AlertSeverity::Info,
+                    };
+                    let category = match sa.category.as_str() {
+                        "CredentialAccess" => {
+                            crate::models::activity::AlertCategory::CredentialAccess
+                        }
+                        "DestructiveCommand" => {
+                            crate::models::activity::AlertCategory::DestructiveCommand
+                        }
+                        "ForcePush" => crate::models::activity::AlertCategory::ForcePush,
+                        "ScopeViolation" => crate::models::activity::AlertCategory::ScopeViolation,
+                        _ => crate::models::activity::AlertCategory::ExternalExfil,
+                    };
+                    let timestamp = sa
+                        .timestamp
+                        .parse::<chrono::DateTime<chrono::Utc>>()
+                        .unwrap_or_else(|_| chrono::Utc::now());
+
+                    alerts.push(Alert {
+                        session_id,
+                        timestamp,
+                        severity,
+                        category,
+                        detail: sa.detail,
+                    });
+                }
+            }
+        }
+
+        // Sort: Critical > Warning > Info, then newest first within same severity
+        alerts.sort_by(|a, b| {
+            b.severity
+                .partial_cmp(&a.severity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| b.timestamp.cmp(&a.timestamp))
+        });
+
+        alerts
     }
 
     /// Get top sessions by total tokens (sorted descending)
@@ -1125,5 +1296,152 @@ mod tests {
         let today = now.format("%Y-%m-%d").to_string();
         assert_eq!(top_days[0].0, today);
         assert_eq!(top_days[0].1, 23000);
+    }
+
+    /// C3: DashMap takes priority over SQLite in all_violations()
+    ///
+    /// Verifies the merge strategy:
+    /// - Same session_id in both → DashMap version returned (fresher)
+    /// - Session only in SQLite → SQLite version returned (fills the gap)
+    #[test]
+    fn test_all_violations_dashmap_priority_over_sqlite() {
+        use crate::models::activity::{ActivitySummary, Alert, AlertCategory, AlertSeverity};
+        use chrono::Utc;
+
+        let dir = tempdir().unwrap();
+        let claude_home = dir.path().to_path_buf();
+        let store = DataStore::with_defaults(claude_home.clone(), None);
+
+        let now = Utc::now();
+
+        // ── Setup: SQLite alert (via MetadataCache directly) ──────────────────
+        let cache = MetadataCache::new(&claude_home.join("cache"))
+            .expect("MetadataCache should open in tempdir");
+
+        // "shared-session" exists in SQLite with a Warning-level alert
+        let sqlite_summary = ActivitySummary {
+            alerts: vec![Alert {
+                session_id: "shared-session".to_string(),
+                timestamp: now,
+                severity: AlertSeverity::Warning,
+                category: AlertCategory::DestructiveCommand,
+                detail: "sqlite-version".to_string(),
+            }],
+            ..Default::default()
+        };
+        cache
+            .put_activity(
+                std::path::Path::new("/projects/test/shared-session.jsonl"),
+                "shared-session",
+                &sqlite_summary,
+                std::time::SystemTime::now(),
+            )
+            .expect("put_activity should succeed");
+
+        // "sqlite-only-session" exists exclusively in SQLite
+        let sqlite_only_summary = ActivitySummary {
+            alerts: vec![Alert {
+                session_id: "sqlite-only-session".to_string(),
+                timestamp: now,
+                severity: AlertSeverity::Info,
+                category: AlertCategory::ExternalExfil,
+                detail: "sqlite-only-detail".to_string(),
+            }],
+            ..Default::default()
+        };
+        cache
+            .put_activity(
+                std::path::Path::new("/projects/test/sqlite-only-session.jsonl"),
+                "sqlite-only-session",
+                &sqlite_only_summary,
+                std::time::SystemTime::now(),
+            )
+            .expect("put_activity should succeed");
+
+        // Attach the same DB to the store's metadata_cache field
+        // (accessible from within the same module in #[cfg(test)])
+        // The store already opened the same cache dir during with_defaults(),
+        // so both share the same SQLite file.
+        // We must write through the *store*'s own cache handle to avoid lock
+        // conflicts. Retrieve it:
+        let store_cache = store
+            .metadata_cache
+            .as_ref()
+            .expect("MetadataCache should be present in store");
+
+        store_cache
+            .put_activity(
+                std::path::Path::new("/projects/test/shared-session.jsonl"),
+                "shared-session",
+                &sqlite_summary,
+                std::time::SystemTime::now(),
+            )
+            .expect("put_activity via store cache should succeed");
+        store_cache
+            .put_activity(
+                std::path::Path::new("/projects/test/sqlite-only-session.jsonl"),
+                "sqlite-only-session",
+                &sqlite_only_summary,
+                std::time::SystemTime::now(),
+            )
+            .expect("put_activity via store cache should succeed");
+
+        // ── Setup: DashMap alert for the shared session (fresher, Critical) ───
+        let dashmap_summary = ActivitySummary {
+            alerts: vec![Alert {
+                session_id: "shared-session".to_string(),
+                timestamp: now,
+                severity: AlertSeverity::Critical,
+                category: AlertCategory::ForcePush,
+                detail: "dashmap-version".to_string(),
+            }],
+            ..Default::default()
+        };
+        store
+            .activity_results
+            .insert("shared-session".to_string(), dashmap_summary);
+
+        // ── Assert ────────────────────────────────────────────────────────────
+        let violations = store.all_violations();
+
+        // The DashMap version must appear
+        let dashmap_hit = violations.iter().find(|a| a.session_id == "shared-session");
+        assert!(
+            dashmap_hit.is_some(),
+            "shared-session alert must appear in violations"
+        );
+        assert_eq!(
+            dashmap_hit.unwrap().detail,
+            "dashmap-version",
+            "DashMap version must take priority over SQLite for shared session"
+        );
+        assert_eq!(
+            dashmap_hit.unwrap().severity,
+            AlertSeverity::Critical,
+            "DashMap severity (Critical) must win over SQLite (Warning)"
+        );
+
+        // The SQLite-only version must appear (fills the gap)
+        let sqlite_hit = violations
+            .iter()
+            .find(|a| a.session_id == "sqlite-only-session");
+        assert!(
+            sqlite_hit.is_some(),
+            "sqlite-only-session must appear in violations (no DashMap entry for it)"
+        );
+        assert_eq!(sqlite_hit.unwrap().detail, "sqlite-only-detail");
+
+        // The SQLite version of shared-session must NOT appear
+        let sqlite_dup = violations
+            .iter()
+            .filter(|a| a.session_id == "shared-session")
+            .count();
+        assert_eq!(
+            sqlite_dup, 1,
+            "shared-session must appear exactly once (DashMap wins, no SQLite duplicate)"
+        );
+
+        // Sorting: Critical before Info
+        assert_eq!(violations[0].severity, AlertSeverity::Critical);
     }
 }

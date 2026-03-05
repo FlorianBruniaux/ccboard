@@ -82,7 +82,9 @@ static PRICING_TABLE: Lazy<HashMap<&'static str, ModelPricing>> = Lazy::new(|| {
         cache_write_multiplier: 1.25, // $6.25/M (125% of $5)
     };
     m.insert("claude-opus-4-5-20251101", opus_45_pricing.clone());
+    m.insert("claude-opus-4-5", opus_45_pricing.clone());
     m.insert("claude-opus-4-6-20250212", opus_45_pricing.clone());
+    m.insert("claude-opus-4-6", opus_45_pricing.clone());
     m.insert("opus-4", opus_45_pricing.clone());
     m.insert("claude-opus-4", opus_45_pricing);
 

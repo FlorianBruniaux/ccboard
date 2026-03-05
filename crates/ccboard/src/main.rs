@@ -5,6 +5,7 @@ mod cli;
 use anyhow::{Context, Result};
 use ccboard_core::DataStore;
 use clap::{Parser, Subcommand};
+use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -311,13 +312,8 @@ async fn run_tui(claude_home: PathBuf, project: Option<PathBuf>) -> Result<()> {
     ccboard_tui::run(store, claude_home, project).await
 }
 
-async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> Result<()> {
-    use indicatif::{ProgressBar, ProgressStyle};
-    use std::time::Instant;
-
-    let start = Instant::now();
-
-    // Create spinner
+/// Create a consistent CLI spinner (cyan, 80ms tick).
+fn create_spinner() -> ProgressBar {
     let spinner = ProgressBar::new_spinner();
     spinner.set_style(
         ProgressStyle::default_spinner()
@@ -326,6 +322,35 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
             .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
     );
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+    spinner
+}
+
+/// Parse an optional `--since` string into a `DateFilter`.
+fn parse_date_filter(since: Option<&str>) -> Result<Option<cli::DateFilter>> {
+    since
+        .map(|s| cli::DateFilter::parse(s).context("Invalid date filter"))
+        .transpose()
+}
+
+/// Print fatal load errors and return `true` if any were found.
+fn report_fatal_errors(spinner: &ProgressBar, report: &ccboard_core::LoadReport) -> bool {
+    if report.has_fatal_errors() {
+        spinner.finish_and_clear();
+        eprintln!("Fatal errors during data load:");
+        for error in &report.errors {
+            eprintln!("  - {}: {}", error.source, error.message);
+        }
+        true
+    } else {
+        false
+    }
+}
+
+async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> Result<()> {
+    use std::time::Instant;
+
+    let start = Instant::now();
+    let spinner = create_spinner();
 
     // Initialize data store
     spinner.set_message("Initializing data store...");
@@ -338,12 +363,7 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
     spinner.set_message("Loading sessions and statistics...");
     let report = store.initial_load().await;
 
-    if report.has_fatal_errors() {
-        spinner.finish_and_clear();
-        eprintln!("Fatal errors during data load:");
-        for error in report.errors.iter() {
-            eprintln!("  - {}: {}", error.source, error.message);
-        }
+    if report_fatal_errors(&spinner, &report) {
         return Ok(());
     }
 
@@ -390,20 +410,10 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
 }
 
 async fn run_both(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> Result<()> {
-    use indicatif::{ProgressBar, ProgressStyle};
     use std::time::Instant;
 
     let start = Instant::now();
-
-    // Create spinner
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap()
-            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
-    );
-    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+    let spinner = create_spinner();
 
     // Initialize data store
     spinner.set_message("Initializing data store...");
@@ -416,12 +426,7 @@ async fn run_both(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> 
     spinner.set_message("Loading sessions and statistics...");
     let report = store.initial_load().await;
 
-    if report.has_fatal_errors() {
-        spinner.finish_and_clear();
-        eprintln!("Fatal errors during data load:");
-        for error in report.errors.iter() {
-            eprintln!("  - {}: {}", error.source, error.message);
-        }
+    if report_fatal_errors(&spinner, &report) {
         return Ok(());
     }
 
@@ -631,11 +636,7 @@ async fn run_search(
     }
 
     // Parse date filter
-    let date_filter = if let Some(ref s) = since {
-        Some(cli::DateFilter::parse(s).context("Invalid date filter")?)
-    } else {
-        None
-    };
+    let date_filter = parse_date_filter(since.as_deref())?;
 
     // Search
     let all = store.recent_sessions(usize::MAX);
@@ -679,11 +680,7 @@ async fn run_recent(
     }
 
     // Parse date filter
-    let date_filter = if let Some(ref s) = since {
-        Some(cli::DateFilter::parse(s).context("Invalid date filter")?)
-    } else {
-        None
-    };
+    let date_filter = parse_date_filter(since.as_deref())?;
 
     // Get recent sessions
     let mut all = store.recent_sessions(usize::MAX);
@@ -891,11 +888,7 @@ async fn run_export_sessions(
     }
 
     // Parse and apply date filter
-    let date_filter = if let Some(ref s) = since {
-        Some(cli::DateFilter::parse(s).context("Invalid date filter")?)
-    } else {
-        None
-    };
+    let date_filter = parse_date_filter(since.as_deref())?;
 
     let mut sessions = store.recent_sessions(usize::MAX);
     if let Some(filter) = date_filter {
@@ -1069,17 +1062,7 @@ async fn run_export_billing(
 }
 
 async fn run_pricing_update(_no_color: bool) -> Result<()> {
-    use indicatif::{ProgressBar, ProgressStyle};
-
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap()
-            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
-    );
-    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
-
+    let spinner = create_spinner();
     spinner.set_message("Fetching pricing from LiteLLM...");
 
     match ccboard_core::pricing::update_pricing_from_litellm().await {

@@ -1,6 +1,7 @@
 //! Web router using Axum
 
 use axum::{extract::Query, routing::get, Router};
+use ccboard_core::AlertSeverity;
 use ccboard_core::DataStore;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -53,6 +54,33 @@ fn default_recent_limit() -> usize {
     5
 }
 
+/// Query parameters for FTS5 session search
+#[derive(Debug, Deserialize)]
+struct SearchQuery {
+    q: String,
+    #[serde(default = "default_search_limit")]
+    limit: usize,
+}
+
+fn default_search_limit() -> usize {
+    20
+}
+
+/// Query parameters for activity violations
+#[derive(Debug, Deserialize)]
+struct ViolationsQuery {
+    /// Maximum number of violations to return (default: 50)
+    #[serde(default = "default_violations_limit")]
+    limit: usize,
+    /// Minimum severity filter: "Info", "Warning", or "Critical"
+    #[serde(default)]
+    min_severity: Option<String>,
+}
+
+fn default_violations_limit() -> usize {
+    50
+}
+
 /// Create the web router
 pub fn create_router(store: Arc<DataStore>) -> Router {
     let cors = CorsLayer::new()
@@ -67,6 +95,7 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
 
     Router::new()
         // API routes (must be before catch-all static files)
+        .route("/api/search", get(search_handler))
         .route("/api/stats", get(stats_handler))
         .route("/api/quota", get(quota_handler))
         .route("/api/sessions/recent", get(recent_sessions_handler)) // Must be before /api/sessions
@@ -81,6 +110,9 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         .route("/api/plugins", get(plugins_handler))
         .route("/api/task-graph", get(task_graph_handler))
         .route("/api/health", get(health_handler))
+        // Activity routes — literal path before parameterised path
+        .route("/api/activity/violations", get(activity_violations_handler))
+        .route("/api/activity/{session_id}", get(activity_session_handler))
         .route("/api/events", get(sse_handler))
         // Static assets from static/ folder
         .nest_service("/static", ServeDir::new("crates/ccboard-web/static"))
@@ -559,6 +591,34 @@ async fn health_handler(
     }))
 }
 
+/// FTS5 full-text search handler
+async fn search_handler(
+    Query(params): Query<SearchQuery>,
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    let results = store.search_sessions(&params.q, params.limit);
+
+    let items: Vec<_> = results
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "session_id": r.session_id,
+                "path": r.path.to_string_lossy(),
+                "project": r.project,
+                "first_user_message": r.first_user_message,
+                "snippet": r.snippet,
+                "rank": r.rank,
+            })
+        })
+        .collect();
+
+    axum::Json(serde_json::json!({
+        "results": items,
+        "total": items.len(),
+        "query": params.q,
+    }))
+}
+
 /// SSE endpoint for live updates
 async fn sse_handler(
     axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
@@ -966,6 +1026,117 @@ async fn task_graph_handler(
                 "error": format!("Failed to parse PLAN.md: {}", e),
             }))
         }
+    }
+}
+
+/// Activity violations handler — returns aggregated security alerts across all sessions.
+///
+/// Merges in-memory DashMap results (freshest) with SQLite-persisted alerts.
+/// Sorted Critical → Warning → Info, then by timestamp descending.
+///
+/// Query params:
+/// - `limit`: max violations to return (default 50)
+/// - `min_severity`: "Info" | "Warning" | "Critical" (default: all)
+async fn activity_violations_handler(
+    Query(params): Query<ViolationsQuery>,
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    let mut violations = store.all_violations();
+
+    // Filter by min_severity (already sorted Critical > Warning > Info by store)
+    if let Some(ref min_sev) = params.min_severity {
+        violations.retain(|a| match min_sev.as_str() {
+            "Critical" => matches!(a.severity, AlertSeverity::Critical),
+            "Warning" => !matches!(a.severity, AlertSeverity::Info),
+            _ => true, // "Info" or unknown → keep all
+        });
+    }
+
+    let total = violations.len();
+
+    // Count by severity for summary cards
+    let critical_count = violations
+        .iter()
+        .filter(|a| matches!(a.severity, AlertSeverity::Critical))
+        .count();
+    let warning_count = violations
+        .iter()
+        .filter(|a| matches!(a.severity, AlertSeverity::Warning))
+        .count();
+    let info_count = violations
+        .iter()
+        .filter(|a| matches!(a.severity, AlertSeverity::Info))
+        .count();
+
+    violations.truncate(params.limit);
+
+    let serialized: Vec<_> = violations
+        .iter()
+        .map(|a| {
+            serde_json::json!({
+                "session_id": a.session_id,
+                "timestamp": a.timestamp.to_rfc3339(),
+                "severity": format!("{:?}", a.severity),
+                "category": format!("{:?}", a.category),
+                "detail": a.detail,
+                "action_hint": a.category.action_hint(),
+            })
+        })
+        .collect();
+
+    axum::Json(serde_json::json!({
+        "violations": serialized,
+        "total": total,
+        "displayed": serialized.len(),
+        "critical_count": critical_count,
+        "warning_count": warning_count,
+        "info_count": info_count,
+    }))
+}
+
+/// Activity session handler — triggers on-demand analysis of a session's tool calls.
+///
+/// Returns `ActivitySummary` (file accesses, bash commands, network calls, alerts).
+/// Results are cached in SQLite after first analysis; subsequent calls return the cache.
+async fn activity_session_handler(
+    axum::extract::Path(session_id): axum::extract::Path<String>,
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    match store.analyze_session(&session_id).await {
+        Ok(summary) => {
+            // Serialize with human-readable severity/category strings
+            let alerts: Vec<_> = summary
+                .alerts
+                .iter()
+                .map(|a| {
+                    serde_json::json!({
+                        "session_id": a.session_id,
+                        "timestamp": a.timestamp.to_rfc3339(),
+                        "severity": format!("{:?}", a.severity),
+                        "category": format!("{:?}", a.category),
+                        "detail": a.detail,
+                        "action_hint": a.category.action_hint(),
+                    })
+                })
+                .collect();
+
+            axum::Json(serde_json::json!({
+                "session_id": session_id,
+                "file_accesses": summary.file_accesses,
+                "bash_commands": summary.bash_commands,
+                "network_calls": summary.network_calls,
+                "alerts": alerts,
+                "stats": {
+                    "file_accesses": summary.file_accesses.len(),
+                    "bash_commands": summary.bash_commands.len(),
+                    "network_calls": summary.network_calls.len(),
+                    "alerts": alerts.len(),
+                }
+            }))
+        }
+        Err(e) => axum::Json(serde_json::json!({
+            "error": format!("Failed to analyze session: {}", e),
+        })),
     }
 }
 

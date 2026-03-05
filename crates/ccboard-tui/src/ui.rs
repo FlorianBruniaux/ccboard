@@ -2,9 +2,10 @@
 
 use crate::app::{App, Tab};
 use crate::components::{Breadcrumb, Breadcrumbs};
+use crate::tabs::render_search_tab;
 use crate::tabs::{
-    AgentsTab, AnalyticsTab, ConfigTab, ConversationTab, CostsTab, DashboardTab, HistoryTab,
-    HooksTab, McpTab, PluginsTab, SessionsTab,
+    ActivityTab, AgentsTab, AnalyticsTab, ConfigTab, ConversationTab, CostsTab, DashboardTab,
+    HistoryTab, HooksTab, McpTab, PluginsTab, SessionsTab,
 };
 use crate::theme::Palette;
 use ccboard_core::DegradedState;
@@ -28,6 +29,7 @@ pub struct Ui {
     mcp: McpTab,
     analytics: AnalyticsTab,
     plugins: PluginsTab,
+    activity: ActivityTab,
     conversation: ConversationTab,
     breadcrumbs: Breadcrumbs,
 }
@@ -51,6 +53,7 @@ impl Ui {
             mcp: McpTab::new(),
             analytics: AnalyticsTab::new(),
             plugins: PluginsTab::new(),
+            activity: ActivityTab::new(),
             conversation: ConversationTab::new(),
             breadcrumbs: Breadcrumbs::new(),
         }
@@ -203,6 +206,50 @@ impl Ui {
             }
             Tab::Plugins => {
                 self.plugins.handle_key(key, &app.store);
+            }
+            Tab::Activity => {
+                let sessions = app.store.recent_sessions(50);
+                self.activity.handle_key(key, &sessions, &app.store);
+            }
+            Tab::Search => {
+                use crossterm::event::KeyCode;
+
+                if app.search_tab.input_mode {
+                    match key {
+                        KeyCode::Esc => {
+                            app.search_tab.toggle_input();
+                        }
+                        KeyCode::Enter => {
+                            let store = app.store.as_ref();
+                            app.search_tab.refresh(store);
+                        }
+                        KeyCode::Backspace => {
+                            app.search_tab.on_backspace();
+                        }
+                        KeyCode::Char(c) => {
+                            app.search_tab.on_char(c);
+                        }
+                        _ => {}
+                    }
+                } else {
+                    match key {
+                        KeyCode::Char('i') => {
+                            app.search_tab.toggle_input();
+                        }
+                        KeyCode::Char('j') | KeyCode::Down => {
+                            app.search_tab.next();
+                        }
+                        KeyCode::Char('k') | KeyCode::Up => {
+                            app.search_tab.prev();
+                        }
+                        KeyCode::Enter => {
+                            if let Some(session_id) = app.search_tab.selected_session_id() {
+                                self.conversation.load_session(session_id.to_string(), &app.store);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     }
@@ -553,6 +600,14 @@ impl Ui {
             Tab::Plugins => {
                 self.plugins.render(frame, area, &app.store, scheme);
             }
+            Tab::Activity => {
+                let sessions = app.store.recent_sessions(50);
+                self.activity
+                    .render(frame, area, &sessions, &app.store, scheme);
+            }
+            Tab::Search => {
+                render_search_tab(&app.search_tab, frame, area);
+            }
         }
     }
 
@@ -582,6 +637,10 @@ impl Ui {
                     "F1-F4 period │ ←→/h/l switch views │ j/k scroll │ s sort │ o order │ r refresh"
                 }
                 Tab::Plugins => "Tab cycle columns │ j/k navigate │ s sort │ r refresh",
+                Tab::Activity => "j/k navigate │ a analyze session │ Tab/Shift+Tab switch tabs",
+                Tab::Search => {
+                    "i type query │ Enter search/open │ j/k navigate │ ESC exit input"
+                }
             };
 
             Line::from(vec![
@@ -638,6 +697,12 @@ impl Ui {
             }
             Tab::Plugins => {
                 path.push(Breadcrumb::new("Plugins").with_level(1));
+            }
+            Tab::Activity => {
+                path.push(Breadcrumb::new("Activity").with_level(1));
+            }
+            Tab::Search => {
+                path.push(Breadcrumb::new("Search").with_level(1));
             }
         }
 

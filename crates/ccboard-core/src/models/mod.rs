@@ -1,5 +1,6 @@
 //! Data models for ccboard
 
+pub mod activity;
 pub mod billing_block;
 pub mod config;
 pub mod invocations;

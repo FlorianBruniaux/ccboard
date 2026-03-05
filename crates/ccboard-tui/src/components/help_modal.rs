@@ -318,6 +318,38 @@ impl HelpModal {
                     Span::raw("Refresh analytics"),
                 ]));
             }
+            Tab::Activity => {
+                lines.push(Line::from(vec![
+                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(focus_color)),
+                    Span::raw("Navigate session list"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  a or Enter  ", Style::default().fg(focus_color)),
+                    Span::raw("Analyze selected session"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  Tab         ", Style::default().fg(focus_color)),
+                    Span::raw("Switch to next tab"),
+                ]));
+            }
+            Tab::Search => {
+                lines.push(Line::from(vec![
+                    Span::styled("  i           ", Style::default().fg(focus_color)),
+                    Span::raw("Enter input mode"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  Enter       ", Style::default().fg(focus_color)),
+                    Span::raw("Execute search"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(focus_color)),
+                    Span::raw("Navigate results"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  ESC         ", Style::default().fg(focus_color)),
+                    Span::raw("Exit input mode"),
+                ]));
+            }
         }
 
         lines.push(Line::from(""));
