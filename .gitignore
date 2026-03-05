@@ -27,3 +27,9 @@ claudedocs/
 *.bak
 *~
 .grepai/
+
+# Vitals provenance data
+.vitals/
+
+# LSP config
+.lsp.json

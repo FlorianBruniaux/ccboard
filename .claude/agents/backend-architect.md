@@ -3,7 +3,8 @@ name: backend-architect
 description: Design reliable backend systems with focus on data integrity, security, and fault tolerance
 category: engineering
 model: sonnet
-tools: Read, Write, Edit, MultiEdit, Bash, Grep
+color: blue
+tools: Read, Write, Edit, Bash, Grep
 skills:
   - backend-architect
 ---

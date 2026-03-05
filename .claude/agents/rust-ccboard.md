@@ -1,8 +1,9 @@
 ---
 name: rust-ccboard
 description: Expert Rust developer for ccboard - workspace management, parsers, concurrency patterns
-model: claude-sonnet-4-5-20250929
-tools: Read, Write, Edit, MultiEdit, Bash, Grep, Glob
+model: sonnet
+color: orange
+tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
 # Rust Expert for ccboard
