@@ -80,7 +80,7 @@ cargo install ccboard
 
 **Why cargo?** ccboard's target audience (Claude Code users) often has Rust installed. Ensures compatibility and always installs latest crates.io version.
 
-> **Note (issue #44):** `cargo install` builds TUI-only mode. The Web UI (`ccboard web`) requires the Leptos WASM frontend which cannot be bundled via crates.io. For Web UI support, use Homebrew, the install script, or [build from source](#development).
+> **Note:** `cargo install` builds the binary from crates.io source without running the WASM build step — Web UI (`ccboard web`) will not serve a frontend. For full Web UI support, use **Homebrew**, the **install script**, or a **pre-built binary** from GitHub Releases (all embed the WASM frontend at compile time).
 
 ### Alternative: Install Script (macOS/Linux/Windows)
 
@@ -263,7 +263,7 @@ Navigate tabs with `1-9`, search with `/`, refresh with `r`, toggle light/dark t
 ### Unique Position
 
 1. **All-local**: Reads `~/.claude` files, no SaaS/API required
-2. **Unified Dashboard**: 9 tabs (config, hooks, agents, MCP, analytics) vs basic CLI
+2. **Unified Dashboard**: 11 tabs (config, hooks, agents, MCP, analytics, security audit, search) vs basic CLI
 3. **Performance**: SQLite cache (89x speedup), handles 10K+ sessions
 4. **Dual Interface**: TUI + Web in single 5.8MB binary
 
@@ -448,10 +448,6 @@ ccboard has **2 web workflows** depending on your use case:
 **For**: Running the full stack (API + Frontend) in production or for general use.
 
 ```bash
-# Step 1: Compile frontend once (run in ccboard repo root)
-trunk build --release
-
-# Step 2: Start server (serves API + static frontend)
 ccboard web
 ```
 
@@ -466,9 +462,9 @@ ccboard web
 
 **Features**:
 - ✅ Single process, single port
-- ✅ Serves backend API (`/api/*`) + frontend static files
+- ✅ WASM frontend embedded in the binary (no separate build step)
 - ✅ Real-time data updates via Server-Sent Events (SSE)
-- ❌ No hot reload (need `trunk build` + F5 after code changes)
+- ❌ No hot reload (requires `trunk build` + F5 after code changes when developing)
 
 **When to use**: Daily use, demos, production, or when you just want the web interface running.
 
