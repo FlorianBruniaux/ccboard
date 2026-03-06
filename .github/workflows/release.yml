@@ -47,6 +47,18 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Add WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install trunk
+        uses: jetli/trunk-action@v0.5.0
+        with:
+          version: "latest"
+
+      - name: Build WASM frontend
+        working-directory: crates/ccboard-web
+        run: trunk build --release
+
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }} --bin ccboard
 

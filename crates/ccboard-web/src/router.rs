@@ -1,14 +1,27 @@
 //! Web router using Axum
 
-use axum::{extract::Query, routing::get, Router};
+use axum::{
+    body::Body,
+    extract::Query,
+    http::{header, StatusCode, Uri},
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+};
 use ccboard_core::AlertSeverity;
 use ccboard_core::DataStore;
+use mime_guess::from_path;
+use rust_embed::RustEmbed;
 use serde::Deserialize;
 use std::sync::Arc;
-use tower_http::{
-    cors::{Any, CorsLayer},
-    services::{ServeDir, ServeFile},
-};
+use tower_http::cors::{Any, CorsLayer};
+
+/// Embedded WASM frontend assets compiled with trunk.
+/// In debug builds, rust-embed reads from disk (trunk must have been run).
+/// In release builds, all files are embedded into the binary at compile time.
+#[derive(RustEmbed)]
+#[folder = "dist/"]
+struct DistAssets;
 
 use crate::sse;
 
@@ -81,17 +94,40 @@ fn default_violations_limit() -> usize {
     50
 }
 
+/// Serve a file from the embedded WASM frontend assets.
+/// Returns None if the file is not found (caller handles SPA fallback).
+fn get_embedded_asset(path: &str) -> Option<Response> {
+    let asset = DistAssets::get(path)?;
+    let mime = from_path(path).first_or_octet_stream();
+    Some(
+        (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, mime.as_ref().to_string())],
+            Body::from(asset.data),
+        )
+            .into_response(),
+    )
+}
+
+/// Fallback handler: serves embedded frontend assets with SPA fallback to index.html.
+///
+/// In debug builds rust-embed reads from the `dist/` directory on disk.
+/// In release builds all assets are compiled into the binary — no filesystem access needed.
+async fn frontend_handler(uri: Uri) -> Response {
+    let path = uri.path().trim_start_matches('/');
+    let path = if path.is_empty() { "index.html" } else { path };
+
+    get_embedded_asset(path)
+        .or_else(|| get_embedded_asset("index.html"))
+        .unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
+}
+
 /// Create the web router
 pub fn create_router(store: Arc<DataStore>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
-
-    // Serve WASM frontend files (JS, WASM, CSS) from dist/
-    // SPA routing: fallback to index.html for client-side routes
-    let dist_dir = ServeDir::new("crates/ccboard-web/dist")
-        .not_found_service(ServeFile::new("crates/ccboard-web/dist/index.html"));
 
     Router::new()
         // API routes (must be before catch-all static files)
@@ -114,10 +150,8 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         .route("/api/activity/violations", get(activity_violations_handler))
         .route("/api/activity/{session_id}", get(activity_session_handler))
         .route("/api/events", get(sse_handler))
-        // Static assets from static/ folder
-        .nest_service("/static", ServeDir::new("crates/ccboard-web/static"))
-        // Serve WASM frontend + SPA fallback to index.html
-        .fallback_service(dist_dir)
+        // Serve WASM frontend (embedded in binary) + SPA fallback to index.html
+        .fallback(frontend_handler)
         .layer(cors)
         .with_state(store)
 }
