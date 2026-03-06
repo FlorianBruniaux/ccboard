@@ -163,11 +163,13 @@ jobs:
         continue-on-error: true
 
       - name: Publish ccboard-web
-        run: cargo publish -p ccboard-web --token ${{ secrets.CARGO_TOKEN }}
+        # --no-verify: dist/ (WASM assets) is not present in a fresh checkout;
+        # the build is already verified by the build-release job.
+        run: cargo publish -p ccboard-web --no-verify --token ${{ secrets.CARGO_TOKEN }}
         continue-on-error: true
 
       - name: Wait for crates.io propagation
         run: sleep 30
 
       - name: Publish ccboard
-        run: cargo publish -p ccboard --token ${{ secrets.CARGO_TOKEN }}
+        run: cargo publish -p ccboard --no-verify --token ${{ secrets.CARGO_TOKEN }}
