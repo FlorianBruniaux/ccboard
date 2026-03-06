@@ -5,6 +5,14 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2026-03-06
+
+### Fixed
+
+- **Web interface 404 on Linux/installed binary**: `ccboard web` now works out of the box when installed via `cargo install`, Homebrew, or downloaded from a release tarball. The WASM frontend (JS, CSS, WASM assets) is now embedded directly into the binary using `rust-embed` at compile time — no source tree required at runtime.
+
+---
+
 ## [0.11.0] - 2026-03-05
 
 ### Added — Activity Security Audit + Search Tab
