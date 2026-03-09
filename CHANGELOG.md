@@ -5,6 +5,14 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2026-03-09
+
+### Fixed
+
+- **Homebrew build from source**: `cargo build --all` now succeeds even when `dist/` is absent (e.g. after `brew install --build-from-source`). A `build.rs` script in `ccboard-web` detects a missing or empty `dist/` directory at compile time, creates a placeholder `index.html`, and emits a `cargo:warning` to inform the developer. All `/api/*` endpoints remain fully functional; only the WASM frontend is replaced by a minimal HTML page pointing to the pre-built binaries. Full-stack builds (with `trunk build --release`) are unaffected.
+
+---
+
 ## [0.11.1] - 2026-03-06
 
 ### Fixed

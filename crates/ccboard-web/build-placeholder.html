@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ccboard — Web UI not available</title>
+  <style>
+    body { background: #0d1117; color: #c9d1d9; font-family: monospace;
+           display:flex; align-items:center; justify-content:center;
+           min-height:100vh; margin:0; }
+    .card { max-width:560px; padding:2rem; border:1px solid #30363d;
+            border-radius:8px; text-align:center; }
+    h1 { color:#58a6ff; font-size:1.4rem; margin-bottom:1rem; }
+    p  { line-height:1.6; color:#8b949e; margin-bottom:1rem; }
+    code { background:#161b22; padding:.2em .5em; border-radius:4px;
+           color:#79c0ff; font-size:.9em; }
+    a { color:#58a6ff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>ccboard web UI</h1>
+    <p>This binary was compiled without the WASM frontend
+       (<code>dist/</code> was absent at build time).</p>
+    <p>All <code>/api/*</code> endpoints are fully functional.</p>
+    <p>For the full interface, use the pre-built binary:</p>
+    <p><code>brew install FlorianBruniaux/tap/ccboard</code></p>
+    <p>or download from
+      <a href="https://github.com/FlorianBruniaux/ccboard/releases/latest">GitHub Releases</a>.
+    </p>
+  </div>
+</body>
+</html>
