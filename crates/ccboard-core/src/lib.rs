@@ -19,8 +19,10 @@ pub mod usage_estimator;
 pub mod watcher;
 
 pub use analytics::{
-    compute_trends, detect_patterns, forecast_usage, generate_insights, AnalyticsData,
-    ForecastData, Period, TrendDirection, TrendsData, UsagePatterns,
+    compute_trends, detect_patterns, discover_call_llm, discover_collect_sessions,
+    discover_patterns, forecast_usage, generate_insights, run_discover, AnalyticsData,
+    DiscoverConfig, DiscoverSessionData, DiscoverSuggestion, ForecastData, LlmSuggestion, Period,
+    SuggestionCategory, TrendDirection, TrendsData, UsagePatterns,
 };
 pub use cache::{AggregateStats, SearchResult, StoredAlert};
 pub use error::{CoreError, DegradedState, LoadReport};

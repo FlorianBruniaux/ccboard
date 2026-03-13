@@ -9,6 +9,8 @@ use std::sync::Arc;
 use crate::models::session::SessionMetadata;
 
 pub mod anomalies;
+pub mod discover;
+pub mod discover_llm;
 pub mod forecasting;
 pub mod insights;
 pub mod patterns;
@@ -19,6 +21,11 @@ pub mod trends;
 mod tests;
 
 pub use anomalies::{detect_anomalies, Anomaly, AnomalyMetric, AnomalySeverity};
+pub use discover::{
+    collect_sessions_data as discover_collect_sessions, discover_patterns, run_discover,
+    DiscoverConfig, DiscoverSuggestion, SessionData as DiscoverSessionData, SuggestionCategory,
+};
+pub use discover_llm::{call_claude_cli as discover_call_llm, LlmSuggestion};
 pub use forecasting::{forecast_usage, ForecastData, TrendDirection};
 pub use insights::{generate_budget_alerts, generate_insights, Alert};
 pub use patterns::{detect_patterns, UsagePatterns};

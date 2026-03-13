@@ -144,6 +144,36 @@ enum Mode {
         #[command(subcommand)]
         command: PricingCommand,
     },
+    /// Analyze session history to suggest skills, commands, and CLAUDE.md rules
+    Discover {
+        /// Time window: 7d, 30d, 90d, or YYYY-MM-DD (default: 90d)
+        #[arg(long, default_value = "90d")]
+        since: String,
+
+        /// Minimum occurrences to surface a pattern (default: 3)
+        #[arg(long, default_value = "3")]
+        min_count: usize,
+
+        /// Maximum suggestions to show (default: 20)
+        #[arg(long, default_value = "20")]
+        top: usize,
+
+        /// Use claude --print for semantic analysis
+        #[arg(long)]
+        llm: bool,
+
+        /// Claude model for --llm mode
+        #[arg(long, default_value = "")]
+        model: String,
+
+        /// Search all projects (default: current project only)
+        #[arg(long)]
+        all: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -286,6 +316,28 @@ async fn main() -> Result<()> {
                 run_pricing_clear(no_color).await?;
             }
         },
+        Mode::Discover {
+            since,
+            min_count,
+            top,
+            llm,
+            model,
+            all,
+            json,
+        } => {
+            run_discover(
+                claude_home,
+                project,
+                since,
+                min_count,
+                top,
+                llm,
+                model,
+                all,
+                json,
+            )
+            .await?;
+        }
     }
 
     Ok(())
@@ -1093,4 +1145,222 @@ async fn run_pricing_clear(_no_color: bool) -> Result<()> {
             Err(e)
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Discover handler
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+async fn run_discover(
+    claude_home: std::path::PathBuf,
+    project: Option<std::path::PathBuf>,
+    since: String,
+    min_count: usize,
+    top: usize,
+    llm: bool,
+    model: String,
+    all: bool,
+    json: bool,
+) -> Result<()> {
+    use ccboard_core::{DiscoverConfig, SuggestionCategory};
+
+    // Parse time window
+    let since_days = parse_since_to_days(&since)?;
+
+    // Determine project filter: if --all or no current project, scan everything
+    let filter_project: Option<&str> = if all {
+        None
+    } else {
+        project
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+    };
+
+    let config = DiscoverConfig {
+        since_days,
+        min_count,
+        top,
+        all_projects: all,
+    };
+
+    if llm {
+        // LLM mode: collect messages, call claude --print
+        let projects_dir = claude_home.join("projects");
+        let sessions_data =
+            ccboard_core::discover_collect_sessions(&projects_dir, since_days, filter_project)
+                .await;
+
+        if sessions_data.is_empty() {
+            eprintln!("No sessions found in the given time range.");
+            return Ok(());
+        }
+
+        let total_sessions = sessions_data.len();
+        let total_projects: std::collections::HashSet<&str> =
+            sessions_data.iter().map(|s| s.project.as_str()).collect();
+        let total_projects_count = total_projects.len();
+
+        let suggestions = ccboard_core::discover_call_llm(&sessions_data, &model)
+            .context("LLM discovery failed")?;
+
+        let suggestions = &suggestions[..suggestions.len().min(top)];
+
+        if json {
+            println!("{}", serde_json::to_string_pretty(suggestions)?);
+            return Ok(());
+        }
+
+        // Human-readable LLM output
+        println!();
+        println!(
+            "  ccboard discover --llm — {} sessions · {} project(s) · {}",
+            total_sessions,
+            total_projects_count,
+            if model.is_empty() { "claude" } else { &model }
+        );
+        println!();
+
+        use std::collections::HashMap;
+        let mut by_category: HashMap<String, Vec<&ccboard_core::LlmSuggestion>> = HashMap::new();
+        for s in suggestions {
+            by_category.entry(s.category.clone()).or_default().push(s);
+        }
+
+        let category_order = ["CLAUDE.md rule", "skill", "command"];
+        let icons = [("CLAUDE.md rule", "📋"), ("skill", "🧩"), ("command", "⚡")];
+
+        for (cat, icon) in &icons {
+            let items = match by_category.get(*cat) {
+                Some(v) if !v.is_empty() => v,
+                _ => continue,
+            };
+            println!("{}  {}", icon, cat.to_uppercase());
+            println!("  {}", "─".repeat(60));
+            for item in items.iter() {
+                println!("  {}", item.pattern);
+                if let Some(ref rationale) = item.rationale {
+                    println!("    {}", rationale);
+                }
+                if let Some(ref name) = item.suggested_name {
+                    println!("    name: {}", name);
+                }
+                println!();
+            }
+            println!();
+        }
+
+        // Items not matching standard categories
+        let known: std::collections::HashSet<&str> = category_order.iter().copied().collect();
+        for (cat, items) in &by_category {
+            if known.contains(cat.as_str()) {
+                continue;
+            }
+            println!("  {}", cat.to_uppercase());
+            println!("  {}", "─".repeat(60));
+            for item in items {
+                println!("  {}", item.pattern);
+                println!();
+            }
+        }
+
+        println!("  Run with --json to pipe to jq for further processing.");
+        println!();
+        return Ok(());
+    }
+
+    // Statistical mode
+    let (suggestions, total_sessions, total_projects) =
+        ccboard_core::run_discover(&claude_home, &config, filter_project)
+            .await
+            .context("Discover failed")?;
+
+    if suggestions.is_empty() {
+        eprintln!("No recurring patterns found (try --min-count 2 or --since 180d).");
+        return Ok(());
+    }
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&suggestions)?);
+        return Ok(());
+    }
+
+    // Human-readable output
+    println!();
+    println!(
+        "  ccboard discover — {} sessions · {} project(s) · since {}",
+        total_sessions, total_projects, since
+    );
+    println!();
+
+    let category_order = [
+        SuggestionCategory::ClaudeMdRule,
+        SuggestionCategory::Skill,
+        SuggestionCategory::Command,
+    ];
+
+    for cat in &category_order {
+        let items: Vec<_> = suggestions.iter().filter(|s| &s.category == cat).collect();
+
+        if items.is_empty() {
+            continue;
+        }
+
+        println!("{}  {}", cat.icon(), cat.as_str());
+        println!("  {}", "─".repeat(60));
+
+        for item in items {
+            let tag = if item.cross_project {
+                "  [cross-project]"
+            } else {
+                ""
+            };
+            let pct = item.session_count as f64 / total_sessions as f64 * 100.0;
+            println!("  {}{}", item.pattern, tag);
+            println!(
+                "    {} sessions ({:.0}%) · {} occurrences · score {:.3}",
+                item.session_count, pct, item.count, item.score
+            );
+            for ex in &item.example_sessions {
+                println!("    → {}", &ex[..ex.len().min(36)]);
+            }
+            println!();
+        }
+
+        println!();
+    }
+
+    println!("  Run with --json to pipe to jq for further processing.");
+    println!();
+
+    Ok(())
+}
+
+/// Parse a `--since` string like "7d", "30d", "90d", or "YYYY-MM-DD" into days.
+fn parse_since_to_days(since: &str) -> Result<u32> {
+    // Try "Nd" format
+    if let Some(n_str) = since.strip_suffix('d') {
+        return n_str.parse::<u32>().map_err(|_| {
+            anyhow::anyhow!(
+                "Invalid --since value '{}'. Use 7d, 30d, 90d, or YYYY-MM-DD",
+                since
+            )
+        });
+    }
+
+    // Try YYYY-MM-DD format
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(since, "%Y-%m-%d") {
+        let today = chrono::Utc::now().date_naive();
+        let diff = today.signed_duration_since(date).num_days();
+        if diff < 0 {
+            anyhow::bail!("--since date '{}' is in the future", since);
+        }
+        return Ok(diff as u32);
+    }
+
+    anyhow::bail!(
+        "Invalid --since value '{}'. Use formats like 7d, 30d, 90d, or YYYY-MM-DD",
+        since
+    )
 }

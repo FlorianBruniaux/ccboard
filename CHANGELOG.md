@@ -5,6 +5,24 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-03-13
+
+### Added — `ccboard discover`
+
+- **`ccboard discover`** — new CLI subcommand that analyzes session history to suggest what to extract as CLAUDE.md rules, skills, or commands, based on recurring n-gram patterns in user messages.
+  - N-gram extraction (3–6 grams) with stop-word filtering, subsumption deduplication, and Jaccard similarity clustering
+  - Category assignment: >20% of sessions → CLAUDE.md rule, ≥5% → skill, else → command
+  - Cross-project patterns get a 1.5× score bonus (`[cross-project]` badge in output)
+  - `--since` accepts `7d`, `30d`, `90d`, or a `YYYY-MM-DD` date (default: `90d`)
+  - `--min-count` / `--top` to control noise threshold and result count
+  - `--all` to scan all projects (default: current project only)
+  - `--json` for machine-readable output (pipe to `jq`)
+  - `--llm` mode: deduplicates messages, builds a structured prompt, calls `claude --print` as a subprocess for semantic analysis
+  - Async loading with bounded concurrency (32-slot semaphore), CPU-bound n-gram work in `tokio::task::spawn_blocking`
+  - 6 new unit tests: normalize, n-gram extraction, Jaccard overlap, category thresholds, cross-project bonus
+
+---
+
 ## [0.11.2] - 2026-03-09
 
 ### Fixed

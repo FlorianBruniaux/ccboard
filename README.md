@@ -25,7 +25,7 @@
   <img src="assets/demo.gif" alt="ccboard demo" width="800"/>
 </p>
 
-> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 377 tests, 0 clippy warnings.
+> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 383 tests, 0 clippy warnings.
 
 ---
 
@@ -534,6 +534,50 @@ ccboard both --port 3333
 - `/activity` - Security audit & violations feed
 - `/search` - Full-text session search
 
+### Discover — Config Optimization
+
+Analyze your session history to surface recurring patterns and suggest what to extract as **CLAUDE.md rules**, **skills**, or **commands**.
+
+```bash
+# Analyze all projects, last 90 days (default)
+ccboard discover --all
+
+# Last 30 days, lower threshold, top 10
+ccboard discover --all --since 30d --min-count 2 --top 10
+
+# Current project only
+ccboard discover --top 20
+
+# JSON output (pipe to jq)
+ccboard discover --all --json | jq '.[0]'
+
+# Semantic analysis via Claude (requires claude in PATH)
+ccboard discover --all --llm
+```
+
+**Output example:**
+```
+ccboard discover — 1121 sessions · 42 project(s) · since 90d
+
+📋  CLAUDE.MD RULE
+────────────────────────────────────────────────────────────
+write tests before implementation                          [cross-project]
+  234 sessions (28%) · 891 occurrences · score 0.416
+  → 3a72f1c4-...
+
+🧩  SKILL
+────────────────────────────────────────────────────────────
+security review authentication flow
+  71 sessions (8%) · 203 occurrences · score 0.084
+
+⚡  COMMAND
+────────────────────────────────────────────────────────────
+generate prisma migration rollback
+  18 sessions (2%) · 44 occurrences · score 0.021
+```
+
+Categories assigned automatically: >20% of sessions → CLAUDE.md rule, ≥5% → skill, else → command. Cross-project patterns get a 1.5× score bonus.
+
 ### Stats Only
 
 ```bash
@@ -819,7 +863,7 @@ RUST_LOG=ccboard=debug cargo run
 ### Testing
 
 ```bash
-# Run all tests (377 tests)
+# Run all tests (383 tests)
 cargo test --all
 
 # Run tests for specific crate
@@ -878,7 +922,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap & Documentation
 
-**Current Status**: 🎉 **PRODUCTION-READY** (v0.11.0)
+**Current Status**: 🎉 **PRODUCTION-READY** (v0.12.0)
 
 ### Completed ✅
 
@@ -894,12 +938,13 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ✅ **Export Features** (v0.10.0): CSV/JSON/Markdown export for sessions, stats, billing, conversations
 - ✅ **Activity Security Audit** (v0.11.0): Per-session tool audit, credential detection, destructive command alerts, cross-session violations feed with remediation hints
 - ✅ **Search Tab** (v0.11.0): FTS5-powered full-text search across all sessions with ranked snippets
+- ✅ **Discover** (v0.12.0): N-gram analysis across session history to suggest CLAUDE.md rules, skills, and commands
 
-**Total**: 377 tests passing, 0 clippy warnings
+**Total**: 383 tests passing, 0 clippy warnings
 
 ### Coming Soon
 
-**v0.12.0: Advanced Analytics** (Phase K)
+**v0.13.0: Advanced Analytics** (Phase K)
 - Anomaly detection: cost spikes, unusual activity hours
 - Usage pattern analysis: peak hours, day-of-week trends
 - Model recommendations: Opus ↔ Sonnet switches based on usage
