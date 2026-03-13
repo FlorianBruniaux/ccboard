@@ -12,10 +12,12 @@ fn main() {
         .unwrap_or(true);
 
     if !dist.exists() || dist_is_empty {
-        fs::create_dir_all(&dist)
-            .expect("build.rs: failed to create dist/ placeholder");
-        fs::write(dist.join("index.html"), include_str!("build-placeholder.html"))
-            .expect("build.rs: failed to write placeholder index.html");
+        fs::create_dir_all(&dist).expect("build.rs: failed to create dist/ placeholder");
+        fs::write(
+            dist.join("index.html"),
+            include_str!("build-placeholder.html"),
+        )
+        .expect("build.rs: failed to write placeholder index.html");
         println!(
             "cargo:warning=dist/ absent — placeholder web UI. Run `trunk build --release` in crates/ccboard-web/ for full frontend."
         );

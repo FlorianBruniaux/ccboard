@@ -244,7 +244,8 @@ impl Ui {
                         }
                         KeyCode::Enter => {
                             if let Some(session_id) = app.search_tab.selected_session_id() {
-                                self.conversation.load_session(session_id.to_string(), &app.store);
+                                self.conversation
+                                    .load_session(session_id.to_string(), &app.store);
                             }
                         }
                         _ => {}
@@ -638,9 +639,7 @@ impl Ui {
                 }
                 Tab::Plugins => "Tab cycle columns │ j/k navigate │ s sort │ r refresh",
                 Tab::Activity => "j/k navigate │ a analyze session │ Tab/Shift+Tab switch tabs",
-                Tab::Search => {
-                    "i type query │ Enter search/open │ j/k navigate │ ESC exit input"
-                }
+                Tab::Search => "i type query │ Enter search/open │ j/k navigate │ ESC exit input",
             };
 
             Line::from(vec![
