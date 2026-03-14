@@ -203,7 +203,8 @@ prompt: |
   **Diff**:
   {gh pr diff {num} output}
 
-  Apply the ccboard Rust review checklist:
+  Apply your security-guardian and backend-architect skills for this review.
+  Additionally, apply the ccboard Rust review checklist:
 
   CRITICAL (block merge if violated):
   - anyhow::Result + .context("msg") on every ? -- no bare ?, no .unwrap() in production code
@@ -216,7 +217,8 @@ prompt: |
   IMPORTANT (should fix before merge):
   - thiserror in ccboard-core (library crate), anyhow in ccboard-tui/ccboard-web/ccboard (binaries)
   - No full JSONL file loading at startup -- metadata-only via BufReader line-by-line
-  - DashMap for high-contention session collections, parking_lot::RwLock for low-contention (stats, config)
+  - Arc<DataStore> for shared ownership (NOT DashMap -- removed in v0.4.0, 50x memory reduction)
+  - parking_lot::RwLock for low-contention shared state (stats, config) -- not std::sync::RwLock
   - Startup performance target maintained: <2s for 1000+ sessions
   - Read-only constraint: no writes to ~/.claude/* (monitoring only)
 

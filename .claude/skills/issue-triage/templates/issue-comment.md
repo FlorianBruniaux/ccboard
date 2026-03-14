@@ -94,7 +94,7 @@ After review, this request falls outside ccboard's current design goals.
 
 ### Alternatives
 
-{If applicable: what the user can do instead. E.g., "For this use case, `ccboard export sessions --format json` gives you the raw data you can pipe into your own tooling."}
+{If applicable: what the user can do instead. E.g., "For this use case, the `/api/sessions` endpoint (available when running `ccboard web`) returns the raw session data you can pipe into your own tooling."}
 
 If the use case evolves or the scope changes in a future version, feel free to reopen with updated context.
 
