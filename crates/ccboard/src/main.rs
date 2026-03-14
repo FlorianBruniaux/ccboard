@@ -445,17 +445,14 @@ async fn run_web(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> R
         report.sessions_scanned
     ));
 
-    // Check if frontend dist/ exists
-    let dist_path = std::path::Path::new("crates/ccboard-web/dist");
-    if dist_path.exists() && dist_path.join("index.html").exists() {
+    if ccboard_web::has_real_frontend() {
         println!("\n🌐 Backend API + Frontend: http://localhost:{}", port);
         println!("   API endpoints:          http://localhost:{}/api/*", port);
     } else {
-        println!(
-            "\n🌐 Backend API only:       http://localhost:{}/api/*",
-            port
-        );
-        println!("   💡 Run 'trunk build' to compile frontend");
+        println!("\n🌐 http://localhost:{}", port);
+        println!("   API: http://localhost:{}/api/*", port);
+        println!("   ⚠️  Frontend not embedded — use a pre-built binary from GitHub Releases");
+        println!("      or run `trunk build` in crates/ccboard-web/ then rebuild.");
     }
 
     ccboard_web::run(store, port).await
@@ -508,13 +505,13 @@ async fn run_both(claude_home: PathBuf, project: Option<PathBuf>, port: u16) -> 
         report.sessions_scanned
     ));
 
-    // Check if frontend dist/ exists
-    let dist_path = std::path::Path::new("crates/ccboard-web/dist");
-    if dist_path.exists() && dist_path.join("index.html").exists() {
+    if ccboard_web::has_real_frontend() {
         println!("🌐 Backend API + Frontend: http://localhost:{}", port);
     } else {
-        println!("🌐 Backend API only:       http://localhost:{}/api/*", port);
-        println!("   💡 Run 'trunk build' to compile frontend");
+        println!(
+            "🌐 http://localhost:{} (API only — frontend not embedded)",
+            port
+        );
     }
 
     // Start web server in background

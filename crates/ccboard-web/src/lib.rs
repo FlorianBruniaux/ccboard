@@ -19,6 +19,8 @@ pub use app::App;
 
 #[cfg(feature = "ssr")]
 pub use router::create_router;
+#[cfg(feature = "ssr")]
+pub use router::has_real_frontend;
 
 // Server-side only code (backend with tokio/axum)
 #[cfg(feature = "ssr")]

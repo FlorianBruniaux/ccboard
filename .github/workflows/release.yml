@@ -138,14 +138,125 @@ jobs:
           TAG="${{ github.ref_name }}"
           VERSION="${{ steps.get_version.outputs.version }}"
           if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "Release $TAG already exists — uploading assets only"
-            gh release upload "$TAG" release-assets/* --clobber
+            echo "Release $TAG already exists — uploading missing assets only (no clobber)"
+            # Only upload assets that are not yet present to avoid SHA256 drift
+            EXISTING=$(gh release view "$TAG" --json assets --jq '[.assets[].name]')
+            for f in release-assets/*; do
+              name=$(basename "$f")
+              if echo "$EXISTING" | grep -q "\"$name\""; then
+                echo "  skip $name (already uploaded)"
+              else
+                gh release upload "$TAG" "$f"
+                echo "  uploaded $name"
+              fi
+            done
           else
             gh release create "$TAG" \
               --title "ccboard v${VERSION}" \
               --notes-file changelog.txt \
               release-assets/*
           fi
+
+  update-homebrew-tap:
+    name: Update Homebrew Tap Formula
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Download release assets and compute SHA256
+        id: sha
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          BASE="https://github.com/FlorianBruniaux/ccboard/releases/download/v${VERSION}"
+          curl -sLo macos-aarch64.tar.gz "${BASE}/ccboard-macos-aarch64.tar.gz"
+          curl -sLo macos-x86_64.tar.gz  "${BASE}/ccboard-macos-x86_64.tar.gz"
+          curl -sLo linux-x86_64.tar.gz  "${BASE}/ccboard-linux-x86_64.tar.gz"
+          echo "sha_macos_arm=$(sha256sum macos-aarch64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "sha_macos_x86=$(sha256sum macos-x86_64.tar.gz  | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "sha_linux_x86=$(sha256sum linux-x86_64.tar.gz  | awk '{print $1}')" >> $GITHUB_OUTPUT
+
+      - name: Update homebrew-tap formula
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          SHA_ARM="${{ steps.sha.outputs.sha_macos_arm }}"
+          SHA_X86="${{ steps.sha.outputs.sha_macos_x86 }}"
+          SHA_LNX="${{ steps.sha.outputs.sha_linux_x86 }}"
+
+          FORMULA=$(cat <<RUBY
+          class Ccboard < Formula
+            desc "Unified TUI/Web dashboard for Claude Code management"
+            homepage "https://github.com/FlorianBruniaux/ccboard"
+            version "${VERSION}"
+            license any_of: ["MIT", "Apache-2.0"]
+
+            on_macos do
+              on_arm do
+                url "https://github.com/FlorianBruniaux/ccboard/releases/download/v\#{version}/ccboard-macos-aarch64.tar.gz"
+                sha256 "${SHA_ARM}"
+              end
+              on_intel do
+                url "https://github.com/FlorianBruniaux/ccboard/releases/download/v\#{version}/ccboard-macos-x86_64.tar.gz"
+                sha256 "${SHA_X86}"
+              end
+            end
+
+            on_linux do
+              on_intel do
+                url "https://github.com/FlorianBruniaux/ccboard/releases/download/v\#{version}/ccboard-linux-x86_64.tar.gz"
+                sha256 "${SHA_LNX}"
+              end
+            end
+
+            def install
+              bin.install "ccboard"
+            end
+
+            def caveats
+              <<~EOS
+                ccboard requires Claude Code installed with ~/.claude directory.
+
+                Run Claude Code at least once to generate the directory:
+                  claude
+
+                Launch ccboard:
+                  ccboard              # TUI mode (default)
+                  ccboard web          # Web interface on port 3333
+                  ccboard stats        # Print stats and exit
+                  ccboard discover     # Analyze sessions for CLAUDE.md/skills/commands suggestions
+
+                Documentation:
+                  https://github.com/FlorianBruniaux/ccboard#readme
+              EOS
+            end
+
+            test do
+              assert_match "ccboard", shell_output("\#{bin}/ccboard --version 2>&1")
+            end
+          end
+          RUBY
+          )
+
+          # Get current file SHA for GitHub API update
+          FILE_SHA=$(curl -s -H "Authorization: token ${TAP_TOKEN}" \
+            "https://api.github.com/repos/FlorianBruniaux/homebrew-tap/contents/Formula/ccboard.rb" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['sha'])")
+
+          ENCODED=$(echo "$FORMULA" | base64 -w 0)
+
+          curl -s -X PUT \
+            -H "Authorization: token ${TAP_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/FlorianBruniaux/homebrew-tap/contents/Formula/ccboard.rb" \
+            -d "{
+              \"message\": \"chore: bump ccboard formula to v${VERSION}\",
+              \"content\": \"${ENCODED}\",
+              \"sha\": \"${FILE_SHA}\"
+            }" | python3 -c "import sys,json; d=json.load(sys.stdin); print('Updated:', d.get('commit',{}).get('sha','ERROR'))"
 
   publish-crates:
     name: Publish to crates.io

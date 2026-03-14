@@ -94,6 +94,19 @@ fn default_violations_limit() -> usize {
     50
 }
 
+/// Returns true if the binary embeds the real WASM frontend (built with trunk).
+/// Returns false when only the build-placeholder.html is embedded (e.g. `cargo install`
+/// without running `trunk build` first).
+pub fn has_real_frontend() -> bool {
+    match DistAssets::get("index.html") {
+        Some(f) => !f
+            .data
+            .windows(b"Web UI not available".len())
+            .any(|w| w == b"Web UI not available"),
+        None => false,
+    }
+}
+
 /// Serve a file from the embedded WASM frontend assets.
 /// Returns None if the file is not found (caller handles SPA fallback).
 fn get_embedded_asset(path: &str) -> Option<Response> {
