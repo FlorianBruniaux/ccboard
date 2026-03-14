@@ -131,14 +131,21 @@ jobs:
             git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD^)..HEAD >> changelog.txt
           fi
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ github.ref_name }} \
-            --title "ccboard v${{ steps.get_version.outputs.version }}" \
-            --notes-file changelog.txt \
-            release-assets/*
+          TAG="${{ github.ref_name }}"
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists — uploading assets only"
+            gh release upload "$TAG" release-assets/* --clobber
+          else
+            gh release create "$TAG" \
+              --title "ccboard v${VERSION}" \
+              --notes-file changelog.txt \
+              release-assets/*
+          fi
 
   publish-crates:
     name: Publish to crates.io
