@@ -7,6 +7,26 @@ use crate::components::{
 use crate::sse_hook::{use_sse, SseEvent};
 use crate::utils::export_as_csv;
 use leptos::prelude::*;
+use serde::{Deserialize, Serialize};
+
+/// A cost optimization suggestion from the backend API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostSuggestionData {
+    pub category: String,
+    pub title: String,
+    pub description: String,
+    pub potential_savings: f64,
+    pub action: String,
+}
+
+/// Response from /api/analytics/suggestions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuggestionsResponse {
+    pub suggestions: Vec<CostSuggestionData>,
+    pub total_cost_analyzed: f64,
+    pub sessions_analyzed: usize,
+    pub generated_at: String,
+}
 
 /// Analytics page
 #[component]
@@ -98,6 +118,12 @@ pub fn Analytics() -> impl IntoView {
                 >
                     "Insights"
                 </button>
+                <button
+                    class=move || if active_tab.get() == "tools" { "analytics-tab analytics-tab--active" } else { "analytics-tab" }
+                    on:click=move |_| set_active_tab.set("tools".to_string())
+                >
+                    "Tools"
+                </button>
             </div>
 
             <div class="page-content">
@@ -117,6 +143,7 @@ pub fn Analytics() -> impl IntoView {
                                     "trends" => view! { <AnalyticsTrends data=data.clone() /> }.into_any(),
                                     "patterns" => view! { <AnalyticsPatterns data=data.clone() /> }.into_any(),
                                     "insights" => view! { <AnalyticsInsights data=data.clone() /> }.into_any(),
+                                    "tools" => view! { <AnalyticsTools /> }.into_any(),
                                     _ => view! { <AnalyticsOverview data=data.clone() /> }.into_any(),
                                 }
                             }
@@ -535,6 +562,88 @@ fn AnalyticsInsights(data: crate::api::StatsData) -> impl IntoView {
                     <li>"Monitor forecast trends weekly to stay ahead of usage spikes"</li>
                 </ul>
             </div>
+        </div>
+    }
+}
+
+/// Tools tab — per-tool cost optimization suggestions from /api/analytics/suggestions
+#[component]
+fn AnalyticsTools() -> impl IntoView {
+    use gloo_net::http::Request;
+
+    let suggestions_data = LocalResource::new(move || async move {
+        let url = "/api/analytics/suggestions";
+        let response = Request::get(url)
+            .send()
+            .await
+            .map_err(|e| format!("Network error: {}", e))?;
+        if !response.ok() {
+            return Err(format!("HTTP error: {}", response.status()));
+        }
+        response
+            .json::<SuggestionsResponse>()
+            .await
+            .map_err(|e| format!("Parse error: {}", e))
+    });
+
+    view! {
+        <div class="analytics-tools">
+            <Suspense fallback=move || view! { <div class="loading">"Loading suggestions..."</div> }>
+                {move || {
+                    suggestions_data.get().map(|result| {
+                        match result.as_ref() {
+                            Err(e) => view! {
+                                <div class="error-message">
+                                    <p>{format!("Failed to load suggestions: {}", e)}</p>
+                                </div>
+                            }.into_any(),
+                            Ok(data) => {
+                                if data.suggestions.is_empty() {
+                                    view! {
+                                        <div class="empty-state">
+                                            <p>"No optimization suggestions at this time."</p>
+                                            <p>"Keep using Claude Code and check back when more session data is available."</p>
+                                        </div>
+                                    }.into_any()
+                                } else {
+                                    let suggestions = data.suggestions.clone();
+                                    view! {
+                                        <div>
+                                            <div class="section-header">
+                                                <h3>"Cost Optimization Suggestions"</h3>
+                                                <span class="badge">{suggestions.len()} " suggestions"</span>
+                                            </div>
+                                            <div class="suggestions-grid">
+                                                {suggestions.into_iter().map(|s| {
+                                                    let savings_label = if s.potential_savings > 0.0 {
+                                                        format!("~${:.2}/mo savings", s.potential_savings)
+                                                    } else {
+                                                        "Qualitative improvement".to_string()
+                                                    };
+                                                    view! {
+                                                        <div class="suggestion-card">
+                                                            <div class="suggestion-header">
+                                                                <span class="suggestion-category">{s.category.clone()}</span>
+                                                                <span class="suggestion-savings">{savings_label}</span>
+                                                            </div>
+                                                            <h4 class="suggestion-title">{s.title.clone()}</h4>
+                                                            <p class="suggestion-description">{s.description.clone()}</p>
+                                                            <div class="suggestion-action">
+                                                                <strong>"Action: "</strong>
+                                                                {s.action.clone()}
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                }).collect::<Vec<_>>()}
+                                            </div>
+                                        </div>
+                                    }.into_any()
+                                }
+                            }
+                        }
+                    })
+                }}
+            </Suspense>
         </div>
     }
 }

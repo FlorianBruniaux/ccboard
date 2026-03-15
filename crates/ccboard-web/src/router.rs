@@ -157,6 +157,10 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         .route("/api/commands", get(commands_handler))
         .route("/api/skills", get(skills_handler))
         .route("/api/plugins", get(plugins_handler))
+        .route(
+            "/api/analytics/suggestions",
+            get(analytics_suggestions_handler),
+        )
         .route("/api/task-graph", get(task_graph_handler))
         .route("/api/health", get(health_handler))
         // Activity routes — literal path before parameterised path
@@ -586,6 +590,60 @@ async fn plugins_handler(
     // Return JSON response
     axum::Json(serde_json::json!({
         "analytics": analytics,
+        "generated_at": Utc::now().to_rfc3339(),
+    }))
+}
+
+/// Cost optimization suggestions handler
+///
+/// Returns actionable suggestions for reducing Claude Code costs based on:
+/// - Dead plugins (defined but never invoked)
+/// - High-cost tools (>20% of total token budget)
+///
+/// GET /api/analytics/suggestions
+async fn analytics_suggestions_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    use ccboard_core::analytics::{aggregate_plugin_usage, generate_cost_suggestions};
+    use chrono::Utc;
+
+    let sessions = store.recent_sessions(10000);
+
+    // Aggregate per-tool token usage across all sessions
+    let mut tool_token_usage: std::collections::HashMap<String, u64> =
+        std::collections::HashMap::new();
+    for session in &sessions {
+        for (tool, &tokens) in &session.tool_token_usage {
+            *tool_token_usage.entry(tool.clone()).or_default() += tokens;
+        }
+    }
+
+    // Compute plugin analytics (for dead-code detection)
+    let invocation_stats = store.invocation_stats();
+    let skills: Vec<String> = invocation_stats.skills.keys().cloned().collect();
+    let commands: Vec<String> = invocation_stats.commands.keys().cloned().collect();
+    let plugin_analytics = aggregate_plugin_usage(&sessions, &skills, &commands);
+
+    // Estimate monthly cost from all sessions
+    let total_cost: f64 = sessions
+        .iter()
+        .map(|s| {
+            calculate_session_cost(
+                s.input_tokens,
+                s.output_tokens,
+                s.cache_creation_tokens,
+                s.cache_read_tokens,
+                &s.models_used,
+            )
+        })
+        .sum();
+
+    let suggestions = generate_cost_suggestions(&plugin_analytics, &tool_token_usage, total_cost);
+
+    axum::Json(serde_json::json!({
+        "suggestions": suggestions,
+        "total_cost_analyzed": total_cost,
+        "sessions_analyzed": sessions.len(),
         "generated_at": Utc::now().to_rfc3339(),
     }))
 }
