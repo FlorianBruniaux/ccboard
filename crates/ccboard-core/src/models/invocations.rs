@@ -19,6 +19,11 @@ pub struct InvocationStats {
     /// Example: "pdf-generator" -> 3
     pub skills: HashMap<String, usize>,
 
+    /// Per-agent token consumption (subagent_type -> total tokens)
+    /// Populated when Task tool calls have associated token data
+    #[serde(default)]
+    pub agent_token_stats: HashMap<String, u64>,
+
     /// When stats were last computed
     pub last_computed: DateTime<Utc>,
 
@@ -33,6 +38,7 @@ impl InvocationStats {
             agents: HashMap::new(),
             commands: HashMap::new(),
             skills: HashMap::new(),
+            agent_token_stats: HashMap::new(),
             last_computed: Utc::now(),
             sessions_analyzed: 0,
         }
@@ -55,6 +61,9 @@ impl InvocationStats {
         }
         for (name, count) in &other.skills {
             *self.skills.entry(name.clone()).or_insert(0) += count;
+        }
+        for (name, tokens) in &other.agent_token_stats {
+            *self.agent_token_stats.entry(name.clone()).or_insert(0) += tokens;
         }
         self.sessions_analyzed += other.sessions_analyzed;
         // Keep the most recent timestamp

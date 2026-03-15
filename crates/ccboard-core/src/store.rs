@@ -995,7 +995,23 @@ impl DataStore {
         debug!(session_count = paths.len(), "Computing invocation stats");
 
         let parser = InvocationParser::new();
-        let stats = parser.scan_sessions(&paths).await;
+        let mut stats = parser.scan_sessions(&paths).await;
+
+        // Populate agent_token_stats from session tool_token_usage
+        // The Task tool tokens serve as a proxy for agent token consumption
+        for session_ref in self.sessions.iter() {
+            let session = session_ref.value();
+            if let Some(&task_tokens) = session.tool_token_usage.get("Task") {
+                // Distribute Task tool tokens equally among agents spawned in this session
+                let agent_count =
+                    session.tool_usage.get("Task").copied().unwrap_or(0).max(1) as u64;
+                let tokens_per_agent = task_tokens / agent_count;
+                // Attribute to all agent types found in stats that were invoked
+                for agent_type in stats.agents.keys().cloned().collect::<Vec<_>>() {
+                    *stats.agent_token_stats.entry(agent_type).or_insert(0) += tokens_per_agent;
+                }
+            }
+        }
 
         let mut guard = self.invocation_stats.write();
         *guard = stats;
