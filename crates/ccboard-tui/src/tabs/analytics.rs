@@ -25,6 +25,8 @@ pub enum AnalyticsView {
     Patterns,
     Insights,
     Anomalies,
+    /// Per-tool token usage and cost optimization suggestions (Phase K)
+    Plugins,
 }
 
 impl AnalyticsView {
@@ -35,18 +37,20 @@ impl AnalyticsView {
             Self::Trends => Self::Patterns,
             Self::Patterns => Self::Insights,
             Self::Insights => Self::Anomalies,
-            Self::Anomalies => Self::Overview,
+            Self::Anomalies => Self::Plugins,
+            Self::Plugins => Self::Overview,
         }
     }
 
     /// Cycle to previous view
     pub fn prev(self) -> Self {
         match self {
-            Self::Overview => Self::Anomalies,
+            Self::Overview => Self::Plugins,
             Self::Trends => Self::Overview,
             Self::Patterns => Self::Trends,
             Self::Insights => Self::Patterns,
             Self::Anomalies => Self::Insights,
+            Self::Plugins => Self::Anomalies,
         }
     }
 
@@ -58,6 +62,7 @@ impl AnalyticsView {
             Self::Patterns => "Patterns",
             Self::Insights => "Insights",
             Self::Anomalies => "Anomalies",
+            Self::Plugins => "Plugins",
         }
     }
 }
@@ -216,6 +221,7 @@ impl AnalyticsTab {
                     AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data, &p),
                     AnalyticsView::Insights => self.render_insights(frame, chunks[1], data, &p),
                     AnalyticsView::Anomalies => self.render_anomalies(frame, chunks[1], store, &p),
+                    AnalyticsView::Plugins => self.render_plugins(frame, chunks[1], data, &p),
                 }
             }
             None => {
@@ -263,6 +269,7 @@ impl AnalyticsTab {
             AnalyticsView::Patterns,
             AnalyticsView::Insights,
             AnalyticsView::Anomalies,
+            AnalyticsView::Plugins,
         ];
         let tabs_text: Vec<Span> = views
             .iter()
@@ -1615,5 +1622,184 @@ impl AnalyticsTab {
             .column_spacing(1);
 
         frame.render_widget(table, area);
+    }
+
+    /// Render Plugins sub-view: per-tool token usage + cost optimization suggestions
+    fn render_plugins(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(55), // Tool token bar chart
+                Constraint::Percentage(45), // Cost suggestions
+            ])
+            .split(area);
+
+        self.render_tool_token_chart(frame, chunks[0], data, p);
+        self.render_cost_suggestions(frame, chunks[1], data, p);
+    }
+
+    /// Render per-tool token usage as a bar chart
+    fn render_tool_token_chart(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        data: &AnalyticsData,
+        p: &Palette,
+    ) {
+        // Aggregate tool_token_usage across available data
+        // AnalyticsData doesn't store per-tool tokens directly, so we show tool chains
+        // as a proxy. If tool_chains is present, show top tools from bigrams.
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Tool Token Distribution (by call frequency) ")
+            .style(Style::default().fg(p.border));
+
+        if let Some(ref chains) = data.tool_chains {
+            if chains.top_bigrams.is_empty() {
+                let para = Paragraph::new(vec![
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "No tool chain data available.",
+                        Style::default().fg(p.muted),
+                    )),
+                    Line::from(Span::styled(
+                        "Run more sessions with tool calls to see patterns.",
+                        Style::default().fg(p.muted),
+                    )),
+                ])
+                .block(block)
+                .alignment(Alignment::Center);
+                frame.render_widget(para, area);
+                return;
+            }
+
+            // Build bar data from top bigrams (frequency as proxy for cost)
+            let bar_data: Vec<(&str, u64)> = chains
+                .top_bigrams
+                .iter()
+                .take(15)
+                .map(|c| {
+                    // Use static string slices from sequence — take first tool name
+                    (c.sequence[0].as_str(), c.frequency as u64)
+                })
+                .collect();
+
+            // Deduplicate by tool name (keep highest frequency)
+            let mut seen_tools: std::collections::HashMap<&str, u64> =
+                std::collections::HashMap::new();
+            for (tool, freq) in &bar_data {
+                let entry = seen_tools.entry(tool).or_insert(0);
+                if *freq > *entry {
+                    *entry = *freq;
+                }
+            }
+
+            let mut sorted_tools: Vec<(&str, u64)> = seen_tools.into_iter().collect();
+            sorted_tools.sort_by(|a, b| b.1.cmp(&a.1));
+            sorted_tools.truncate(10);
+
+            if sorted_tools.is_empty() {
+                let para = Paragraph::new("No data").block(block);
+                frame.render_widget(para, area);
+                return;
+            }
+
+            let chart_data: Vec<(&str, u64)> = sorted_tools;
+
+            let bar_chart = BarChart::default()
+                .block(block)
+                .data(&chart_data)
+                .bar_width(7)
+                .bar_gap(1)
+                .bar_style(Style::default().fg(p.focus))
+                .value_style(Style::default().fg(p.bg).add_modifier(Modifier::BOLD))
+                .label_style(Style::default().fg(p.fg));
+
+            frame.render_widget(bar_chart, area);
+        } else {
+            let para = Paragraph::new(vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "Tool analytics not yet computed.",
+                    Style::default().fg(p.muted),
+                )),
+                Line::from(Span::styled(
+                    "Press 'r' to refresh.",
+                    Style::default().fg(p.muted),
+                )),
+            ])
+            .block(block)
+            .alignment(Alignment::Center);
+            frame.render_widget(para, area);
+        }
+    }
+
+    /// Render cost optimization suggestions list
+    fn render_cost_suggestions(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        data: &AnalyticsData,
+        p: &Palette,
+    ) {
+        let title = format!(
+            " Cost Optimization ({} suggestions) ",
+            data.cost_suggestions.len()
+        );
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .style(Style::default().fg(p.border));
+
+        if data.cost_suggestions.is_empty() {
+            let para = Paragraph::new(vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "No optimization suggestions — your setup looks efficient.",
+                    Style::default().fg(p.success),
+                )),
+            ])
+            .block(block)
+            .alignment(Alignment::Center);
+            frame.render_widget(para, area);
+            return;
+        }
+
+        let visible = (area.height as usize).saturating_sub(2);
+        let start = self
+            .scroll_offset
+            .min(data.cost_suggestions.len().saturating_sub(1));
+
+        let items: Vec<ListItem> = data
+            .cost_suggestions
+            .iter()
+            .skip(start)
+            .take(visible)
+            .map(|s| {
+                let savings_str = if s.potential_savings > 0.01 {
+                    format!(" [-${:.2}/mo]", s.potential_savings)
+                } else {
+                    String::new()
+                };
+                let line1 = Line::from(vec![
+                    Span::styled(
+                        format!("{} {} ", s.category.icon(), s.category.label()),
+                        Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!("{}{}", s.title, savings_str),
+                        Style::default().fg(p.fg),
+                    ),
+                ]);
+                let line2 = Line::from(Span::styled(
+                    format!("   {} {}", "→", s.action),
+                    Style::default().fg(p.muted),
+                ));
+                ListItem::new(vec![line1, line2])
+            })
+            .collect();
+
+        let list = List::new(items).block(block);
+        frame.render_widget(list, area);
     }
 }
