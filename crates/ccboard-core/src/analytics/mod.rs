@@ -13,6 +13,7 @@ pub mod discover;
 pub mod discover_llm;
 pub mod forecasting;
 pub mod insights;
+pub mod optimization;
 pub mod patterns;
 pub mod plugin_usage;
 pub mod tool_chains;
@@ -29,6 +30,7 @@ pub use discover::{
 pub use discover_llm::{call_claude_cli as discover_call_llm, LlmSuggestion};
 pub use forecasting::{forecast_usage, ForecastData, TrendDirection};
 pub use insights::{generate_budget_alerts, generate_insights, Alert};
+pub use optimization::{generate_cost_suggestions, CostSuggestion, OptimizationCategory};
 pub use patterns::{detect_patterns, UsagePatterns};
 pub use plugin_usage::{aggregate_plugin_usage, PluginAnalytics, PluginType, PluginUsage};
 pub use tool_chains::{analyze_tool_chains, ToolChain, ToolChainAnalysis};
@@ -94,6 +96,8 @@ pub struct AnalyticsData {
     pub insights: Vec<String>,
     /// Tool chain bigram/trigram analysis
     pub tool_chains: Option<ToolChainAnalysis>,
+    /// Cost optimization suggestions
+    pub cost_suggestions: Vec<optimization::CostSuggestion>,
     /// Timestamp of computation
     pub computed_at: DateTime<Utc>,
     /// Period analyzed
@@ -114,12 +118,34 @@ impl AnalyticsData {
         let patterns = detect_patterns(sessions, period.days());
         let insights = generate_insights(&trends, &patterns, &forecast);
 
+        // Aggregate per-tool token usage across all sessions
+        let mut aggregated_tool_tokens: std::collections::HashMap<String, u64> =
+            std::collections::HashMap::new();
+        for session in sessions {
+            for (tool, &tokens) in &session.tool_token_usage {
+                *aggregated_tool_tokens.entry(tool.clone()).or_default() += tokens;
+            }
+        }
+
+        // Estimate period cost from trend data
+        let total_cost_estimate: f64 = trends.daily_cost.iter().sum();
+
+        // Generate cost suggestions (plugin_analytics populated with empty data here;
+        // full plugin analytics with dead-code detection requires skill/command lists
+        // which are provided by DataStore when calling the analytics tab)
+        let cost_suggestions = optimization::generate_cost_suggestions(
+            &plugin_usage::PluginAnalytics::empty(),
+            &aggregated_tool_tokens,
+            total_cost_estimate,
+        );
+
         Self {
             trends,
             forecast,
             patterns,
             insights,
             tool_chains: Some(analyze_tool_chains(sessions)),
+            cost_suggestions,
             computed_at: Utc::now(),
             period,
         }
@@ -138,6 +164,7 @@ impl AnalyticsData {
             patterns: detect_patterns(sessions, period.days()),
             insights: vec!["Limited insights: stats cache unavailable".to_string()],
             tool_chains: Some(analyze_tool_chains(sessions)),
+            cost_suggestions: Vec::new(),
             computed_at: Utc::now(),
             period,
         }
