@@ -181,6 +181,11 @@ pub struct SessionMetadata {
     /// Tool usage statistics: tool name -> call count
     /// Extracted from tool_calls in assistant messages during session scan
     pub tool_usage: std::collections::HashMap<String, usize>,
+
+    /// Per-tool token attribution: tool name -> tokens
+    /// Proportionally distributed from message-level token counts
+    #[serde(default)]
+    pub tool_token_usage: std::collections::HashMap<String, u64>,
 }
 
 impl SessionMetadata {
@@ -213,6 +218,7 @@ impl SessionMetadata {
             duration_seconds: None,
             branch: None,
             tool_usage: std::collections::HashMap::new(),
+            tool_token_usage: std::collections::HashMap::new(),
         }
     }
 

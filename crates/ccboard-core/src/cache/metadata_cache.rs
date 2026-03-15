@@ -22,6 +22,7 @@
 //! - v4: Added branch field to SessionMetadata
 //! - v5: Added activity_cache + activity_alerts tables for Phase 2 activity module
 //! - v6: Added aggregate_stats table with triggers + FTS5 session_fts table
+//! - v7: Added tool_token_usage field to SessionMetadata (Phase K analytics)
 
 use crate::models::activity::ActivitySummary;
 use crate::models::SessionMetadata;
@@ -49,7 +50,8 @@ use tracing::{debug, warn};
 /// - v4: Added branch field to SessionMetadata
 /// - v5: Added activity_cache + activity_alerts tables
 /// - v6: Added aggregate_stats table with triggers + FTS5 session_fts table
-const CACHE_VERSION: i32 = 6;
+/// - v7: Added tool_token_usage field to SessionMetadata (Phase K analytics)
+const CACHE_VERSION: i32 = 7;
 
 /// SQLite-based metadata cache (thread-safe)
 pub struct MetadataCache {

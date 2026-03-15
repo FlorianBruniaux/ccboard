@@ -285,6 +285,8 @@ impl SessionIndexParser {
         let mut branch: Option<String> = None;
         let mut tool_usage: std::collections::HashMap<String, usize> =
             std::collections::HashMap::new();
+        let mut tool_token_usage: std::collections::HashMap<String, u64> =
+            std::collections::HashMap::new();
 
         while let Some(line_result) = lines.next_line().await.map_err(|e| CoreError::FileRead {
             path: path.to_path_buf(),
@@ -433,6 +435,32 @@ impl SessionIndexParser {
                     // Also check content array for tool_use blocks (real Claude Code format)
                     if let Some(ref content) = msg.content {
                         if let Some(blocks) = content.as_array() {
+                            // Collect tool names in this message for proportional token distribution
+                            let message_tools: Vec<String> = blocks
+                                .iter()
+                                .filter(|block| {
+                                    block.get("type").and_then(|t| t.as_str()) == Some("tool_use")
+                                })
+                                .filter_map(|block| {
+                                    block.get("name").and_then(|n| n.as_str()).map(String::from)
+                                })
+                                .collect();
+
+                            // Distribute message tokens proportionally across tools
+                            if !message_tools.is_empty() {
+                                let message_tokens = usage_opt.map(|u| u.total()).unwrap_or(0);
+                                if message_tokens > 0 {
+                                    let tool_count = message_tools.len() as u64;
+                                    let tokens_per_tool = message_tokens / tool_count;
+                                    let remainder = message_tokens % tool_count;
+                                    for (i, tool_name) in message_tools.iter().enumerate() {
+                                        let extra = if i == 0 { remainder } else { 0 };
+                                        *tool_token_usage.entry(tool_name.clone()).or_default() +=
+                                            tokens_per_tool + extra;
+                                    }
+                                }
+                            }
+
                             for block in blocks {
                                 if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
                                 {
@@ -484,6 +512,9 @@ impl SessionIndexParser {
 
         // Apply tool usage
         metadata.tool_usage = tool_usage;
+
+        // Apply per-tool token usage
+        metadata.tool_token_usage = tool_token_usage;
 
         Ok(metadata)
     }

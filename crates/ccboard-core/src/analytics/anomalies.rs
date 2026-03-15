@@ -244,6 +244,7 @@ mod tests {
             duration_seconds: Some(60),
             branch: Some("main".to_string()),
             tool_usage: std::collections::HashMap::new(),
+            tool_token_usage: std::collections::HashMap::new(),
         })
     }
 
