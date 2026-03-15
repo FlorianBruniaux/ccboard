@@ -5,6 +5,38 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-03-15
+
+### Added — Phase K: Tool Cost Analytics
+
+- **`tool_token_usage: HashMap<String, u64>`** on `SessionMetadata` — per-tool token attribution via proportional distribution across `tool_use` blocks in each assistant message (JSONL streaming, no full parse). SQLite cache version bumped to v7 for transparent invalidation.
+
+- **`agent_token_stats: HashMap<String, u64>`** on `InvocationStats` — accumulates Task-tool token spend keyed by agent/command name. Updated `compute_invocations()` in `DataStore` to populate from session data.
+
+- **`ccboard-core/src/analytics/tool_chains.rs`** — bigram/trigram analysis over per-session tool sequences:
+  - `ToolChain` (sequence, frequency, sessions_count), `ToolChainAnalysis` (top bigrams, trigrams, most expensive chains)
+  - Sliding-window extraction, sorted by frequency descending, capped at top-10 per category
+  - 4 unit tests covering bigram extraction, deduplication, empty sessions
+
+- **`ccboard-core/src/analytics/optimization.rs`** — cost optimization suggestion engine:
+  - `OptimizationCategory` enum: `UnusedPlugin`, `HighCostTool`, `ModelDowngrade`, `RedundantCalls`
+  - `CostSuggestion` with title, description, potential_savings ($/mo), action
+  - `generate_cost_suggestions()` flags dead plugins (0 invocations) and tools consuming >20% of total tokens with estimated 30% reduction potential
+  - Sorted by potential savings descending
+  - 5 unit tests
+
+- **`AnalyticsData`** extended with `tool_chains: Option<ToolChainAnalysis>` and `cost_suggestions: Vec<CostSuggestion>`. Both populated in `compute()`, gracefully omitted in `from_sessions_only()`.
+
+- **TUI Analytics tab — Plugins sub-view** (cycle with `[`/`]`):
+  - Per-tool token usage bar chart (top 8 tools)
+  - Cost suggestions list with category icon, title, savings estimate, and action
+
+- **Web Analytics page — Tools tab**:
+  - `GET /api/analytics/suggestions` — aggregates `tool_token_usage` across all sessions, runs dead-plugin and high-cost-tool analysis, returns sorted `CostSuggestion` list as JSON
+  - `AnalyticsTools` Leptos component with Suspense-wrapped suggestion cards showing category, savings estimate, description, and action
+
+---
+
 ## [0.12.0] - 2026-03-13
 
 ### Added — `ccboard discover`
