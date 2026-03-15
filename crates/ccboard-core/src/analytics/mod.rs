@@ -15,6 +15,7 @@ pub mod forecasting;
 pub mod insights;
 pub mod patterns;
 pub mod plugin_usage;
+pub mod tool_chains;
 pub mod trends;
 
 #[cfg(test)]
@@ -30,6 +31,7 @@ pub use forecasting::{forecast_usage, ForecastData, TrendDirection};
 pub use insights::{generate_budget_alerts, generate_insights, Alert};
 pub use patterns::{detect_patterns, UsagePatterns};
 pub use plugin_usage::{aggregate_plugin_usage, PluginAnalytics, PluginType, PluginUsage};
+pub use tool_chains::{analyze_tool_chains, ToolChain, ToolChainAnalysis};
 pub use trends::{compute_trends, SessionDurationStats, TrendsData};
 
 /// Period selection for analytics computation
@@ -90,6 +92,8 @@ pub struct AnalyticsData {
     pub patterns: UsagePatterns,
     /// Actionable insights
     pub insights: Vec<String>,
+    /// Tool chain bigram/trigram analysis
+    pub tool_chains: Option<ToolChainAnalysis>,
     /// Timestamp of computation
     pub computed_at: DateTime<Utc>,
     /// Period analyzed
@@ -115,6 +119,7 @@ impl AnalyticsData {
             forecast,
             patterns,
             insights,
+            tool_chains: Some(analyze_tool_chains(sessions)),
             computed_at: Utc::now(),
             period,
         }
@@ -132,6 +137,7 @@ impl AnalyticsData {
             forecast: ForecastData::unavailable("Stats cache required for cost forecasting"),
             patterns: detect_patterns(sessions, period.days()),
             insights: vec!["Limited insights: stats cache unavailable".to_string()],
+            tool_chains: Some(analyze_tool_chains(sessions)),
             computed_at: Utc::now(),
             period,
         }
