@@ -140,14 +140,34 @@ fn detect_live_sessions_unix() -> Result<Vec<LiveSession>> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let sessions: Vec<LiveSession> = stdout
         .lines()
-        .filter(|line| {
-            // Filter for lines containing "claude" but not "grep" (avoid self-detection)
-            line.contains("claude") && !line.contains("grep") && !line.contains("ccboard")
-        })
+        .filter(|line| is_claude_process_line(line))
         .filter_map(parse_ps_line)
         .collect();
 
     Ok(sessions)
+}
+
+/// Returns true if a `ps aux` line belongs to a Claude Code process.
+///
+/// Checks the COMMAND column (field 10, 0-indexed) basename is exactly `claude`
+/// or `claude-code`, avoiding false matches on `claude-desktop`, scripts, grep, etc.
+#[cfg(unix)]
+fn is_claude_process_line(line: &str) -> bool {
+    if line.contains("grep") || line.contains("ccboard") {
+        return false;
+    }
+    // ps aux columns: USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND…
+    // split_whitespace() collapses multiple spaces — skip 10 columns to reach COMMAND
+    let mut fields = line.split_whitespace();
+    for _ in 0..10 {
+        if fields.next().is_none() {
+            return false;
+        }
+    }
+    // First token of COMMAND is the binary (possibly a full path)
+    let binary = fields.next().unwrap_or("");
+    let base = binary.rsplit('/').next().unwrap_or(binary);
+    base == "claude" || base == "claude-code"
 }
 
 #[cfg(unix)]
@@ -340,8 +360,8 @@ fn get_session_metadata(working_directory: &Option<String>) -> Option<LiveSessio
     let encoded = cwd.replace('/', "-");
 
     // Build sessions directory path
-    let home = std::env::var("HOME").ok()?;
-    let sessions_dir = std::path::Path::new(&home)
+    let home = dirs::home_dir()?;
+    let sessions_dir = home
         .join(".claude")
         .join("projects")
         .join(&encoded);
@@ -559,14 +579,6 @@ pub fn merge_live_sessions(
                 if matched_ps[i] {
                     continue;
                 }
-                // ps TTY column is e.g. "ttys001" — hook tty is "/dev/ttys001"
-                let ps_tty = ps
-                    .command
-                    .split_whitespace()
-                    .next()
-                    .unwrap_or("")
-                    .to_string();
-                let _ = ps_tty; // we don't have TTY from ps directly
 
                 // Fallback: match by cwd
                 if ps
@@ -675,5 +687,83 @@ mod tests {
         let result = parse_start_time("Feb 04");
         // Should return None for non-HH:MM format (can't reliably parse month/day)
         assert!(result.is_none());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_is_claude_process_line_match() {
+        let line = "user  12345  0.0  0.1  123456  78910  ttys001  S+   14:30   0:05.23  /usr/local/bin/claude --resume abc";
+        assert!(is_claude_process_line(line));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_is_claude_process_line_bare_claude() {
+        let line = "user  12345  0.0  0.1  123456  78910  ttys001  S+   14:30   0:05.23  claude";
+        assert!(is_claude_process_line(line));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_is_claude_process_line_rejects_desktop() {
+        // claude-desktop should NOT match
+        let line = "user  99999  0.0  0.1  123456  78910  ttys001  S+   14:30   0:05.23  /Applications/Claude.app/claude-desktop";
+        assert!(!is_claude_process_line(line));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_is_claude_process_line_rejects_grep() {
+        let line = "user  99999  0.0  0.1  123456  78910  ttys001  S+   14:30   0:05.23  grep claude";
+        assert!(!is_claude_process_line(line));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_is_claude_process_line_rejects_ccboard() {
+        let line = "user  99999  0.0  0.1  123456  78910  ttys001  S+   14:30   0:05.23  ccboard hook PreToolUse";
+        assert!(!is_claude_process_line(line));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_is_claude_process_line_rejects_script_with_claude_in_name() {
+        let line = "user  88888  0.0  0.1  123456  78910  ttys001  S+   14:30   0:05.23  python3 claude_runner.py";
+        assert!(!is_claude_process_line(line));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_parse_claude_flags_cli() {
+        let flags = parse_claude_flags("/usr/local/bin/claude --resume abc");
+        assert_eq!(flags.session_type, SessionType::Cli);
+        assert_eq!(flags.resume_id.as_deref(), Some("abc"));
+        assert!(flags.model.is_none());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_parse_claude_flags_vscode() {
+        let flags = parse_claude_flags(
+            "claude --output-format stream-json --permission-prompt-tool stdio",
+        );
+        assert_eq!(flags.session_type, SessionType::VsCode);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_parse_claude_flags_subagent() {
+        let flags = parse_claude_flags("claude --output-format stream-json --model claude-opus-4");
+        assert_eq!(flags.session_type, SessionType::Subagent);
+        assert_eq!(flags.model.as_deref(), Some("claude-opus-4"));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_parse_claude_flags_no_flags() {
+        let flags = parse_claude_flags("claude");
+        assert_eq!(flags.session_type, SessionType::Cli);
+        assert!(flags.model.is_none());
+        assert!(flags.resume_id.is_none());
     }
 }

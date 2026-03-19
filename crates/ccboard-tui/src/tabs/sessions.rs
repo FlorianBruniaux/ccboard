@@ -925,9 +925,19 @@ impl SessionsTab {
                     }
                     if let Some(proc) = &s.process {
                         let tokens_str = proc.tokens.map_or("?".to_string(), Self::format_short);
+                        // Session type label (hide "CLI" as it's the default/noise-free case)
+                        let type_str = match proc.session_type {
+                            ccboard_core::SessionType::Cli => String::new(),
+                            ref t => format!("[{}] ", t.label()),
+                        };
+                        let model_str = proc
+                            .model
+                            .as_deref()
+                            .map(|m| format!("{}  ", m))
+                            .unwrap_or_default();
                         parts.push(format!(
-                            "CPU:{:.1}% RAM:{}MB Tok:{}",
-                            proc.cpu_percent, proc.memory_mb, tokens_str
+                            "{}{}CPU:{:.1}% RAM:{}MB Tok:{}",
+                            type_str, model_str, proc.cpu_percent, proc.memory_mb, tokens_str
                         ));
                     }
                     parts
@@ -1573,6 +1583,20 @@ impl SessionsTab {
                 Line::from(vec![
                     Span::styled("PID: ", Style::default().fg(p.muted)),
                     Span::styled(proc.pid.to_string(), Style::default().fg(p.focus).bold()),
+                ]),
+                Line::from(vec![
+                    Span::styled("Type: ", Style::default().fg(p.muted)),
+                    Span::styled(
+                        proc.session_type.label(),
+                        Style::default().fg(p.important).bold(),
+                    ),
+                ]),
+                Line::from(vec![
+                    Span::styled("Model: ", Style::default().fg(p.muted)),
+                    Span::styled(
+                        proc.model.as_deref().unwrap_or("default"),
+                        Style::default().fg(p.fg),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("Running: ", Style::default().fg(p.muted)),

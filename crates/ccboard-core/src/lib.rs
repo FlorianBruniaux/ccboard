@@ -40,7 +40,7 @@ pub use hook_state::{
 };
 pub use live_monitor::{
     detect_live_sessions, merge_live_sessions, LiveSession, LiveSessionDisplayStatus,
-    MergedLiveSession,
+    MergedLiveSession, SessionType,
 };
 pub use models::activity::{
     ActivitySummary, Alert, AlertCategory, AlertSeverity, BashCommand, FileAccess, FileOperation,

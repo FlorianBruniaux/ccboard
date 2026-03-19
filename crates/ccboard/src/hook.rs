@@ -63,9 +63,12 @@ pub fn run_hook(event_name: String) -> Result<()> {
         .context("Failed to acquire write lock on live-sessions")?;
 
     // 7. Load existing state (Default if file absent)
-    let mut session_file = LiveSessionFile::load(&file_path).unwrap_or_else(|_| LiveSessionFile {
-        version: 1,
-        ..Default::default()
+    let mut session_file = LiveSessionFile::load(&file_path).unwrap_or_else(|e| {
+        eprintln!("[ccboard] Warning: failed to parse live-sessions.json: {e}. Starting fresh.");
+        LiveSessionFile {
+            version: 1,
+            ..Default::default()
+        }
     });
 
     // 8. Upsert session entry
@@ -101,12 +104,15 @@ pub fn run_hook(event_name: String) -> Result<()> {
                 .unwrap_or("unknown")
                 .to_string();
 
+            // Sanitize: escape backslashes then double-quotes to prevent AppleScript injection
+            let safe_name = project_name.replace('\\', "\\\\").replace('"', "\\\"");
+
             let _ = std::process::Command::new("osascript")
                 .args([
                     "-e",
                     &format!(
                         "display notification \"Session terminée : {}\" with title \"ccboard\"",
-                        project_name
+                        safe_name
                     ),
                 ])
                 .spawn(); // non-blocking — hook returns immediately

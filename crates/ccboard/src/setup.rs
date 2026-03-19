@@ -47,6 +47,16 @@ pub async fn run_setup(dry_run: bool, claude_home: PathBuf) -> Result<()> {
         .to_string_lossy()
         .to_string();
 
+    // Warn if running from a debug/cargo build — the injected path won't survive a `cargo clean`
+    if binary_path.contains("/target/debug/") || binary_path.contains("/target/release/") {
+        eprintln!(
+            "Warning: ccboard is running from a build directory ({}).\n\
+             The hook scripts will point to this binary. Install ccboard system-wide\n\
+             (e.g. via `cargo install` or Homebrew) for a stable hook path.",
+            binary_path
+        );
+    }
+
     // 4. Inject hooks (idempotent)
     let hooks_obj = settings
         .entry("hooks")
