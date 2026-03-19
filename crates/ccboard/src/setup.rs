@@ -76,10 +76,10 @@ pub async fn run_setup(dry_run: bool, claude_home: PathBuf) -> Result<()> {
             continue;
         }
 
-        // Add hook entry
+        // Add hook entry — new format: [{matcher, hooks: [{type, command}]}]
         let hook_def = json!([{
-            "type": "command",
-            "command": hook_command
+            "matcher": "",
+            "hooks": [{"type": "command", "command": hook_command}]
         }]);
 
         hooks_obj.insert(event.to_string(), hook_def);
@@ -156,19 +156,33 @@ pub async fn run_setup(dry_run: bool, claude_home: PathBuf) -> Result<()> {
     Ok(())
 }
 
-/// Check if a hook command is already present for a given event
+/// Check if a hook command is already present for a given event.
+///
+/// Supports both formats:
+/// - New: `[{matcher, hooks: [{type, command}]}]`
+/// - Old: `[{type, command}]`
 fn hook_already_present(hooks_obj: &Map<String, Value>, event: &str, command: &str) -> bool {
     let Some(event_hooks) = hooks_obj.get(event) else {
         return false;
     };
 
-    // Event hooks can be an array of hook definitions
     let Some(hooks_array) = event_hooks.as_array() else {
         return false;
     };
 
-    hooks_array.iter().any(|hook| {
-        hook.get("command")
+    hooks_array.iter().any(|entry| {
+        // New format: entry has a "hooks" array
+        if let Some(inner) = entry.get("hooks").and_then(|h| h.as_array()) {
+            return inner.iter().any(|hook| {
+                hook.get("command")
+                    .and_then(|c| c.as_str())
+                    .map(|c| c == command)
+                    .unwrap_or(false)
+            });
+        }
+        // Old format: entry has "command" directly
+        entry
+            .get("command")
             .and_then(|c| c.as_str())
             .map(|c| c == command)
             .unwrap_or(false)
@@ -181,7 +195,21 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_hook_already_present_true() {
+    fn test_hook_already_present_new_format() {
+        let mut hooks_obj = Map::new();
+        hooks_obj.insert(
+            "PreToolUse".to_string(),
+            json!([{"matcher": "", "hooks": [{"type": "command", "command": "/usr/local/bin/ccboard hook PreToolUse"}]}]),
+        );
+        assert!(hook_already_present(
+            &hooks_obj,
+            "PreToolUse",
+            "/usr/local/bin/ccboard hook PreToolUse"
+        ));
+    }
+
+    #[test]
+    fn test_hook_already_present_old_format() {
         let mut hooks_obj = Map::new();
         hooks_obj.insert(
             "PreToolUse".to_string(),
