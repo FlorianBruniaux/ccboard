@@ -8,6 +8,8 @@ pub mod error;
 pub mod event;
 pub mod export;
 pub mod graph;
+pub mod hook_event;
+pub mod hook_state;
 pub mod live_monitor;
 pub mod models;
 pub mod parsers;
@@ -32,7 +34,14 @@ pub use export::{
     export_sessions_to_csv, export_sessions_to_json, export_sessions_to_markdown,
     export_stats_to_csv, export_stats_to_json, export_stats_to_markdown,
 };
-pub use live_monitor::{detect_live_sessions, LiveSession};
+pub use hook_event::{status_from_event, HookPayload};
+pub use hook_state::{
+    make_session_key, HookSession, HookSessionStatus, LiveSessionFile, SessionKey,
+};
+pub use live_monitor::{
+    detect_live_sessions, merge_live_sessions, LiveSession, LiveSessionDisplayStatus,
+    MergedLiveSession,
+};
 pub use models::activity::{
     ActivitySummary, Alert, AlertCategory, AlertSeverity, BashCommand, FileAccess, FileOperation,
     NetworkCall, NetworkTool, ToolCall as ActivityToolCall,

@@ -545,8 +545,8 @@ impl SessionsTab {
 
     fn get_selected_live_session<'a>(
         &self,
-        live_sessions: &'a [ccboard_core::LiveSession],
-    ) -> Option<&'a ccboard_core::LiveSession> {
+        live_sessions: &'a [ccboard_core::MergedLiveSession],
+    ) -> Option<&'a ccboard_core::MergedLiveSession> {
         let live_idx = self.live_sessions_state.selected()?;
         live_sessions.get(live_idx)
     }
@@ -573,7 +573,7 @@ impl SessionsTab {
         frame: &mut Frame,
         area: Rect,
         sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
-        live_sessions: &[ccboard_core::LiveSession],
+        live_sessions: &[ccboard_core::MergedLiveSession],
         _scheme: ccboard_core::models::config::ColorScheme,
     ) {
         let p = Palette::new(_scheme);
@@ -818,11 +818,13 @@ impl SessionsTab {
         &mut self,
         frame: &mut Frame,
         area: Rect,
-        live_sessions: &[ccboard_core::LiveSession],
+        live_sessions: &[ccboard_core::MergedLiveSession],
         is_focused: bool,
         p: &Palette,
     ) {
+        use ccboard_core::LiveSessionDisplayStatus;
         use chrono::Local;
+        use ratatui::style::Color;
 
         // Clamp selection to valid range
         if let Some(sel) = self.live_sessions_state.selected() {
@@ -849,57 +851,93 @@ impl SessionsTab {
             return;
         }
 
+        let now = Local::now();
+
         let items: Vec<ListItem> = live_sessions
             .iter()
             .map(|s| {
-                let now = Local::now();
-                let duration = now.signed_duration_since(s.start_time);
-                let hours = duration.num_hours();
-                let minutes = duration.num_minutes() % 60;
+                let status = s.effective_status();
 
-                let duration_str = if hours > 0 {
-                    format!("{}h{}m", hours, minutes)
-                } else {
-                    format!("{}m", minutes)
+                // Icon + color based on hook status
+                let (icon, status_color) = match status {
+                    LiveSessionDisplayStatus::Running => ("●", p.success),
+                    LiveSessionDisplayStatus::WaitingInput => ("◐", Color::Yellow),
+                    LiveSessionDisplayStatus::Stopped => ("✓", p.muted),
+                    LiveSessionDisplayStatus::ProcessOnly => ("🟢", p.success),
+                    LiveSessionDisplayStatus::Unknown => ("?", p.muted),
                 };
 
-                let cwd_display = s
-                    .working_directory
-                    .as_ref()
-                    .and_then(|p| std::path::Path::new(p).file_name())
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("unknown");
+                // Project name from cwd
+                let cwd_display = s.project_name();
 
-                // Line 1: Process info + Session ID
+                // Session ID (shortened)
                 let session_id_display = s
                     .session_id
                     .as_ref()
                     .map(|id| format!(" [{}]", &id[..8.min(id.len())]))
                     .unwrap_or_default();
 
+                // Duration: prefer process start_time, fallback to last_event_at
+                let duration_str = if let Some(proc) = &s.process {
+                    let dur = now.signed_duration_since(proc.start_time);
+                    let h = dur.num_hours();
+                    let m = dur.num_minutes() % 60;
+                    if h > 0 {
+                        format!("{}h{}m ago", h, m)
+                    } else {
+                        format!("{}m ago", m)
+                    }
+                } else if let Some(last_at) = s.last_event_at {
+                    let dur = now.signed_duration_since(last_at);
+                    let secs = dur.num_seconds();
+                    if secs < 60 {
+                        format!("{}s ago", secs)
+                    } else {
+                        format!("{}m ago", dur.num_minutes())
+                    }
+                } else {
+                    "—".to_string()
+                };
+
+                // Idle time for WaitingInput
+                let idle_suffix = if status == LiveSessionDisplayStatus::WaitingInput {
+                    if let Some(last_at) = s.last_event_at {
+                        let idle_secs = now.signed_duration_since(last_at).num_seconds();
+                        format!(" • idle {}s", idle_secs)
+                    } else {
+                        String::new()
+                    }
+                } else {
+                    String::new()
+                };
+
+                // Line 1: icon + project + duration
                 let line1 = format!(
-                    "🟢 PID {} • {} • {} ago{}",
-                    s.pid, cwd_display, duration_str, session_id_display
+                    "{} {} • {}{}{}",
+                    icon, cwd_display, duration_str, idle_suffix, session_id_display
                 );
 
-                // Line 2: Session name (if available)
-                let session_name_line = s.session_name.as_ref().map(|name| {
-                    Line::from(format!("   ├─ 📝 {}", name)).style(Style::default().fg(p.focus))
-                });
+                // Line 2: last event + metrics
+                let metrics_parts: Vec<String> = {
+                    let mut parts = Vec::new();
+                    if let Some(event) = &s.last_event {
+                        parts.push(format!("last: {}", event));
+                    }
+                    if let Some(proc) = &s.process {
+                        let tokens_str = proc.tokens.map_or("?".to_string(), Self::format_short);
+                        parts.push(format!(
+                            "CPU:{:.1}% RAM:{}MB Tok:{}",
+                            proc.cpu_percent, proc.memory_mb, tokens_str
+                        ));
+                    }
+                    parts
+                };
+                let metrics_line = format!("   ├─ {}", metrics_parts.join(" │ "));
 
-                // Line 3: Performance metrics (shortened to fit)
-                let tokens_str = s.tokens.map_or("?".to_string(), Self::format_short);
-                let metrics_line = format!(
-                    "   ├─ CPU:{:>4.1}% RAM:{:>4}MB Tok:{:>5}",
-                    s.cpu_percent, s.memory_mb, tokens_str
-                );
-
-                // Build lines vec conditionally
-                let mut lines = vec![Line::from(line1).style(Style::default().fg(p.success))];
-                if let Some(name_line) = session_name_line {
-                    lines.push(name_line);
+                let mut lines = vec![Line::from(line1).style(Style::default().fg(status_color))];
+                if !metrics_parts.is_empty() {
+                    lines.push(Line::from(metrics_line).style(Style::default().fg(p.muted)));
                 }
-                lines.push(Line::from(metrics_line).style(Style::default().fg(p.muted)));
 
                 ListItem::new(lines)
             })
@@ -1440,84 +1478,138 @@ impl SessionsTab {
         &self,
         frame: &mut Frame,
         area: Rect,
-        live_session: &ccboard_core::LiveSession,
+        live_session: &ccboard_core::MergedLiveSession,
         session_meta: Option<&Arc<SessionMetadata>>,
         p: &Palette,
     ) {
+        use ccboard_core::LiveSessionDisplayStatus;
         use chrono::Local;
+
+        let status = live_session.effective_status();
+        let (status_icon, status_label, status_color) = match status {
+            LiveSessionDisplayStatus::Running => ("●", "Running", p.success),
+            LiveSessionDisplayStatus::WaitingInput => {
+                ("◐", "Waiting for input", ratatui::style::Color::Yellow)
+            }
+            LiveSessionDisplayStatus::Stopped => ("✓", "Stopped", p.muted),
+            LiveSessionDisplayStatus::ProcessOnly => ("🟢", "Running (ps only)", p.success),
+            LiveSessionDisplayStatus::Unknown => ("?", "Unknown", p.muted),
+        };
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(p.success))
+            .border_style(Style::default().fg(status_color))
             .title(Span::styled(
-                " 🟢 Live Session Detail ",
-                Style::default().fg(p.success).bold(),
+                format!(" {} Live Session Detail ", status_icon),
+                Style::default().fg(status_color).bold(),
             ));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
         let now = Local::now();
-        let duration = now.signed_duration_since(live_session.start_time);
-        let hours = duration.num_hours();
-        let minutes = duration.num_minutes() % 60;
-        let duration_str = if hours > 0 {
-            format!("{}h {}m", hours, minutes)
-        } else {
-            format!("{} min", minutes)
-        };
 
         let mut lines = vec![
             Line::from(Span::styled(
-                "PROCESS INFORMATION",
+                "HOOK STATUS",
                 Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
             )),
             Line::from(""),
             Line::from(vec![
-                Span::styled("PID: ", Style::default().fg(p.muted)),
+                Span::styled("Status: ", Style::default().fg(p.muted)),
                 Span::styled(
-                    live_session.pid.to_string(),
-                    Style::default().fg(p.focus).bold(),
+                    format!("{} {}", status_icon, status_label),
+                    Style::default().fg(status_color).bold(),
                 ),
             ]),
-            Line::from(vec![
-                Span::styled("Running: ", Style::default().fg(p.muted)),
-                Span::styled(duration_str, Style::default().fg(p.success)),
-            ]),
-            Line::from(vec![
-                Span::styled("CPU: ", Style::default().fg(p.muted)),
-                Span::styled(
-                    format!("{:.1}%", live_session.cpu_percent),
-                    Style::default().fg(if live_session.cpu_percent > 50.0 {
-                        p.error
-                    } else if live_session.cpu_percent > 20.0 {
-                        p.warning
-                    } else {
-                        p.success
-                    }),
-                ),
-            ]),
-            Line::from(vec![
-                Span::styled("Memory: ", Style::default().fg(p.muted)),
-                Span::styled(
-                    format!("{} MB", live_session.memory_mb),
-                    Style::default().fg(p.focus),
-                ),
-            ]),
-            Line::from(vec![
-                Span::styled("Working Dir: ", Style::default().fg(p.muted)),
-                Span::styled(
-                    live_session
-                        .working_directory
-                        .as_deref()
-                        .unwrap_or("unknown"),
-                    Style::default().fg(p.warning),
-                ),
-            ]),
-            Line::from(""),
         ];
 
-        // Add session metadata if available
+        if let Some(last_event) = &live_session.last_event {
+            lines.push(Line::from(vec![
+                Span::styled("Last event: ", Style::default().fg(p.muted)),
+                Span::styled(last_event, Style::default().fg(p.focus)),
+            ]));
+        }
+
+        if let Some(last_at) = live_session.last_event_at {
+            let idle_secs = now.signed_duration_since(last_at).num_seconds();
+            lines.push(Line::from(vec![
+                Span::styled("Last seen: ", Style::default().fg(p.muted)),
+                Span::styled(format!("{}s ago", idle_secs), Style::default().fg(p.fg)),
+            ]));
+        }
+
+        if let Some(tty) = &live_session.tty {
+            lines.push(Line::from(vec![
+                Span::styled("TTY: ", Style::default().fg(p.muted)),
+                Span::styled(tty, Style::default().fg(p.fg)),
+            ]));
+        }
+
+        lines.push(Line::from(vec![
+            Span::styled("Working Dir: ", Style::default().fg(p.muted)),
+            Span::styled(&live_session.cwd, Style::default().fg(p.warning)),
+        ]));
+
+        lines.push(Line::from(""));
+
+        // Process info (if ps detected it)
+        if let Some(proc) = &live_session.process {
+            let duration = now.signed_duration_since(proc.start_time);
+            let hours = duration.num_hours();
+            let minutes = duration.num_minutes() % 60;
+            let duration_str = if hours > 0 {
+                format!("{}h {}m", hours, minutes)
+            } else {
+                format!("{} min", minutes)
+            };
+
+            lines.extend(vec![
+                Line::from(Span::styled(
+                    "PROCESS INFORMATION",
+                    Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("PID: ", Style::default().fg(p.muted)),
+                    Span::styled(proc.pid.to_string(), Style::default().fg(p.focus).bold()),
+                ]),
+                Line::from(vec![
+                    Span::styled("Running: ", Style::default().fg(p.muted)),
+                    Span::styled(duration_str, Style::default().fg(p.success)),
+                ]),
+                Line::from(vec![
+                    Span::styled("CPU: ", Style::default().fg(p.muted)),
+                    Span::styled(
+                        format!("{:.1}%", proc.cpu_percent),
+                        Style::default().fg(if proc.cpu_percent > 50.0 {
+                            p.error
+                        } else if proc.cpu_percent > 20.0 {
+                            p.warning
+                        } else {
+                            p.success
+                        }),
+                    ),
+                ]),
+                Line::from(vec![
+                    Span::styled("Memory: ", Style::default().fg(p.muted)),
+                    Span::styled(
+                        format!("{} MB", proc.memory_mb),
+                        Style::default().fg(p.focus),
+                    ),
+                ]),
+            ]);
+
+            if let Some(tokens) = proc.tokens {
+                lines.push(Line::from(vec![
+                    Span::styled("Tokens: ", Style::default().fg(p.muted)),
+                    Span::styled(Self::format_tokens(tokens), Style::default().fg(p.focus)),
+                ]));
+            }
+            lines.push(Line::from(""));
+        }
+
+        // Historical session metadata if matched
         if let Some(session) = session_meta {
             let mut session_lines = vec![
                 Line::from(Span::styled(
@@ -1538,7 +1630,6 @@ impl SessionsTab {
                 ]),
             ];
 
-            // Add branch if available
             if let Some(ref branch) = session.branch {
                 session_lines.push(Line::from(vec![
                     Span::styled("Branch: ", Style::default().fg(p.muted)),
@@ -1556,9 +1647,9 @@ impl SessionsTab {
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Tokens: ", Style::default().fg(p.muted)),
+                    Span::styled("Total Tokens: ", Style::default().fg(p.muted)),
                     Span::styled(
-                        Self::format_tokens(live_session.tokens.unwrap_or(session.total_tokens)),
+                        Self::format_tokens(session.total_tokens),
                         Style::default().fg(p.focus),
                     ),
                 ]),
@@ -1585,38 +1676,6 @@ impl SessionsTab {
             ]);
 
             lines.extend(session_lines);
-        } else if let Some(session_name) = &live_session.session_name {
-            lines.extend(vec![
-                Line::from(Span::styled(
-                    "SESSION INFORMATION",
-                    Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
-                )),
-                Line::from(""),
-                Line::from(vec![
-                    Span::styled("Name: ", Style::default().fg(p.muted)),
-                    Span::styled(session_name, Style::default().fg(p.fg)),
-                ]),
-                Line::from(vec![
-                    Span::styled("Tokens: ", Style::default().fg(p.muted)),
-                    Span::styled(
-                        live_session
-                            .tokens
-                            .map(Self::format_short)
-                            .unwrap_or_else(|| "?".to_string()),
-                        Style::default().fg(p.focus),
-                    ),
-                ]),
-                Line::from(""),
-                Line::from(Span::styled(
-                    "(Full session details not available yet)",
-                    Style::default().fg(p.muted).italic(),
-                )),
-            ]);
-        } else {
-            lines.extend(vec![Line::from(Span::styled(
-                "Session metadata not available",
-                Style::default().fg(p.muted).italic(),
-            ))]);
         }
 
         lines.push(Line::from(""));

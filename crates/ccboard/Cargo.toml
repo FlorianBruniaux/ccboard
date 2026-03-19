@@ -44,3 +44,6 @@ comfy-table = "7"
 indicatif = "0.17"
 serde_json.workspace = true
 chrono.workspace = true
+
+# File locking (for hook subcommand — cross-platform)
+fd-lock = "4"

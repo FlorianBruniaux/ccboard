@@ -174,8 +174,8 @@ pub struct App {
     /// Confirmation dialog (for future destructive actions)
     pub confirm_dialog: ConfirmDialog,
 
-    /// Cached live sessions (refreshed every 2s)
-    pub live_sessions_cache: Vec<ccboard_core::LiveSession>,
+    /// Cached live sessions (refreshed every 2s) — merged hook + ps data
+    pub live_sessions_cache: Vec<ccboard_core::MergedLiveSession>,
 
     /// Last time live sessions were refreshed
     pub last_live_refresh: std::time::Instant,
@@ -405,6 +405,13 @@ impl App {
                 DataEvent::LoadCompleted => {
                     self.needs_refresh = true;
                 }
+                DataEvent::LiveSessionStatusChanged => {
+                    // Trigger immediate live session cache refresh on next render
+                    self.needs_refresh = true;
+                    self.last_live_refresh = std::time::Instant::now()
+                        .checked_sub(std::time::Duration::from_secs(10))
+                        .unwrap_or_else(std::time::Instant::now);
+                }
             }
         }
     }
@@ -419,13 +426,13 @@ impl App {
         // Check if 2 seconds have elapsed since last refresh
         let now = std::time::Instant::now();
         if now.duration_since(self.last_live_refresh).as_secs() >= 2 {
-            self.live_sessions_cache = self.store.live_sessions();
+            self.live_sessions_cache = self.store.merged_live_sessions();
             self.last_live_refresh = now;
         }
     }
 
-    /// Get cached live sessions
-    pub fn live_sessions(&self) -> &[ccboard_core::LiveSession] {
+    /// Get cached live sessions (merged hook + ps data)
+    pub fn live_sessions(&self) -> &[ccboard_core::MergedLiveSession] {
         &self.live_sessions_cache
     }
 }

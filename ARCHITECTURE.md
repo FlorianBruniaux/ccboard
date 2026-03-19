@@ -1,7 +1,7 @@
 # ccboard Architecture
 
-**Version**: 0.11.0
-**Last Updated**: 2026-03-05
+**Version**: 0.12.0
+**Last Updated**: 2026-03-14
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
@@ -313,7 +313,7 @@ pub trait Parser {
 
 **Rule**: Parsers NEVER panic, always return `Option<T>`.
 
-### Parser Inventory (11 modules)
+### Parser Inventory (12 modules)
 
 | Module | Input | Strategy | Output |
 |--------|-------|----------|--------|
@@ -327,6 +327,7 @@ pub trait Parser {
 | **TaskParser** | `tasks/*.json` | serde_json | `Vec<Task>` |
 | **InvocationParser** | Scan JSONL | Regex agent/command/skill | `InvocationStats` |
 | **ActivityParser** | `*.jsonl` | Single-pass tool_use extraction | `ActivitySummary` (FileAccess, BashCommand, NetworkCall, Alert) |
+| **DiscoverParser** | JSONL user messages | N-gram (3–6) + Jaccard clustering | `Vec<DiscoverSuggestion>` |
 | **filters** | Message text | Pattern matching | `bool` (is_meaningful) |
 
 ### Settings Merge Logic
@@ -729,6 +730,8 @@ async fn sse_handler(
 - ✅ Quota management integration (v0.8.0)
 - ✅ Activity Security Audit (v0.11.0)
 - ✅ FTS5 full-text search (v0.11.0)
+- ✅ WASM assets embedded via rust-embed, bug #44 resolved (v0.11.1)
+- ✅ `ccboard discover` CLI subcommand (v0.12.0)
 
 **Architecture**: Leptos WASM frontend (port 3333) communicates with Axum backend (port 8080) via REST API + SSE for live updates. Features include config modal, elevation system, responsive design, and budget tracking with quota gauges.
 
@@ -981,7 +984,7 @@ Standardized terminology used across ccboard documentation and codebase:
 
 | Level | Count | Location | Purpose |
 |-------|-------|----------|---------|
-| **Unit** | ~340 | `#[cfg(test)] mod tests` in source files | Parser logic, model validation, formatters |
+| **Unit** | ~346 | `#[cfg(test)] mod tests` in source files | Parser logic, model validation, formatters |
 | **Integration** | ~37 | `tests/` directories | Cross-module, cache + store interactions |
 | **Platform** | CI matrix | GitHub Actions | macOS + Linux + Windows builds |
 | **Manual** | Pre-release | Checklist in CROSS_PLATFORM.md | TUI navigation, Web UI, CLI commands |
@@ -1001,7 +1004,7 @@ Standardized terminology used across ccboard documentation and codebase:
 ### Running Tests
 
 ```bash
-cargo test --all                    # All 377 tests
+cargo test --all                    # All ~383 tests
 cargo test -p ccboard-core          # Core crate only
 RUST_LOG=debug cargo test           # With logging
 cargo test --all-features           # Integration tests (requires ~/.claude)
@@ -1058,6 +1061,6 @@ cargo test --all-features           # Integration tests (requires ~/.claude)
 
 ---
 
-**Document Version**: 1.3
-**Last Updated**: 2026-03-05
+**Document Version**: 1.4
+**Last Updated**: 2026-03-14
 **Maintainer**: Florian Bruniaux

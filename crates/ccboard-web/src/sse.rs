@@ -33,6 +33,9 @@ pub fn create_sse_stream(
                 DataEvent::WatcherError(msg) => {
                     ("watcher_error", format!(r#"{{"message":"{}"}}"#, msg))
                 }
+                DataEvent::LiveSessionStatusChanged => {
+                    ("live_session_status_changed", "{}".to_string())
+                }
             };
 
             Ok(Event::default().event(event_type).data(data))

@@ -22,14 +22,30 @@ pub struct WatcherConfig {
 
     /// Burst detection threshold (events per second)
     pub burst_threshold: u32,
+
+    /// Additional paths to watch (e.g. ~/.ccboard/ for live-sessions.json)
+    pub extra_watch_paths: Vec<PathBuf>,
 }
 
 impl Default for WatcherConfig {
     fn default() -> Self {
+        // Auto-include ~/.ccboard/ for live session monitoring
+        let extra_watch_paths = dirs::home_dir()
+            .map(|h| {
+                let ccboard_dir = h.join(".ccboard");
+                if ccboard_dir.exists() {
+                    vec![ccboard_dir]
+                } else {
+                    vec![]
+                }
+            })
+            .unwrap_or_default();
+
         Self {
             debounce_delay: Duration::from_millis(500),
             max_debounce_delay: Duration::from_secs(3),
             burst_threshold: 10,
+            extra_watch_paths,
         }
     }
 }
@@ -109,6 +125,14 @@ impl FileWatcher {
             }
         }
 
+        // Watch extra paths (e.g. ~/.ccboard/ for live-sessions.json)
+        for extra_path in &config.extra_watch_paths {
+            if extra_path.exists() {
+                let _ = file_watcher.watch_path(extra_path, RecursiveMode::NonRecursive);
+                debug!(path = %extra_path.display(), "Watching extra path for live sessions");
+            }
+        }
+
         info!(claude_home = %claude_home.display(), "File watcher started");
 
         // Spawn event processor
@@ -175,6 +199,15 @@ impl FileWatcher {
             .unwrap_or(false)
         {
             return Some((DataEvent::StatsUpdated, path.clone()));
+        }
+
+        // Live sessions hook file (~/.ccboard/live-sessions.json)
+        if path
+            .file_name()
+            .map(|n| n == "live-sessions.json")
+            .unwrap_or(false)
+        {
+            return Some((DataEvent::LiveSessionStatusChanged, path.clone()));
         }
 
         // Session files
@@ -246,6 +279,12 @@ impl FileWatcher {
             DataEvent::ConfigChanged(_scope) => {
                 // Reload settings
                 store.reload_settings().await;
+            }
+            DataEvent::LiveSessionStatusChanged => {
+                // Reload live session hook state from disk
+                if let Some(p) = path {
+                    store.reload_live_hook_sessions(p).await;
+                }
             }
             _ => {}
         }
@@ -319,6 +358,7 @@ impl DebounceState {
             DataEvent::AnalyticsUpdated => "analytics".to_string(),
             DataEvent::LoadCompleted => "load".to_string(),
             DataEvent::WatcherError(_) => "error".to_string(),
+            DataEvent::LiveSessionStatusChanged => "live_sessions".to_string(),
         }
     }
 }
@@ -333,6 +373,7 @@ mod tests {
             debounce_delay: Duration::from_millis(100),
             max_debounce_delay: Duration::from_millis(500),
             burst_threshold: 5,
+            extra_watch_paths: vec![],
         };
         let mut state = DebounceState::new(config);
 

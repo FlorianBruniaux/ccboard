@@ -2,7 +2,11 @@
 //!
 //! Detects running Claude Code processes on the system and provides metadata
 //! about active sessions (PID, working directory, duration since start).
+//!
+//! Also provides `MergedLiveSession` which combines hook-based status data
+//! (from ~/.ccboard/live-sessions.json) with ps-based process data.
 
+use crate::hook_state::{HookSessionStatus, LiveSessionFile};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local, TimeZone};
 use std::process::Command;
@@ -348,6 +352,207 @@ fn get_session_metadata(working_directory: &Option<String>) -> Option<LiveSessio
         session_id,
         session_name,
     })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Merged live sessions (hook + ps)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Display status computed from hook data and ps-based fallback
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LiveSessionDisplayStatus {
+    /// Hook says Running
+    Running,
+    /// Hook says WaitingInput (permission prompt)
+    WaitingInput,
+    /// Hook says Stopped
+    Stopped,
+    /// No hooks — detected via ps only
+    ProcessOnly,
+    /// Unknown (hooks present but status unclear)
+    Unknown,
+}
+
+impl LiveSessionDisplayStatus {
+    /// Short icon for TUI display
+    pub fn icon(&self) -> &'static str {
+        match self {
+            LiveSessionDisplayStatus::Running => "●",
+            LiveSessionDisplayStatus::WaitingInput => "◐",
+            LiveSessionDisplayStatus::Stopped => "✓",
+            LiveSessionDisplayStatus::ProcessOnly => "🟢",
+            LiveSessionDisplayStatus::Unknown => "?",
+        }
+    }
+}
+
+/// A merged view of hook data + ps-based process data for one Claude session
+#[derive(Debug, Clone)]
+pub struct MergedLiveSession {
+    /// Session ID (from hook data or ps metadata)
+    pub session_id: Option<String>,
+    /// Working directory
+    pub cwd: String,
+    /// TTY device (from hook data)
+    pub tty: Option<String>,
+    /// Status from hook events (None = no hooks for this session)
+    pub hook_status: Option<HookSessionStatus>,
+    /// Underlying ps-detected process (None = hook-only, ps couldn't find it yet)
+    pub process: Option<LiveSession>,
+    /// When the last hook event was received
+    pub last_event_at: Option<DateTime<Local>>,
+    /// Name of the last hook event
+    pub last_event: Option<String>,
+}
+
+impl MergedLiveSession {
+    /// Compute the effective display status
+    pub fn effective_status(&self) -> LiveSessionDisplayStatus {
+        match self.hook_status {
+            Some(HookSessionStatus::Running) => LiveSessionDisplayStatus::Running,
+            Some(HookSessionStatus::WaitingInput) => LiveSessionDisplayStatus::WaitingInput,
+            Some(HookSessionStatus::Stopped) => LiveSessionDisplayStatus::Stopped,
+            Some(HookSessionStatus::Unknown) | None => {
+                if self.process.is_some() {
+                    LiveSessionDisplayStatus::ProcessOnly
+                } else {
+                    LiveSessionDisplayStatus::Unknown
+                }
+            }
+        }
+    }
+
+    /// Project name (basename of cwd)
+    pub fn project_name(&self) -> &str {
+        std::path::Path::new(&self.cwd)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(&self.cwd)
+    }
+}
+
+/// Merge hook file data with ps-based session list.
+///
+/// Priority order:
+/// 1. session_id match (if both have session_id)
+/// 2. TTY match
+/// 3. cwd basename match (fallback)
+///
+/// Sessions present only in ps get `hook_status = None` (ProcessOnly).
+/// Sessions present only in hooks (not yet visible to ps) are included.
+pub fn merge_live_sessions(
+    hook_file: &LiveSessionFile,
+    ps_sessions: &[LiveSession],
+) -> Vec<MergedLiveSession> {
+    let mut result: Vec<MergedLiveSession> = Vec::new();
+    let mut matched_ps: Vec<bool> = vec![false; ps_sessions.len()];
+
+    // For each hook session, try to find a matching ps session
+    for hook_session in hook_file.sessions.values() {
+        let mut matched_ps_idx: Option<usize> = None;
+
+        // Match by session_id
+        if matched_ps_idx.is_none() {
+            for (i, ps) in ps_sessions.iter().enumerate() {
+                if matched_ps[i] {
+                    continue;
+                }
+                if ps
+                    .session_id
+                    .as_deref()
+                    .map(|id| id == hook_session.session_id)
+                    .unwrap_or(false)
+                {
+                    matched_ps_idx = Some(i);
+                    break;
+                }
+            }
+        }
+
+        // Match by TTY (ps TTY column vs hook tty)
+        if matched_ps_idx.is_none() && hook_session.tty != "unknown" {
+            let hook_tty_base = std::path::Path::new(&hook_session.tty)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(&hook_session.tty);
+
+            for (i, ps) in ps_sessions.iter().enumerate() {
+                if matched_ps[i] {
+                    continue;
+                }
+                // ps TTY column is e.g. "ttys001" — hook tty is "/dev/ttys001"
+                let ps_tty = ps
+                    .command
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
+                let _ = ps_tty; // we don't have TTY from ps directly
+
+                // Fallback: match by cwd
+                if ps
+                    .working_directory
+                    .as_deref()
+                    .map(|wd| wd == hook_session.cwd)
+                    .unwrap_or(false)
+                {
+                    matched_ps_idx = Some(i);
+                    break;
+                }
+
+                // Try hook_tty_base against session command
+                if ps.command.contains(hook_tty_base) {
+                    matched_ps_idx = Some(i);
+                    break;
+                }
+            }
+        }
+
+        if let Some(idx) = matched_ps_idx {
+            matched_ps[idx] = true;
+            let ps = &ps_sessions[idx];
+            result.push(MergedLiveSession {
+                session_id: Some(hook_session.session_id.clone()),
+                cwd: hook_session.cwd.clone(),
+                tty: Some(hook_session.tty.clone()),
+                hook_status: Some(hook_session.status),
+                process: Some(ps.clone()),
+                last_event_at: Some(hook_session.updated_at.with_timezone(&Local)),
+                last_event: Some(hook_session.last_event.clone()),
+            });
+        } else {
+            // Hook-only (ps hasn't picked it up or process ended)
+            result.push(MergedLiveSession {
+                session_id: Some(hook_session.session_id.clone()),
+                cwd: hook_session.cwd.clone(),
+                tty: Some(hook_session.tty.clone()),
+                hook_status: Some(hook_session.status),
+                process: None,
+                last_event_at: Some(hook_session.updated_at.with_timezone(&Local)),
+                last_event: Some(hook_session.last_event.clone()),
+            });
+        }
+    }
+
+    // Remaining unmatched ps sessions → ProcessOnly
+    for (i, ps) in ps_sessions.iter().enumerate() {
+        if !matched_ps[i] {
+            result.push(MergedLiveSession {
+                session_id: ps.session_id.clone(),
+                cwd: ps
+                    .working_directory
+                    .clone()
+                    .unwrap_or_else(|| "unknown".to_string()),
+                tty: None,
+                hook_status: None,
+                process: Some(ps.clone()),
+                last_event_at: None,
+                last_event: None,
+            });
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]

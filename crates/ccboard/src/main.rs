@@ -1,6 +1,8 @@
 //! ccboard - Unified Claude Code Management Dashboard
 
 mod cli;
+mod hook;
+mod setup;
 
 use anyhow::{Context, Result};
 use ccboard_core::DataStore;
@@ -143,6 +145,17 @@ enum Mode {
     Pricing {
         #[command(subcommand)]
         command: PricingCommand,
+    },
+    /// Handle a Claude Code hook event (called by Claude Code hooks)
+    Hook {
+        /// Hook event name (PreToolUse, PostToolUse, UserPromptSubmit, Notification, Stop)
+        event: String,
+    },
+    /// Inject ccboard hooks into Claude Code settings.json
+    Setup {
+        /// Show what would be changed without writing files
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Analyze session history to suggest skills, commands, and CLAUDE.md rules
     Discover {
@@ -316,6 +329,13 @@ async fn main() -> Result<()> {
                 run_pricing_clear(no_color).await?;
             }
         },
+        Mode::Hook { event } => {
+            // Sync dispatch — no tokio overhead for this fast path (<20ms)
+            tokio::task::block_in_place(|| hook::run_hook(event))?;
+        }
+        Mode::Setup { dry_run } => {
+            setup::run_setup(dry_run, claude_home).await?;
+        }
         Mode::Discover {
             since,
             min_count,

@@ -1,7 +1,7 @@
 # ccboard Roadmap
 
-**Last Updated**: 2026-03-05
-**Current Version**: v0.11.0
+**Last Updated**: 2026-03-14
+**Current Version**: v0.12.0
 **Target**: v1.0.0 (Phases K-L complete)
 
 ---
@@ -18,7 +18,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-## 📍 Current Status (v0.11.0)
+## 📍 Current Status (v0.12.0)
 
 ### ✅ Production Features
 
@@ -31,7 +31,14 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 **Performance**:
 - 89x faster startup (SQLite cache: 20s → 33ms)
 - 50x memory reduction (Arc migration: 1.4GB → 28MB)
-- 377 tests passing, 0 clippy warnings
+- ~383 tests passing, 0 clippy warnings
+
+**`ccboard discover`** (v0.12.0):
+- Analyzes session history to suggest CLAUDE.md rules, skills, or commands
+- N-gram extraction (3–6 grams) with stop-word filtering and Jaccard clustering
+- `--llm` mode: calls `claude --print` for semantic analysis
+- `--since`, `--min-count`, `--top`, `--all`, `--json` flags
+- Cross-project pattern detection with 1.5× score bonus
 
 **Export Features** (v0.10.0):
 - `ccboard export sessions/stats/billing --format csv|json|md`
@@ -52,7 +59,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ### 🐛 Known Issues
 
-- **#44** — Web UI non-functional after `cargo install` (WASM assets not bundled in binary)
+None critical. Bug #44 (Web UI non-functional after `cargo install`) resolved in v0.11.1 via `rust-embed`.
 
 ---
 
@@ -71,28 +78,38 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-### ✅ Phase K-Activity: Activity Security Audit + Search (v0.11.0) - **DONE**
+### ✅ Phase K-Activity + Fixes: v0.11.0 → v0.11.2 - **DONE**
 
 **Priority**: 🔴 HIGH
-**Status**: ✅ Released 2026-03-05
+**Status**: ✅ Released
 
 **Delivered**:
-- Activity tab (TUI) + `/activity` page (Web): per-session security audit
-- `parse_tool_calls()` + `classify_tool_calls()` — single-pass JSONL streaming engine
-- 6 alert rules: CredentialAccess, DestructiveCommand, ForcePush, ExternalExfil, ScopeViolation
-- Violations feed: cross-session, sorted Critical → Warning → Info, with remediation hints
-- Batch scan: `Arc<Semaphore>` 4 permits, live counter, SQLite persistence
-- Search tab (TUI) + `/search` page (Web): FTS5 full-text search with ranked snippets
-- SQLite activity tables: `activity_cache` + `activity_alerts` (cache v5)
-- 29 new unit tests in `parsers/activity.rs`, 1 in `models/activity.rs`
+- v0.11.0 (2026-03-05): Activity tab (TUI + Web), FTS5 Search tab, SQLite cache v5, 30 new tests
+- v0.11.1 (2026-03-06): Bug #44 fixed — WASM assets embedded via `rust-embed` (binary self-contained)
+- v0.11.2 (2026-03-09): Homebrew build from source fix via `build.rs` fallback for missing `dist/`
 
 ---
 
-### Phase K-Analytics: Advanced Analytics (v0.12.0) - **NEXT**
+### ✅ Phase Discover: `ccboard discover` (v0.12.0) - **DONE**
+
+**Priority**: 🟡 MEDIUM
+**Status**: ✅ Released 2026-03-13
+
+**Delivered**:
+- `ccboard discover` — CLI subcommand for config optimization suggestions from session history
+- N-gram extraction (3–6 grams) with stop-word filtering, subsumption deduplication, Jaccard clustering
+- Category assignment: >20% sessions → CLAUDE.md rule, ≥5% → skill, else → command
+- Cross-project pattern detection with 1.5× score bonus
+- `--llm` mode via `claude --print` subprocess for semantic analysis
+- 6 new unit tests
+
+---
+
+### Phase K-Analytics: Advanced Analytics (v0.13.0) - **NEXT**
 
 **Priority**: 🟡 MEDIUM
 **Duration**: 10-12h
-**Status**: 📋 Backlog
+**Status**: 📋 Backlog (v0.13.0)
 
 **Goal**: AI-powered insights, anomaly detection, and usage pattern analysis.
 
@@ -109,7 +126,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-### Phase L: Plugin System (v0.12.0)
+### Phase L: Plugin System (v0.13.5)
 
 **Priority**: 🟢 LOW
 **Duration**: 12-15h
@@ -132,7 +149,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-### Phase M: Conversation Viewer Enhancements (v0.12.5)
+### Phase M: Conversation Viewer Enhancements (v0.13.5)
 
 **Priority**: 🟡 MEDIUM
 **Duration**: 8-10h
@@ -151,7 +168,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-### Phase N: Plan-Aware Completion (v0.13.0)
+### Phase N: Plan-Aware Completion (v0.14.0)
 
 **Priority**: 🟢 LOW
 **Duration**: 10-14h
@@ -235,8 +252,10 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 |-------|----------|----------|---------|-------|---------------|--------|
 | **J** | 🔴 HIGH | 6-8h | v0.10.0 | Export features | — | ✅ Done |
 | **K-Activity** | 🔴 HIGH | 8-10h | v0.11.0 | Activity security audit + Search | — | ✅ Done |
-| **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.12.0 | Advanced analytics | #14-21 | ⏳ Next |
-| **L** | 🟢 LOW | 12-15h | v0.13.0 | Plugin system | — | 📋 Backlog |
+| **K-Fixes** | — | — | v0.11.1/0.11.2 | Bug #44 (WASM embed) + Homebrew fix | #44 | ✅ Done |
+| **Discover** | 🟡 MEDIUM | 4-6h | v0.12.0 | `ccboard discover` config optimizer | — | ✅ Done |
+| **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.13.0 | Advanced analytics | #14-21 | ⏳ Next |
+| **L** | 🟢 LOW | 12-15h | v0.13.5 | Plugin system | — | 📋 Backlog |
 | **M** | 🟡 MEDIUM | 8-10h | v0.13.5 | Conversation enhancements | #3, #7, #8 | 📋 Backlog |
 | **N** | 🟢 LOW | 10-14h | v0.14.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
@@ -275,6 +294,6 @@ Interested in implementing a roadmap phase? See:
 
 ---
 
-**Last Updated**: 2026-03-05
+**Last Updated**: 2026-03-14
 **Maintainer**: @FlorianBruniaux
 **Repository**: https://github.com/FlorianBruniaux/ccboard

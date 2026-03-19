@@ -112,6 +112,9 @@ pub struct DataStore {
 
     /// In-memory activity analysis results (populated by analyze_session)
     activity_results: DashMap<String, ActivitySummary>,
+
+    /// Hook-based live session state (loaded from ~/.ccboard/live-sessions.json)
+    live_hook_sessions: RwLock<crate::hook_state::LiveSessionFile>,
 }
 
 /// Project leaderboard entry with aggregated metrics
@@ -168,6 +171,7 @@ impl DataStore {
             degraded_state: RwLock::new(DegradedState::Healthy),
             metadata_cache,
             activity_results: DashMap::new(),
+            live_hook_sessions: RwLock::new(crate::hook_state::LiveSessionFile::default()),
         }
     }
 
@@ -429,12 +433,34 @@ impl DataStore {
         Some(crate::quota::calculate_quota_status(&stats, budget))
     }
 
-    /// Get live Claude Code sessions (running processes)
+    /// Get live Claude Code sessions (running processes, ps-based)
     ///
     /// Detects active Claude processes on the system and returns metadata.
     /// Returns empty vector if detection fails or no processes are running.
     pub fn live_sessions(&self) -> Vec<crate::live_monitor::LiveSession> {
         crate::live_monitor::detect_live_sessions().unwrap_or_default()
+    }
+
+    /// Get merged live sessions: hook data + ps-based fallback
+    ///
+    /// Hook sessions are prioritized; unmatched ps sessions appear as ProcessOnly.
+    pub fn merged_live_sessions(&self) -> Vec<crate::live_monitor::MergedLiveSession> {
+        let hook_file = self.live_hook_sessions.read().clone();
+        let ps_sessions = crate::live_monitor::detect_live_sessions().unwrap_or_default();
+        crate::live_monitor::merge_live_sessions(&hook_file, &ps_sessions)
+    }
+
+    /// Reload hook-based live session state from a file path
+    pub async fn reload_live_hook_sessions(&self, path: &std::path::Path) {
+        match crate::hook_state::LiveSessionFile::load(path) {
+            Ok(file) => {
+                *self.live_hook_sessions.write() = file;
+                debug!("Reloaded live hook sessions from {}", path.display());
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to reload live-sessions.json");
+            }
+        }
     }
 
     /// Get session count

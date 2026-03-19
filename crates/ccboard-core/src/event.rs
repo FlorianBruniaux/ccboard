@@ -22,6 +22,8 @@ pub enum DataEvent {
     LoadCompleted,
     /// Watcher encountered an error
     WatcherError(String),
+    /// Hook-based live session status changed (live-sessions.json updated)
+    LiveSessionStatusChanged,
 }
 
 /// Scope of configuration change
