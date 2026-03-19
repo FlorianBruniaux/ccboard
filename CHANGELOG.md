@@ -5,6 +5,63 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-03-19
+
+### Added — Phase Hook-Monitor: Live Session Monitoring
+
+#### `ccboard hook` subcommand
+
+- **`ccboard hook <EventName>`** — reads Claude Code hook JSON from stdin, updates `~/.ccboard/live-sessions.json` with fd-lock file locking and atomic save (`.tmp` + rename). Called by Claude Code hook events: `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Notification`, `Stop`.
+- **`HookSessionStatus` enum**: `Running`, `WaitingInput`, `Stopped`, `Unknown` — state machine driven by event type:
+  - `PreToolUse` / `PostToolUse` / `UserPromptSubmit` → `Running`
+  - `Notification` with `permission_prompt` reason → `WaitingInput`
+  - `Stop` → `Stopped`
+  - `UserPromptSubmit` on a previously `Stopped` session → revival back to `Running`
+- **Pruning**: stopped sessions older than 30 minutes are removed on each hook invocation.
+- **macOS notifications**: non-blocking `osascript` spawn on `Stop` events, project name sanitized against AppleScript injection.
+- **File watcher**: auto-watches `~/.ccboard/` directory, fires `DataEvent::LiveSessionStatusChanged` on changes to trigger TUI redraw.
+
+#### `ccboard setup` subcommand
+
+- Injects 5 hooks into `~/.claude/settings.json` idempotently: `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Notification`, `Stop`.
+- Backup written before any write, atomic save via `.tmp` + rename.
+- `--dry-run` flag prints planned changes without modifying files.
+- Warning printed when running from a Cargo build directory.
+
+#### TUI Sessions tab — live session display
+
+- **`MergedLiveSession`**: hook data and `ps`-based process data merged by session_id → TTY → cwd fallback.
+- **`LiveSessionDisplayStatus`** with colored icons: `Running ●`, `WaitingInput ◐`, `Stopped ✓`, `ProcessOnly 🟢`, `Unknown ?`.
+- Session list shows idle time for `WaitingInput` sessions and a detail view with status, TTY, and last event.
+
+#### SessionType detection
+
+- **`SessionType` enum**: `Cli`, `VsCode` (stream-json + stdio), `Subagent` (stream-json only) — detected from Claude Code CLI flags.
+- `LiveSession` gains `session_type`, `model` (from `--model`), and `resume_id` (from `--resume`).
+- Displayed as `IDE` / `Agent` labels in the session list and detail view.
+
+#### `~/.claude.json` parser (`ClaudeGlobalStats`)
+
+- Parses `~/.claude.json` `projects[].lastModelUsage` fields: `costUSD`, `inputTokens`, `outputTokens`, cache tokens.
+- **`ClaudeGlobalStats`**: projects sorted by cost descending, `total_last_cost` aggregate across all projects.
+- `DataStore` gains `claude_global_stats()` accessor, populated at startup.
+- **Costs tab — "6. Per Project" view**: table with last session cost per project, color-coded by magnitude, with model breakdown.
+
+### Fixed — Security & Correctness
+
+- **AppleScript injection**: project name fully escaped before being passed to `osascript`.
+- **ps filter**: `is_claude_process_line()` now checks the COMMAND basename exactly, rejecting `claude-desktop`, shell scripts, and `grep` itself.
+- Dead code removed from ps TTY block.
+- `dirs::home_dir()` used consistently — `std::env::var("HOME")` was previously used in some paths.
+- `eprintln!` warning on JSON corruption in `live-sessions.json` (was: silent reset).
+- 10 new tests for `is_claude_process_line` and `parse_claude_flags`.
+
+### Tests
+
+- **419 tests passing** (was 405, +14).
+
+---
+
 ## [0.13.0] - 2026-03-15
 
 ### Added — Phase K: Tool Cost Analytics

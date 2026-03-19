@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-377_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-419_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
   <img src="https://img.shields.io/badge/Clippy-0_warnings-success?style=for-the-badge&logo=rust" alt="Clippy"/>
   <img src="https://img.shields.io/badge/Binary-5.8MB-blue?style=for-the-badge" alt="Binary Size"/>
   <img src="https://img.shields.io/badge/Cache_Speedup-89x-orange?style=for-the-badge&logo=sqlite" alt="Speedup"/>
@@ -36,11 +36,11 @@
 | Tab | Key | Description | Highlights |
 |-----|-----|-------------|------------|
 | **Dashboard** | `1` | Overview stats, model usage, 7-day activity | API usage estimation, plan-based budgets, MCP server count |
-| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live Claude processes (CPU/RAM/Tokens), search, detail view |
+| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓/🟢), session type (CLI/IDE/Agent), hook-based real-time status, CPU/RAM/Tokens, search, detail view |
 | **Config** | `3` | Cascading configuration editor | 4-column diff (default/global/project/local), edit with `e` |
 | **Hooks** | `4` | Event-based hook management | Bash syntax highlighting, test mode, badge indicators |
 | **Agents** | `5` | Agents, commands, and skills browser | Frontmatter YAML parsing, invocation stats |
-| **Costs** | `6` | Token analytics (4 sub-views) | Overview, By Model, Daily chart, Billing Blocks (5h windows) |
+| **Costs** | `6` | Token analytics (6 sub-views incl. Per Project (~/.claude.json)) | Overview, By Model, Daily chart, Billing Blocks (5h windows), Per Project |
 | **History** | `7` | Full-text search across sessions | Temporal patterns, CSV/JSON export |
 | **MCP** | `8` | MCP server management | Status detection (running/stopped), env vars masking |
 | **Analytics** | `9` | Advanced analytics (4 sub-views) | Budget tracking, 30-day forecast, heatmap, insights |
@@ -56,8 +56,13 @@
 | **UX** | Command palette (`:`), vim keybindings (hjkl), breadcrumbs, scrollbar indicators, Light/Dark mode (`Ctrl+T`, persistent) |
 | **File Operations** | Edit with `$EDITOR` (`e`), reveal in file manager (`o`), cross-platform |
 | **Zero Config** | Works out of the box with `~/.claude`, single 5.8MB binary, macOS/Linux/Windows |
+| **Hook Integration** | `ccboard setup` injects Claude Code hooks, live session status (Running/WaitingInput/Stopped), macOS notification on stop |
 
 > Missing a feature? [Request it here](https://github.com/FlorianBruniaux/ccboard/issues/new?template=feature_request.yml) | Found a bug? [Report it](https://github.com/FlorianBruniaux/ccboard/issues/new?template=bug_report.yml)
+
+### Hook-Based Live Monitoring
+
+Run `ccboard setup` once to inject hooks into `~/.claude/settings.json`. After that, ccboard tracks every Claude session in real time — which session is running, which is waiting for your permission, which just finished — visible in the Sessions tab with ●/◐/✓ indicators and macOS notifications.
 
 ---
 

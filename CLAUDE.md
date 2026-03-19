@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ccboard** is a unified dashboard for Claude Code management, providing both TUI and web interfaces from a single binary to visualize sessions, stats, configuration, hooks, agents, costs, and history from `~/.claude` directories.
 
-**Stack**: Rust workspace with 4 crates, Ratatui (9-tab TUI), Axum (Web API backend), Leptos (WASM frontend), Arc + parking_lot for concurrency.
+**Stack**: Rust workspace with 4 crates, Ratatui (11-tab TUI), Axum (Web API backend), Leptos (WASM frontend), Arc + parking_lot for concurrency.
 
 ## Workspace Architecture
 
@@ -15,7 +15,7 @@ This is a Cargo workspace with a layered architecture:
 ```
 ccboard/                     # Root binary - CLI entry point
 ├─ ccboard-core/             # Shared data layer (parsers, models, store, watcher)
-├─ ccboard-tui/              # Ratatui frontend (9 tabs)
+├─ ccboard-tui/              # Ratatui frontend (11 tabs)
 └─ ccboard-web/              # Axum API backend + Leptos WASM frontend
 ```
 
@@ -193,12 +193,12 @@ ccboard reads from `~/.claude` and optional project `.claude/`:
 
 Located in `ccboard-tui/src/`:
 
-- **9 tabs**: Dashboard, Sessions, Config, Hooks, Agents/Capabilities, Costs, History, MCP, Analytics
+- **11 tabs**: Dashboard, Sessions, Config, Hooks, Agents/Capabilities, Costs, History, MCP, Analytics, Activity, Search
 - **Key bindings**: `Tab`/`Shift+Tab` (nav tabs), `j/k` (nav lists), `Enter` (detail), `/` (search), `r` (refresh), `q` (quit), `1-9` (jump tabs)
 - **Event loop**: Crossterm events + DataStore EventBus subscriptions
 - **Widgets**: Sparkline, BarChart, Tree, List, Popup, Table (Ratatui components)
 
-**Current implementation status**: All 9 tabs fully functional (v0.5.0).
+**Current implementation status**: All 11 tabs fully functional.
 
 ## Web Structure (Axum API + Leptos Frontend)
 
@@ -249,14 +249,16 @@ Follow Rust-specific error handling rules from RULES.md:
 - ✅ **Phase G (Leptos Frontend)**: Web UI with 100% TUI parity (9 pages)
 - ✅ **Phase F (Conversation Viewer)**: Full JSONL content display with syntax highlighting, full-text search
 - ✅ **Budget Tracking (v0.8.0)**: MTD cost calculation, monthly projection, 4-level alerts, quota gauges
+- ✅ **Phase K (Tool Cost Analytics)**: Per-tool token tracking, tool chain analysis, cost suggestions engine (v0.13.0)
+- ✅ **Phase Hook-Monitor (Live Session Monitoring)**: hook-based status (Running/WaitingInput/Stopped), ccboard setup, MergedLiveSession, SessionType, ~/.claude.json parser (v0.14.0)
 
 **Next Phase**:
-- 🎯 **Phase J (Export Features)**: Export sessions/stats/billing to CSV/JSON/Markdown
+- 🎯 **Phase K-Analytics (Advanced Analytics)**: Anomaly detection, usage patterns, model recommendations (v0.15.0)
 
 **Future Phases**:
-- **Phase K (Advanced Analytics)**: Anomaly detection, usage patterns, model recommendations
 - **Phase L (Plugin System)**: Extensible architecture for community plugins
 - **Phase H (Plan-Aware)**: PLAN.md parsing, task completion tracking
+- **Phase M (Conversation Viewer Enhancements)**: Tool call visualization, message threading, regex search
 
 ## Important Constraints
 

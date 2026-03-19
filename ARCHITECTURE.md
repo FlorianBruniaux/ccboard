@@ -1,7 +1,7 @@
 # ccboard Architecture
 
-**Version**: 0.12.0
-**Last Updated**: 2026-03-14
+**Version**: 0.14.0
+**Last Updated**: 2026-03-19
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
@@ -54,6 +54,8 @@ ccboard is a Rust workspace with 4 crates providing dual TUI + Web interfaces fo
               │ • Cache         │
               │ • Analytics     │
               │ • Export        │
+              │ • hook_state    │
+              │ • hook_event    │
               └─────────────────┘
 ```
 
@@ -329,6 +331,8 @@ pub trait Parser {
 | **ActivityParser** | `*.jsonl` | Single-pass tool_use extraction | `ActivitySummary` (FileAccess, BashCommand, NetworkCall, Alert) |
 | **DiscoverParser** | JSONL user messages | N-gram (3–6) + Jaccard clustering | `Vec<DiscoverSuggestion>` |
 | **filters** | Message text | Pattern matching | `bool` (is_meaningful) |
+| **LiveSessionFile** | `~/.ccboard/live-sessions.json` | fd-lock + atomic write | `Vec<LiveSession>` |
+| **ClaudeGlobalStats** | `~/.claude.json` | serde_json | `GlobalStats` (per-project costs) |
 
 ### Settings Merge Logic
 
@@ -584,6 +588,45 @@ loop {
         }
     }
 }
+```
+
+---
+
+## Hook System
+
+### Overview
+
+Claude Code fires lifecycle hooks that `ccboard hook <EventName>` handles via stdin JSON in under 20ms:
+
+```
+Claude Code hook fires
+    │
+    ▼
+ccboard hook <EventName>   ← stdin JSON payload, <20ms target
+    │
+    ├─> fd-lock on ~/.ccboard/live-sessions.json
+    ├─> load → upsert session status → prune stale entries
+    ├─> atomic save (write tmp + rename)
+    └─> macOS notify (osascript) on Stop event
+```
+
+### Status Machine
+
+| Hook Event | Resulting Status |
+|-----------|-----------------|
+| `PreToolUse` / `PostToolUse` / `UserPromptSubmit` | `Running` |
+| `Notification` (permission_prompt) | `WaitingInput` |
+| `Stop` | `Stopped` |
+
+### Integration with DataStore
+
+The file watcher auto-watches `~/.ccboard/` alongside `~/.claude/`. When `live-sessions.json` changes, the watcher fires `DataEvent::LiveSessionStatusChanged`, which triggers a TUI redraw of the Sessions tab. `MergedLiveSession` combines hook status data with `ps` process info for the full live view.
+
+### Setup
+
+```bash
+ccboard setup           # Inject hooks into ~/.claude/settings.json (idempotent)
+ccboard setup --dry-run # Preview changes without writing
 ```
 
 ---
@@ -1061,6 +1104,6 @@ cargo test --all-features           # Integration tests (requires ~/.claude)
 
 ---
 
-**Document Version**: 1.4
-**Last Updated**: 2026-03-14
+**Document Version**: 1.5
+**Last Updated**: 2026-03-19
 **Maintainer**: Florian Bruniaux

@@ -1,7 +1,7 @@
 # ccboard Roadmap
 
-**Last Updated**: 2026-03-14
-**Current Version**: v0.12.0
+**Last Updated**: 2026-03-19
+**Current Version**: v0.14.0
 **Target**: v1.0.0 (Phases K-L complete)
 
 ---
@@ -18,20 +18,27 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-## 📍 Current Status (v0.12.0)
+## 📍 Current Status (v0.14.0)
 
 ### ✅ Production Features
 
 **TUI + Web UI** (11 tabs, 100% parity):
-- Dashboard, Sessions (live monitoring), Config, Hooks, Agents
-- Costs (4 views + quota), History (search + export), MCP, Analytics
+- Dashboard, Sessions (live monitoring with hook-based status), Config, Hooks, Agents
+- Costs (5 views + quota + per-project last session cost), History (search + export), MCP, Analytics
 - **Activity** — security audit, violations feed, on-demand session analysis, batch scan (4 concurrent)
 - **Search** — FTS5 full-text search across all sessions with ranked snippets
+
+**Live Session Monitoring** (v0.14.0):
+- `ccboard hook <EventName>` ingests Claude Code hook JSON, updates `~/.ccboard/live-sessions.json` with file locking + atomic save
+- `ccboard setup` injects 5 hooks into `~/.claude/settings.json` idempotently (`--dry-run` supported)
+- `SessionType` detection (Cli / VsCode / Subagent) from Claude CLI flags
+- `~/.claude.json` parser for per-project last session cost (Costs tab "Per Project" view)
+- macOS osascript notifications on session stop
 
 **Performance**:
 - 89x faster startup (SQLite cache: 20s → 33ms)
 - 50x memory reduction (Arc migration: 1.4GB → 28MB)
-- ~383 tests passing, 0 clippy warnings
+- 419 tests passing, 0 clippy warnings
 
 **`ccboard discover`** (v0.12.0):
 - Analyzes session history to suggest CLAUDE.md rules, skills, or commands
@@ -105,11 +112,29 @@ None critical. Bug #44 (Web UI non-functional after `cargo install`) resolved in
 
 ---
 
-### Phase K-Analytics: Advanced Analytics (v0.13.0) - **NEXT**
+### ✅ Phase Hook-Monitor: Live Session Monitoring (v0.14.0) - **DONE**
+
+**Priority**: 🔴 HIGH
+**Status**: ✅ Released 2026-03-19
+
+**Delivered**:
+- `ccboard hook <EventName>` — Claude Code hook receiver, updates `~/.ccboard/live-sessions.json` with fd-lock + atomic save
+- `ccboard setup` — idempotent hook injection into `~/.claude/settings.json`, `--dry-run` support
+- `HookSessionStatus` state machine: Running / WaitingInput / Stopped / Unknown, with 30-min prune for stale stopped sessions
+- `SessionType` detection (Cli / VsCode / Subagent) from Claude CLI flags
+- `MergedLiveSession` display in TUI Sessions tab with colored status icons and idle time
+- `~/.claude.json` parser (`ClaudeGlobalStats`) + Costs tab "Per Project" view
+- File watcher for `~/.ccboard/` firing `DataEvent::LiveSessionStatusChanged` for live TUI redraw
+- macOS `osascript` notification on Stop (non-blocking, injection-safe)
+- 10 new tests for `is_claude_process_line` and `parse_claude_flags` — 419 total
+
+---
+
+### Phase K-Analytics: Advanced Analytics (v0.15.0) - **NEXT**
 
 **Priority**: 🟡 MEDIUM
 **Duration**: 10-12h
-**Status**: 📋 Backlog (v0.13.0)
+**Status**: 📋 Backlog (v0.15.0)
 
 **Goal**: AI-powered insights, anomaly detection, and usage pattern analysis.
 
@@ -254,10 +279,12 @@ None critical. Bug #44 (Web UI non-functional after `cargo install`) resolved in
 | **K-Activity** | 🔴 HIGH | 8-10h | v0.11.0 | Activity security audit + Search | — | ✅ Done |
 | **K-Fixes** | — | — | v0.11.1/0.11.2 | Bug #44 (WASM embed) + Homebrew fix | #44 | ✅ Done |
 | **Discover** | 🟡 MEDIUM | 4-6h | v0.12.0 | `ccboard discover` config optimizer | — | ✅ Done |
-| **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.13.0 | Advanced analytics | #14-21 | ⏳ Next |
-| **L** | 🟢 LOW | 12-15h | v0.13.5 | Plugin system | — | 📋 Backlog |
-| **M** | 🟡 MEDIUM | 8-10h | v0.13.5 | Conversation enhancements | #3, #7, #8 | 📋 Backlog |
-| **N** | 🟢 LOW | 10-14h | v0.14.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
+| **K-Analytics (Tool Cost)** | 🟡 MEDIUM | — | v0.13.0 | Tool token analytics, optimization suggestions | — | ✅ Done |
+| **Hook-Monitor** | 🔴 HIGH | — | v0.14.0 | Live session monitoring, hook receiver, setup | — | ✅ Done |
+| **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.15.0 | Advanced analytics (anomaly, forecasts) | #14-21 | ⏳ Next |
+| **L** | 🟢 LOW | 12-15h | v0.15.5 | Plugin system | — | 📋 Backlog |
+| **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | 📋 Backlog |
+| **N** | 🟢 LOW | 10-14h | v0.16.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
 **Total Estimated**: 46-59h for v1.0.0 completion
 
@@ -294,6 +321,6 @@ Interested in implementing a roadmap phase? See:
 
 ---
 
-**Last Updated**: 2026-03-14
+**Last Updated**: 2026-03-19
 **Maintainer**: @FlorianBruniaux
 **Repository**: https://github.com/FlorianBruniaux/ccboard
