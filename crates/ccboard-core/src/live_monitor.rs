@@ -11,6 +11,70 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Local, TimeZone};
 use std::process::Command;
 
+/// Type of Claude Code session, detected from CLI flags
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum SessionType {
+    /// Standard `claude` CLI invocation
+    #[default]
+    Cli,
+    /// IDE integration (--output-format stream-json + --permission-prompt-tool stdio)
+    VsCode,
+    /// Sub-agent (--output-format stream-json, no --permission-prompt-tool)
+    Subagent,
+}
+
+impl SessionType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            SessionType::Cli => "CLI",
+            SessionType::VsCode => "IDE",
+            SessionType::Subagent => "Agent",
+        }
+    }
+}
+
+/// Parsed CLI flags from the claude command line
+struct ParsedFlags {
+    session_type: SessionType,
+    model: Option<String>,
+    resume_id: Option<String>,
+}
+
+/// Extract the value following a flag from a command string.
+/// E.g. `extract_flag_value("claude --model opus-4", "--model")` → `Some("opus-4")`
+fn extract_flag_value(command: &str, flag: &str) -> Option<String> {
+    let tokens: Vec<&str> = command.split_whitespace().collect();
+    for i in 0..tokens.len().saturating_sub(1) {
+        if tokens[i] == flag {
+            return Some(tokens[i + 1].to_string());
+        }
+    }
+    None
+}
+
+/// Parse CLI flags from a claude command string to determine session type and metadata.
+fn parse_claude_flags(command: &str) -> ParsedFlags {
+    let has_stream_json = command.contains("stream-json");
+    let has_stdio_tool = command.contains("permission-prompt-tool") && command.contains("stdio");
+
+    let session_type = if has_stream_json && has_stdio_tool {
+        SessionType::VsCode
+    } else if has_stream_json {
+        SessionType::Subagent
+    } else {
+        SessionType::Cli
+    };
+
+    let model = extract_flag_value(command, "--model");
+    let resume_id = extract_flag_value(command, "--resume");
+
+    ParsedFlags {
+        session_type,
+        model,
+        resume_id,
+    }
+}
+
 /// Represents a live Claude Code session (running process)
 #[derive(Debug, Clone)]
 pub struct LiveSession {
@@ -32,6 +96,12 @@ pub struct LiveSession {
     pub session_id: Option<String>,
     /// Session name/title (from session_start event)
     pub session_name: Option<String>,
+    /// Type of session (CLI / IDE / Agent), detected from CLI flags
+    pub session_type: SessionType,
+    /// Model in use (from --model flag, if present)
+    pub model: Option<String>,
+    /// Resume session ID (from --resume flag, may differ from session_id)
+    pub resume_id: Option<String>,
 }
 
 /// Detect all running Claude Code processes on the system
@@ -96,6 +166,9 @@ fn parse_ps_line(line: &str) -> Option<LiveSession> {
     let start_str = parts[8]; // START column (HH:MM or MMM DD)
     let command = parts[10..].join(" ");
 
+    // Parse CLI flags (session type, model, resume ID)
+    let flags = parse_claude_flags(&command);
+
     // Parse start time (best effort - format varies by OS and process age)
     let start_time = parse_start_time(start_str).unwrap_or_else(Local::now);
 
@@ -117,6 +190,9 @@ fn parse_ps_line(line: &str) -> Option<LiveSession> {
         session_name: session_metadata
             .as_ref()
             .and_then(|m| m.session_name.clone()),
+        session_type: flags.session_type,
+        model: flags.model,
+        resume_id: flags.resume_id,
     })
 }
 
@@ -231,6 +307,9 @@ fn parse_tasklist_csv(line: &str) -> Option<LiveSession> {
         tokens: None,
         session_id: None,
         session_name: None,
+        session_type: SessionType::Cli,
+        model: None,
+        resume_id: None,
     })
 }
 

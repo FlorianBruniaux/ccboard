@@ -125,10 +125,10 @@ impl CostsTab {
 
         match key {
             KeyCode::Tab | KeyCode::Right | KeyCode::Char('l') => {
-                self.view_mode = (self.view_mode + 1) % 5;
+                self.view_mode = (self.view_mode + 1) % 6;
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                self.view_mode = (self.view_mode + 4) % 5; // +4 instead of -1 for wrapping
+                self.view_mode = (self.view_mode + 5) % 6;
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 let current = self.model_state.selected().unwrap_or(0);
@@ -177,6 +177,7 @@ impl CostsTab {
             2 => self.render_daily(frame, chunks[1], stats, &p),
             3 => self.render_billing_blocks(frame, chunks[1], billing_blocks, &p),
             4 => self.render_leaderboard(frame, chunks[1], store, &p),
+            5 => self.render_per_project(frame, chunks[1], store, &p),
             _ => {}
         }
     }
@@ -188,6 +189,7 @@ impl CostsTab {
             "3. Daily",
             "4. Billing Blocks",
             "5. Leaderboard",
+            "6. Per Project",
         ];
 
         let block = Block::default()
@@ -199,7 +201,7 @@ impl CostsTab {
 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Ratio(1, 5); 5])
+            .constraints(vec![Constraint::Ratio(1, 6); 6])
             .split(inner);
 
         for (i, (tab, chunk)) in tabs.iter().zip(chunks.iter()).enumerate() {
@@ -1202,5 +1204,138 @@ impl CostsTab {
         .column_spacing(1);
 
         frame.render_widget(table, inner);
+    }
+
+    fn render_per_project(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        store: Option<&ccboard_core::store::DataStore>,
+        p: &Palette,
+    ) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(p.border))
+            .title(Span::styled(
+                " $ Last Session Cost per Project ",
+                Style::default().fg(p.fg).bold(),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let global = store.and_then(|s| s.claude_global_stats());
+
+        let Some(global) = global else {
+            let msg = Paragraph::new("~/.claude.json not found or empty")
+                .style(Style::default().fg(p.muted))
+                .alignment(Alignment::Center);
+            frame.render_widget(msg, inner);
+            return;
+        };
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3), // Summary header
+                Constraint::Min(0),    // Table
+            ])
+            .split(inner);
+
+        // Summary line
+        let summary = Paragraph::new(Line::from(vec![
+            Span::styled("Total across ", Style::default().fg(p.muted)),
+            Span::styled(
+                format!("{}", global.projects.len()),
+                Style::default().fg(p.focus).bold(),
+            ),
+            Span::styled(" projects: ", Style::default().fg(p.muted)),
+            Span::styled(
+                format!("${:.4}", global.total_last_cost),
+                Style::default().fg(p.important).bold(),
+            ),
+            Span::styled(
+                "  (last session only — cumulative totals in Overview)",
+                Style::default().fg(p.muted),
+            ),
+        ]))
+        .alignment(Alignment::Center);
+        frame.render_widget(summary, chunks[0]);
+
+        // Build table rows
+        let visible_count = self.model_state.selected().unwrap_or(0);
+        let _ = visible_count; // used below for scroll
+
+        let rows: Vec<Row> = global
+            .projects
+            .iter()
+            .map(|proj| {
+                // Build model breakdown string (top 2 models)
+                let mut models: Vec<(&String, f64)> = proj
+                    .model_usage
+                    .iter()
+                    .map(|(m, u)| (m, u.cost_usd))
+                    .collect();
+                models.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+                let model_str = models
+                    .iter()
+                    .take(2)
+                    .map(|(m, cost)| {
+                        let short = if m.contains("opus") {
+                            "opus"
+                        } else if m.contains("sonnet") {
+                            "sonnet"
+                        } else if m.contains("haiku") {
+                            "haiku"
+                        } else {
+                            m.as_str()
+                        };
+                        format!("{} ${:.3}", short, cost)
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                let total_tokens: u64 = proj
+                    .model_usage
+                    .values()
+                    .map(|u| u.total_tokens())
+                    .sum();
+
+                let cost_style = if proj.last_cost > 1.0 {
+                    Style::default().fg(p.error)
+                } else if proj.last_cost > 0.1 {
+                    Style::default().fg(p.warning)
+                } else {
+                    Style::default().fg(p.success)
+                };
+
+                Row::new(vec![
+                    ratatui::text::Text::from(proj.name.clone()),
+                    ratatui::text::Text::from(format!("${:.4}", proj.last_cost))
+                        .patch_style(cost_style),
+                    ratatui::text::Text::from(format!("{}", total_tokens)),
+                    ratatui::text::Text::from(model_str),
+                ])
+            })
+            .collect();
+
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Percentage(30),
+                Constraint::Length(10),
+                Constraint::Length(12),
+                Constraint::Min(20),
+            ],
+        )
+        .header(
+            Row::new(vec!["Project", "Last Cost", "Tokens", "Models"])
+                .style(Style::default().fg(p.focus).add_modifier(Modifier::BOLD)),
+        )
+        .row_highlight_style(Style::default().fg(p.focus).add_modifier(Modifier::BOLD))
+        .column_spacing(1);
+
+        frame.render_widget(table, chunks[1]);
     }
 }

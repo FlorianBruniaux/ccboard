@@ -12,8 +12,8 @@ use crate::models::{
     BillingBlockManager, InvocationStats, MergedConfig, SessionId, SessionMetadata, StatsCache,
 };
 use crate::parsers::{
-    classify_tool_calls, parse_tool_calls, InvocationParser, McpConfig, Rules,
-    SessionContentParser, SessionIndexParser, SettingsParser, StatsParser,
+    classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats, InvocationParser,
+    McpConfig, Rules, SessionContentParser, SessionIndexParser, SettingsParser, StatsParser,
 };
 use dashmap::DashMap;
 use moka::future::Cache;
@@ -115,6 +115,9 @@ pub struct DataStore {
 
     /// Hook-based live session state (loaded from ~/.ccboard/live-sessions.json)
     live_hook_sessions: RwLock<crate::hook_state::LiveSessionFile>,
+
+    /// Per-project last session stats from ~/.claude.json
+    claude_global_stats: RwLock<Option<ClaudeGlobalStats>>,
 }
 
 /// Project leaderboard entry with aggregated metrics
@@ -172,6 +175,7 @@ impl DataStore {
             metadata_cache,
             activity_results: DashMap::new(),
             live_hook_sessions: RwLock::new(crate::hook_state::LiveSessionFile::default()),
+            claude_global_stats: RwLock::new(None),
         }
     }
 
@@ -198,6 +202,14 @@ impl DataStore {
 
         // Load stats
         self.load_stats(&mut report).await;
+
+        // Load ~/.claude.json global stats (per-project last session costs)
+        if let Some(home) = dirs::home_dir() {
+            if let Some(global) = parse_claude_global(&home) {
+                *self.claude_global_stats.write() = Some(global);
+                debug!("~/.claude.json loaded successfully");
+            }
+        }
 
         // Load settings
         self.load_settings(&mut report).await;
@@ -461,6 +473,11 @@ impl DataStore {
                 warn!(error = %e, "Failed to reload live-sessions.json");
             }
         }
+    }
+
+    /// Get per-project last session stats from ~/.claude.json
+    pub fn claude_global_stats(&self) -> Option<ClaudeGlobalStats> {
+        self.claude_global_stats.read().clone()
     }
 
     /// Get session count
