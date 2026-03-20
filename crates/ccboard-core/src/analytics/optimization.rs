@@ -5,8 +5,10 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::analytics::plugin_usage::PluginAnalytics;
+use crate::models::session::SessionMetadata;
 
 /// Category of a cost optimization suggestion
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -133,6 +135,68 @@ pub fn generate_cost_suggestions(
     });
 
     suggestions
+}
+
+/// Generate model downgrade recommendations based on session history.
+///
+/// If >60% of sessions use an Opus model AND average tool calls per session < 8,
+/// suggests switching to Sonnet for routine work. Estimates monthly savings.
+///
+/// # Returns
+/// Vec of `CostSuggestion` with category `ModelDowngrade`, sorted by savings desc.
+pub fn generate_model_recommendations(
+    sessions: &[Arc<SessionMetadata>],
+    total_monthly_cost: f64,
+) -> Vec<CostSuggestion> {
+    const MIN_SESSIONS: usize = 5;
+    const OPUS_THRESHOLD: f64 = 0.60;
+    const LOW_TOOL_CALLS: usize = 8;
+
+    if sessions.len() < MIN_SESSIONS || total_monthly_cost < 0.50 {
+        return vec![];
+    }
+
+    let mut opus_sessions = 0usize;
+    let mut total_tool_calls_opus = 0usize;
+
+    for session in sessions {
+        let uses_opus = session
+            .models_used
+            .iter()
+            .any(|m| m.to_lowercase().contains("opus"));
+        if uses_opus {
+            opus_sessions += 1;
+            total_tool_calls_opus += session.tool_usage.values().sum::<usize>();
+        }
+    }
+
+    if opus_sessions == 0 {
+        return vec![];
+    }
+
+    let opus_pct = opus_sessions as f64 / sessions.len() as f64;
+    let avg_tool_calls = total_tool_calls_opus / opus_sessions;
+
+    if opus_pct > OPUS_THRESHOLD && avg_tool_calls < LOW_TOOL_CALLS {
+        // Opus is ~5x more expensive than Sonnet; estimate 70% savings on Opus sessions
+        let savings = total_monthly_cost * opus_pct * 0.70;
+        vec![CostSuggestion {
+            category: OptimizationCategory::ModelDowngrade,
+            title: format!("Switch {:.0}% of Opus sessions to Sonnet", opus_pct * 100.0),
+            description: format!(
+                "{:.0}% of sessions use Opus with only ~{} avg tool calls — \
+                 Sonnet handles most coding tasks at ~5× lower cost.",
+                opus_pct * 100.0,
+                avg_tool_calls
+            ),
+            potential_savings: savings,
+            action: "Use claude-sonnet-4-6 for routine tasks, reserve Opus 4.6 for complex \
+                     multi-step reasoning."
+                .to_string(),
+        }]
+    } else {
+        vec![]
+    }
 }
 
 #[cfg(test)]

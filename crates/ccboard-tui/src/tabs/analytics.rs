@@ -1,7 +1,9 @@
 //! Analytics tab - Trends, forecasting, patterns, insights, anomalies with 5 sub-views
 
 use crate::theme::Palette;
-use ccboard_core::analytics::{detect_anomalies, AnalyticsData, Period};
+use ccboard_core::analytics::{
+    detect_anomalies, detect_daily_cost_spikes, AnalyticsData, AnomalySeverity, Period,
+};
 use ccboard_core::models::session::SessionMetadata;
 use ccboard_core::store::DataStore;
 use ratatui::{
@@ -962,12 +964,18 @@ impl AnalyticsTab {
             Span::raw(" More"),
         ]));
 
+        // Streak info in title
+        let streak = data.patterns.current_streak_days;
+        let longest = data.patterns.longest_streak_days;
+        let streak_label = if streak > 0 {
+            format!(" 🔥 {} day streak (best: {})", streak, longest)
+        } else {
+            format!(" best: {} days", longest)
+        };
+        let heatmap_title = format!("Activity Heatmap{}", streak_label);
+
         let paragraph = Paragraph::new(lines)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("Activity Heatmap (Sessions by Day & Hour)"),
-            )
+            .block(Block::default().borders(Borders::ALL).title(heatmap_title))
             .alignment(Alignment::Left);
 
         frame.render_widget(paragraph, area);
@@ -1456,6 +1464,69 @@ impl AnalyticsTab {
 
         // Detect anomalies
         let anomalies = detect_anomalies(&sessions);
+        let daily_spikes = detect_daily_cost_spikes(&sessions, self.current_period.days());
+
+        // Split area: daily cost spikes panel (top) + session anomaly table (bottom)
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(6), Constraint::Min(0)])
+            .split(area);
+
+        // Render daily cost spikes panel
+        {
+            let spike_title = format!(" Daily Cost Spikes ({} detected) ", daily_spikes.len());
+            let spike_block = Block::default()
+                .borders(Borders::ALL)
+                .title(spike_title)
+                .style(Style::default().fg(p.border));
+
+            if daily_spikes.is_empty() {
+                let para = Paragraph::new(vec![Line::from(Span::styled(
+                    "✅  No daily cost spikes — usage within normal range",
+                    Style::default().fg(p.success),
+                ))])
+                .block(spike_block)
+                .alignment(Alignment::Center);
+                frame.render_widget(para, chunks[0]);
+            } else {
+                let items: Vec<ListItem> = daily_spikes
+                    .iter()
+                    .take(3)
+                    .map(|s| {
+                        let color = match s.severity {
+                            AnomalySeverity::Critical => p.error,
+                            AnomalySeverity::Warning => p.warning,
+                        };
+                        ListItem::new(Line::from(vec![
+                            Span::styled(
+                                format!("{} ", s.severity.icon()),
+                                Style::default().fg(color),
+                            ),
+                            Span::styled(
+                                s.date.format("%Y-%m-%d").to_string(),
+                                Style::default().fg(p.fg),
+                            ),
+                            Span::styled(
+                                format!(
+                                    "  {}  (avg {})",
+                                    s.format_cost(),
+                                    format!("${:.3}", s.avg_cost)
+                                ),
+                                Style::default().fg(p.muted),
+                            ),
+                            Span::styled(
+                                format!("  {}", s.format_ratio()),
+                                Style::default().fg(color).bold(),
+                            ),
+                        ]))
+                    })
+                    .collect();
+                let list = List::new(items).block(spike_block);
+                frame.render_widget(list, chunks[0]);
+            }
+        }
+
+        let area = chunks[1];
 
         // Check minimum data requirement
         if sessions.len() < 10 {
@@ -1547,8 +1618,6 @@ impl AnalyticsTab {
             .take(10)
             .skip(self.scroll_offset)
             .map(|anomaly| {
-                use ccboard_core::analytics::AnomalySeverity;
-
                 // Severity column with emoji and color
                 let (severity_color, severity_icon) = match anomaly.severity {
                     AnomalySeverity::Critical => (p.error, "🚨"),
@@ -1606,7 +1675,7 @@ impl AnalyticsTab {
 
         let critical_count = anomalies
             .iter()
-            .filter(|a| a.severity == ccboard_core::analytics::AnomalySeverity::Critical)
+            .filter(|a| a.severity == AnomalySeverity::Critical)
             .count();
 
         let title = format!(

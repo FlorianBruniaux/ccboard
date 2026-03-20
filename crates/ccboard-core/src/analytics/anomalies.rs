@@ -4,6 +4,8 @@
 //! significantly from normal behavior patterns.
 
 use crate::models::session::{SessionId, SessionMetadata};
+use chrono::{Local, NaiveDate};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Severity level for anomalies based on standard deviations
@@ -218,6 +220,104 @@ pub fn detect_anomalies(sessions: &[Arc<SessionMetadata>]) -> Vec<Anomaly> {
     anomalies
 }
 
+/// A daily cost spike: one day's estimated cost is an outlier vs the recent baseline.
+#[derive(Debug, Clone)]
+pub struct DailyCostAnomaly {
+    /// Date of the spike
+    pub date: NaiveDate,
+    /// Estimated cost for this day (tokens × $0.01/K)
+    pub cost_estimate: f64,
+    /// Rolling mean cost per day over the window
+    pub avg_cost: f64,
+    /// cost_estimate / avg_cost — how many times above average
+    pub ratio: f64,
+    /// Severity based on ratio
+    pub severity: AnomalySeverity,
+}
+
+impl DailyCostAnomaly {
+    /// Human-readable label, e.g. "3.2× average"
+    pub fn format_ratio(&self) -> String {
+        format!("{:.1}× avg", self.ratio)
+    }
+
+    /// Formatted cost
+    pub fn format_cost(&self) -> String {
+        format!("${:.3}", self.cost_estimate)
+    }
+}
+
+/// Detect days where cost is ≥2× the rolling daily average.
+///
+/// Requires at least 7 days of data. Aggregates sessions by calendar day,
+/// flags days above the threshold. Returns results sorted most recent first.
+pub fn detect_daily_cost_spikes(
+    sessions: &[Arc<SessionMetadata>],
+    window_days: usize,
+) -> Vec<DailyCostAnomaly> {
+    const MIN_DAYS: usize = 7;
+    const SPIKE_2X: f64 = 2.0;
+    const SPIKE_3X: f64 = 3.0;
+    // Rough cost estimate: $0.01 per 1K tokens
+    const COST_PER_1K_TOKENS: f64 = 0.01;
+
+    let cutoff = (Local::now() - chrono::Duration::days(window_days as i64)).naive_local();
+
+    // Aggregate estimated cost per day
+    let mut daily_costs: BTreeMap<NaiveDate, f64> = BTreeMap::new();
+    for session in sessions {
+        if let Some(ts) = session.first_timestamp {
+            let local_date = ts.with_timezone(&Local).date_naive();
+            if local_date.and_hms_opt(0, 0, 0).unwrap_or_default() < cutoff {
+                continue;
+            }
+            let cost = (session.total_tokens as f64 / 1000.0) * COST_PER_1K_TOKENS;
+            *daily_costs.entry(local_date).or_default() += cost;
+        }
+    }
+
+    if daily_costs.len() < MIN_DAYS {
+        return vec![];
+    }
+
+    let costs: Vec<f64> = daily_costs.values().copied().collect();
+    let Some(stats) = Statistics::compute(&costs) else {
+        return vec![];
+    };
+
+    // Need meaningful cost data (skip if average < $0.01/day)
+    if stats.mean < 0.01 {
+        return vec![];
+    }
+
+    let mut spikes: Vec<DailyCostAnomaly> = daily_costs
+        .iter()
+        .filter_map(|(date, &cost)| {
+            let ratio = cost / stats.mean;
+            if ratio >= SPIKE_2X {
+                let severity = if ratio >= SPIKE_3X {
+                    AnomalySeverity::Critical
+                } else {
+                    AnomalySeverity::Warning
+                };
+                Some(DailyCostAnomaly {
+                    date: *date,
+                    cost_estimate: cost,
+                    avg_cost: stats.mean,
+                    ratio,
+                    severity,
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Most recent first
+    spikes.sort_by(|a, b| b.date.cmp(&a.date));
+    spikes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -373,5 +473,64 @@ mod tests {
             "Deviation should be >100% for extreme outlier, got {}%",
             outlier.deviation_pct
         );
+    }
+
+    // --- Daily cost spike tests ---
+
+    fn create_session_on_date(id: &str, tokens: u64, days_ago: i64) -> Arc<SessionMetadata> {
+        let ts = chrono::Utc::now() - chrono::Duration::days(days_ago);
+        Arc::new(SessionMetadata {
+            id: id.into(),
+            file_path: std::path::PathBuf::from(format!("/tmp/{}.jsonl", id)),
+            project_path: "test".into(),
+            first_timestamp: Some(ts),
+            last_timestamp: Some(ts),
+            message_count: 5,
+            total_tokens: tokens,
+            input_tokens: tokens / 2,
+            output_tokens: tokens / 2,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            models_used: vec!["test-model".to_string()],
+            file_size_bytes: 512,
+            first_user_message: Some("test".to_string()),
+            has_subagents: false,
+            duration_seconds: Some(30),
+            branch: Some("main".to_string()),
+            tool_usage: std::collections::HashMap::new(),
+            tool_token_usage: std::collections::HashMap::new(),
+        })
+    }
+
+    #[test]
+    fn test_daily_spikes_insufficient_data() {
+        // Only 3 days of data — below MIN_DAYS=7
+        let sessions: Vec<_> = (0..3)
+            .map(|i| create_session_on_date(&format!("s{}", i), 1000, i as i64))
+            .collect();
+        let spikes = detect_daily_cost_spikes(&sessions, 30);
+        assert!(spikes.is_empty(), "Should return empty for <7 days data");
+    }
+
+    #[test]
+    fn test_daily_spikes_detects_outlier_day() {
+        // 8 normal days (~100K tokens each) + 1 spike day (~1M tokens)
+        let mut sessions = vec![];
+        for day in 1..=8i64 {
+            for j in 0..3 {
+                sessions.push(create_session_on_date(
+                    &format!("normal_d{}_s{}", day, j),
+                    33_000, // ~100K tokens/day total
+                    day,
+                ));
+            }
+        }
+        // Spike: 1M tokens on day 0 (today)
+        sessions.push(create_session_on_date("spike", 1_000_000, 0));
+
+        let spikes = detect_daily_cost_spikes(&sessions, 30);
+        assert!(!spikes.is_empty(), "Should detect the spike day");
+        assert_eq!(spikes[0].severity, AnomalySeverity::Critical);
+        assert!(spikes[0].ratio > 3.0, "ratio should be >3x average");
     }
 }

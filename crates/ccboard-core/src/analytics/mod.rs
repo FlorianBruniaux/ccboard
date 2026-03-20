@@ -22,7 +22,10 @@ pub mod trends;
 #[cfg(test)]
 mod tests;
 
-pub use anomalies::{detect_anomalies, Anomaly, AnomalyMetric, AnomalySeverity};
+pub use anomalies::{
+    detect_anomalies, detect_daily_cost_spikes, Anomaly, AnomalyMetric, AnomalySeverity,
+    DailyCostAnomaly,
+};
 pub use discover::{
     collect_sessions_data as discover_collect_sessions, discover_patterns, run_discover,
     DiscoverConfig, DiscoverSuggestion, SessionData as DiscoverSessionData, SuggestionCategory,
@@ -30,7 +33,9 @@ pub use discover::{
 pub use discover_llm::{call_claude_cli as discover_call_llm, LlmSuggestion};
 pub use forecasting::{forecast_usage, ForecastData, TrendDirection};
 pub use insights::{generate_budget_alerts, generate_insights, Alert};
-pub use optimization::{generate_cost_suggestions, CostSuggestion, OptimizationCategory};
+pub use optimization::{
+    generate_cost_suggestions, generate_model_recommendations, CostSuggestion, OptimizationCategory,
+};
 pub use patterns::{detect_patterns, UsagePatterns};
 pub use plugin_usage::{aggregate_plugin_usage, PluginAnalytics, PluginType, PluginUsage};
 pub use tool_chains::{analyze_tool_chains, ToolChain, ToolChainAnalysis};
@@ -133,11 +138,22 @@ impl AnalyticsData {
         // Generate cost suggestions (plugin_analytics populated with empty data here;
         // full plugin analytics with dead-code detection requires skill/command lists
         // which are provided by DataStore when calling the analytics tab)
-        let cost_suggestions = optimization::generate_cost_suggestions(
+        let mut cost_suggestions = optimization::generate_cost_suggestions(
             &plugin_usage::PluginAnalytics::empty(),
             &aggregated_tool_tokens,
             total_cost_estimate,
         );
+
+        // Append model downgrade recommendations
+        let model_recs =
+            optimization::generate_model_recommendations(sessions, total_cost_estimate);
+        cost_suggestions.extend(model_recs);
+        // Re-sort by potential savings descending after merge
+        cost_suggestions.sort_by(|a, b| {
+            b.potential_savings
+                .partial_cmp(&a.potential_savings)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Self {
             trends,

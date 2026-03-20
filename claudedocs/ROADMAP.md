@@ -1,6 +1,6 @@
 # ccboard Roadmap
 
-**Last Updated**: 2026-03-19
+**Last Updated**: 2026-03-20
 **Current Version**: v0.14.0
 **Target**: v1.0.0 (Phases K-L complete)
 
@@ -127,6 +127,15 @@ None critical. Bug #44 (Web UI non-functional after `cargo install`) resolved in
 - File watcher for `~/.ccboard/` firing `DataEvent::LiveSessionStatusChanged` for live TUI redraw
 - macOS `osascript` notification on Stop (non-blocking, injection-safe)
 - 10 new tests for `is_claude_process_line` and `parse_claude_flags` — 419 total
+
+---
+
+### ✅ Tab Bar UX Redesign (v0.14.x) - **DONE**
+
+**Status**: ✅ Done 2026-03-20
+
+Onglets inactifs : icône seule (4 cols). Onglet actif : icône blanc + `[k]` muted + nom cyan+bold. Barre passe de 193 cols à ~85 cols max — plus d'overflow sur terminal standard.
+Fichier modifié : `crates/ccboard-tui/src/ui.rs` `render_header()`.
 
 ---
 
@@ -321,6 +330,6 @@ Interested in implementing a roadmap phase? See:
 
 ---
 
-**Last Updated**: 2026-03-19
+**Last Updated**: 2026-03-20
 **Maintainer**: @FlorianBruniaux
 **Repository**: https://github.com/FlorianBruniaux/ccboard

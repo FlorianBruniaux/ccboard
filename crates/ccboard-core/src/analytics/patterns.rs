@@ -3,8 +3,8 @@
 //! Identifies behavioral patterns: peak hours, productive days,
 //! model distribution, and session duration analytics.
 
-use chrono::{Datelike, Timelike, Weekday};
-use std::collections::HashMap;
+use chrono::{Datelike, NaiveDate, Timelike, Weekday};
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -36,6 +36,10 @@ pub struct UsagePatterns {
     pub activity_heatmap: [[usize; 24]; 7],
     /// Tool usage statistics: tool name -> call count
     pub tool_usage: HashMap<String, usize>,
+    /// Current consecutive-day usage streak (days ending today or yesterday)
+    pub current_streak_days: u32,
+    /// Longest consecutive-day streak across all loaded sessions
+    pub longest_streak_days: u32,
 }
 
 impl UsagePatterns {
@@ -53,6 +57,8 @@ impl UsagePatterns {
             weekday_distribution: [0; 7],
             activity_heatmap: [[0; 24]; 7],
             tool_usage: HashMap::new(),
+            current_streak_days: 0,
+            longest_streak_days: 0,
         }
     }
 }
@@ -76,6 +82,59 @@ fn estimate_cost(session: &SessionMetadata) -> f64 {
 /// - Empty sessions: Returns UsagePatterns::empty()
 /// - Missing timestamps: Session skipped with warning
 /// - No duration data: avg_session_duration = 0
+/// Compute current and longest consecutive-day streaks across all sessions.
+///
+/// "Current streak" counts backward from today (a gap yesterday ends it).
+/// "Longest streak" scans all active days.
+fn compute_streaks(sessions: &[Arc<SessionMetadata>]) -> (u32, u32) {
+    use chrono::Local;
+
+    let mut active_days: BTreeSet<NaiveDate> = BTreeSet::new();
+    for session in sessions {
+        if let Some(ts) = session.first_timestamp {
+            active_days.insert(ts.with_timezone(&Local).date_naive());
+        }
+    }
+
+    if active_days.is_empty() {
+        return (0, 0);
+    }
+
+    // Current streak: walk backward from today
+    let today = Local::now().date_naive();
+    let mut current = 0u32;
+    let mut check = today;
+    loop {
+        if active_days.contains(&check) {
+            current += 1;
+            check -= chrono::Duration::days(1);
+        } else {
+            break;
+        }
+    }
+
+    // Longest streak: scan sorted days
+    let days_vec: Vec<NaiveDate> = active_days.into_iter().collect();
+    let mut longest = 0u32;
+    let mut streak = 0u32;
+    let mut prev: Option<NaiveDate> = None;
+    for day in &days_vec {
+        if let Some(p) = prev {
+            if *day == p + chrono::Duration::days(1) {
+                streak += 1;
+            } else {
+                streak = 1;
+            }
+        } else {
+            streak = 1;
+        }
+        longest = longest.max(streak);
+        prev = Some(*day);
+    }
+
+    (current, longest)
+}
+
 pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsagePatterns {
     use chrono::Local;
 
@@ -214,6 +273,8 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
         HashMap::new()
     };
 
+    let (current_streak_days, longest_streak_days) = compute_streaks(sessions);
+
     UsagePatterns {
         most_productive_hour,
         most_productive_day,
@@ -226,5 +287,7 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
         weekday_distribution: weekday_counts,
         activity_heatmap,
         tool_usage,
+        current_streak_days,
+        longest_streak_days,
     }
 }
