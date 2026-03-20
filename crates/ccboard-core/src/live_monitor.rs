@@ -361,10 +361,7 @@ fn get_session_metadata(working_directory: &Option<String>) -> Option<LiveSessio
 
     // Build sessions directory path
     let home = dirs::home_dir()?;
-    let sessions_dir = home
-        .join(".claude")
-        .join("projects")
-        .join(&encoded);
+    let sessions_dir = home.join(".claude").join("projects").join(&encoded);
 
     if !sessions_dir.exists() {
         return None;
@@ -714,7 +711,8 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_is_claude_process_line_rejects_grep() {
-        let line = "user  99999  0.0  0.1  123456  78910  ttys001  S+   14:30   0:05.23  grep claude";
+        let line =
+            "user  99999  0.0  0.1  123456  78910  ttys001  S+   14:30   0:05.23  grep claude";
         assert!(!is_claude_process_line(line));
     }
 
@@ -744,9 +742,8 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_parse_claude_flags_vscode() {
-        let flags = parse_claude_flags(
-            "claude --output-format stream-json --permission-prompt-tool stdio",
-        );
+        let flags =
+            parse_claude_flags("claude --output-format stream-json --permission-prompt-tool stdio");
         assert_eq!(flags.session_type, SessionType::VsCode);
     }
 

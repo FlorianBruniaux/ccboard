@@ -1,7 +1,7 @@
 # ccboard Roadmap
 
 **Last Updated**: 2026-03-20
-**Current Version**: v0.14.0
+**Current Version**: v0.15.0
 **Target**: v1.0.0 (Phases K-L complete)
 
 ---
@@ -34,6 +34,13 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 - `SessionType` detection (Cli / VsCode / Subagent) from Claude CLI flags
 - `~/.claude.json` parser for per-project last session cost (Costs tab "Per Project" view)
 - macOS osascript notifications on session stop
+
+**Advanced Analytics (v0.15.0)**:
+- Streak detection (current + longest) dans UsagePatterns
+- Daily cost spikes (DailyCostAnomaly, Z-score based)
+- Model downgrade recommendations (Opus heavy + low tools → Sonnet)
+- AnalyticsData caching anomalies/daily_spikes (fini per-frame recomputation)
+- 433 tests, 0 warnings
 
 **Performance**:
 - 89x faster startup (SQLite cache: 20s → 33ms)
@@ -139,24 +146,16 @@ Fichier modifié : `crates/ccboard-tui/src/ui.rs` `render_header()`.
 
 ---
 
-### Phase K-Analytics: Advanced Analytics (v0.15.0) - **NEXT**
+### ✅ Phase K-Analytics: Advanced Analytics (v0.15.0) - **DONE**
 
 **Priority**: 🟡 MEDIUM
-**Duration**: 10-12h
-**Status**: 📋 Backlog (v0.15.0)
+**Status**: ✅ Released 2026-03-20
+**Commits**: f17e747 (implémentation) + c2d315b (10 code review fixes)
 
-**Goal**: AI-powered insights, anomaly detection, and usage pattern analysis.
-
-**Features**:
-- **Anomaly Detection**: Cost spikes > 2x average, unusual activity hours
-- **Usage Patterns**: Peak hours, day-of-week trends, model switching patterns
-- **Model Recommendations**: Suggest Opus ↔ Sonnet switches based on usage
-- **Forecast Accuracy Tracking**: Compare projections vs actual costs
-
-**Value**:
-- ✅ Proactive cost management
-- ✅ Identify optimization opportunities
-- ✅ Understand team productivity patterns
+Delivered:
+- Streak detection, daily cost spikes, model downgrade recommendations
+- AnalyticsData owns anomalies/daily_spikes (computed once, cached)
+- 11 nouveaux tests — 433 total
 
 ---
 
@@ -183,11 +182,11 @@ Fichier modifié : `crates/ccboard-tui/src/ui.rs` `render_header()`.
 
 ---
 
-### Phase M: Conversation Viewer Enhancements (v0.13.5)
+### Phase M: Conversation Viewer Enhancements (v0.15.5)
 
 **Priority**: 🟡 MEDIUM
 **Duration**: 8-10h
-**Status**: 📋 Backlog (extends Phase F)
+**Status**: ⏳ **NEXT** (v0.15.5)
 **GitHub Issues**: #3 (umbrella), #7 (message filtering), #8 (export conversations)
 
 **Goal**: Advanced conversation analysis and visualization.
@@ -290,9 +289,9 @@ Fichier modifié : `crates/ccboard-tui/src/ui.rs` `render_header()`.
 | **Discover** | 🟡 MEDIUM | 4-6h | v0.12.0 | `ccboard discover` config optimizer | — | ✅ Done |
 | **K-Analytics (Tool Cost)** | 🟡 MEDIUM | — | v0.13.0 | Tool token analytics, optimization suggestions | — | ✅ Done |
 | **Hook-Monitor** | 🔴 HIGH | — | v0.14.0 | Live session monitoring, hook receiver, setup | — | ✅ Done |
-| **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.15.0 | Advanced analytics (anomaly, forecasts) | #14-21 | ⏳ Next |
-| **L** | 🟢 LOW | 12-15h | v0.15.5 | Plugin system | — | 📋 Backlog |
-| **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | 📋 Backlog |
+| **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.15.0 | Advanced analytics (anomaly, forecasts) | #14-21 | ✅ Done 2026-03-20 |
+| **L** | 🟢 LOW | 12-15h | v0.16.0 | Plugin system | — | 📋 Backlog |
+| **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | ⏳ **NEXT** |
 | **N** | 🟢 LOW | 10-14h | v0.16.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
 **Total Estimated**: 46-59h for v1.0.0 completion

@@ -440,21 +440,29 @@ impl Ui {
         ]));
         frame.render_widget(logo, tab_bar_chunks[0]);
 
-        // Tabs with icons
+        // Tabs with icons — active shows icon+[k]+name, inactive shows icon only
         let titles: Vec<Line> = Tab::all()
             .iter()
             .map(|t| {
-                let style = if *t == active {
-                    Style::default()
-                        .fg(p.focus)
-                        .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+                if *t == active {
+                    Line::from(vec![
+                        Span::raw(" "),
+                        Span::styled(t.icon(), Style::default().fg(p.fg)),
+                        Span::raw(" "),
+                        Span::styled(format!("[{}]", t.shortcut()), Style::default().fg(p.muted)),
+                        Span::raw(" "),
+                        Span::styled(
+                            t.name(),
+                            Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw(" "),
+                    ])
                 } else {
-                    Style::default().fg(p.muted)
-                };
-                Line::from(Span::styled(
-                    format!(" {} {} {} ", t.icon(), t.shortcut(), t.name()),
-                    style,
-                ))
+                    Line::from(Span::styled(
+                        format!(" {} ", t.icon()),
+                        Style::default().fg(p.muted),
+                    ))
+                }
             })
             .collect();
 

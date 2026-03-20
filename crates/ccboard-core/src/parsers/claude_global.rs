@@ -111,7 +111,11 @@ pub fn parse_claude_global(home: &Path) -> Option<ClaudeGlobalStats> {
         .collect();
 
     // Sort by cost descending
-    projects.sort_by(|a, b| b.last_cost.partial_cmp(&a.last_cost).unwrap_or(std::cmp::Ordering::Equal));
+    projects.sort_by(|a, b| {
+        b.last_cost
+            .partial_cmp(&a.last_cost)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let total_last_cost = projects.iter().map(|p| p.last_cost).sum();
 

@@ -12,8 +12,9 @@ use crate::models::{
     BillingBlockManager, InvocationStats, MergedConfig, SessionId, SessionMetadata, StatsCache,
 };
 use crate::parsers::{
-    classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats, InvocationParser,
-    McpConfig, Rules, SessionContentParser, SessionIndexParser, SettingsParser, StatsParser,
+    classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats,
+    InvocationParser, McpConfig, Rules, SessionContentParser, SessionIndexParser, SettingsParser,
+    StatsParser,
 };
 use dashmap::DashMap;
 use moka::future::Cache;

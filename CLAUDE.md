@@ -402,6 +402,15 @@ let entry = parse_entry(line)?; // Panics on first malformed entry
 
 ---
 
+## Code Exploration Protocol
+
+When exploring this codebase, structure first:
+1. Run `rg "^\s*(pub\s+)?(async\s+)?fn |^\s*(pub\s+)?(struct|enum|trait|impl)\s" crates/ --no-heading -n`
+2. Pick 2-3 signatures that match the task
+3. Read only those functions with line offset
+
+Never read full files when exploring.
+
 ## Code Search Strategy
 
 Pour naviguer dans le code, utiliser les outils dans cet ordre :

@@ -5,21 +5,20 @@
   },
   "permissions": {
     "deny": [
-      "Bash(command:*rm -rf*)",
-      "Bash(command:*git push --force*)",
-      "Bash(command:*git push -f*)",
-      "Bash(command:*git reset --hard*)",
-      "Read(file_path:*.env*)",
-      "Read(file_path:*.pem)",
-      "Read(file_path:*.key)",
-      "Read(file_path:*credentials*)",
-      "Read(file_path:*secrets*)",
-      "Edit(file_path:*.env*)",
-      "Edit(file_path:*.pem)",
-      "Edit(file_path:*.key)",
-      "Write(file_path:*.env*)",
-      "Write(file_path:*.pem)",
-      "Write(file_path:*.key)"
+      "Bash(*rm -rf*)",
+      "Bash(*git push --force*)",
+      "Bash(*git push -f*)",
+      "Bash(*git reset --hard*)",
+      "Read(**/*.env*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*credentials*)",
+      "Read(**/*secrets*)",
+      "Edit(**/*.env*)",
+      "Edit(**/*.pem)",
+      "Edit(**/*.key)",
+      "Write(**/*.env*)",
+      "Write(**/*.pem)"
     ]
   }
 }

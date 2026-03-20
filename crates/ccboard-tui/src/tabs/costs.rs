@@ -1296,11 +1296,7 @@ impl CostsTab {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                let total_tokens: u64 = proj
-                    .model_usage
-                    .values()
-                    .map(|u| u.total_tokens())
-                    .sum();
+                let total_tokens: u64 = proj.model_usage.values().map(|u| u.total_tokens()).sum();
 
                 let cost_style = if proj.last_cost > 1.0 {
                     Style::default().fg(p.error)
