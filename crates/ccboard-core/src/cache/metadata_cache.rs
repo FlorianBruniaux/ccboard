@@ -546,8 +546,10 @@ impl MetadataCache {
                     sm.session_id,
                     sm.project,
                     sm.first_user_message,
-                    snippet(session_fts, 2, '[', ']', '...', 8) AS snippet,
-                    session_fts.rank
+                    snippet(session_fts, 2, '[', ']', '...', 12) AS snippet,
+                    session_fts.rank,
+                    sm.first_timestamp,
+                    sm.message_count
                 FROM session_fts
                 JOIN session_metadata sm ON session_fts.rowid = sm.rowid
                 WHERE session_fts MATCH ?
@@ -567,6 +569,8 @@ impl MetadataCache {
                     first_user_message: row.get(3)?,
                     snippet: row.get(4)?,
                     rank: row.get(5)?,
+                    first_timestamp: row.get(6)?,
+                    message_count: row.get::<_, Option<i64>>(7)?.unwrap_or(0) as u64,
                 })
             })
             .context("Failed to execute FTS5 search")?;
@@ -885,6 +889,10 @@ pub struct SearchResult {
     pub first_user_message: Option<String>,
     pub snippet: Option<String>,
     pub rank: f64,
+    /// ISO 8601 timestamp string from session_metadata (e.g. "2026-03-20T14:30:00Z")
+    pub first_timestamp: Option<String>,
+    /// Total message count for this session
+    pub message_count: u64,
 }
 
 /// Activity cache statistics

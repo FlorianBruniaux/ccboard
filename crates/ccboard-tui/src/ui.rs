@@ -220,15 +220,25 @@ impl Ui {
                             app.search_tab.toggle_input();
                         }
                         KeyCode::Enter => {
-                            let store = app.store.as_ref();
-                            app.search_tab.refresh(store);
+                            // Open selected result's conversation
+                            if let Some(session_id) = app.search_tab.selected_session_id() {
+                                self.conversation
+                                    .load_session(session_id.to_string(), &app.store);
+                            }
                         }
                         KeyCode::Backspace => {
-                            app.search_tab.on_backspace();
+                            if app.search_tab.on_backspace() {
+                                app.search_tab.refresh(app.store.as_ref());
+                            }
                         }
                         KeyCode::Char(c) => {
-                            app.search_tab.on_char(c);
+                            if app.search_tab.on_char(c) {
+                                app.search_tab.refresh(app.store.as_ref());
+                            }
                         }
+                        // Allow navigating results while in input mode
+                        KeyCode::Down => app.search_tab.next(),
+                        KeyCode::Up => app.search_tab.prev(),
                         _ => {}
                     }
                 } else {
