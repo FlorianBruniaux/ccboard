@@ -15,6 +15,7 @@ use ratatui::{
     },
     Frame,
 };
+use regex::Regex;
 use serde_json;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -144,6 +145,14 @@ pub struct SessionsTab {
     replay_scroll: ListState,
     /// Expanded tool results (set of message indices)
     replay_expanded: HashSet<usize>,
+    /// Regex search query in the replay viewer
+    replay_search_query: String,
+    /// Whether the replay search bar is active (typing mode)
+    replay_search_active: bool,
+    /// Message indices matching current search (for n/N navigation)
+    replay_search_hits: Vec<usize>,
+    /// Current position within search hits (for n/N navigation)
+    replay_search_hit_idx: usize,
     /// Error message to display
     error_message: Option<String>,
     /// Last refresh timestamp
@@ -192,6 +201,10 @@ impl SessionsTab {
             replay_messages: Vec::new(),
             replay_scroll,
             replay_expanded: HashSet::new(),
+            replay_search_query: String::new(),
+            replay_search_active: false,
+            replay_search_hits: Vec::new(),
+            replay_search_hit_idx: 0,
             error_message: None,
             last_refresh: Instant::now(),
             refresh_message: None,
@@ -214,7 +227,26 @@ impl SessionsTab {
     ) {
         use crossterm::event::KeyCode;
 
-        // Search mode has priority
+        // Replay search mode has priority when replay is open
+        if self.replay_search_active {
+            match key {
+                KeyCode::Char(c) => {
+                    self.replay_search_query.push(c);
+                    self.rebuild_replay_search_hits();
+                }
+                KeyCode::Backspace => {
+                    self.replay_search_query.pop();
+                    self.rebuild_replay_search_hits();
+                }
+                KeyCode::Esc | KeyCode::Enter => {
+                    self.replay_search_active = false;
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        // Session list search mode
         if self.search_active {
             match key {
                 KeyCode::Char(c) => {
@@ -404,10 +436,17 @@ impl SessionsTab {
             KeyCode::Esc => {
                 if self.error_message.is_some() {
                     self.error_message = None;
+                } else if self.show_replay && !self.replay_search_query.is_empty() {
+                    // First Esc clears search, second Esc closes replay
+                    self.replay_search_query.clear();
+                    self.replay_search_hits.clear();
+                    self.replay_search_hit_idx = 0;
                 } else if self.show_replay {
                     self.show_replay = false;
                     self.replay_messages.clear();
                     self.replay_expanded.clear();
+                    self.replay_search_query.clear();
+                    self.replay_search_hits.clear();
                 } else if self.show_live_detail {
                     self.show_live_detail = false;
                 } else {
@@ -415,16 +454,26 @@ impl SessionsTab {
                 }
             }
             KeyCode::Char('/') => {
-                self.search_active = !self.search_active;
-                if !self.search_active {
-                    self.search_filter.clear();
-                    self.search_global = false;
+                if self.show_replay {
+                    // `/` inside replay viewer activates replay search
+                    self.replay_search_active = true;
+                    self.replay_search_query.clear();
+                    self.replay_search_hits.clear();
                 } else {
-                    // Set global search mode based on current focus
-                    // focus==1 (Projects) or focus==0 (Live) → global search
-                    // focus==2 (Sessions) → local search within selected project
-                    self.search_global = self.focus != 2;
+                    self.search_active = !self.search_active;
+                    if !self.search_active {
+                        self.search_filter.clear();
+                        self.search_global = false;
+                    } else {
+                        self.search_global = self.focus != 2;
+                    }
                 }
+            }
+            KeyCode::Char('n') if self.show_replay => {
+                self.replay_next_hit(1);
+            }
+            KeyCode::Char('N') if self.show_replay => {
+                self.replay_next_hit(-1);
             }
             KeyCode::PageUp => {
                 // Jump up by 10 items
@@ -530,6 +579,67 @@ impl SessionsTab {
         let current = self.replay_scroll.selected().unwrap_or(0) as i32;
         let new_idx = (current + delta).clamp(0, self.replay_messages.len() as i32 - 1) as usize;
         self.replay_scroll.select(Some(new_idx));
+    }
+
+    /// Rebuild the list of message indices matching the current replay search query.
+    /// Tries query as a regex first; falls back to literal match if invalid regex.
+    fn rebuild_replay_search_hits(&mut self) {
+        self.replay_search_hits.clear();
+        self.replay_search_hit_idx = 0;
+        if self.replay_search_query.is_empty() {
+            return;
+        }
+        let re = match Regex::new(&format!("(?i){}", self.replay_search_query)) {
+            Ok(r) => r,
+            Err(_) => {
+                // Invalid regex → treat as literal string
+                match Regex::new(&format!("(?i){}", regex::escape(&self.replay_search_query))) {
+                    Ok(r) => r,
+                    Err(_) => return,
+                }
+            }
+        };
+        for (idx, msg) in self.replay_messages.iter().enumerate() {
+            if Self::message_matches_regex(msg, &re) {
+                self.replay_search_hits.push(idx);
+            }
+        }
+        // Jump to first hit
+        if let Some(&first) = self.replay_search_hits.first() {
+            self.replay_scroll.select(Some(first));
+        }
+    }
+
+    /// Check whether a SessionLine's text content matches the given regex.
+    fn message_matches_regex(msg: &SessionLine, re: &Regex) -> bool {
+        if let Some(message) = &msg.message {
+            if let Some(content) = &message.content {
+                let text = Self::extract_message_content(content);
+                if re.is_match(&text) {
+                    return true;
+                }
+                // Also match tool names
+                for (_, name, _) in Self::extract_tool_use_blocks(content) {
+                    if re.is_match(&name) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Navigate to the next (direction=1) or previous (direction=-1) search hit.
+    fn replay_next_hit(&mut self, direction: i32) {
+        if self.replay_search_hits.is_empty() {
+            return;
+        }
+        let len = self.replay_search_hits.len() as i32;
+        let new_idx =
+            (self.replay_search_hit_idx as i32 + direction).rem_euclid(len) as usize;
+        self.replay_search_hit_idx = new_idx;
+        self.replay_scroll
+            .select(Some(self.replay_search_hits[new_idx]));
     }
 
     fn get_selected_session<'a>(
@@ -1794,10 +1904,17 @@ impl SessionsTab {
                             } else {
                                 content_text
                             };
-                            lines.push(Line::from(vec![Span::styled(
-                                format!("  {}", preview),
-                                Style::default().fg(p.fg),
-                            )]));
+                            if !self.replay_search_query.is_empty() {
+                                // Highlighted search matches
+                                let mut spans = vec![Span::raw("  ")];
+                                spans.extend(highlight_matches(&preview, &self.replay_search_query));
+                                lines.push(Line::from(spans));
+                            } else {
+                                lines.push(Line::from(vec![Span::styled(
+                                    format!("  {}", preview),
+                                    Style::default().fg(p.fg),
+                                )]));
+                            }
                         }
 
                         // Tool calls from content blocks (real Claude Code format)
@@ -1917,36 +2034,72 @@ impl SessionsTab {
             frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
         }
 
-        // Keyboard hints overlay (bottom of popup)
-        let hints_area = Rect {
+        // Search bar or keyboard hints overlay (bottom of popup)
+        let bottom_area = Rect {
             x: area.x + 1,
             y: area.y + area.height.saturating_sub(2),
             width: area.width.saturating_sub(2),
             height: 1,
         };
 
-        let hints = Line::from(vec![
-            Span::raw(" ["),
-            Span::styled("j/k ↑↓", Style::default().fg(p.bg).bg(p.important).bold()),
-            Span::raw("] "),
-            Span::styled("scroll", Style::default().fg(p.fg)),
-            Span::styled(" │ ", Style::default().fg(p.muted)),
-            Span::raw("["),
-            Span::styled("Enter", Style::default().fg(p.bg).bg(p.important).bold()),
-            Span::raw("] "),
-            Span::styled("expand/collapse", Style::default().fg(p.fg)),
-            Span::styled(" │ ", Style::default().fg(p.muted)),
-            Span::raw("["),
-            Span::styled("Esc", Style::default().fg(p.bg).bg(p.important).bold()),
-            Span::raw("] "),
-            Span::styled("close", Style::default().fg(p.fg)),
-        ]);
-
-        let hints_widget = Paragraph::new(hints)
-            .style(Style::default().bg(p.border))
-            .alignment(ratatui::layout::Alignment::Center);
-
-        frame.render_widget(hints_widget, hints_area);
+        if self.replay_search_active || !self.replay_search_query.is_empty() {
+            // Show search bar with query and match count
+            let hit_info = if self.replay_search_hits.is_empty() {
+                if self.replay_search_query.is_empty() {
+                    String::new()
+                } else {
+                    " [no matches]".to_string()
+                }
+            } else {
+                format!(
+                    " [{}/{}]",
+                    self.replay_search_hit_idx + 1,
+                    self.replay_search_hits.len()
+                )
+            };
+            let cursor = if self.replay_search_active { "▌" } else { "" };
+            let search_line = Line::from(vec![
+                Span::styled(" /", Style::default().fg(p.important).bold()),
+                Span::styled(
+                    format!("{}{}", self.replay_search_query, cursor),
+                    Style::default().fg(p.fg),
+                ),
+                Span::styled(hit_info, Style::default().fg(p.muted)),
+                Span::styled(
+                    "  n/N next/prev  Esc clear",
+                    Style::default().fg(p.muted),
+                ),
+            ]);
+            let search_widget = Paragraph::new(search_line)
+                .style(Style::default().bg(p.border));
+            frame.render_widget(search_widget, bottom_area);
+        } else {
+            let hints = Line::from(vec![
+                Span::raw(" ["),
+                Span::styled("j/k ↑↓", Style::default().fg(p.bg).bg(p.important).bold()),
+                Span::raw("] "),
+                Span::styled("scroll", Style::default().fg(p.fg)),
+                Span::styled(" │ ", Style::default().fg(p.muted)),
+                Span::raw("["),
+                Span::styled("Enter", Style::default().fg(p.bg).bg(p.important).bold()),
+                Span::raw("] "),
+                Span::styled("expand", Style::default().fg(p.fg)),
+                Span::styled(" │ ", Style::default().fg(p.muted)),
+                Span::raw("["),
+                Span::styled("/", Style::default().fg(p.bg).bg(p.important).bold()),
+                Span::raw("] "),
+                Span::styled("search", Style::default().fg(p.fg)),
+                Span::styled(" │ ", Style::default().fg(p.muted)),
+                Span::raw("["),
+                Span::styled("Esc", Style::default().fg(p.bg).bg(p.important).bold()),
+                Span::raw("] "),
+                Span::styled("close", Style::default().fg(p.fg)),
+            ]);
+            let hints_widget = Paragraph::new(hints)
+                .style(Style::default().bg(p.border))
+                .alignment(ratatui::layout::Alignment::Center);
+            frame.render_widget(hints_widget, bottom_area);
+        }
     }
 
     /// Extract text content from message content field
@@ -2315,6 +2468,96 @@ impl SessionsTab {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use ccboard_core::models::SessionLine;
+
+    fn make_text_msg(text: &str) -> SessionLine {
+        serde_json::from_value(serde_json::json!({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": text
+            }
+        }))
+        .unwrap()
+    }
+
+    fn make_tool_msg(tool_name: &str) -> SessionLine {
+        serde_json::from_value(serde_json::json!({
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {"type": "tool_use", "id": "x", "name": tool_name, "input": {}}
+                ]
+            }
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn test_message_matches_regex_text() {
+        let msg = make_text_msg("hello world from Rust");
+        let re = regex::Regex::new("(?i)rust").unwrap();
+        assert!(SessionsTab::message_matches_regex(&msg, &re));
+
+        let re_no = regex::Regex::new("(?i)python").unwrap();
+        assert!(!SessionsTab::message_matches_regex(&msg, &re_no));
+    }
+
+    #[test]
+    fn test_message_matches_regex_tool_name() {
+        let msg = make_tool_msg("Bash");
+        let re = regex::Regex::new("(?i)bash").unwrap();
+        assert!(SessionsTab::message_matches_regex(&msg, &re));
+    }
+
+    #[test]
+    fn test_rebuild_replay_search_hits() {
+        let mut tab = SessionsTab::new();
+        tab.replay_messages = vec![
+            make_text_msg("hello world"),
+            make_text_msg("goodbye world"),
+            make_tool_msg("Bash"),
+        ];
+        tab.replay_search_query = "world".to_string();
+        tab.rebuild_replay_search_hits();
+        assert_eq!(tab.replay_search_hits, vec![0, 1]);
+    }
+
+    #[test]
+    fn test_rebuild_replay_search_hits_invalid_regex_fallback() {
+        let mut tab = SessionsTab::new();
+        tab.replay_messages = vec![make_text_msg("price is (100)")];
+        // "(100" is invalid regex (unclosed group) — should fall back to literal "(100"
+        tab.replay_search_query = "(100".to_string();
+        tab.rebuild_replay_search_hits();
+        // Literal match against "(100)" should succeed
+        assert_eq!(tab.replay_search_hits, vec![0]);
+    }
+
+    #[test]
+    fn test_replay_next_hit_wraps() {
+        let mut tab = SessionsTab::new();
+        tab.replay_messages = vec![
+            make_text_msg("match"),
+            make_text_msg("no"),
+            make_text_msg("match"),
+        ];
+        tab.replay_search_query = "match".to_string();
+        tab.rebuild_replay_search_hits();
+        assert_eq!(tab.replay_search_hits, vec![0, 2]);
+        assert_eq!(tab.replay_search_hit_idx, 0);
+
+        tab.replay_next_hit(1);
+        assert_eq!(tab.replay_search_hit_idx, 1);
+
+        tab.replay_next_hit(1); // wraps to 0
+        assert_eq!(tab.replay_search_hit_idx, 0);
+
+        tab.replay_next_hit(-1); // wraps to 1
+        assert_eq!(tab.replay_search_hit_idx, 1);
+    }
 
     #[test]
     fn test_extract_tool_use_blocks_empty() {
