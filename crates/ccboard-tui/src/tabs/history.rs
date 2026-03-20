@@ -9,8 +9,8 @@ use ratatui::{
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
-        Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
-        ScrollbarState, Sparkline,
+        Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, Sparkline,
     },
     Frame,
 };
@@ -461,7 +461,9 @@ impl HistoryTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);
@@ -522,7 +524,9 @@ impl HistoryTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         if self.filtered_sessions.is_empty() {
@@ -697,7 +701,9 @@ impl HistoryTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Activity Overview ",
                 Style::default().fg(p.fg).bold(),
@@ -907,7 +913,9 @@ impl HistoryTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.focus))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Session Detail ",
                 Style::default().fg(p.fg).bold(),
@@ -1140,7 +1148,9 @@ impl HistoryTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(border_color));
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface));
 
         let inner = block.inner(msg_area);
         frame.render_widget(block, msg_area);

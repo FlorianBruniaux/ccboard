@@ -1,8 +1,10 @@
+use crate::theme::{FocusStyle, Palette};
+use ccboard_core::models::config::ColorScheme;
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::Span,
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     Frame,
 };
 
@@ -27,27 +29,28 @@ impl DetailPane {
     }
 
     /// Render the detail pane
-    pub fn render(&self, frame: &mut Frame, area: Rect) {
+    pub fn render(&self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
+        let p = Palette::new(scheme);
         let border_color = if self.focused {
-            Color::Cyan
+            FocusStyle::focused_border(scheme)
         } else {
-            Color::DarkGray
+            p.border
         };
 
         let paragraph = Paragraph::new(self.content.as_str())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
                     .border_style(Style::default().fg(border_color))
+                    .style(Style::default().bg(p.surface))
                     .title(Span::styled(
                         format!(" {} ", self.title),
-                        Style::default()
-                            .fg(Color::White)
-                            .add_modifier(Modifier::BOLD),
+                        Style::default().fg(p.fg).add_modifier(Modifier::BOLD),
                     )),
             )
             .wrap(Wrap { trim: false })
-            .style(Style::default().fg(Color::Gray));
+            .style(Style::default().fg(p.muted));
 
         frame.render_widget(paragraph, area);
     }

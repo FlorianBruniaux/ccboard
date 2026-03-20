@@ -7,8 +7,8 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{
-        Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
-        ScrollbarState, Tabs,
+        Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, Tabs,
     },
     Frame,
 };
@@ -459,7 +459,9 @@ impl AgentsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         if list_len == 0 {
@@ -578,7 +580,9 @@ impl AgentsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.focus))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(" Detail ", Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);

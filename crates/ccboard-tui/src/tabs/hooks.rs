@@ -8,8 +8,8 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{
-        Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
-        ScrollbarState,
+        Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Scrollbar,
+        ScrollbarOrientation, ScrollbarState,
     },
     Frame,
 };
@@ -368,7 +368,9 @@ impl HooksTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 format!(" Events ({}) ", self.event_names.len()),
                 Style::default().fg(p.fg).bold(),
@@ -469,7 +471,9 @@ impl HooksTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(title, Style::default().fg(p.fg).bold()))
             .title_bottom(Line::from(vec![
                 Span::styled("Tab", Style::default().fg(p.focus)),
@@ -696,7 +700,9 @@ impl HooksTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(title, Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);
@@ -754,7 +760,9 @@ impl HooksTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Hook Content ",
                 Style::default().fg(p.fg).bold(),

@@ -1,5 +1,6 @@
 //! Analytics tab - Trends, forecasting, patterns, insights, anomalies with 5 sub-views
 
+use crate::empty_state;
 use crate::theme::Palette;
 use ccboard_core::analytics::{AnalyticsData, AnomalySeverity, Period};
 use ccboard_core::store::DataStore;
@@ -9,8 +10,8 @@ use ratatui::{
     symbols,
     text::{Line, Span},
     widgets::{
-        Axis, BarChart, Block, Borders, Cell, Chart, Dataset, GraphType, List, ListItem, Paragraph,
-        Row, Sparkline, Table,
+        Axis, BarChart, Block, BorderType, Borders, Cell, Chart, Dataset, GraphType, List,
+        ListItem, Paragraph, Row, Sparkline, Table,
     },
     Frame,
 };
@@ -257,7 +258,12 @@ impl AnalyticsTab {
             Span::styled("[F1:7d F2:30d F3:90d F4:All]", Style::default().fg(p.muted)),
         ];
         let period_para = Paragraph::new(Line::from(period_text))
-            .block(Block::default().borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface)),
+            )
             .alignment(Alignment::Left);
         frame.render_widget(period_para, chunks[0]);
 
@@ -270,31 +276,41 @@ impl AnalyticsTab {
             AnalyticsView::Anomalies,
             AnalyticsView::Plugins,
         ];
-        let tabs_text: Vec<Span> = views
-            .iter()
-            .flat_map(|view| {
-                let is_active = *view == self.current_view;
-                let style = if is_active {
-                    Style::default().fg(p.warning).add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default().fg(p.muted)
-                };
-                vec![Span::styled(view.name(), style), Span::raw(" | ")]
-            })
-            .collect();
-
-        let tabs_para = Paragraph::new(Line::from(tabs_text))
-            .block(Block::default().borders(Borders::ALL))
-            .alignment(Alignment::Center);
-        frame.render_widget(tabs_para, chunks[1]);
+        let mut tab_spans: Vec<Span> = Vec::new();
+        for (i, view) in views.iter().enumerate() {
+            if i > 0 {
+                tab_spans.push(Span::styled("  │  ", Style::default().fg(p.border)));
+            }
+            let is_active = *view == self.current_view;
+            if is_active {
+                tab_spans.push(Span::styled(
+                    view.name(),
+                    Style::default()
+                        .fg(p.focus)
+                        .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                ));
+            } else {
+                tab_spans.push(Span::styled(view.name(), Style::default().fg(p.muted)));
+            }
+        }
+        let tab_block = Block::default()
+            .borders(Borders::BOTTOM)
+            .border_style(Style::default().fg(p.border));
+        let tab_inner = tab_block.inner(chunks[1]);
+        frame.render_widget(tab_block, chunks[1]);
+        frame.render_widget(
+            Paragraph::new(Line::from(tab_spans)).alignment(Alignment::Center),
+            tab_inner,
+        );
     }
 
     /// Render loading state
     fn render_loading(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .title("Analytics")
-            .style(Style::default().fg(p.muted));
+            .style(Style::default().fg(p.muted).bg(p.surface));
 
         let para = Paragraph::new(vec![
             Line::from(""),
@@ -530,6 +546,8 @@ impl AnalyticsTab {
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .style(Style::default().bg(p.surface))
                         .title("Budget Status"),
                 )
                 .alignment(Alignment::Left);
@@ -552,6 +570,8 @@ impl AnalyticsTab {
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .style(Style::default().bg(p.surface))
                         .title("Budget Status"),
                 )
                 .alignment(Alignment::Center);
@@ -574,7 +594,9 @@ impl AnalyticsTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 title,
                 Style::default().fg(color).add_modifier(Modifier::BOLD),
@@ -623,6 +645,8 @@ impl AnalyticsTab {
         // Outer block with title and borders
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .style(Style::default().bg(p.surface))
             .title("Token Usage Over Time");
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -706,6 +730,8 @@ impl AnalyticsTab {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface))
                     .title("Top Insights (Tab to Insights view for all)"),
             )
             .style(Style::default().fg(p.fg));
@@ -717,6 +743,8 @@ impl AnalyticsTab {
     fn render_trends(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .style(Style::default().bg(p.surface))
             .title("Trends - Token & Session Activity Over Time");
 
         // Prepare data points for chart
@@ -972,7 +1000,13 @@ impl AnalyticsTab {
         let heatmap_title = format!("Activity Heatmap{}", streak_label);
 
         let paragraph = Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(heatmap_title))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface))
+                    .title(heatmap_title),
+            )
             .alignment(Alignment::Left);
 
         frame.render_widget(paragraph, area);
@@ -1007,6 +1041,8 @@ impl AnalyticsTab {
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .style(Style::default().bg(p.surface))
                         .title("Most Used Tools"),
                 )
                 .alignment(Alignment::Center);
@@ -1047,6 +1083,8 @@ impl AnalyticsTab {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface))
                     .title("Most Used Tools"),
             )
             .alignment(Alignment::Left);
@@ -1082,6 +1120,8 @@ impl AnalyticsTab {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface))
                     .title("Hourly Distribution (Session Count)"),
             )
             .data(&bar_data)
@@ -1115,6 +1155,8 @@ impl AnalyticsTab {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface))
                     .title("Model Distribution (Token %)"),
             )
             .data(&model_data)
@@ -1213,6 +1255,8 @@ impl AnalyticsTab {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface))
                     .title("Session Duration Statistics"),
             )
             .alignment(Alignment::Left);
@@ -1222,6 +1266,14 @@ impl AnalyticsTab {
 
     /// Render insights sub-view (scrollable list)
     fn render_insights(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
+        // Empty state when no insights computed
+        if data.insights.is_empty() {
+            let period_label = self.current_period.display(0);
+            let empty = empty_state::no_insights(period_label);
+            frame.render_widget(empty, area);
+            return;
+        }
+
         let insights: Vec<ListItem> = data
             .insights
             .iter()
@@ -1263,6 +1315,8 @@ impl AnalyticsTab {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface))
                     .title(format!("Actionable Insights{}", scroll_indicator)),
             )
             .style(Style::default().fg(p.fg));
@@ -1421,6 +1475,8 @@ impl AnalyticsTab {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface))
                     .title("Project Leaderboard (Top 5) - [s] sort column | [o] order"),
             )
             .column_spacing(1);
@@ -1445,8 +1501,9 @@ impl AnalyticsTab {
             let spike_title = format!(" Daily Cost Spikes ({} detected) ", daily_spikes.len());
             let spike_block = Block::default()
                 .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
                 .title(spike_title)
-                .style(Style::default().fg(p.border));
+                .style(Style::default().fg(p.border).bg(p.surface));
 
             if daily_spikes.is_empty() {
                 let para = Paragraph::new(vec![Line::from(Span::styled(
@@ -1520,6 +1577,8 @@ impl AnalyticsTab {
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .style(Style::default().bg(p.surface))
                         .title("Anomaly Detection"),
                 )
                 .alignment(Alignment::Center);
@@ -1555,6 +1614,8 @@ impl AnalyticsTab {
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .style(Style::default().bg(p.surface))
                         .title("Anomaly Detection"),
                 )
                 .alignment(Alignment::Center);
@@ -1655,7 +1716,13 @@ impl AnalyticsTab {
 
         let table = Table::new(rows, widths)
             .header(header)
-            .block(Block::default().borders(Borders::ALL).title(title))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(Style::default().bg(p.surface))
+                    .title(title),
+            )
             .column_spacing(1);
 
         frame.render_widget(table, area);
@@ -1688,8 +1755,9 @@ impl AnalyticsTab {
         // as a proxy. If tool_chains is present, show top tools from bigrams.
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .title(" Tool Token Distribution (by call frequency) ")
-            .style(Style::default().fg(p.border));
+            .style(Style::default().fg(p.border).bg(p.surface));
 
         if let Some(ref chains) = data.tool_chains {
             if chains.top_bigrams.is_empty() {
@@ -1785,8 +1853,9 @@ impl AnalyticsTab {
         );
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .title(title)
-            .style(Style::default().fg(p.border));
+            .style(Style::default().fg(p.border).bg(p.surface));
 
         if data.cost_suggestions.is_empty() {
             let para = Paragraph::new(vec![

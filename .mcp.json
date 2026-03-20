@@ -24,6 +24,11 @@
       "env": {
         "GREPAI_PROJECT_PATH": "${CLAUDE_PROJECT_DIR}"
       }
+    },
+    "tree-sitter": {
+      "type": "stdio",
+      "command": "mcp-server-tree-sitter",
+      "args": []
     }
   }
 }

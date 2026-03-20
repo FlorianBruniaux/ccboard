@@ -80,9 +80,7 @@ impl SearchTab {
 
     /// Currently selected result (for detail pane)
     pub fn selected_result(&self) -> Option<&SearchResult> {
-        self.list_state
-            .selected()
-            .and_then(|i| self.results.get(i))
+        self.list_state.selected().and_then(|i| self.results.get(i))
     }
 
     /// Refresh results from data store (min 2 chars to trigger)
@@ -214,10 +212,7 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled(
-                        format!("{} ", date),
-                        Style::default().fg(Color::Yellow),
-                    ),
+                    Span::styled(format!("{} ", date), Style::default().fg(Color::Yellow)),
                     Span::styled(
                         r.snippet
                             .as_deref()
@@ -261,7 +256,12 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
             let detail_lines = vec![
                 Line::from(vec![
                     Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(project, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        project,
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("Date:    ", Style::default().fg(Color::DarkGray)),
@@ -284,7 +284,9 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
                 Line::from(""),
                 Line::from(Span::styled(
                     "Snippet:",
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
                 )),
                 Line::from(Span::styled(snippet, Style::default().fg(Color::Gray))),
                 Line::from(""),

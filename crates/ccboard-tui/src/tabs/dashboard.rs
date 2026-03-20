@@ -9,7 +9,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
     symbols,
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph, Sparkline},
+    widgets::{Block, BorderType, Borders, Gauge, Paragraph, Sparkline},
     Frame,
 };
 use std::sync::Arc;
@@ -197,7 +197,9 @@ impl DashboardTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 format!(" {} ", title),
                 Style::default().fg(color).bold(),
@@ -206,18 +208,19 @@ impl DashboardTab {
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        // Split inner area for value and subtitle
+        // Split inner area for value and subtitle — more breathing room between value/label
         let inner_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // top padding
-                Constraint::Length(2), // value
+                Constraint::Length(2), // top padding (increased for visual air)
+                Constraint::Length(1), // value
+                Constraint::Length(1), // spacer
                 Constraint::Length(1), // subtitle
                 Constraint::Min(0),    // bottom padding
             ])
             .split(inner);
 
-        // Main value - large and centered
+        // Main value - bold and centered
         let value_widget = Paragraph::new(Line::from(Span::styled(
             value,
             Style::default().fg(color).add_modifier(Modifier::BOLD),
@@ -225,13 +228,13 @@ impl DashboardTab {
         .alignment(Alignment::Center);
         frame.render_widget(value_widget, inner_chunks[1]);
 
-        // Subtitle
+        // Subtitle - muted, smaller visual weight
         let subtitle_widget = Paragraph::new(Line::from(Span::styled(
             subtitle,
             Style::default().fg(p.muted),
         )))
         .alignment(Alignment::Center);
-        frame.render_widget(subtitle_widget, inner_chunks[2]);
+        frame.render_widget(subtitle_widget, inner_chunks[3]);
     }
 
     fn render_activity(
@@ -243,7 +246,9 @@ impl DashboardTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " ≡ 7-Day Activity ",
                 Style::default().fg(p.fg).bold(),
@@ -351,7 +356,9 @@ impl DashboardTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " ◈ Model Usage ",
                 Style::default().fg(p.fg).bold(),
@@ -471,8 +478,9 @@ impl DashboardTab {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
                     .border_style(Style::default().fg(p.warning))
-                    .style(Style::default().bg(p.bg)),
+                    .style(Style::default().bg(p.surface)),
             );
 
         frame.render_widget(hint, area);
@@ -562,7 +570,9 @@ impl DashboardTab {
                 Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
             ))
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(p.focus));
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(p.focus))
+            .style(Style::default().bg(p.surface));
 
         let paragraph = Paragraph::new(text)
             .block(block)

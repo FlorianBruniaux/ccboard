@@ -6,7 +6,10 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{BarChart, Block, Borders, Gauge, List, ListItem, ListState, Paragraph, Row, Table},
+    widgets::{
+        BarChart, Block, BorderType, Borders, Gauge, List, ListItem, ListState, Paragraph, Row,
+        Table,
+    },
     Frame,
 };
 
@@ -183,39 +186,41 @@ impl CostsTab {
     }
 
     fn render_view_tabs(&self, frame: &mut Frame, area: Rect, p: &Palette) {
-        let tabs = [
-            "1. Overview",
-            "2. By Model",
-            "3. Daily",
-            "4. Billing Blocks",
-            "5. Leaderboard",
-            "6. Per Project",
+        let tab_names = [
+            "Overview",
+            "By Model",
+            "Daily",
+            "Billing Blocks",
+            "Leaderboard",
+            "Per Project",
         ];
+
+        let mut spans = Vec::new();
+        for (i, name) in tab_names.iter().enumerate() {
+            if i > 0 {
+                spans.push(Span::styled("  │  ", Style::default().fg(p.border)));
+            }
+            if i == self.view_mode {
+                spans.push(Span::styled(
+                    *name,
+                    Style::default()
+                        .fg(p.focus)
+                        .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                ));
+            } else {
+                spans.push(Span::styled(*name, Style::default().fg(p.muted)));
+            }
+        }
 
         let block = Block::default()
             .borders(Borders::BOTTOM)
             .border_style(Style::default().fg(p.border));
-
         let inner = block.inner(area);
         frame.render_widget(block, area);
-
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Ratio(1, 6); 6])
-            .split(inner);
-
-        for (i, (tab, chunk)) in tabs.iter().zip(chunks.iter()).enumerate() {
-            let style = if i == self.view_mode {
-                Style::default()
-                    .fg(p.focus)
-                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
-            } else {
-                Style::default().fg(p.muted)
-            };
-
-            let label = Paragraph::new(Span::styled(*tab, style)).alignment(Alignment::Center);
-            frame.render_widget(label, *chunk);
-        }
+        frame.render_widget(
+            Paragraph::new(Line::from(spans)).alignment(Alignment::Center),
+            inner,
+        );
     }
 
     fn render_overview(
@@ -259,7 +264,9 @@ impl CostsTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " $ Total Estimated Cost ",
                 Style::default().fg(p.fg).bold(),
@@ -386,7 +393,9 @@ impl CostsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " 💰 Monthly Budget ",
                 Style::default().fg(p.fg).bold(),
@@ -424,7 +433,9 @@ impl CostsTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Token Breakdown ",
                 Style::default().fg(p.fg).bold(),
@@ -511,7 +522,9 @@ impl CostsTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Model Cost Distribution ",
                 Style::default().fg(p.fg).bold(),
@@ -586,7 +599,9 @@ impl CostsTab {
         );
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);
@@ -666,7 +681,9 @@ impl CostsTab {
     fn render_daily(&self, frame: &mut Frame, area: Rect, stats: Option<&StatsCache>, p: &Palette) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Daily Token Usage (Last 14 Days) ",
                 Style::default().fg(p.fg).bold(),
@@ -828,7 +845,9 @@ impl CostsTab {
                 .block(
                     Block::default()
                         .title("Billing Blocks (5h)")
-                        .borders(Borders::ALL),
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .style(Style::default().bg(p.surface)),
                 )
                 .style(Style::default().fg(p.muted));
             frame.render_widget(no_data, area);
@@ -867,7 +886,9 @@ impl CostsTab {
                 .block(
                     Block::default()
                         .title("Billing Blocks (5h)")
-                        .borders(Borders::ALL),
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .style(Style::default().bg(p.surface)),
                 )
                 .alignment(ratatui::layout::Alignment::Left);
             frame.render_widget(no_data, area);
@@ -938,7 +959,9 @@ impl CostsTab {
             Block::default()
                 .title("Billing Blocks (5h UTC) — Last 10 Days")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(p.focus)),
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(p.focus))
+                .style(Style::default().bg(p.surface)),
         )
         .column_spacing(2);
 
@@ -970,7 +993,9 @@ impl CostsTab {
                 .block(
                     Block::default()
                         .title("Token Leaderboard")
-                        .borders(Borders::ALL),
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .style(Style::default().bg(p.surface)),
                 )
                 .style(Style::default().fg(p.muted));
             frame.render_widget(no_data, area);
@@ -1007,7 +1032,9 @@ impl CostsTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.focus))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Top 10 Sessions by Tokens ",
                 Style::default().fg(p.fg).bold(),
@@ -1085,7 +1112,9 @@ impl CostsTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.focus))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Top 10 Models by Tokens ",
                 Style::default().fg(p.fg).bold(),
@@ -1150,7 +1179,9 @@ impl CostsTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.focus))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Top 10 Days by Tokens ",
                 Style::default().fg(p.fg).bold(),
@@ -1215,7 +1246,9 @@ impl CostsTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " $ Last Session Cost per Project ",
                 Style::default().fg(p.fg).bold(),

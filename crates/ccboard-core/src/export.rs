@@ -820,10 +820,7 @@ pub fn export_conversation_to_html(
         writer,
         "        .code-block pre {{ margin: 0 !important; padding: 12px !important; overflow-x: auto; border-radius: 0 !important; font-size: 13px; line-height: 1.5; }}"
     )?;
-    writeln!(
-        writer,
-        "        .text {{ white-space: pre-wrap; }}"
-    )?;
+    writeln!(writer, "        .text {{ white-space: pre-wrap; }}")?;
     writeln!(writer, "    </style>")?;
     writeln!(writer, "</head>")?;
     writeln!(writer, "<body>")?;
@@ -934,8 +931,7 @@ use syntect::parsing::SyntaxSet;
 
 static SYNTAX_SET: Lazy<SyntaxSet> = Lazy::new(SyntaxSet::load_defaults_newlines);
 static THEME_SET: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
-static CODE_FENCE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?s)```(\w*)\n(.*?)```").unwrap());
+static CODE_FENCE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?s)```(\w*)\n(.*?)```").unwrap());
 
 /// Render message content as HTML, detecting fenced code blocks and applying
 /// syntax highlighting via syntect. Plain text regions are HTML-escaped.
@@ -976,10 +972,8 @@ pub fn render_content_as_html(content: &str) -> String {
                 .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text())
         };
 
-        let highlighted =
-            highlighted_html_for_string(code, &SYNTAX_SET, syntax, theme).unwrap_or_else(|_| {
-                format!("<pre><code>{}</code></pre>", html_escape(code))
-            });
+        let highlighted = highlighted_html_for_string(code, &SYNTAX_SET, syntax, theme)
+            .unwrap_or_else(|_| format!("<pre><code>{}</code></pre>", html_escape(code)));
 
         let lang_label = if lang.is_empty() {
             String::new()
@@ -1415,7 +1409,8 @@ mod tests {
     fn test_render_html_export_with_code_block() {
         let mut messages = create_test_messages();
         messages[1].content =
-            "Here's an example:\n```rust\nlet x = 42;\nprintln!(\"{}\", x);\n```\nEnjoy!".to_string();
+            "Here's an example:\n```rust\nlet x = 42;\nprintln!(\"{}\", x);\n```\nEnjoy!"
+                .to_string();
 
         let metadata = create_test_session("test-html", "/test/project", 2, 150);
         let temp_dir = TempDir::new().unwrap();

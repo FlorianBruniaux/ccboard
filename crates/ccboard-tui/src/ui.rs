@@ -1,7 +1,7 @@
 //! TUI rendering logic
 
 use crate::app::{App, Tab};
-use crate::components::{Breadcrumb, Breadcrumbs};
+// Breadcrumbs removed — navigation is now shown in the header tab bar
 use crate::tabs::render_search_tab;
 use crate::tabs::{
     ActivityTab, AgentsTab, AnalyticsTab, ConfigTab, ConversationTab, CostsTab, DashboardTab,
@@ -10,8 +10,8 @@ use crate::tabs::{
 use crate::theme::Palette;
 use ccboard_core::DegradedState;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Tabs},
     Frame,
@@ -31,7 +31,6 @@ pub struct Ui {
     plugins: PluginsTab,
     activity: ActivityTab,
     conversation: ConversationTab,
-    breadcrumbs: Breadcrumbs,
 }
 
 impl Default for Ui {
@@ -55,7 +54,6 @@ impl Ui {
             plugins: PluginsTab::new(),
             activity: ActivityTab::new(),
             conversation: ConversationTab::new(),
-            breadcrumbs: Breadcrumbs::new(),
         }
     }
 
@@ -290,7 +288,7 @@ impl Ui {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(5), // Header + Tab bar + Breadcrumbs (2 for tabs + 2 for breadcrumbs + 1 for borders)
+                Constraint::Length(3), // Header: logo + tabs on one line + separator
                 Constraint::Min(0),    // Content
                 Constraint::Length(1), // Status bar
             ])
@@ -409,67 +407,52 @@ impl Ui {
     fn render_header(&mut self, frame: &mut Frame, area: Rect, active: Tab, app: &App) {
         let p = Palette::new(app.color_scheme);
 
+        // Separator border at bottom only
         let block = Block::default()
             .borders(Borders::BOTTOM)
-            .border_style(Style::default().fg(p.muted));
+            .border_style(Style::default().fg(p.border));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        // Split header vertically: tab bar + separator + breadcrumbs
-        let header_rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(2), // Tab bar with padding
-                Constraint::Length(2), // Breadcrumbs (with top border = 1 line + content = 1 line)
-            ])
-            .split(inner);
-
-        // Add vertical padding to tab bar area (empty line at bottom)
-        let tab_bar_padded = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1), // Tabs
-                Constraint::Length(1), // Bottom padding
-            ])
-            .split(header_rows[0]);
-
-        // Tab bar: split horizontally (logo left, tabs right)
+        // Horizontal layout: logo | tabs | hints
         let tab_bar_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(12), // Logo
-                Constraint::Min(0),     // Tabs
+                Constraint::Length(12), // "◈ ccboard"
+                Constraint::Min(0),     // Tab bar
+                Constraint::Length(20), // "[?] help  [q] quit"
             ])
-            .split(tab_bar_padded[0]);
+            .split(inner);
 
         // Logo
-        let logo = Paragraph::new(Line::from(vec![
-            Span::styled("◈ ", Style::default().fg(p.focus)),
-            Span::styled("ccboard", Style::default().fg(p.fg).bold()),
-        ]));
-        frame.render_widget(logo, tab_bar_chunks[0]);
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled("◈ ", Style::default().fg(p.focus)),
+                Span::styled("ccboard", Style::default().fg(p.fg).bold()),
+            ])),
+            tab_bar_chunks[0],
+        );
 
-        // Tabs with icons — active shows icon+[k]+name, inactive shows icon only
+        // Tabs — all show their full name, active gets highlight background
         let titles: Vec<Line> = Tab::all()
             .iter()
             .map(|t| {
                 if *t == active {
                     Line::from(vec![
                         Span::raw(" "),
-                        Span::styled(t.icon(), Style::default().fg(p.fg)),
-                        Span::raw(" "),
-                        Span::styled(format!("[{}]", t.shortcut()), Style::default().fg(p.muted)),
-                        Span::raw(" "),
                         Span::styled(
                             t.name(),
-                            Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
+                            Style::default()
+                                .fg(p.focus)
+                                .bg(Color::Rgb(20, 40, 55))
+                                .add_modifier(Modifier::BOLD),
                         ),
                         Span::raw(" "),
                     ])
                 } else {
                     Line::from(Span::styled(
-                        format!(" {} ", t.icon()),
+                        format!(" {} ", t.name()),
                         Style::default().fg(p.muted),
                     ))
                 }
@@ -478,22 +461,21 @@ impl Ui {
 
         let tabs = Tabs::new(titles)
             .select(active.index())
-            .divider(Span::styled("│", Style::default().fg(p.muted)));
+            .divider(Span::styled("│", Style::default().fg(p.border)));
 
         frame.render_widget(tabs, tab_bar_chunks[1]);
 
-        // Breadcrumbs (second row with top border)
-        let breadcrumb_block = Block::default()
-            .borders(Borders::TOP)
-            .border_style(Style::default().fg(p.muted));
-
-        let breadcrumb_inner = breadcrumb_block.inner(header_rows[1]);
-        frame.render_widget(breadcrumb_block, header_rows[1]);
-
-        let breadcrumbs_path = self.get_breadcrumbs_for_tab(active, app);
-        self.breadcrumbs.set_path(breadcrumbs_path);
-        self.breadcrumbs
-            .render(frame, breadcrumb_inner, app.color_scheme);
+        // Hints (right-aligned)
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled("[?]", Style::default().fg(p.focus)),
+                Span::styled(" help  ", Style::default().fg(p.muted)),
+                Span::styled("[q]", Style::default().fg(p.focus)),
+                Span::styled(" quit", Style::default().fg(p.muted)),
+            ]))
+            .alignment(Alignment::Right),
+            tab_bar_chunks[2],
+        );
     }
 
     fn render_degraded_banner(
@@ -675,54 +657,5 @@ impl Ui {
 
         let bar = Paragraph::new(status).style(Style::default().bg(p.muted));
         frame.render_widget(bar, area);
-    }
-
-    /// Get breadcrumbs path for the active tab
-    fn get_breadcrumbs_for_tab(&self, tab: Tab, _app: &App) -> Vec<Breadcrumb> {
-        let mut path = vec![Breadcrumb::new("Dashboard").with_level(0)];
-
-        match tab {
-            Tab::Dashboard => {
-                // Just "Dashboard"
-            }
-            Tab::Sessions => {
-                path.push(Breadcrumb::new("Sessions").with_level(1));
-            }
-            Tab::Config => {
-                path.push(Breadcrumb::new("Config").with_level(1));
-            }
-            Tab::Hooks => {
-                path.push(Breadcrumb::new("Hooks").with_level(1));
-            }
-            Tab::Agents => {
-                path.push(Breadcrumb::new("Capabilities").with_level(1));
-                // Add sub-tab to breadcrumbs
-                let sub_tab_label = self.agents.current_sub_tab_label();
-                path.push(Breadcrumb::new(sub_tab_label).with_level(2));
-            }
-            Tab::Costs => {
-                path.push(Breadcrumb::new("Costs").with_level(1));
-            }
-            Tab::History => {
-                path.push(Breadcrumb::new("History").with_level(1));
-            }
-            Tab::Mcp => {
-                path.push(Breadcrumb::new("MCP").with_level(1));
-            }
-            Tab::Analytics => {
-                path.push(Breadcrumb::new("Analytics").with_level(1));
-            }
-            Tab::Plugins => {
-                path.push(Breadcrumb::new("Plugins").with_level(1));
-            }
-            Tab::Activity => {
-                path.push(Breadcrumb::new("Activity").with_level(1));
-            }
-            Tab::Search => {
-                path.push(Breadcrumb::new("Search").with_level(1));
-            }
-        }
-
-        path
     }
 }

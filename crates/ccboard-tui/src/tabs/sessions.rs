@@ -10,8 +10,8 @@ use ratatui::{
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
-        Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarOrientation,
-        ScrollbarState,
+        Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Scrollbar,
+        ScrollbarOrientation, ScrollbarState,
     },
     Frame,
 };
@@ -635,8 +635,7 @@ impl SessionsTab {
             return;
         }
         let len = self.replay_search_hits.len() as i32;
-        let new_idx =
-            (self.replay_search_hit_idx as i32 + direction).rem_euclid(len) as usize;
+        let new_idx = (self.replay_search_hit_idx as i32 + direction).rem_euclid(len) as usize;
         self.replay_search_hit_idx = new_idx;
         self.replay_scroll
             .select(Some(self.replay_search_hits[new_idx]));
@@ -731,7 +730,9 @@ impl SessionsTab {
         let search_block = Block::default()
             .title(search_title)
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(search_border_color));
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(search_border_color))
+            .style(Style::default().bg(p.surface));
 
         let search_text = if self.search_filter.is_empty() {
             format!("/ {}", search_placeholder)
@@ -948,7 +949,9 @@ impl SessionsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 format!(" ⚡ Live Sessions ({}) ", live_sessions.len()),
                 Style::default().fg(p.success).add_modifier(Modifier::BOLD),
@@ -1106,7 +1109,9 @@ impl SessionsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 format!(" Projects ({}) ", self.projects.len()),
                 Style::default().fg(p.fg).bold(),
@@ -1206,7 +1211,9 @@ impl SessionsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(title_text, Style::default().fg(p.fg).bold()));
 
         if sessions.is_empty() {
@@ -1388,7 +1395,9 @@ impl SessionsTab {
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.focus))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 " Session Detail ",
                 Style::default().fg(p.fg).bold(),
@@ -1618,7 +1627,9 @@ impl SessionsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(status_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 format!(" {} Live Session Detail ", status_icon),
                 Style::default().fg(status_color).bold(),
@@ -1838,7 +1849,9 @@ impl SessionsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(p.important))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(title, Style::default().fg(p.important).bold()));
 
         let inner = block.inner(area);
@@ -1907,7 +1920,8 @@ impl SessionsTab {
                             if !self.replay_search_query.is_empty() {
                                 // Highlighted search matches
                                 let mut spans = vec![Span::raw("  ")];
-                                spans.extend(highlight_matches(&preview, &self.replay_search_query));
+                                spans
+                                    .extend(highlight_matches(&preview, &self.replay_search_query));
                                 lines.push(Line::from(spans));
                             } else {
                                 lines.push(Line::from(vec![Span::styled(
@@ -1941,9 +1955,7 @@ impl SessionsTab {
                                 for (_, name, input) in &tool_uses {
                                     lines.push(Line::from(vec![Span::styled(
                                         format!("    🔧 {}", name),
-                                        Style::default()
-                                            .fg(p.warning)
-                                            .add_modifier(Modifier::BOLD),
+                                        Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
                                     )]));
                                     let summary = Self::format_tool_input_summary(name, input);
                                     if !summary.is_empty() {
@@ -2065,13 +2077,9 @@ impl SessionsTab {
                     Style::default().fg(p.fg),
                 ),
                 Span::styled(hit_info, Style::default().fg(p.muted)),
-                Span::styled(
-                    "  n/N next/prev  Esc clear",
-                    Style::default().fg(p.muted),
-                ),
+                Span::styled("  n/N next/prev  Esc clear", Style::default().fg(p.muted)),
             ]);
-            let search_widget = Paragraph::new(search_line)
-                .style(Style::default().bg(p.border));
+            let search_widget = Paragraph::new(search_line).style(Style::default().bg(p.border));
             frame.render_widget(search_widget, bottom_area);
         } else {
             let hints = Line::from(vec![
@@ -2451,7 +2459,9 @@ impl SessionsTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(p.success));
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(p.success))
+            .style(Style::default().bg(p.surface));
 
         let inner = block.inner(msg_area);
         frame.render_widget(block, msg_area);

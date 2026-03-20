@@ -23,7 +23,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
 use std::collections::HashMap;
@@ -230,7 +230,9 @@ impl McpTab {
         if mcp_config.is_none() {
             let block = Block::default()
                 .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(border_color))
+                .style(Style::default().bg(p.surface))
                 .title(Span::styled(
                     " MCP Servers (0) ",
                     Style::default().fg(p.fg).bold(),
@@ -251,7 +253,9 @@ impl McpTab {
         if server_count == 0 {
             let block = Block::default()
                 .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(border_color))
+                .style(Style::default().bg(p.surface))
                 .title(Span::styled(
                     " MCP Servers (0) ",
                     Style::default().fg(p.fg).bold(),
@@ -300,7 +304,9 @@ impl McpTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 format!(" MCP Servers ({}) ", server_count),
                 Style::default().fg(p.fg).bold(),
@@ -335,16 +341,16 @@ impl McpTab {
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(border_color))
+            .style(Style::default().bg(p.surface))
             .title(Span::styled(title, Style::default().fg(p.fg).bold()));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
         if selected_server.is_none() {
-            let empty = Paragraph::new("Select a server to view details")
-                .style(Style::default().fg(p.muted))
-                .alignment(Alignment::Center);
+            let empty = empty_state::no_server_selected();
             frame.render_widget(empty, inner);
             return;
         }
@@ -815,17 +821,18 @@ mod tests {
     #[test]
     fn test_status_icon() {
         use ccboard_core::models::config::ColorScheme;
+        // Colors match the updated Rgb palette (Phase 1 redesign)
         assert_eq!(
             ServerStatus::Running(123).icon(ColorScheme::Dark),
-            ("●", Color::Green)
+            ("●", Color::Rgb(80, 200, 120))
         );
         assert_eq!(
             ServerStatus::Stopped.icon(ColorScheme::Dark),
-            ("○", Color::Red)
+            ("○", Color::Rgb(220, 80, 80))
         );
         assert_eq!(
             ServerStatus::Unknown.icon(ColorScheme::Dark),
-            ("?", Color::DarkGray)
+            ("?", Color::Rgb(90, 95, 120))
         );
     }
 

@@ -20,23 +20,25 @@ use ratatui::style::Color;
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Palette {
-    /// Primary background (Black / White)
+    /// Primary background — near-black with blue warmth
     pub bg: Color,
-    /// Primary foreground text (White / Black)
+    /// Card/panel surface — one step above bg
+    pub surface: Color,
+    /// Primary foreground text — soft white
     pub fg: Color,
-    /// Muted/secondary text (DarkGray / Gray)
+    /// Muted/secondary text — clearly distinct from border
     pub muted: Color,
-    /// Unfocused border color
+    /// Unfocused border color — subtle but visible
     pub border: Color,
-    /// Focus/accent color (Cyan / dark cyan)
+    /// Focus/accent color — desaturated cyan
     pub focus: Color,
-    /// Success/healthy color (Green / dark green)
+    /// Success/healthy color
     pub success: Color,
-    /// Error/critical color (Red / dark red)
+    /// Error/critical color
     pub error: Color,
-    /// Warning/pending color (Yellow / dark amber)
+    /// Warning/pending color — warm amber
     pub warning: Color,
-    /// Important/cost alert color (Magenta / dark magenta)
+    /// Important/cost alert color — soft violet
     pub important: Color,
 }
 
@@ -44,18 +46,20 @@ impl Palette {
     pub fn new(scheme: ColorScheme) -> Self {
         match scheme {
             ColorScheme::Dark => Self {
-                bg: Color::Black,
-                fg: Color::White,
-                muted: Color::DarkGray,
-                border: Color::DarkGray,
-                focus: Color::Cyan,
-                success: Color::Green,
-                error: Color::Red,
-                warning: Color::Yellow,
-                important: Color::Magenta,
+                bg: Color::Rgb(13, 17, 23), // GitHub dark — near-black with blue warmth
+                surface: Color::Rgb(22, 27, 34), // Card/panel layer above bg
+                fg: Color::Rgb(220, 220, 235), // Soft white, less fatiguing
+                muted: Color::Rgb(90, 95, 120), // Clearly distinct from border
+                border: Color::Rgb(48, 54, 72), // Subtle but visible
+                focus: Color::Rgb(80, 190, 210), // Desaturated cyan — readable without glare
+                success: Color::Rgb(80, 200, 120), // Softer green
+                error: Color::Rgb(220, 80, 80), // Slightly desaturated red
+                warning: Color::Rgb(220, 175, 60), // Warm amber vs terminal yellow
+                important: Color::Rgb(180, 100, 220), // Soft violet
             },
             ColorScheme::Light => Self {
                 bg: Color::White,
+                surface: Color::Rgb(245, 246, 248), // Slightly off-white for panels
                 fg: Color::Black,
                 muted: Color::Gray,
                 border: Color::Gray,
@@ -91,12 +95,12 @@ impl StatusColor {
     pub fn to_color(self, scheme: ColorScheme) -> Color {
         match scheme {
             ColorScheme::Dark => match self {
-                StatusColor::Success => Color::Green,
-                StatusColor::Error => Color::Red,
-                StatusColor::Warning => Color::Yellow,
-                StatusColor::Neutral => Color::DarkGray,
-                StatusColor::Focus => Color::Cyan,
-                StatusColor::Important => Color::Magenta,
+                StatusColor::Success => Color::Rgb(80, 200, 120),
+                StatusColor::Error => Color::Rgb(220, 80, 80),
+                StatusColor::Warning => Color::Rgb(220, 175, 60),
+                StatusColor::Neutral => Color::Rgb(90, 95, 120),
+                StatusColor::Focus => Color::Rgb(80, 190, 210),
+                StatusColor::Important => Color::Rgb(180, 100, 220),
             },
             ColorScheme::Light => match self {
                 StatusColor::Success => Color::Rgb(0, 128, 0), // Dark green
@@ -323,8 +327,8 @@ impl FocusStyle {
     /// Background for focused item
     pub fn focused_bg(scheme: ColorScheme) -> Color {
         match scheme {
-            ColorScheme::Dark => Color::DarkGray,
-            ColorScheme::Light => Color::Rgb(220, 220, 220), // Light gray
+            ColorScheme::Dark => Color::Rgb(30, 36, 55), // Dark navy highlight
+            ColorScheme::Light => Color::Rgb(220, 220, 220),
         }
     }
 }
@@ -336,7 +340,7 @@ impl BaseColors {
     /// Primary background color
     pub fn bg(scheme: ColorScheme) -> Color {
         match scheme {
-            ColorScheme::Dark => Color::Black,
+            ColorScheme::Dark => Color::Rgb(13, 17, 23),
             ColorScheme::Light => Color::White,
         }
     }
@@ -344,7 +348,7 @@ impl BaseColors {
     /// Primary foreground/text color
     pub fn fg(scheme: ColorScheme) -> Color {
         match scheme {
-            ColorScheme::Dark => Color::White,
+            ColorScheme::Dark => Color::Rgb(220, 220, 235),
             ColorScheme::Light => Color::Black,
         }
     }
@@ -352,7 +356,7 @@ impl BaseColors {
     /// Muted/secondary text color
     pub fn muted(scheme: ColorScheme) -> Color {
         match scheme {
-            ColorScheme::Dark => Color::DarkGray,
+            ColorScheme::Dark => Color::Rgb(90, 95, 120),
             ColorScheme::Light => Color::Gray,
         }
     }
