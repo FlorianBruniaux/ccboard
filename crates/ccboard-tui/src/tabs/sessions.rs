@@ -1786,73 +1786,81 @@ impl SessionsTab {
                 // Message content
                 if let Some(message) = &msg.message {
                     if let Some(content) = &message.content {
+                        // Text content (tool blocks handled separately)
                         let content_text = Self::extract_message_content(content);
-                        let preview = if content_text.len() > 150 {
-                            format!("{}...", &content_text[..147])
-                        } else {
-                            content_text
-                        };
+                        if !content_text.is_empty() {
+                            let preview = if content_text.len() > 200 {
+                                format!("{}...", &content_text[..197])
+                            } else {
+                                content_text
+                            };
+                            lines.push(Line::from(vec![Span::styled(
+                                format!("  {}", preview),
+                                Style::default().fg(p.fg),
+                            )]));
+                        }
 
-                        lines.push(Line::from(vec![Span::styled(
-                            format!("  {}", preview),
-                            Style::default().fg(p.fg),
-                        )]));
-                    }
-
-                    // Tool calls (if present and expanded)
-                    if let Some(tool_calls) = &message.tool_calls {
-                        if !tool_calls.is_empty() {
+                        // Tool calls from content blocks (real Claude Code format)
+                        let tool_uses = Self::extract_tool_use_blocks(content);
+                        if !tool_uses.is_empty() {
+                            let names: Vec<&str> =
+                                tool_uses.iter().map(|(_, n, _)| n.as_str()).collect();
+                            let names_str = if names.len() > 3 {
+                                format!("{}, +{}", names[..3].join(", "), names.len() - 3)
+                            } else {
+                                names.join(", ")
+                            };
                             lines.push(Line::from(vec![Span::styled(
                                 format!(
-                                    "  {} {} tool call(s) {}",
+                                    "  {} {} tool call(s): {} {}",
                                     if is_expanded { "▼" } else { "▶" },
-                                    tool_calls.len(),
-                                    if is_expanded { "" } else { "[Enter to expand]" }
+                                    tool_uses.len(),
+                                    names_str,
+                                    if is_expanded { "" } else { "[Enter]" }
                                 ),
                                 Style::default().fg(p.warning),
                             )]));
-
                             if is_expanded {
-                                for (i, tool_call) in tool_calls.iter().enumerate() {
-                                    let tool_name = tool_call
-                                        .get("name")
-                                        .and_then(|n| n.as_str())
-                                        .unwrap_or("unknown");
+                                for (_, name, input) in &tool_uses {
                                     lines.push(Line::from(vec![Span::styled(
-                                        format!("    {}. {}", i + 1, tool_name),
-                                        Style::default().fg(p.warning),
+                                        format!("    🔧 {}", name),
+                                        Style::default()
+                                            .fg(p.warning)
+                                            .add_modifier(Modifier::BOLD),
                                     )]));
+                                    let summary = Self::format_tool_input_summary(name, input);
+                                    if !summary.is_empty() {
+                                        lines.push(Line::from(vec![Span::styled(
+                                            format!("       {}", summary),
+                                            Style::default().fg(p.muted),
+                                        )]));
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // Tool results (if present and expanded)
-                    if let Some(tool_results) = &message.tool_results {
+                        // Tool results from content blocks (user messages returning output)
+                        let tool_results = Self::extract_tool_result_blocks(content);
                         if !tool_results.is_empty() {
                             lines.push(Line::from(vec![Span::styled(
                                 format!(
                                     "  {} {} result(s) {}",
                                     if is_expanded { "▼" } else { "▶" },
                                     tool_results.len(),
-                                    if is_expanded { "" } else { "[Enter to expand]" }
+                                    if is_expanded { "" } else { "[Enter]" }
                                 ),
                                 Style::default().fg(p.focus),
                             )]));
-
                             if is_expanded {
-                                for (i, result) in tool_results.iter().enumerate() {
-                                    let output = result
-                                        .get("output")
-                                        .and_then(|o| o.as_str())
-                                        .unwrap_or("(no output)");
-                                    let preview = if output.len() > 100 {
-                                        format!("{}...", &output[..97])
+                                for (_, output) in &tool_results {
+                                    let first_line = output.lines().next().unwrap_or("(empty)");
+                                    let display = if first_line.len() > 100 {
+                                        format!("{}...", &first_line[..97])
                                     } else {
-                                        output.to_string()
+                                        first_line.to_string()
                                     };
                                     lines.push(Line::from(vec![Span::styled(
-                                        format!("    {}. {}", i + 1, preview),
+                                        format!("    📊 {}", display),
                                         Style::default().fg(p.muted),
                                     )]));
                                 }
@@ -1951,17 +1959,127 @@ impl SessionsTab {
             serde_json::Value::Array(blocks) => {
                 let mut parts = Vec::new();
                 for block in blocks {
-                    if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
-                        parts.push(text.to_string());
-                    } else if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
-                        // Handle non-text blocks (like tool_use)
-                        parts.push(format!("[{}]", block_type));
+                    let block_type = block.get("type").and_then(|t| t.as_str());
+                    match block_type {
+                        Some("text") => {
+                            if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
+                                parts.push(text.to_string());
+                            }
+                        }
+                        // tool_use and tool_result blocks rendered separately
+                        Some("tool_use") | Some("tool_result") => {}
+                        _ => {
+                            if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
+                                parts.push(text.to_string());
+                            }
+                        }
                     }
                 }
                 parts.join(" ")
             }
             _ => "(unsupported content format)".to_string(),
         }
+    }
+
+    /// Extract tool_use content blocks from an assistant message's content array.
+    /// Returns Vec of (id, name, input_json) for each tool_use block.
+    fn extract_tool_use_blocks(
+        content: &serde_json::Value,
+    ) -> Vec<(String, String, serde_json::Value)> {
+        let Some(blocks) = content.as_array() else {
+            return Vec::new();
+        };
+        blocks
+            .iter()
+            .filter_map(|block| {
+                if block.get("type").and_then(|t| t.as_str()) != Some("tool_use") {
+                    return None;
+                }
+                let id = block
+                    .get("id")
+                    .and_then(|i| i.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let name = block
+                    .get("name")
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let input = block
+                    .get("input")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+                Some((id, name, input))
+            })
+            .collect()
+    }
+
+    /// Extract tool_result content blocks from a user message's content array.
+    /// Returns Vec of (tool_use_id, output_text) pairs.
+    fn extract_tool_result_blocks(content: &serde_json::Value) -> Vec<(String, String)> {
+        let Some(blocks) = content.as_array() else {
+            return Vec::new();
+        };
+        blocks
+            .iter()
+            .filter_map(|block| {
+                if block.get("type").and_then(|t| t.as_str()) != Some("tool_result") {
+                    return None;
+                }
+                let tool_use_id = block
+                    .get("tool_use_id")
+                    .and_then(|i| i.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let output = match block.get("content") {
+                    Some(serde_json::Value::String(s)) => s.clone(),
+                    Some(serde_json::Value::Array(arr)) => arr
+                        .iter()
+                        .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                    _ => String::new(),
+                };
+                Some((tool_use_id, output))
+            })
+            .collect()
+    }
+
+    /// Format a compact summary of tool input parameters for display.
+    fn format_tool_input_summary(name: &str, input: &serde_json::Value) -> String {
+        let Some(obj) = input.as_object() else {
+            return String::new();
+        };
+        let key_field = match name {
+            "Read" | "Write" | "Edit" | "MultiEdit" => "file_path",
+            "Bash" => "command",
+            "Grep" => "pattern",
+            "Glob" => "pattern",
+            "WebFetch" | "WebSearch" => "url",
+            _ => "",
+        };
+        if !key_field.is_empty() {
+            if let Some(val) = obj.get(key_field).and_then(|v| v.as_str()) {
+                let s = if val.len() > 70 {
+                    format!("{}...", &val[..67])
+                } else {
+                    val.to_string()
+                };
+                return format!("{}: {}", key_field, s);
+            }
+        }
+        // Fallback: first string value in the object
+        for (k, v) in obj.iter().take(1) {
+            if let Some(s) = v.as_str() {
+                let truncated = if s.len() > 70 {
+                    format!("{}...", &s[..67])
+                } else {
+                    s.to_string()
+                };
+                return format!("{}: {}", k, truncated);
+            }
+        }
+        String::new()
     }
 
     fn render_error_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
@@ -2189,5 +2307,81 @@ impl SessionsTab {
             .style(Style::default().fg(p.success))
             .alignment(ratatui::layout::Alignment::Center);
         frame.render_widget(paragraph, inner);
+    }
+}
+
+// ─── Tests ──────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_tool_use_blocks_empty() {
+        let content = serde_json::Value::String("hello".to_string());
+        assert!(SessionsTab::extract_tool_use_blocks(&content).is_empty());
+    }
+
+    #[test]
+    fn test_extract_tool_use_blocks_from_array() {
+        let content = serde_json::json!([
+            {"type": "text", "text": "I'll read this file."},
+            {"type": "tool_use", "id": "call_1", "name": "Read", "input": {"file_path": "/foo/bar.rs"}},
+            {"type": "tool_use", "id": "call_2", "name": "Bash", "input": {"command": "cargo test"}}
+        ]);
+        let blocks = SessionsTab::extract_tool_use_blocks(&content);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].1, "Read");
+        assert_eq!(blocks[1].1, "Bash");
+    }
+
+    #[test]
+    fn test_extract_tool_result_blocks() {
+        let content = serde_json::json!([
+            {"type": "tool_result", "tool_use_id": "call_1", "content": "file contents here"},
+            {"type": "tool_result", "tool_use_id": "call_2", "content": [{"type": "text", "text": "output"}]}
+        ]);
+        let results = SessionsTab::extract_tool_result_blocks(&content);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].1, "file contents here");
+        assert_eq!(results[1].1, "output");
+    }
+
+    #[test]
+    fn test_format_tool_input_summary_known_tools() {
+        let input = serde_json::json!({"file_path": "/src/main.rs", "limit": 100});
+        assert_eq!(
+            SessionsTab::format_tool_input_summary("Read", &input),
+            "file_path: /src/main.rs"
+        );
+
+        let bash_input = serde_json::json!({"command": "cargo test --all"});
+        assert_eq!(
+            SessionsTab::format_tool_input_summary("Bash", &bash_input),
+            "command: cargo test --all"
+        );
+    }
+
+    #[test]
+    fn test_format_tool_input_summary_truncates_long_values() {
+        let long_path = "a".repeat(80);
+        let input = serde_json::json!({"file_path": long_path});
+        let summary = SessionsTab::format_tool_input_summary("Read", &input);
+        assert!(summary.ends_with("..."));
+        // "file_path: " (11) + 67 chars + "..." (3) = 81 max
+        assert!(summary.len() <= 85);
+    }
+
+    #[test]
+    fn test_extract_message_content_skips_tool_blocks() {
+        let content = serde_json::json!([
+            {"type": "text", "text": "Let me read this."},
+            {"type": "tool_use", "id": "x", "name": "Read", "input": {}},
+            {"type": "tool_result", "tool_use_id": "x", "content": "result"}
+        ]);
+        let text = SessionsTab::extract_message_content(&content);
+        assert_eq!(text, "Let me read this.");
+        assert!(!text.contains("tool_use"));
+        assert!(!text.contains("tool_result"));
     }
 }
