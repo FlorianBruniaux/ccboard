@@ -5,6 +5,32 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - Phase M in progress
+
+### Added — Phase M: Conversation Viewer Enhancements
+
+#### MA1 — Tool Call Visualization (commit c213a65)
+
+- **`extract_tool_use_blocks`**: parses `tool_use` content blocks from assistant messages, returns `(id, name, input_json)` triples — real Claude Code format (content array, not legacy `tool_calls` field)
+- **`extract_tool_result_blocks`**: parses `tool_result` content blocks from user messages, returns `(tool_use_id, output_text)` pairs
+- **`format_tool_input_summary`**: shows most relevant input param per tool (`file_path` for Read/Write/Edit, `command` for Bash, `pattern` for Grep/Glob, `url` for WebFetch)
+- Replay viewer: collapsed shows `▶ 2 tool call(s): Read, Bash [Enter]`, expanded shows tool name bold + key param
+- `extract_message_content` now skips `tool_use`/`tool_result` blocks — no more `[tool_use]` noise in previews
+- 6 new unit tests (444 total)
+
+#### MA2 — Regex Search in Replay Viewer (commit 11426b8)
+
+- **`/`** inside the replay viewer activates an inline search bar (separate from the session list search)
+- Type to search: tries input as a full regex (`(?i)pattern`), falls back to escaped literal on invalid regex
+- **`n`/`N`**: navigate to next/previous hit, wraps around, shows `[2/7]` counter in the search bar
+- **Esc**: first press clears the query, second press closes the replay viewer
+- Matching text highlighted in yellow in message content (reuses `highlight_matches`)
+- Matches on both text content and tool names
+- `rebuild_replay_search_hits`: O(n) rescan on each keystroke, jumps to first hit automatically
+- 5 new unit tests (444 total)
+
+---
+
 ## [0.14.0] - 2026-03-19
 
 ### Added — Phase Hook-Monitor: Live Session Monitoring

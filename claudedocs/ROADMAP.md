@@ -42,6 +42,12 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 - AnalyticsData caching anomalies/daily_spikes (fini per-frame recomputation)
 - 433 tests, 0 warnings
 
+**Phase M — Conversation Viewer (en cours, v0.15.5)**:
+- MA1 ✅ Tool call visualization — expandable nodes, input params, 6 tests (c213a65)
+- MA2 ✅ Regex search in replay viewer — `/` search, `n`/`N` nav, highlights, 5 tests (11426b8)
+- MA3 🔜 Export HTML enrichi avec syntax highlighting
+- MA4 🔜 Multi-session full-text search cross-sessions
+
 **Performance**:
 - 89x faster startup (SQLite cache: 20s → 33ms)
 - 50x memory reduction (Arc migration: 1.4GB → 28MB)
@@ -186,7 +192,7 @@ Delivered:
 
 **Priority**: 🟡 MEDIUM
 **Duration**: 8-10h
-**Status**: ⏳ **NEXT** (v0.15.5)
+**Status**: 🔄 **IN PROGRESS** (MA1 ✅ MA2 ✅ MA3 🔜 MA4 🔜)
 **GitHub Issues**: #3 (umbrella), #7 (message filtering), #8 (export conversations)
 
 **Goal**: Advanced conversation analysis and visualization.
@@ -291,7 +297,7 @@ Delivered:
 | **Hook-Monitor** | 🔴 HIGH | — | v0.14.0 | Live session monitoring, hook receiver, setup | — | ✅ Done |
 | **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.15.0 | Advanced analytics (anomaly, forecasts) | #14-21 | ✅ Done 2026-03-20 |
 | **L** | 🟢 LOW | 12-15h | v0.16.0 | Plugin system | — | 📋 Backlog |
-| **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | ⏳ **NEXT** |
+| **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | 🔄 In Progress (MA1✅ MA2✅) |
 | **N** | 🟢 LOW | 10-14h | v0.16.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
 **Total Estimated**: 46-59h for v1.0.0 completion

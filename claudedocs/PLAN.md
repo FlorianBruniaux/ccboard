@@ -10,7 +10,7 @@ status: ACTIVE
 
 **Dernière mise à jour**: 2026-03-20
 **Version actuelle**: v0.15.0
-**Dernier commit**: c2d315b — fix(analytics): address all 10 code review findings
+**Dernier commit**: 11426b8 — feat(sessions): MA2 — regex search in replay viewer
 
 > Pour l'historique des phases 0→K, voir [ROADMAP.md](ROADMAP.md).
 
@@ -24,19 +24,24 @@ status: ACTIVE
 
 ---
 
-## 🎯 Phase M: Conversation Viewer Enhancements (v0.15.5) — NEXT
+## 🎯 Phase M: Conversation Viewer Enhancements (v0.15.5) — EN COURS
 
 **Priorité**: 🟡 MEDIUM | **Durée**: 8-10h | **GitHub**: #3, #7, #8
 
-### MA1 — Tool Call Visualization (~3h)
-Expandable tool call nodes (input/output) dans le detail view de session.
-- Fichiers : `crates/ccboard-tui/src/tabs/sessions.rs`, `crates/ccboard-core/src/parsers/session_index.rs`
-- Prérequis : `ConversationMessage` déjà parsé ✅
+### ✅ MA1 — Tool Call Visualization — DONE (commit c213a65)
+Parse tool_use/tool_result content blocks, expandable dans le replay viewer.
+- `extract_tool_use_blocks`, `extract_tool_result_blocks`, `format_tool_input_summary`
+- Collapsed: `▶ 2 tool call(s): Read, Bash [Enter]` — Expanded: nom + param clé
+- `extract_message_content` ne pollue plus avec `[tool_use]`
+- 6 nouveaux tests
 
-### MA2 — Regex Search dans le viewer (~2h)
-Remplacer la recherche plain-text par regex dans la vue conversation.
-- Fichier : `crates/ccboard-tui/src/tabs/sessions.rs`
-- FTS5 SQLite pour metadata, regex pour content display
+### ✅ MA2 — Regex Search dans le viewer — DONE (commit 11426b8)
+Barre de recherche interactive avec regex + navigation hits dans le replay viewer.
+- `/` active la search, `n`/`N` next/prev hit (cyclique), Esc clear/close
+- Highlights jaune dans le texte (réutilise `highlight_matches`)
+- Fallback literal si regex invalide
+- Compteur `[2/7]` dans la barre de status
+- 5 nouveaux tests
 
 ### MA3 — Export HTML enrichi (~2h)
 Syntax highlighting dans l'export HTML des conversations.
