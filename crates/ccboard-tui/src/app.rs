@@ -31,18 +31,18 @@ pub enum Tab {
 impl Tab {
     pub fn all() -> &'static [Tab] {
         &[
-            Tab::Dashboard,
-            Tab::Sessions,
-            Tab::Config,
-            Tab::Hooks,
-            Tab::Agents,
-            Tab::Costs,
-            Tab::History,
-            Tab::Mcp,
-            Tab::Analytics,
-            Tab::Plugins,
-            Tab::Activity,
-            Tab::Search,
+            Tab::Dashboard,  // 0
+            Tab::Sessions,   // 1
+            Tab::Analytics,  // 2
+            Tab::Costs,      // 3
+            Tab::History,    // 4
+            Tab::Activity,   // 5
+            Tab::Mcp,        // 6
+            Tab::Config,     // 7
+            Tab::Hooks,      // 8
+            Tab::Agents,     // 9
+            Tab::Plugins,    // 10
+            Tab::Search,     // 11
         ]
     }
 
@@ -50,15 +50,15 @@ impl Tab {
         match self {
             Tab::Dashboard => 0,
             Tab::Sessions => 1,
-            Tab::Config => 2,
-            Tab::Hooks => 3,
-            Tab::Agents => 4,
-            Tab::Costs => 5,
-            Tab::History => 6,
-            Tab::Mcp => 7,
-            Tab::Analytics => 8,
-            Tab::Plugins => 9,
-            Tab::Activity => 10,
+            Tab::Analytics => 2,
+            Tab::Costs => 3,
+            Tab::History => 4,
+            Tab::Activity => 5,
+            Tab::Mcp => 6,
+            Tab::Config => 7,
+            Tab::Hooks => 8,
+            Tab::Agents => 9,
+            Tab::Plugins => 10,
             Tab::Search => 11,
         }
     }
@@ -67,15 +67,15 @@ impl Tab {
         match idx {
             0 => Tab::Dashboard,
             1 => Tab::Sessions,
-            2 => Tab::Config,
-            3 => Tab::Hooks,
-            4 => Tab::Agents,
-            5 => Tab::Costs,
-            6 => Tab::History,
-            7 => Tab::Mcp,
-            8 => Tab::Analytics,
-            9 => Tab::Plugins,
-            10 => Tab::Activity,
+            2 => Tab::Analytics,
+            3 => Tab::Costs,
+            4 => Tab::History,
+            5 => Tab::Activity,
+            6 => Tab::Mcp,
+            7 => Tab::Config,
+            8 => Tab::Hooks,
+            9 => Tab::Agents,
+            10 => Tab::Plugins,
             11 => Tab::Search,
             _ => Tab::Dashboard,
         }
@@ -102,16 +102,16 @@ impl Tab {
         match self {
             Tab::Dashboard => '1',
             Tab::Sessions => '2',
-            Tab::Config => '3',
-            Tab::Hooks => '4',
-            Tab::Agents => '5',
-            Tab::Costs => '6',
-            Tab::History => '7',
-            Tab::Mcp => '8',
-            Tab::Analytics => '9',
-            Tab::Plugins => '0',
-            Tab::Activity => 'a', // decorative — no JumpTab action wired
-            Tab::Search => 's',   // decorative — no JumpTab action wired
+            Tab::Analytics => '3',
+            Tab::Costs => '4',
+            Tab::History => '5',
+            Tab::Activity => '6',
+            Tab::Mcp => '7',
+            Tab::Config => '8',
+            Tab::Hooks => '9',
+            Tab::Agents => '0',
+            Tab::Plugins => 'p', // decorative — beyond 0-9 range
+            Tab::Search => 's',  // decorative — accessible via /
         }
     }
 

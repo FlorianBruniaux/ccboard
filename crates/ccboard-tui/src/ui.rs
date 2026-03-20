@@ -461,6 +461,7 @@ impl Ui {
 
         let tabs = Tabs::new(titles)
             .select(active.index())
+            .highlight_style(Style::default()) // disable Ratatui's default REVERSED highlight
             .divider(Span::styled("│", Style::default().fg(p.border)));
 
         frame.render_widget(tabs, tab_bar_chunks[1]);
