@@ -103,6 +103,12 @@ pub struct AnalyticsData {
     pub tool_chains: Option<ToolChainAnalysis>,
     /// Cost optimization suggestions
     pub cost_suggestions: Vec<optimization::CostSuggestion>,
+    /// Session-level anomalies (Z-score based)
+    pub anomalies: Vec<anomalies::Anomaly>,
+    /// Daily cost spikes
+    pub daily_spikes: Vec<anomalies::DailyCostAnomaly>,
+    /// Number of sessions in the analyzed period
+    pub sessions_in_period: usize,
     /// Timestamp of computation
     pub computed_at: DateTime<Utc>,
     /// Period analyzed
@@ -118,10 +124,29 @@ impl AnalyticsData {
     /// # Performance
     /// Target: <100ms for 1000 sessions over 30 days
     pub fn compute(sessions: &[Arc<SessionMetadata>], period: Period) -> Self {
+        use chrono::Local;
+
         let trends = compute_trends(sessions, period.days());
         let forecast = forecast_usage(&trends);
         let patterns = detect_patterns(sessions, period.days());
         let insights = generate_insights(&trends, &patterns, &forecast);
+
+        // Filter sessions to the period for anomaly detection
+        let cutoff = Local::now() - chrono::Duration::days(period.days() as i64);
+        let period_sessions: Vec<Arc<SessionMetadata>> = sessions
+            .iter()
+            .filter(|s| {
+                s.first_timestamp
+                    .map(|ts| ts.with_timezone(&Local) >= cutoff)
+                    .unwrap_or(false)
+            })
+            .cloned()
+            .collect();
+
+        let sessions_in_period = period_sessions.len();
+        let anomalies_detected = anomalies::detect_anomalies(&period_sessions);
+        let daily_spikes_detected =
+            anomalies::detect_daily_cost_spikes(&period_sessions, period.days());
 
         // Aggregate per-tool token usage across all sessions
         let mut aggregated_tool_tokens: std::collections::HashMap<String, u64> =
@@ -162,6 +187,9 @@ impl AnalyticsData {
             insights,
             tool_chains: Some(analyze_tool_chains(sessions)),
             cost_suggestions,
+            anomalies: anomalies_detected,
+            daily_spikes: daily_spikes_detected,
+            sessions_in_period,
             computed_at: Utc::now(),
             period,
         }
@@ -181,6 +209,9 @@ impl AnalyticsData {
             insights: vec!["Limited insights: stats cache unavailable".to_string()],
             tool_chains: Some(analyze_tool_chains(sessions)),
             cost_suggestions: Vec::new(),
+            anomalies: Vec::new(),
+            daily_spikes: Vec::new(),
+            sessions_in_period: sessions.len(),
             computed_at: Utc::now(),
             period,
         }

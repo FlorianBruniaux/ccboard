@@ -64,27 +64,13 @@ impl UsagePatterns {
 }
 
 /// Estimate cost from session (same as trends.rs)
-///
-/// TODO: Deduplicate with trends.rs estimate_cost()
 fn estimate_cost(session: &SessionMetadata) -> f64 {
     (session.total_tokens as f64 / 1000.0) * 0.01
 }
 
-/// Detect usage patterns
-///
-/// Analyzes hourly/weekday distributions, model usage (token + cost weighted),
-/// session duration, and peak hours (80th percentile threshold).
-///
-/// # Performance
-/// Target: <30ms for 1000 sessions
-///
-/// # Graceful Degradation
-/// - Empty sessions: Returns UsagePatterns::empty()
-/// - Missing timestamps: Session skipped with warning
-/// - No duration data: avg_session_duration = 0
 /// Compute current and longest consecutive-day streaks across all sessions.
 ///
-/// "Current streak" counts backward from today (a gap yesterday ends it).
+/// "Current streak" counts backward from today (or yesterday if no session today).
 /// "Longest streak" scans all active days.
 fn compute_streaks(sessions: &[Arc<SessionMetadata>]) -> (u32, u32) {
     use chrono::Local;
@@ -100,10 +86,39 @@ fn compute_streaks(sessions: &[Arc<SessionMetadata>]) -> (u32, u32) {
         return (0, 0);
     }
 
-    // Current streak: walk backward from today
+    // Current streak: walk backward from today (or yesterday if no session today)
     let today = Local::now().date_naive();
+    let yesterday = today - chrono::Duration::days(1);
+    let start = if active_days.contains(&today) {
+        today
+    } else if active_days.contains(&yesterday) {
+        yesterday
+    } else {
+        // No activity today or yesterday — streak is 0
+        let longest = {
+            let days_vec: Vec<NaiveDate> = active_days.into_iter().collect();
+            let mut longest = 0u32;
+            let mut streak = 0u32;
+            let mut prev: Option<NaiveDate> = None;
+            for day in &days_vec {
+                if let Some(p) = prev {
+                    if *day == p + chrono::Duration::days(1) {
+                        streak += 1;
+                    } else {
+                        streak = 1;
+                    }
+                } else {
+                    streak = 1;
+                }
+                longest = longest.max(streak);
+                prev = Some(*day);
+            }
+            longest
+        };
+        return (0, longest);
+    };
     let mut current = 0u32;
-    let mut check = today;
+    let mut check = start;
     loop {
         if active_days.contains(&check) {
             current += 1;
@@ -131,6 +146,8 @@ fn compute_streaks(sessions: &[Arc<SessionMetadata>]) -> (u32, u32) {
         longest = longest.max(streak);
         prev = Some(*day);
     }
+    // current streak cannot exceed longest
+    let current = current.min(longest);
 
     (current, longest)
 }
@@ -148,7 +165,7 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
     let mut tool_usage: HashMap<String, usize> = HashMap::new();
     let mut total_duration = Duration::from_secs(0);
     let mut duration_count = 0usize;
-    let mut model_tokens: HashMap<String, u64> = HashMap::new();
+    let mut model_tokens: HashMap<String, f64> = HashMap::new();
     let mut model_costs: HashMap<String, f64> = HashMap::new();
 
     // Filter by period (same logic as compute_trends)
@@ -196,13 +213,13 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
         // Divide tokens equally among models used in this session
         if session.models_used.is_empty() {
             // No model info: attribute to "unknown"
-            *model_tokens.entry("unknown".to_string()).or_default() += session.total_tokens;
+            *model_tokens.entry("unknown".to_string()).or_default() += session.total_tokens as f64;
             *model_costs.entry("unknown".to_string()).or_default() += estimate_cost(session);
         } else {
-            let models_count = session.models_used.len() as u64;
-            let tokens_per_model = session.total_tokens / models_count;
+            let models_count = session.models_used.len() as f64;
+            let tokens_per_model = session.total_tokens as f64 / models_count;
             let cost = estimate_cost(session);
-            let cost_per_model = cost / models_count as f64;
+            let cost_per_model = cost / models_count;
 
             for model in &session.models_used {
                 *model_tokens.entry(model.clone()).or_default() += tokens_per_model;
@@ -245,11 +262,11 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
         .collect();
 
     // Model distribution (by tokens)
-    let total_tokens: u64 = model_tokens.values().sum();
-    let model_distribution: HashMap<String, f64> = if total_tokens > 0 {
+    let total_tokens: f64 = model_tokens.values().sum();
+    let model_distribution: HashMap<String, f64> = if total_tokens > 0.0 {
         model_tokens
             .into_iter()
-            .map(|(model, tokens)| (model, tokens as f64 / total_tokens as f64))
+            .map(|(model, tokens)| (model, tokens / total_tokens))
             .collect()
     } else {
         HashMap::new()
@@ -289,5 +306,87 @@ pub fn detect_patterns(sessions: &[Arc<SessionMetadata>], days: usize) -> UsageP
         tool_usage,
         current_streak_days,
         longest_streak_days,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn session_on_days_ago(days_ago: i64) -> Arc<SessionMetadata> {
+        let ts = chrono::Utc::now() - chrono::Duration::days(days_ago);
+        Arc::new(SessionMetadata {
+            id: format!("s{}", days_ago).into(),
+            file_path: std::path::PathBuf::from(format!("/tmp/s{}.jsonl", days_ago)),
+            project_path: "test".into(),
+            first_timestamp: Some(ts),
+            last_timestamp: Some(ts),
+            message_count: 1,
+            total_tokens: 100,
+            input_tokens: 50,
+            output_tokens: 50,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            models_used: vec![],
+            file_size_bytes: 256,
+            first_user_message: None,
+            has_subagents: false,
+            duration_seconds: Some(10),
+            branch: None,
+            tool_usage: std::collections::HashMap::new(),
+            tool_token_usage: std::collections::HashMap::new(),
+        })
+    }
+
+    #[test]
+    fn test_streak_empty_sessions() {
+        let (current, longest) = compute_streaks(&[]);
+        assert_eq!(current, 0);
+        assert_eq!(longest, 0);
+    }
+
+    #[test]
+    fn test_streak_single_today() {
+        let sessions = vec![session_on_days_ago(0)];
+        let (current, longest) = compute_streaks(&sessions);
+        assert_eq!(current, 1);
+        assert_eq!(longest, 1);
+    }
+
+    #[test]
+    fn test_streak_yesterday_only() {
+        // No session today, but one yesterday — current streak should be 1
+        let sessions = vec![session_on_days_ago(1)];
+        let (current, longest) = compute_streaks(&sessions);
+        assert_eq!(current, 1);
+        assert_eq!(longest, 1);
+    }
+
+    #[test]
+    fn test_streak_gap_breaks_current() {
+        // Sessions 2+ days ago only — current streak is 0
+        let sessions = vec![session_on_days_ago(3), session_on_days_ago(4)];
+        let (current, longest) = compute_streaks(&sessions);
+        assert_eq!(current, 0);
+        assert_eq!(longest, 2);
+    }
+
+    #[test]
+    fn test_streak_consecutive_days() {
+        // Sessions for 5 consecutive days ending today
+        let sessions: Vec<_> = (0..5).map(session_on_days_ago).collect();
+        let (current, longest) = compute_streaks(&sessions);
+        assert_eq!(current, 5);
+        assert_eq!(longest, 5);
+    }
+
+    #[test]
+    fn test_streak_longer_historical_than_current() {
+        // Historical 7-day streak (10-16 days ago) + current 2-day streak (0-1 days ago)
+        let mut sessions: Vec<_> = (0..=1).map(session_on_days_ago).collect();
+        sessions.extend((10..=16).map(session_on_days_ago));
+        let (current, longest) = compute_streaks(&sessions);
+        assert_eq!(current, 2);
+        assert_eq!(longest, 7);
     }
 }

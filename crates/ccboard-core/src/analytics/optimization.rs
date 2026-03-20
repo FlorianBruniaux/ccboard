@@ -175,16 +175,16 @@ pub fn generate_model_recommendations(
     }
 
     let opus_pct = opus_sessions as f64 / sessions.len() as f64;
-    let avg_tool_calls = total_tool_calls_opus / opus_sessions;
+    let avg_tool_calls = total_tool_calls_opus as f64 / opus_sessions as f64;
 
-    if opus_pct > OPUS_THRESHOLD && avg_tool_calls < LOW_TOOL_CALLS {
+    if opus_pct > OPUS_THRESHOLD && avg_tool_calls < LOW_TOOL_CALLS as f64 {
         // Opus is ~5x more expensive than Sonnet; estimate 70% savings on Opus sessions
         let savings = total_monthly_cost * opus_pct * 0.70;
         vec![CostSuggestion {
             category: OptimizationCategory::ModelDowngrade,
             title: format!("Switch {:.0}% of Opus sessions to Sonnet", opus_pct * 100.0),
             description: format!(
-                "{:.0}% of sessions use Opus with only ~{} avg tool calls — \
+                "{:.0}% of sessions use Opus with only ~{:.0} avg tool calls — \
                  Sonnet handles most coding tasks at ~5× lower cost.",
                 opus_pct * 100.0,
                 avg_tool_calls
@@ -203,7 +203,9 @@ pub fn generate_model_recommendations(
 mod tests {
     use super::*;
     use crate::analytics::plugin_usage::PluginAnalytics;
+    use crate::models::session::SessionMetadata;
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     fn empty_analytics() -> PluginAnalytics {
         PluginAnalytics::empty()
@@ -285,5 +287,91 @@ mod tests {
                 "Should be sorted by potential savings descending"
             );
         }
+    }
+
+    // --- generate_model_recommendations tests ---
+
+    fn make_session(id: &str, model: &str, tool_calls: usize) -> Arc<SessionMetadata> {
+        let mut tool_usage = HashMap::new();
+        if tool_calls > 0 {
+            tool_usage.insert("Bash".to_string(), tool_calls);
+        }
+        Arc::new(SessionMetadata {
+            id: id.into(),
+            file_path: std::path::PathBuf::from(format!("/tmp/{}.jsonl", id)),
+            project_path: "test".into(),
+            first_timestamp: Some(chrono::Utc::now()),
+            last_timestamp: Some(chrono::Utc::now()),
+            message_count: 5,
+            total_tokens: 10_000,
+            input_tokens: 5_000,
+            output_tokens: 5_000,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            models_used: vec![model.to_string()],
+            file_size_bytes: 1024,
+            first_user_message: None,
+            has_subagents: false,
+            duration_seconds: Some(60),
+            branch: None,
+            tool_usage,
+            tool_token_usage: HashMap::new(),
+        })
+    }
+
+    #[test]
+    fn test_model_recommendations_too_few_sessions() {
+        // Below MIN_SESSIONS=5 — should return empty
+        let sessions: Vec<_> = (0..4)
+            .map(|i| make_session(&format!("s{}", i), "claude-opus-4-6", 3))
+            .collect();
+        let recs = generate_model_recommendations(&sessions, 50.0);
+        assert!(recs.is_empty(), "Need at least 5 sessions");
+    }
+
+    #[test]
+    fn test_model_recommendations_low_cost() {
+        // Below $0.50/month — should return empty
+        let sessions: Vec<_> = (0..10)
+            .map(|i| make_session(&format!("s{}", i), "claude-opus-4-6", 3))
+            .collect();
+        let recs = generate_model_recommendations(&sessions, 0.40);
+        assert!(recs.is_empty(), "Cost too low to recommend downgrade");
+    }
+
+    #[test]
+    fn test_model_recommendations_sonnet_heavy() {
+        // Mostly Sonnet — no downgrade recommendation
+        let mut sessions: Vec<_> = (0..8)
+            .map(|i| make_session(&format!("sonnet_{}", i), "claude-sonnet-4-6", 5))
+            .collect();
+        sessions.extend((0..2).map(|i| make_session(&format!("opus_{}", i), "claude-opus-4-6", 3)));
+        let recs = generate_model_recommendations(&sessions, 50.0);
+        assert!(recs.is_empty(), "Mostly Sonnet — no downgrade needed");
+    }
+
+    #[test]
+    fn test_model_recommendations_opus_heavy_low_tools() {
+        // >60% Opus with <8 avg tool calls — should recommend downgrade
+        let sessions: Vec<_> = (0..10)
+            .map(|i| make_session(&format!("s{}", i), "claude-opus-4-6", 4)) // 4 tool calls avg
+            .collect();
+        let recs = generate_model_recommendations(&sessions, 100.0);
+        assert!(
+            !recs.is_empty(),
+            "Should recommend Sonnet for low-tool Opus sessions"
+        );
+        assert_eq!(recs[0].category, OptimizationCategory::ModelDowngrade);
+        assert!(recs[0].potential_savings > 0.0);
+    }
+
+    #[test]
+    fn test_model_recommendations_opus_heavy_high_tools() {
+        // >60% Opus but with many tool calls — no recommendation (complex tasks)
+        let sessions: Vec<_> = (0..10)
+            .map(|i| make_session(&format!("s{}", i), "claude-opus-4-6", 12)) // 12 tool calls avg
+            .collect();
+        let recs = generate_model_recommendations(&sessions, 100.0);
+        assert!(recs.is_empty(), "High tool calls — Opus justified");
     }
 }

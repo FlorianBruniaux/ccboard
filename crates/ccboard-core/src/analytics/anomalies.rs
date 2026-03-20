@@ -122,7 +122,7 @@ impl Statistics {
 
     /// Calculate Z-score for a value
     fn z_score(&self, value: f64) -> f64 {
-        if self.std_dev == 0.0 {
+        if self.std_dev < f64::EPSILON {
             return 0.0; // Avoid division by zero
         }
         (value - self.mean) / self.std_dev
@@ -261,14 +261,14 @@ pub fn detect_daily_cost_spikes(
     // Rough cost estimate: $0.01 per 1K tokens
     const COST_PER_1K_TOKENS: f64 = 0.01;
 
-    let cutoff = (Local::now() - chrono::Duration::days(window_days as i64)).naive_local();
+    let cutoff_date = (Local::now() - chrono::Duration::days(window_days as i64)).date_naive();
 
     // Aggregate estimated cost per day
     let mut daily_costs: BTreeMap<NaiveDate, f64> = BTreeMap::new();
     for session in sessions {
         if let Some(ts) = session.first_timestamp {
             let local_date = ts.with_timezone(&Local).date_naive();
-            if local_date.and_hms_opt(0, 0, 0).unwrap_or_default() < cutoff {
+            if local_date < cutoff_date {
                 continue;
             }
             let cost = (session.total_tokens as f64 / 1000.0) * COST_PER_1K_TOKENS;

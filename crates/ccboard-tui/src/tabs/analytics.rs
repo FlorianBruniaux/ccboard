@@ -1,10 +1,7 @@
 //! Analytics tab - Trends, forecasting, patterns, insights, anomalies with 5 sub-views
 
 use crate::theme::Palette;
-use ccboard_core::analytics::{
-    detect_anomalies, detect_daily_cost_spikes, AnalyticsData, AnomalySeverity, Period,
-};
-use ccboard_core::models::session::SessionMetadata;
+use ccboard_core::analytics::{AnalyticsData, AnomalySeverity, Period};
 use ccboard_core::store::DataStore;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -222,7 +219,7 @@ impl AnalyticsTab {
                     AnalyticsView::Trends => self.render_trends(frame, chunks[1], data, &p),
                     AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data, &p),
                     AnalyticsView::Insights => self.render_insights(frame, chunks[1], data, &p),
-                    AnalyticsView::Anomalies => self.render_anomalies(frame, chunks[1], store, &p),
+                    AnalyticsView::Anomalies => self.render_anomalies(frame, chunks[1], data, &p),
                     AnalyticsView::Plugins => self.render_plugins(frame, chunks[1], data, &p),
                 }
             }
@@ -1432,39 +1429,10 @@ impl AnalyticsTab {
     }
 
     /// Render anomalies sub-view (Z-score based anomaly detection)
-    fn render_anomalies(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        store: Option<&Arc<DataStore>>,
-        p: &Palette,
-    ) {
-        let Some(store) = store else {
-            self.render_loading(frame, area, p);
-            return;
-        };
-
-        // Get all sessions for current period
-        let sessions: Vec<Arc<SessionMetadata>> = store
-            .sessions_by_project()
-            .values()
-            .flat_map(|v| v.iter().cloned())
-            .filter(|s| {
-                // Filter by period (same logic as analytics computation)
-                if let Some(timestamp) = s.first_timestamp {
-                    let days_ago = chrono::Utc::now()
-                        .signed_duration_since(timestamp)
-                        .num_days();
-                    days_ago <= self.current_period.days() as i64
-                } else {
-                    false
-                }
-            })
-            .collect();
-
-        // Detect anomalies
-        let anomalies = detect_anomalies(&sessions);
-        let daily_spikes = detect_daily_cost_spikes(&sessions, self.current_period.days());
+    fn render_anomalies(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
+        let anomalies = &data.anomalies;
+        let daily_spikes = &data.daily_spikes;
+        let session_count = data.sessions_in_period;
 
         // Split area: daily cost spikes panel (top) + session anomaly table (bottom)
         let chunks = Layout::default()
@@ -1507,11 +1475,7 @@ impl AnalyticsTab {
                                 Style::default().fg(p.fg),
                             ),
                             Span::styled(
-                                format!(
-                                    "  {}  (avg {})",
-                                    s.format_cost(),
-                                    format!("${:.3}", s.avg_cost)
-                                ),
+                                format!("  {}  (avg ${:.3})", s.format_cost(), s.avg_cost),
                                 Style::default().fg(p.muted),
                             ),
                             Span::styled(
@@ -1529,7 +1493,7 @@ impl AnalyticsTab {
         let area = chunks[1];
 
         // Check minimum data requirement
-        if sessions.len() < 10 {
+        if session_count < 10 {
             let text = vec![
                 Line::from(""),
                 Line::from(Span::styled(
@@ -1538,7 +1502,7 @@ impl AnalyticsTab {
                 )),
                 Line::from(""),
                 Line::from(Span::styled(
-                    format!("Found {} sessions (minimum 10 required)", sessions.len()),
+                    format!("Found {} sessions (minimum 10 required)", session_count),
                     Style::default().fg(p.muted),
                 )),
                 Line::from(""),
@@ -1576,7 +1540,7 @@ impl AnalyticsTab {
                 Line::from(Span::styled(
                     format!(
                         "Analyzed {} sessions - All within normal range",
-                        sessions.len()
+                        session_count
                     ),
                     Style::default().fg(p.muted),
                 )),
@@ -1631,7 +1595,11 @@ impl AnalyticsTab {
                     )),
                     Cell::from(anomaly.date.clone()),
                     Cell::from(Span::styled(
-                        &anomaly.session_id.as_str()[..8.min(anomaly.session_id.len())],
+                        anomaly
+                            .session_id
+                            .as_str()
+                            .get(..8)
+                            .unwrap_or(anomaly.session_id.as_str()),
                         Style::default().fg(p.focus),
                     )),
                     Cell::from(anomaly.metric.name()),
