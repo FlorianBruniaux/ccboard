@@ -808,6 +808,22 @@ pub fn export_conversation_to_html(
         writer,
         "        .tokens {{ color: #999; font-size: 12px; margin-top: 10px; }}"
     )?;
+    writeln!(
+        writer,
+        "        .code-block {{ margin: 10px 0; border-radius: 6px; overflow: hidden; border: 1px solid #ddd; }}"
+    )?;
+    writeln!(
+        writer,
+        "        .code-lang {{ background: #f0f0f0; color: #555; padding: 4px 12px; font-size: 11px; font-family: monospace; border-bottom: 1px solid #ddd; }}"
+    )?;
+    writeln!(
+        writer,
+        "        .code-block pre {{ margin: 0 !important; padding: 12px !important; overflow-x: auto; border-radius: 0 !important; font-size: 13px; line-height: 1.5; }}"
+    )?;
+    writeln!(
+        writer,
+        "        .text {{ white-space: pre-wrap; }}"
+    )?;
     writeln!(writer, "    </style>")?;
     writeln!(writer, "</head>")?;
     writeln!(writer, "<body>")?;
@@ -872,7 +888,7 @@ pub fn export_conversation_to_html(
         writeln!(
             writer,
             "        <div class=\"content\">{}</div>",
-            html_escape(&msg.content)
+            render_content_as_html(&msg.content)
         )?;
 
         // Add token info for assistant messages
@@ -904,6 +920,96 @@ fn html_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#x27;")
+}
+
+// ============================================================================
+// Syntax Highlighting Helpers (MA3)
+// ============================================================================
+
+use once_cell::sync::Lazy;
+use regex::Regex;
+use syntect::highlighting::ThemeSet;
+use syntect::html::highlighted_html_for_string;
+use syntect::parsing::SyntaxSet;
+
+static SYNTAX_SET: Lazy<SyntaxSet> = Lazy::new(SyntaxSet::load_defaults_newlines);
+static THEME_SET: Lazy<ThemeSet> = Lazy::new(ThemeSet::load_defaults);
+static CODE_FENCE_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?s)```(\w*)\n(.*?)```").unwrap());
+
+/// Render message content as HTML, detecting fenced code blocks and applying
+/// syntax highlighting via syntect. Plain text regions are HTML-escaped.
+///
+/// Supports:
+/// - ` ```rust ... ``` ` → highlighted Rust block
+/// - ` ```bash ... ``` ` → highlighted Bash block
+/// - ` ``` ... ``` ` (no lang) → plain monospace block
+/// - All other text → html_escaped with whitespace preserved
+pub fn render_content_as_html(content: &str) -> String {
+    let theme = &THEME_SET.themes["InspiredGitHub"];
+
+    let mut result = String::new();
+    let mut last_end = 0usize;
+    let mut found_any = false;
+
+    for cap in CODE_FENCE_RE.captures_iter(content) {
+        found_any = true;
+        let m = cap.get(0).unwrap();
+        let lang = cap.get(1).map(|l| l.as_str()).unwrap_or("").trim();
+        let code = cap.get(2).map(|c| c.as_str()).unwrap_or("");
+
+        // Plain text before this code block
+        let before = &content[last_end..m.start()];
+        if !before.is_empty() {
+            result.push_str(&format!(
+                "<span class=\"text\">{}</span>",
+                html_escape(before)
+            ));
+        }
+
+        // Syntax-highlight the code
+        let syntax = if lang.is_empty() {
+            SYNTAX_SET.find_syntax_plain_text()
+        } else {
+            SYNTAX_SET
+                .find_syntax_by_token(lang)
+                .unwrap_or_else(|| SYNTAX_SET.find_syntax_plain_text())
+        };
+
+        let highlighted =
+            highlighted_html_for_string(code, &SYNTAX_SET, syntax, theme).unwrap_or_else(|_| {
+                format!("<pre><code>{}</code></pre>", html_escape(code))
+            });
+
+        let lang_label = if lang.is_empty() {
+            String::new()
+        } else {
+            format!("<div class=\"code-lang\">{}</div>", html_escape(lang))
+        };
+
+        result.push_str(&format!(
+            "<div class=\"code-block\">{}{}</div>",
+            lang_label, highlighted
+        ));
+
+        last_end = m.end();
+    }
+
+    if !found_any {
+        // No code blocks — fast path: just escape the whole content
+        return html_escape(content);
+    }
+
+    // Remaining text after last code block
+    let remaining = &content[last_end..];
+    if !remaining.is_empty() {
+        result.push_str(&format!(
+            "<span class=\"text\">{}</span>",
+            html_escape(remaining)
+        ));
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -1246,5 +1352,82 @@ mod tests {
         super::export_conversation_to_markdown(&messages, &metadata, &nested_path).unwrap();
 
         assert!(nested_path.exists());
+    }
+
+    // MA3 — render_content_as_html tests
+
+    #[test]
+    fn test_render_plain_text_no_code_block() {
+        let text = "Hello, this is plain text.";
+        let result = super::render_content_as_html(text);
+        // No code blocks → fast path, just html_escape
+        assert_eq!(result, "Hello, this is plain text.");
+    }
+
+    #[test]
+    fn test_render_html_escaping_in_plain_text() {
+        let text = "<script>alert('XSS')</script>";
+        let result = super::render_content_as_html(text);
+        assert!(result.contains("&lt;script&gt;"));
+        assert!(!result.contains("<script>"));
+    }
+
+    #[test]
+    fn test_render_fenced_code_block_with_lang() {
+        let text = "Here is some code:\n```rust\nfn main() {}\n```\nDone.";
+        let result = super::render_content_as_html(text);
+        // Should contain a code-block div with lang label
+        assert!(result.contains("code-block"));
+        assert!(result.contains("code-lang"));
+        assert!(result.contains("rust"));
+        // Should contain the function name highlighted or escaped
+        assert!(result.contains("main"));
+        // Surrounding text should be present
+        assert!(result.contains("Here is some code:"));
+        assert!(result.contains("Done."));
+    }
+
+    #[test]
+    fn test_render_fenced_code_block_no_lang() {
+        let text = "```\nsome plain code\n```";
+        let result = super::render_content_as_html(text);
+        assert!(result.contains("code-block"));
+        assert!(result.contains("some plain code"));
+        // No lang label when empty
+        assert!(!result.contains("code-lang"));
+    }
+
+    #[test]
+    fn test_render_multiple_code_blocks() {
+        let text = "First:\n```bash\necho hello\n```\nSecond:\n```python\nprint('world')\n```";
+        let result = super::render_content_as_html(text);
+        let count = result.matches("code-block").count();
+        assert_eq!(count, 2, "Expected 2 code blocks, got {count}");
+        // Tokens may be in separate <span> tags after highlighting
+        assert!(result.contains("echo"));
+        assert!(result.contains("hello"));
+        assert!(result.contains("print"));
+        assert!(result.contains("First:"));
+        assert!(result.contains("Second:"));
+    }
+
+    #[test]
+    fn test_render_html_export_with_code_block() {
+        let mut messages = create_test_messages();
+        messages[1].content =
+            "Here's an example:\n```rust\nlet x = 42;\nprintln!(\"{}\", x);\n```\nEnjoy!".to_string();
+
+        let metadata = create_test_session("test-html", "/test/project", 2, 150);
+        let temp_dir = TempDir::new().unwrap();
+        let html_path = temp_dir.path().join("conversation.html");
+
+        super::export_conversation_to_html(&messages, &metadata, &html_path).unwrap();
+
+        let contents = std::fs::read_to_string(&html_path).unwrap();
+        assert!(contents.contains("code-block"));
+        assert!(contents.contains("code-lang"));
+        assert!(contents.contains("rust"));
+        // syntect produces inline-style highlighted HTML inside the pre block
+        assert!(contents.contains("<pre"));
     }
 }
