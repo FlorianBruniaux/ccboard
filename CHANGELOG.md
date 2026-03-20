@@ -5,9 +5,9 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - Phase M in progress
+## [0.15.5] - 2026-03-20
 
-### Added — Phase M: Conversation Viewer Enhancements
+### Added — Phase M: Conversation Viewer Enhancements (complete)
 
 #### MA1 — Tool Call Visualization (commit c213a65)
 
@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`format_tool_input_summary`**: shows most relevant input param per tool (`file_path` for Read/Write/Edit, `command` for Bash, `pattern` for Grep/Glob, `url` for WebFetch)
 - Replay viewer: collapsed shows `▶ 2 tool call(s): Read, Bash [Enter]`, expanded shows tool name bold + key param
 - `extract_message_content` now skips `tool_use`/`tool_result` blocks — no more `[tool_use]` noise in previews
-- 6 new unit tests (444 total)
+- 6 new unit tests
 
 #### MA2 — Regex Search in Replay Viewer (commit 11426b8)
 
@@ -25,9 +25,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`n`/`N`**: navigate to next/previous hit, wraps around, shows `[2/7]` counter in the search bar
 - **Esc**: first press clears the query, second press closes the replay viewer
 - Matching text highlighted in yellow in message content (reuses `highlight_matches`)
-- Matches on both text content and tool names
 - `rebuild_replay_search_hits`: O(n) rescan on each keystroke, jumps to first hit automatically
-- 5 new unit tests (444 total)
+- 5 new unit tests
+
+#### MA3 — HTML Export with Syntax Highlighting (commit d87a25d)
+
+- **`render_content_as_html`**: detects fenced code blocks (` ```lang...``` `) in message content via regex, applies syntect syntax highlighting
+- Uses **InspiredGitHub** light theme (matches the HTML export's white background design)
+- Language badge (`.code-lang`) above each block, `.code-block` container with border
+- Supports Rust, Bash, Python, and 40+ languages via syntect's bundled syntaxes
+- Fast path for plain-text messages (no regex scan overhead)
+- Graceful fallback to `html_escape` on syntect errors
+- `syntect 5.2` added to `ccboard-core` dependencies (`regex-fancy` backend)
+- 6 new unit tests
+
+#### MA4 — FTS5 Extended + Search Tab UX (commit 4520c2e)
+
+- **`SearchResult`** now includes `first_timestamp` and `message_count` (SQL join on `session_metadata`)
+- FTS5 snippet extended from 8 to 12 tokens for more context
+- **Results list**: date displayed in yellow + message count per result
+- **Detail pane** (40% width, right side): project, date, session ID, message count, full snippet
+- **Search-as-you-type**: auto-refresh FTS5 on every char/backspace (min 2 chars threshold)
+- ↑/↓ arrow keys navigate results while in input mode
+- Enter opens conversation overlay from both input mode and navigation mode
+- Cursor `▌` shown when input mode active
+- 8 new unit tests
+
+**458 tests total, 0 clippy warnings**
 
 ---
 

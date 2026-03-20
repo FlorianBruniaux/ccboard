@@ -42,11 +42,11 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 - AnalyticsData caching anomalies/daily_spikes (fini per-frame recomputation)
 - 433 tests, 0 warnings
 
-**Phase M — Conversation Viewer (en cours, v0.15.5)**:
+**Phase M — Conversation Viewer (v0.15.5)** ✅:
 - MA1 ✅ Tool call visualization — expandable nodes, input params, 6 tests (c213a65)
 - MA2 ✅ Regex search in replay viewer — `/` search, `n`/`N` nav, highlights, 5 tests (11426b8)
-- MA3 🔜 Export HTML enrichi avec syntax highlighting
-- MA4 🔜 Multi-session full-text search cross-sessions
+- MA3 ✅ Export HTML enrichi — syntect syntax highlighting, code-lang badge, 6 tests (d87a25d)
+- MA4 ✅ FTS5 extended + Search tab — date+messages in results, detail pane, search-as-you-type, 8 tests (4520c2e)
 
 **Performance**:
 - 89x faster startup (SQLite cache: 20s → 33ms)
@@ -188,22 +188,19 @@ Delivered:
 
 ---
 
-### Phase M: Conversation Viewer Enhancements (v0.15.5)
+### ✅ Phase M: Conversation Viewer Enhancements (v0.15.5) - **DONE**
 
 **Priority**: 🟡 MEDIUM
-**Duration**: 8-10h
-**Status**: 🔄 **IN PROGRESS** (MA1 ✅ MA2 ✅ MA3 🔜 MA4 🔜)
-**GitHub Issues**: #3 (umbrella), #7 (message filtering), #8 (export conversations)
+**Status**: ✅ Released 2026-03-20
+**Commits**: c213a65, 11426b8, d87a25d, 4520c2e
 
-**Goal**: Advanced conversation analysis and visualization.
+**Delivered**:
+- MA1: Tool call visualization (expandable blocks, 6 tests)
+- MA2: Regex search in replay viewer (`/`, `n`/`N`, yellow highlights, 5 tests)
+- MA3: HTML export with syntect syntax highlighting (InspiredGitHub theme, 6 tests)
+- MA4: FTS5 extended + Search tab detail pane, search-as-you-type, 8 tests
 
-**Features**:
-- **Tool Call Visualization**: Expandable nodes with input/output
-- **Message Threading**: Conversation flow graphs
-- **Export Enhancements**: HTML reports with syntax highlighting
-- **Full-Text Search**: Regex support, multi-session search
-
-**Depends on**: Phase F (Conversation Viewer) completed in v0.7.0
+**458 tests total, 0 clippy warnings**
 
 ---
 
@@ -297,7 +294,7 @@ Delivered:
 | **Hook-Monitor** | 🔴 HIGH | — | v0.14.0 | Live session monitoring, hook receiver, setup | — | ✅ Done |
 | **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.15.0 | Advanced analytics (anomaly, forecasts) | #14-21 | ✅ Done 2026-03-20 |
 | **L** | 🟢 LOW | 12-15h | v0.16.0 | Plugin system | — | 📋 Backlog |
-| **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | 🔄 In Progress (MA1✅ MA2✅) |
+| **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | ✅ Done 2026-03-20 |
 | **N** | 🟢 LOW | 10-14h | v0.16.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
 **Total Estimated**: 46-59h for v1.0.0 completion
