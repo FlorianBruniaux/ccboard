@@ -60,7 +60,7 @@ impl AnalyticsView {
             Self::Overview => "Overview",
             Self::Trends => "Trends",
             Self::Patterns => "Patterns",
-            Self::Insights => "Insights",
+            Self::Insights => "Summary",
             Self::Anomalies => "Anomalies",
             Self::Plugins => "Plugins",
         }
@@ -237,26 +237,36 @@ impl AnalyticsTab {
         frame: &mut Frame,
         area: Rect,
         _analytics: Option<&AnalyticsData>,
-        store: Option<&Arc<DataStore>>,
+        _store: Option<&Arc<DataStore>>,
         p: &Palette,
     ) {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints([Constraint::Length(35), Constraint::Min(0)])
             .split(area);
 
         // Period selector (left)
-        let session_count = store.map(|s| s.session_count()).unwrap_or(0);
-        let period_display = self.current_period.display(session_count);
-        let period_text = vec![
-            Span::raw("Period: "),
-            Span::styled(
-                period_display,
-                Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" "),
-            Span::styled("[F1:7d F2:30d F3:90d F4:All]", Style::default().fg(p.muted)),
+        let periods: &[(&str, bool)] = &[
+            ("F1:7d", matches!(self.current_period, Period::Days(7))),
+            ("F2:30d", matches!(self.current_period, Period::Days(30))),
+            ("F3:90d", matches!(self.current_period, Period::Days(90))),
+            ("F4:All", matches!(self.current_period, Period::Available)),
         ];
+        let mut period_text = vec![Span::styled(" ", Style::default())];
+        for (label, is_active) in periods {
+            if *is_active {
+                period_text.push(Span::styled(
+                    format!(" {} ", label),
+                    Style::default().fg(p.bg).bg(p.focus).add_modifier(Modifier::BOLD),
+                ));
+            } else {
+                period_text.push(Span::styled(
+                    format!(" {} ", label),
+                    Style::default().fg(p.muted),
+                ));
+            }
+            period_text.push(Span::raw(" "));
+        }
         let period_para = Paragraph::new(Line::from(period_text))
             .block(
                 Block::default()

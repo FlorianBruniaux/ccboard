@@ -3,7 +3,7 @@
 use ccboard_core::cache::SearchResult;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
@@ -110,7 +110,15 @@ fn fmt_timestamp(ts: &str) -> String {
 }
 
 /// Render the search tab
-pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) {
+pub fn render_search_tab(
+    search_tab: &SearchTab,
+    frame: &mut Frame,
+    area: Rect,
+    scheme: ccboard_core::models::config::ColorScheme,
+) {
+    use crate::theme::{FocusStyle, Palette};
+    let p = Palette::new(scheme);
+
     let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -121,9 +129,9 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
 
     // ─── Search input box ─────────────────────────────────────────────────
     let input_style = if search_tab.input_mode {
-        Style::default().fg(Color::Cyan)
+        Style::default().fg(p.focus)
     } else {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(p.muted)
     };
 
     let mode_hint = if search_tab.input_mode {
@@ -134,12 +142,14 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
 
     let cursor = if search_tab.input_mode { "▌" } else { "" };
     let input = Paragraph::new(format!("{}{}", search_tab.query, cursor))
-        .style(Style::default().fg(Color::White))
+        .style(Style::default().fg(p.fg))
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("Search{}", mode_hint))
-                .border_style(input_style),
+                .border_type(ratatui::widgets::BorderType::Rounded)
+                .style(Style::default().bg(p.surface))
+                .border_style(input_style)
+                .title(format!("Search{}", mode_hint)),
         );
     frame.render_widget(input, vertical[0]);
 
@@ -152,14 +162,17 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
         } else {
             "No results found"
         };
-        let p = Paragraph::new(placeholder)
-            .style(Style::default().fg(Color::DarkGray))
+        let empty = Paragraph::new(placeholder)
+            .style(Style::default().fg(p.muted))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .border_type(ratatui::widgets::BorderType::Rounded)
+                    .border_style(Style::default().fg(p.border))
+                    .style(Style::default().bg(p.surface))
                     .title(format!(" Results ({}) ", search_tab.results.len())),
             );
-        frame.render_widget(p, results_area);
+        frame.render_widget(empty, results_area);
         return;
     }
 
@@ -180,6 +193,9 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
     // ─── Results list ─────────────────────────────────────────────────────
     let results_block = Block::default()
         .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(p.border))
+        .style(Style::default().bg(p.surface))
         .title(format!(" Results ({}) ", search_tab.results.len()));
 
     let items: Vec<ListItem> = search_tab
@@ -198,28 +214,26 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
                 Line::from(vec![
                     Span::styled(
                         format!("{} ", project),
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
+                        Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(
                         format!("[{}]", &r.session_id[..id_len]),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     ),
                     Span::styled(
                         format!("  {} msgs", r.message_count),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(p.muted),
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled(format!("{} ", date), Style::default().fg(Color::Yellow)),
+                    Span::styled(format!("{} ", date), Style::default().fg(p.warning)),
                     Span::styled(
                         r.snippet
                             .as_deref()
                             .or(r.first_user_message.as_deref())
                             .unwrap_or("(no preview)")
                             .to_string(),
-                        Style::default().fg(Color::Gray),
+                        Style::default().fg(p.muted),
                     ),
                 ]),
             ])
@@ -231,7 +245,7 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
         .block(results_block)
         .highlight_style(
             Style::default()
-                .bg(Color::DarkGray)
+                .bg(FocusStyle::focused_bg(scheme))
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol("> ");
@@ -255,44 +269,40 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
 
             let detail_lines = vec![
                 Line::from(vec![
-                    Span::styled("Project: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Project: ", Style::default().fg(p.muted)),
                     Span::styled(
                         project,
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD),
+                        Style::default().fg(p.focus).add_modifier(Modifier::BOLD),
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Date:    ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(&date, Style::default().fg(Color::Yellow)),
+                    Span::styled("Date:    ", Style::default().fg(p.muted)),
+                    Span::styled(&date, Style::default().fg(p.warning)),
                 ]),
                 Line::from(vec![
-                    Span::styled("Session: ", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Session: ", Style::default().fg(p.muted)),
                     Span::styled(
                         &r.session_id[..r.session_id.len().min(12)],
-                        Style::default().fg(Color::White),
+                        Style::default().fg(p.fg),
                     ),
                 ]),
                 Line::from(vec![
-                    Span::styled("Messages:", Style::default().fg(Color::DarkGray)),
+                    Span::styled("Messages:", Style::default().fg(p.muted)),
                     Span::styled(
                         format!(" {}", r.message_count),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(p.fg),
                     ),
                 ]),
                 Line::from(""),
                 Line::from(Span::styled(
                     "Snippet:",
-                    Style::default()
-                        .fg(Color::DarkGray)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(p.muted).add_modifier(Modifier::BOLD),
                 )),
-                Line::from(Span::styled(snippet, Style::default().fg(Color::Gray))),
+                Line::from(Span::styled(snippet, Style::default().fg(p.muted))),
                 Line::from(""),
                 Line::from(Span::styled(
                     "Enter → open conversation",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(p.muted),
                 )),
             ];
 
@@ -300,8 +310,10 @@ pub fn render_search_tab(search_tab: &SearchTab, frame: &mut Frame, area: Rect) 
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title(" Detail ")
-                        .border_style(Style::default().fg(Color::DarkGray)),
+                        .border_type(ratatui::widgets::BorderType::Rounded)
+                        .border_style(Style::default().fg(p.border))
+                        .style(Style::default().bg(p.surface))
+                        .title(" Detail "),
                 )
                 .wrap(Wrap { trim: true });
 

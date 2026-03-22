@@ -51,9 +51,9 @@ impl AgentType {
 
     fn color(&self) -> Color {
         match self {
-            AgentType::Agent => Color::Cyan,
-            AgentType::Command => Color::Green,
-            AgentType::Skill => Color::Yellow,
+            AgentType::Agent => Color::Rgb(80, 190, 210),   // p.focus
+            AgentType::Command => Color::Rgb(80, 200, 120), // p.success
+            AgentType::Skill => Color::Rgb(220, 175, 60),   // p.warning
         }
     }
 }

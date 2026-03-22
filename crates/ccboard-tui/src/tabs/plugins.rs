@@ -19,9 +19,9 @@ use ccboard_core::models::config::ColorScheme;
 use ccboard_core::DataStore;
 use crossterm::event::KeyCode;
 use ratatui::{
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, BorderType, Borders, Gauge, List, ListItem, ListState, Paragraph},
     Frame,
 };
 use std::sync::Arc;
@@ -227,14 +227,15 @@ impl PluginsTab {
             .split(area);
 
         // Render stats header
-        self.render_header(frame, chunks[0]);
+        self.render_header(frame, chunks[0], scheme);
 
         // Render three-column layout
         self.render_columns(frame, chunks[1], &p);
     }
 
     /// Render stats header
-    fn render_header(&self, frame: &mut Frame, area: Rect) {
+    fn render_header(&self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
+        let p = Palette::new(scheme);
         let analytics = self.analytics.as_ref().unwrap();
         let active_pct = if analytics.total_plugins > 0 {
             (analytics.active_plugins as f64 / analytics.total_plugins as f64) * 100.0
@@ -242,24 +243,43 @@ impl PluginsTab {
             0.0
         };
 
-        let stats_text = format!(
-            "Total: {} | Active: {} ({:.0}%) | Dead Code: {} | Sort: [s] {}",
-            analytics.total_plugins,
-            analytics.active_plugins,
-            active_pct,
+        // Split: gauge left + stats right
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area);
+
+        let gauge_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(p.border))
+            .style(Style::default().bg(p.surface))
+            .title(" Plugin Analytics ");
+
+        let gauge = Gauge::default()
+            .block(gauge_block)
+            .gauge_style(Style::default().fg(p.success).bg(p.border))
+            .ratio((active_pct / 100.0).min(1.0))
+            .label(format!(
+                "{}/{} active ({:.0}%)",
+                analytics.active_plugins, analytics.total_plugins, active_pct
+            ));
+        frame.render_widget(gauge, chunks[0]);
+
+        let sort_text = Paragraph::new(format!(
+            " Dead: {} | Sort: [s] {}",
             analytics.dead_plugins.len(),
             self.sort_mode.label()
-        );
-
-        let stats = Paragraph::new(stats_text)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("🎁 Plugin Analytics"),
-            )
-            .alignment(Alignment::Center);
-
-        frame.render_widget(stats, area);
+        ))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(p.border))
+                .style(Style::default().bg(p.surface)),
+        )
+        .alignment(Alignment::Center);
+        frame.render_widget(sort_text, chunks[1]);
     }
 
     /// Render three-column layout
@@ -369,14 +389,18 @@ impl PluginsTab {
         let focused = self.focus == Focus::DeadCode;
 
         if analytics.dead_plugins.is_empty() {
-            let empty = Paragraph::new("No dead code detected!\nAll plugins are being used.")
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title("Dead Code (Never Used)"),
-                )
-                .alignment(Alignment::Center);
-            frame.render_widget(empty, area);
+            let empty = EmptyState::new("No Dead Code Detected")
+                .message("All plugins are active in recent sessions.")
+                .build();
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(if focused { p.focus } else { p.border }))
+                .style(Style::default().bg(p.surface))
+                .title("Dead Code (Never Used)");
+            let inner = block.inner(area);
+            frame.render_widget(block, area);
+            frame.render_widget(empty, inner);
             return;
         }
 

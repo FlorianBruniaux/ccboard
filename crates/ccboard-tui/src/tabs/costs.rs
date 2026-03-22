@@ -190,8 +190,8 @@ impl CostsTab {
             "Overview",
             "By Model",
             "Daily",
-            "Billing Blocks",
-            "Leaderboard",
+            "Usage Periods",
+            "Top Sessions",
             "Per Project",
         ];
 

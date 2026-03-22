@@ -87,13 +87,13 @@ impl Tab {
             Tab::Sessions => "Sessions",
             Tab::Config => "Config",
             Tab::Hooks => "Hooks",
-            Tab::Agents => "Capabilities",
+            Tab::Agents => "Tools",
             Tab::Costs => "Costs",
             Tab::History => "History",
             Tab::Mcp => "MCP",
             Tab::Analytics => "Analytics",
             Tab::Plugins => "Plugins",
-            Tab::Activity => "Activity",
+            Tab::Activity => "Audit Log",
             Tab::Search => "Search",
         }
     }

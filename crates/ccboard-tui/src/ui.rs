@@ -435,24 +435,39 @@ impl Ui {
         );
 
         // Tabs — all show their full name, active gets highlight background
+        let active_bg = match app.color_scheme {
+            ccboard_core::models::config::ColorScheme::Dark => Color::Rgb(20, 40, 55),
+            ccboard_core::models::config::ColorScheme::Light => Color::Rgb(200, 220, 240),
+        };
         let titles: Vec<Line> = Tab::all()
             .iter()
             .map(|t| {
+                let sc = t.shortcut();
                 if *t == active {
+                    let label = if sc.is_ascii_digit() {
+                        format!("{} {}", sc, t.name())
+                    } else {
+                        t.name().to_string()
+                    };
                     Line::from(vec![
                         Span::raw(" "),
                         Span::styled(
-                            t.name(),
+                            label,
                             Style::default()
                                 .fg(p.focus)
-                                .bg(Color::Rgb(20, 40, 55))
+                                .bg(active_bg)
                                 .add_modifier(Modifier::BOLD),
                         ),
                         Span::raw(" "),
                     ])
                 } else {
+                    let inactive_label = if sc.is_ascii_digit() {
+                        format!(" {} {} ", sc, t.name())
+                    } else {
+                        format!(" {} ", t.name())
+                    };
                     Line::from(Span::styled(
-                        format!(" {} ", t.name()),
+                        inactive_label,
                         Style::default().fg(p.muted),
                     ))
                 }
@@ -608,7 +623,7 @@ impl Ui {
                     .render(frame, area, &sessions, &app.store, scheme);
             }
             Tab::Search => {
-                render_search_tab(&app.search_tab, frame, area);
+                render_search_tab(&app.search_tab, frame, area, scheme);
             }
         }
     }

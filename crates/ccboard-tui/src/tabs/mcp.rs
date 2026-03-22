@@ -191,10 +191,10 @@ impl McpTab {
     ) {
         let p = Palette::new(scheme);
 
-        // Dual-pane layout: 35% list | 65% details
+        // Dual-pane layout: fixed list width | flexible details
         let chunks = Layout::default()
             .direction(ratatui::layout::Direction::Horizontal)
-            .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
+            .constraints([Constraint::Length(30), Constraint::Min(0)])
             .split(area);
 
         // Render server list
