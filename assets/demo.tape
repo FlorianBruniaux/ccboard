@@ -22,7 +22,7 @@ Enter
 Sleep 6s
 
 # === Dashboard (tab 1) ===
-Sleep 2s
+Sleep 2.5s
 
 # === Sessions (tab 2) ===
 Type "2"
@@ -36,20 +36,34 @@ Sleep 300ms
 Type "j"
 Sleep 1s
 
-# === Config (tab 3) ===
-Type "3"
+# === Conversation Viewer (Enter from Sessions) ===
+Enter
+Sleep 2.5s
+
+# Scroll through messages
+Type "j"
+Sleep 400ms
+Type "j"
+Sleep 400ms
+Type "j"
+Sleep 400ms
+Type "j"
 Sleep 1.5s
 
-# === Costs (tab 6) ===
+# Back to Sessions
+Escape
+Sleep 1s
+
+# === Analytics (tab 3) — heatmap + trends ===
+Type "3"
+Sleep 2.5s
+
+# === Costs (tab 4) — budget gauge ===
+Type "4"
+Sleep 2s
+
+# === Audit Log (tab 6) — security violations feed ===
 Type "6"
-Sleep 2s
-
-# === Analytics (tab 9) ===
-Type "9"
-Sleep 2s
-
-# === Activity Security Audit (press 'a') ===
-Type "a"
 Sleep 2.5s
 
 # Navigate violations
@@ -60,13 +74,17 @@ Sleep 400ms
 Type "j"
 Sleep 1.5s
 
-# Toggle to Sessions view
-Tab
+# === Config (tab 8) — 4-column diff ===
+Type "8"
 Sleep 2s
 
-# === Search tab (press Tab to navigate) ===
-Tab
-Sleep 1s
+# === Hooks (tab 9) — syntax highlighting ===
+Type "9"
+Sleep 2s
+
+# === Search (/) — FTS5 full-text search ===
+Type "/"
+Sleep 1.5s
 
 # Type a search query
 Type "bug"
@@ -79,7 +97,7 @@ Sleep 2s
 
 # === Back to Dashboard ===
 Type "1"
-Sleep 1.5s
+Sleep 2s
 
 # Quit
 Type "q"
