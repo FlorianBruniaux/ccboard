@@ -5124,3 +5124,233 @@ pre code {
   background: #666;
 }
 
+
+/* ─── Activity / Security Audit ─────────────────────────────────────────── */
+
+.activity-page .page-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Summary stat cards */
+.activity-summary {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.stat-card {
+  flex: 0 0 auto;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #2d3748;
+  background: #161b22;
+  text-align: center;
+  min-width: 100px;
+}
+
+.stat-card__value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat-card__label {
+  font-size: 0.75rem;
+  color: #8b949e;
+  margin-top: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-card--critical { border-color: #dc2626; }
+.stat-card--critical .stat-card__value { color: #ef4444; }
+
+.stat-card--warning { border-color: #d97706; }
+.stat-card--warning .stat-card__value { color: #f59e0b; }
+
+.stat-card--info { border-color: #2563eb; }
+.stat-card--info .stat-card__value { color: #60a5fa; }
+
+/* Filter buttons */
+.activity-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.activity-filters__label {
+  color: #8b949e;
+  font-size: 0.875rem;
+}
+
+.filter-btn {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: #161b22;
+  color: #c9d1d9;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.filter-btn:hover {
+  border-color: #50e3c2;
+  background: #1c2a3a;
+}
+
+.filter-btn--active {
+  border-color: #50e3c2;
+  background: #0d2137;
+  color: #50e3c2;
+  font-weight: 600;
+}
+
+/* Severity badge */
+.severity-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.severity-badge--critical {
+  background: rgba(220, 38, 38, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+}
+
+.severity-badge--warning {
+  background: rgba(217, 119, 6, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(217, 119, 6, 0.4);
+}
+
+.severity-badge--info {
+  background: rgba(37, 99, 235, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(37, 99, 235, 0.4);
+}
+
+/* Violations list */
+.violations-list {
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.875rem;
+}
+
+.violations-list__header {
+  display: grid;
+  grid-template-columns: 90px 160px 90px 1fr 140px 36px;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: #0d1117;
+  border-bottom: 1px solid #30363d;
+  color: #8b949e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Violation row */
+.violation-row {
+  border-bottom: 1px solid #21262d;
+  transition: background 0.1s;
+}
+
+.violation-row:last-child {
+  border-bottom: none;
+}
+
+.violation-row:hover {
+  background: #161b22;
+}
+
+.violation-row__main {
+  display: grid;
+  grid-template-columns: 90px 160px 90px 1fr 140px 36px;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  align-items: center;
+}
+
+.violation-row__category {
+  color: #c9d1d9;
+  font-size: 0.8125rem;
+}
+
+.violation-row__session {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #8b949e;
+}
+
+.violation-row__detail {
+  color: #c9d1d9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.violation-row__ts {
+  color: #8b949e;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.violation-row__hint-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #30363d;
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.violation-row__hint-btn:hover {
+  border-color: #50e3c2;
+  color: #50e3c2;
+}
+
+.violation-row__hint {
+  padding: 0.5rem 1rem 0.5rem 2.5rem;
+  background: #0d1117;
+  color: #8b949e;
+  font-size: 0.8125rem;
+  border-top: 1px solid #21262d;
+}
+
+/* Empty / error states */
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+  color: #8b949e;
+}
+
+.empty-state__hint {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  color: #6e7681;
+}
+
+.error-state {
+  padding: 2rem;
+  color: #ef4444;
+  text-align: center;
+}
