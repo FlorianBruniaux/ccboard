@@ -1,8 +1,8 @@
 # ccboard Roadmap
 
-**Last Updated**: 2026-03-20
-**Current Version**: v0.15.0
-**Target**: v1.0.0 (Phases K-L complete)
+**Last Updated**: 2026-03-23
+**Current Version**: v0.16.4
+**Target**: v1.0.0 (Phases L + N complete)
 
 ---
 
@@ -18,15 +18,16 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-## 📍 Current Status (v0.14.0)
+## 📍 Current Status (v0.16.4)
 
 ### ✅ Production Features
 
-**TUI + Web UI** (11 tabs, 100% parity):
+**TUI + Web UI** (12 tabs, 100% parity):
 - Dashboard, Sessions (live monitoring with hook-based status), Config, Hooks, Agents
 - Costs (5 views + quota + per-project last session cost), History (search + export), MCP, Analytics
 - **Activity** — security audit, violations feed, on-demand session analysis, batch scan (4 concurrent)
-- **Search** — FTS5 full-text search across all sessions with ranked snippets
+- **Search** — FTS5 full-text search with date, message count, detail pane, search-as-you-type
+- **Visual redesign (v0.16.0)**: palette system, rounded borders, responsive heatmap, sub-tabs
 
 **Live Session Monitoring** (v0.14.0):
 - `ccboard hook <EventName>` ingests Claude Code hook JSON, updates `~/.ccboard/live-sessions.json` with file locking + atomic save
@@ -36,22 +37,30 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 - macOS osascript notifications on session stop
 
 **Advanced Analytics (v0.15.0)**:
-- Streak detection (current + longest) dans UsagePatterns
+- Streak detection (current + longest) in UsagePatterns
 - Daily cost spikes (DailyCostAnomaly, Z-score based)
 - Model downgrade recommendations (Opus heavy + low tools → Sonnet)
-- AnalyticsData caching anomalies/daily_spikes (fini per-frame recomputation)
-- 433 tests, 0 warnings
+- AnalyticsData caching anomalies/daily_spikes (no per-frame recomputation)
 
 **Phase M — Conversation Viewer (v0.15.5)** ✅:
-- MA1 ✅ Tool call visualization — expandable nodes, input params, 6 tests (c213a65)
-- MA2 ✅ Regex search in replay viewer — `/` search, `n`/`N` nav, highlights, 5 tests (11426b8)
-- MA3 ✅ Export HTML enrichi — syntect syntax highlighting, code-lang badge, 6 tests (d87a25d)
-- MA4 ✅ FTS5 extended + Search tab — date+messages in results, detail pane, search-as-you-type, 8 tests (4520c2e)
+- MA1 ✅ Tool call visualization — expandable nodes, input params (c213a65)
+- MA2 ✅ Regex search in replay viewer — `/`, `n`/`N` nav, highlights (11426b8)
+- MA3 ✅ Export HTML enrichi — syntect syntax highlighting, code-lang badge (d87a25d)
+- MA4 ✅ FTS5 extended + Search tab — date, detail pane, search-as-you-type (4520c2e)
+
+**Bug Fixes & Polish (v0.16.0 → v0.16.4)**:
+- TUI keybindings `?` / `:` fixed on macOS (KeyModifiers::NONE vs SHIFT)
+- Web Activity + Analytics Tools pages fully styled (440+ CSS lines added)
+- Web session tooltip positioning fixed (invalid HTML in `<tr>` → `<td>`)
+- Pricing table extended: `claude-sonnet-4-6`, dot-style aliases (`claude-sonnet-4.5`, etc.)
+- Dashboard plan auto-detection from `~/.claude.json` (`hasAvailableSubscription` / `hasOpusPlanDefault`)
+- `cargo install` web embedding fixed (dist/ included in crates.io package)
+- Complete user guide: `docs/GUIDE.md` (700 lines, all 12 tabs + CLI reference)
 
 **Performance**:
 - 89x faster startup (SQLite cache: 20s → 33ms)
 - 50x memory reduction (Arc migration: 1.4GB → 28MB)
-- 419 tests passing, 0 clippy warnings
+- 458 tests passing, 0 clippy warnings
 
 **`ccboard discover`** (v0.12.0):
 - Analyzes session history to suggest CLAUDE.md rules, skills, or commands
@@ -293,9 +302,10 @@ Delivered:
 | **K-Analytics (Tool Cost)** | 🟡 MEDIUM | — | v0.13.0 | Tool token analytics, optimization suggestions | — | ✅ Done |
 | **Hook-Monitor** | 🔴 HIGH | — | v0.14.0 | Live session monitoring, hook receiver, setup | — | ✅ Done |
 | **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.15.0 | Advanced analytics (anomaly, forecasts) | #14-21 | ✅ Done 2026-03-20 |
-| **L** | 🟢 LOW | 12-15h | v0.16.0 | Plugin system | — | 📋 Backlog |
 | **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | ✅ Done 2026-03-20 |
-| **N** | 🟢 LOW | 10-14h | v0.16.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
+| **v0.16.x fixes** | — | — | v0.16.0–0.16.4 | Visual redesign, keybindings, web CSS, pricing, plan detection | — | ✅ Done 2026-03-23 |
+| **L** | 🟢 LOW | 12-15h | v0.17.0 | Plugin system | — | 📋 Backlog |
+| **N** | 🟢 LOW | 10-14h | v0.17.5 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
 **Total Estimated**: 46-59h for v1.0.0 completion
 
@@ -332,6 +342,6 @@ Interested in implementing a roadmap phase? See:
 
 ---
 
-**Last Updated**: 2026-03-20
+**Last Updated**: 2026-03-23
 **Maintainer**: @FlorianBruniaux
 **Repository**: https://github.com/FlorianBruniaux/ccboard

@@ -1,16 +1,16 @@
 ---
 date: 2026-03-20
-last_updated: 2026-03-20
-version: 0.15.5
+last_updated: 2026-03-23
+version: 0.16.4
 title: ccboard — Plan phases restantes vers v1.0.0
 status: ACTIVE
 ---
 
 # Plan: Phases restantes vers v1.0.0
 
-**Dernière mise à jour**: 2026-03-20
-**Version actuelle**: v0.15.5
-**Dernier commit**: 4520c2e — feat(search): MA4 — extend FTS5 search with date, detail pane, search-as-you-type
+**Dernière mise à jour**: 2026-03-23
+**Version actuelle**: v0.16.4
+**Dernier commit**: a5ef51d — fix: Unknown Plan + missing model IDs in pricing table (v0.16.4)
 
 > Pour l'historique des phases 0→K, voir [ROADMAP.md](ROADMAP.md).
 
@@ -53,7 +53,19 @@ Extension FTS5 + UX Search tab.
 
 ---
 
-## 📋 Phase L: Plugin System (v0.16.0)
+## ✅ v0.16.x — Visual Redesign + Bug Fixes (2026-03-23)
+
+- TUI visual redesign : palette system, rounded borders, sub-tabs, heatmap responsive
+- Keybindings `?` / `:` fixés sur macOS (KeyModifiers::NONE)
+- Web Activity + Analytics Tools CSS complet (440+ lignes)
+- Pricing étendu : `claude-sonnet-4-6`, alias dot-style
+- Plan auto-détection depuis `~/.claude.json`
+- `cargo install` web embedding fixé (dist/ inclus dans crates.io)
+- `docs/GUIDE.md` créé (700 lignes, guide complet)
+
+---
+
+## 📋 Phase L: Plugin System (v0.17.0)
 
 **Priorité**: 🟢 LOW | **Durée**: 12-15h
 
@@ -62,7 +74,7 @@ Aucun prérequis bloquant mais forte complexité. À faire après M.
 
 ---
 
-## 📋 Phase N: Plan-Aware Completion (v0.16.5)
+## 📋 Phase N: Plan-Aware Completion (v0.17.5)
 
 **Priorité**: 🟢 LOW | **Durée**: 10-14h | **GitHub**: #4, #10-13
 
@@ -76,9 +88,10 @@ Prérequis : Phase H partiellement fait en v0.8.0.
 | Phase | Status | Version |
 |-------|--------|---------|
 | K-Analytics | ✅ Done | v0.15.0 |
-| **M — Conversation** | **✅ Done** | v0.15.5 |
-| L — Plugins | 📋 Backlog | v0.16.0 |
-| N — Plan-aware | 📋 Backlog | v0.16.5 |
-| **v1.0.0** | 🎯 Q3 2026 | L + N + docs |
+| M — Conversation | ✅ Done | v0.15.5 |
+| v0.16.x fixes | ✅ Done | v0.16.0–0.16.4 |
+| **L — Plugins** | 📋 Backlog | v0.17.0 |
+| N — Plan-aware | 📋 Backlog | v0.17.5 |
+| **v1.0.0** | 🎯 Q3 2026 | L + N |
 
-**Critères v1.0.0** : 500+ tests, 0 bugs critiques, user guide, Phase L livrée.
+**Critères v1.0.0** : 500+ tests, 0 bugs critiques, Phase L livrée.
