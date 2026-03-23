@@ -894,9 +894,9 @@ impl AnalyticsTab {
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([
-                Constraint::Length(12), // Activity Heatmap
-                Constraint::Length(12), // Most Used Tools
-                Constraint::Min(8),     // Remaining space for other widgets
+                Constraint::Min(10),    // Activity Heatmap — takes all available space
+                Constraint::Length(12), // Most Used Tools — fixed
+                Constraint::Length(12), // Model Distribution + Duration — fixed
             ])
             .split(area);
 
@@ -917,6 +917,7 @@ impl AnalyticsTab {
     }
 
     /// Render activity heatmap (GitHub-style 7 days x 24 hours)
+    /// Cells are sized dynamically to fill the available area.
     fn render_activity_heatmap(
         &self,
         frame: &mut Frame,
@@ -934,69 +935,92 @@ impl AnalyticsTab {
             .copied()
             .unwrap_or(1);
 
-        // Build heatmap lines: each day is a row
         let weekday_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+        // --- Calculate responsive cell dimensions ---
+        let label_w = 4usize; // "Mon "
+        let inner_w = area.width.saturating_sub(2) as usize; // minus block borders
+        let grid_w = inner_w.saturating_sub(label_w);
+        let cell_w = (grid_w / 24).max(1);
+
+        let inner_h = area.height.saturating_sub(2) as usize; // minus block borders
+        // Reserve: 1 header + 2 blank + 1 legend = 4 fixed rows
+        let available_for_days = inner_h.saturating_sub(4);
+        // Cap cell height at 5 lines so cells stay compact and readable
+        let cell_h = (available_for_days / 7).clamp(1, 5);
+
         let mut lines = vec![];
 
-        // Header: hour labels (every 4 hours)
-        let header = Line::from(vec![
-            Span::raw("    "),
-            Span::styled("00", Style::default().fg(p.muted)),
-            Span::raw("   "),
-            Span::styled("04", Style::default().fg(p.muted)),
-            Span::raw("   "),
-            Span::styled("08", Style::default().fg(p.muted)),
-            Span::raw("   "),
-            Span::styled("12", Style::default().fg(p.muted)),
-            Span::raw("   "),
-            Span::styled("16", Style::default().fg(p.muted)),
-            Span::raw("   "),
-            Span::styled("20", Style::default().fg(p.muted)),
-        ]);
-        lines.push(header);
-
-        // Heatmap rows (one per weekday)
-        for (day_idx, day_label) in weekday_labels.iter().enumerate() {
-            let mut row_spans = vec![Span::styled(
-                format!("{:<3} ", day_label),
-                Style::default().fg(p.muted),
-            )];
-
-            for &activity in &heatmap[day_idx] {
-                let intensity = if max_activity > 0 {
-                    (activity as f64 / max_activity as f64 * 4.0) as u8
-                } else {
-                    0
-                };
-
-                // Color scale: None -> DarkGray -> Green -> Cyan -> Yellow
-                let color = match intensity {
-                    0 => p.muted,
-                    1 => p.success,
-                    2 => p.focus,
-                    3 => p.warning,
-                    _ => p.important,
-                };
-
-                row_spans.push(Span::styled("█", Style::default().fg(color)));
+        // --- Header: hour labels positioned at correct column offsets ---
+        let mut header_chars: Vec<char> = vec![' '; label_w + 24 * cell_w];
+        for (hour, label) in [(0, "00"), (4, "04"), (8, "08"), (12, "12"), (16, "16"), (20, "20")] {
+            let pos = label_w + hour * cell_w;
+            if pos + 2 <= header_chars.len() {
+                header_chars[pos] = label.chars().next().unwrap_or(' ');
+                header_chars[pos + 1] = label.chars().nth(1).unwrap_or(' ');
             }
+        }
+        lines.push(Line::from(Span::styled(
+            header_chars.into_iter().collect::<String>(),
+            Style::default().fg(p.muted),
+        )));
 
-            lines.push(Line::from(row_spans));
+        // --- Heatmap rows: each day occupies cell_h terminal lines ---
+        for (day_idx, day_label) in weekday_labels.iter().enumerate() {
+            let row_activity: Vec<u8> = heatmap[day_idx]
+                .iter()
+                .map(|&activity| {
+                    if max_activity > 0 {
+                        (activity as f64 / max_activity as f64 * 4.0) as u8
+                    } else {
+                        0
+                    }
+                })
+                .collect();
+
+            for sub_row in 0..cell_h {
+                // Show day label on the middle sub-row only
+                let prefix = if sub_row == cell_h / 2 {
+                    Span::styled(
+                        format!("{:<width$}", day_label, width = label_w),
+                        Style::default().fg(p.muted),
+                    )
+                } else {
+                    Span::raw(format!("{:width$}", "", width = label_w))
+                };
+
+                let mut row_spans = vec![prefix];
+                for &intensity in &row_activity {
+                    let color = match intensity {
+                        0 => p.muted,
+                        1 => p.success,
+                        2 => p.focus,
+                        3 => p.warning,
+                        _ => p.important,
+                    };
+                    row_spans.push(Span::styled(
+                        "█".repeat(cell_w),
+                        Style::default().fg(color),
+                    ));
+                }
+                lines.push(Line::from(row_spans));
+            }
         }
 
-        // Legend
+        // --- Legend (2 lines for breathing room) ---
         lines.push(Line::from(""));
         lines.push(Line::from(vec![
-            Span::styled("█", Style::default().fg(p.muted)),
-            Span::raw(" Less  "),
-            Span::styled("█", Style::default().fg(p.success)),
-            Span::raw(" "),
-            Span::styled("█", Style::default().fg(p.focus)),
-            Span::raw(" "),
-            Span::styled("█", Style::default().fg(p.warning)),
-            Span::raw(" "),
-            Span::styled("█", Style::default().fg(p.important)),
-            Span::raw(" More"),
+            Span::raw("  "),
+            Span::styled("██", Style::default().fg(p.muted)),
+            Span::styled("  No activity    ", Style::default().fg(p.muted)),
+            Span::styled("██", Style::default().fg(p.success)),
+            Span::styled("  Low    ", Style::default().fg(p.muted)),
+            Span::styled("██", Style::default().fg(p.focus)),
+            Span::styled("  Medium    ", Style::default().fg(p.muted)),
+            Span::styled("██", Style::default().fg(p.warning)),
+            Span::styled("  High    ", Style::default().fg(p.muted)),
+            Span::styled("██", Style::default().fg(p.important)),
+            Span::styled("  Peak", Style::default().fg(p.muted)),
         ]));
 
         // Streak info in title
