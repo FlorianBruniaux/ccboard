@@ -5,6 +5,14 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-03-23
+
+### Fixed
+
+- **Web — Frontend not embedded in released binary**: `trunk build --release` was not run before publishing 0.16.0, leaving the web UI absent from the binary (placeholder warning at startup); fixed by compiling the Leptos/WASM frontend and embedding it via rust-embed before release
+
+---
+
 ## [0.16.0] - 2026-03-23
 
 ### Fixed
