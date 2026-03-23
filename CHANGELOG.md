@@ -5,6 +5,27 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-03-23
+
+### Fixed
+
+- **TUI — `?` and `:` keybindings broken**: `ToggleHelp` and `ShowCommandPalette` were registered with `KeyModifiers::SHIFT`, but crossterm sends these characters with `KeyModifiers::NONE` on macOS — pressing `?` now correctly opens the help modal
+- **Web — Activity page completely unstyled**: all CSS classes (`stat-card`, `severity-badge`, `filter-btn`, `violation-row`, etc.) were missing from style.css; added ~230 lines for the Security Audit / Activity page
+- **Web — Analytics Tools tab unstyled**: suggestion cards, tool breakdown, and forecast sections had no CSS; added ~210 lines covering `.suggestion-card`, `.suggestions-grid`, `.forecast-section`, `.breakdown-section`
+- **Web — Dashboard session tooltip positioning**: tooltip was a direct child of `<tr>` (invalid HTML — browsers eject it from the table), causing it to appear at the left edge of the viewport; moved inside `<td class="preview--with-tooltip">` with `position: relative` anchor and `right: 0` alignment
+
+### Changed
+
+- **TUI — Activity heatmap responsive layout**: heatmap now fills all available vertical space (layout constraint changed from `Length(12)` to `Min(10)`); cell width scales with terminal width (`cell_w = grid_w / 24`); cell height clamps between 1 and 5 rows (`cell_h = available_height / 7 clamp(1, 5)`)
+- **TUI — Heatmap legend redesign**: swatches enlarged from 1 to 2 chars (`██`), labeled with human-readable levels (`No activity / Low / Medium / High / Peak`) for better readability at a glance
+
+### Documentation
+
+- **README.md**: updated tab reference (11 → 12 tabs with correct keyboard shortcuts), added Quick Start section mentioning `?` help and `:` command palette, replaced broken `claudedocs/` links with `docs/GUIDE.md` and `CHANGELOG.md`
+- **`docs/GUIDE.md`** (new): complete 700-line user guide covering all 12 tabs, keyboard shortcuts, conversation viewer, live session monitoring, CLI reference, and tips & tricks
+
+---
+
 ## [0.15.5] - 2026-03-20
 
 ### Added — Phase M: Conversation Viewer Enhancements (complete)
