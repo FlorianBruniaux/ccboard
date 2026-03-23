@@ -949,7 +949,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 **Total**: 419 tests passing, 0 clippy warnings
 
-For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [NEXT_STEPS.md](claudedocs/NEXT_STEPS.md).
+For detailed version history, see [CHANGELOG.md](CHANGELOG.md).
 
 ### Documentation
 
@@ -963,7 +963,7 @@ For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [NEXT_STEPS.md
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development guidelines and contribution workflow |
 | [API Documentation](docs/API.md) | REST API and SSE endpoints for Web UI |
 | [Architecture Decision Records](docs/architecture/) | Key architectural decisions and their rationale |
-| [PLAN.md](claudedocs/PLAN.md) | Development phases and post-mortems |
+| [Architecture Decision Records](docs/architecture/) | Key architectural decisions and their rationale |
 
 ---
 
@@ -1005,7 +1005,7 @@ This project was developed following Test-Driven Development (TDD) principles wi
 - **Issues**: https://github.com/FlorianBruniaux/ccboard/issues
 - **Releases**: https://github.com/FlorianBruniaux/ccboard/releases
 - **Crates.io**: https://crates.io/crates/ccboard
-- **Documentation**: [PLAN.md](claudedocs/PLAN.md) | [CHANGELOG.md](CHANGELOG.md)
+- **Documentation**: [User Guide](docs/GUIDE.md) | [CHANGELOG.md](CHANGELOG.md)
 
 ### Related Projects
 
