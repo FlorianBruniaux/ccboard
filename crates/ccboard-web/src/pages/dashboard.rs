@@ -227,26 +227,26 @@ pub fn Dashboard() -> impl IntoView {
                                                                                 <td>{project}</td>
                                                                                 <td class="tokens">{format_number(tokens)}</td>
                                                                                 <td>{messages}</td>
-                                                                                <td class="preview">{preview}</td>
-
-                                                                                // Tooltip preview
-                                                                                <div class="session-preview-tooltip">
-                                                                                    <div class="preview-header">
-                                                                                        <strong>"Project: "</strong>
-                                                                                        {project_tooltip}
+                                                                                <td class="preview preview--with-tooltip">
+                                                                                    <span class="preview-text">{preview}</span>
+                                                                                    <div class="session-preview-tooltip">
+                                                                                        <div class="preview-header">
+                                                                                            <strong>"Project: "</strong>
+                                                                                            {project_tooltip}
+                                                                                        </div>
+                                                                                        <div class="preview-stats">
+                                                                                            <span>{format_number(tokens)} " tokens"</span>
+                                                                                            <span>{format_cost(cost)}</span>
+                                                                                            <span>{messages} " messages"</span>
+                                                                                        </div>
+                                                                                        <div class="preview-snippet">
+                                                                                            {preview_tooltip}
+                                                                                        </div>
+                                                                                        <div class="preview-cta">
+                                                                                            "Click for details →"
+                                                                                        </div>
                                                                                     </div>
-                                                                                    <div class="preview-stats">
-                                                                                        <span>{format_number(tokens)} " tokens"</span>
-                                                                                        <span>{format_cost(cost)}</span>
-                                                                                        <span>{messages} " messages"</span>
-                                                                                    </div>
-                                                                                    <div class="preview-snippet">
-                                                                                        {preview_tooltip}
-                                                                                    </div>
-                                                                                    <div class="preview-cta">
-                                                                                        "Click for details →"
-                                                                                    </div>
-                                                                                </div>
+                                                                                </td>
                                                                             </tr>
                                                                         }
                                                                     }).collect::<Vec<_>>()}

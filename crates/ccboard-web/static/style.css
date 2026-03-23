@@ -1359,27 +1359,38 @@ pre code {
 
 /* Session Preview Tooltip */
 .session-row {
+  /* position: relative on <tr> is not valid HTML — tooltip is in <td> instead */
+}
+
+/* The preview cell anchors the tooltip */
+.preview--with-tooltip {
   position: relative;
+}
+
+.preview-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-preview-tooltip {
   position: absolute;
-  top: 100%;
-  left: 0;
+  top: calc(100% + 4px);
+  right: 0;
   z-index: 1000;
   min-width: 400px;
-  max-width: 500px;
+  max-width: 520px;
   padding: var(--space-md);
   background: rgba(26,26,26,0.98);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-tooltip);
   box-shadow: var(--elevation-4);
-  margin-top: var(--space-xs);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition-base), transform var(--transition-base);
-  transform: translateY(-8px);
+  transform: translateY(-6px);
 }
 
 .session-row:hover .session-preview-tooltip {
