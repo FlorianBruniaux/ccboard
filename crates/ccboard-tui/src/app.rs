@@ -31,18 +31,18 @@ pub enum Tab {
 impl Tab {
     pub fn all() -> &'static [Tab] {
         &[
-            Tab::Dashboard,  // 0
-            Tab::Sessions,   // 1
-            Tab::Analytics,  // 2
-            Tab::Costs,      // 3
-            Tab::History,    // 4
-            Tab::Activity,   // 5
-            Tab::Mcp,        // 6
-            Tab::Config,     // 7
-            Tab::Hooks,      // 8
-            Tab::Agents,     // 9
-            Tab::Plugins,    // 10
-            Tab::Search,     // 11
+            Tab::Dashboard, // 0
+            Tab::Sessions,  // 1
+            Tab::Analytics, // 2
+            Tab::Costs,     // 3
+            Tab::History,   // 4
+            Tab::Activity,  // 5
+            Tab::Mcp,       // 6
+            Tab::Config,    // 7
+            Tab::Hooks,     // 8
+            Tab::Agents,    // 9
+            Tab::Plugins,   // 10
+            Tab::Search,    // 11
         ]
     }
 

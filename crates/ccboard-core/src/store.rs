@@ -1140,13 +1140,29 @@ impl DataStore {
 
     /// Calculate usage estimate based on billing blocks and subscription plan
     pub fn usage_estimate(&self) -> crate::usage_estimator::UsageEstimate {
+        use crate::parsers::claude_global::DetectedPlan;
+        use crate::usage_estimator::SubscriptionPlan;
+
         let settings = self.settings();
-        let plan = settings
-            .merged
-            .subscription_plan
-            .as_ref()
-            .map(|s| crate::usage_estimator::SubscriptionPlan::parse(s))
-            .unwrap_or_default();
+
+        // Priority 1: explicit override in settings.json (ccboard field)
+        let plan = if let Some(s) = settings.merged.subscription_plan.as_ref() {
+            SubscriptionPlan::parse(s)
+        } else {
+            // Priority 2: auto-detect from ~/.claude.json account fields
+            let detected = self
+                .claude_global_stats
+                .read()
+                .as_ref()
+                .and_then(|g| g.detected_plan.clone());
+
+            match detected {
+                Some(DetectedPlan::Pro) => SubscriptionPlan::Pro,
+                Some(DetectedPlan::Max) => SubscriptionPlan::Max5x, // can't distinguish 5x vs 20x
+                Some(DetectedPlan::Api) => SubscriptionPlan::Api,
+                None => SubscriptionPlan::Unknown,
+            }
+        };
 
         let billing_blocks = self.billing_blocks.read();
         crate::usage_estimator::calculate_usage_estimate(&billing_blocks, plan)

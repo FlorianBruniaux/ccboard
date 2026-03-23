@@ -53,6 +53,20 @@ pub struct ClaudeGlobalStats {
     pub projects: Vec<ProjectLastUsage>,
     /// Sum of last_cost across all projects (approximate lifetime lower bound)
     pub total_last_cost: f64,
+    /// Auto-detected subscription plan from hasAvailableSubscription + hasOpusPlanDefault.
+    /// None means the fields were absent (old CC version or unrecognized format).
+    pub detected_plan: Option<DetectedPlan>,
+}
+
+/// Plan detected from ~/.claude.json account fields
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DetectedPlan {
+    /// Pro subscription ($20/month)
+    Pro,
+    /// Max subscription (5x or 20x — can't distinguish without API call)
+    Max,
+    /// API / enterprise (pay-as-you-go or org-level billing)
+    Api,
 }
 
 // Intermediate deserialization types ─────────────────────────────────────────
@@ -66,9 +80,16 @@ struct RawProject {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RawClaudeJson {
     #[serde(default)]
     projects: HashMap<String, RawProject>,
+    /// True if user has an active Claude subscription (Pro or Max)
+    #[serde(default)]
+    has_available_subscription: bool,
+    /// True if user's default model is Opus (indicates Max plan)
+    #[serde(default)]
+    has_opus_plan_default: bool,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,6 +106,17 @@ pub fn parse_claude_global(home: &Path) -> Option<ClaudeGlobalStats> {
 
     let data = std::fs::read(&path).ok()?;
     let raw: RawClaudeJson = serde_json::from_slice(&data).ok()?;
+
+    // Detect plan from subscription flags
+    let detected_plan = Some(if raw.has_available_subscription {
+        if raw.has_opus_plan_default {
+            DetectedPlan::Max
+        } else {
+            DetectedPlan::Pro
+        }
+    } else {
+        DetectedPlan::Api
+    });
 
     let mut projects: Vec<ProjectLastUsage> = raw
         .projects
@@ -122,6 +154,7 @@ pub fn parse_claude_global(home: &Path) -> Option<ClaudeGlobalStats> {
     Some(ClaudeGlobalStats {
         projects,
         total_last_cost,
+        detected_plan,
     })
 }
 

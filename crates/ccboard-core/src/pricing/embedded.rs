@@ -83,8 +83,10 @@ static PRICING_TABLE: Lazy<HashMap<&'static str, ModelPricing>> = Lazy::new(|| {
     };
     m.insert("claude-opus-4-5-20251101", opus_45_pricing.clone());
     m.insert("claude-opus-4-5", opus_45_pricing.clone());
+    m.insert("claude-opus-4.5", opus_45_pricing.clone()); // dot-style alias (newer CC versions)
     m.insert("claude-opus-4-6-20250212", opus_45_pricing.clone());
     m.insert("claude-opus-4-6", opus_45_pricing.clone());
+    m.insert("claude-opus-4.6", opus_45_pricing.clone()); // dot-style alias
     m.insert("opus-4", opus_45_pricing.clone());
     m.insert("claude-opus-4", opus_45_pricing);
 
@@ -98,7 +100,7 @@ static PRICING_TABLE: Lazy<HashMap<&'static str, ModelPricing>> = Lazy::new(|| {
     m.insert("claude-opus-4-0-20250514", opus_legacy_pricing.clone());
     m.insert("claude-opus-4-1-20250805", opus_legacy_pricing);
 
-    // Claude Sonnet 4.5 - Balanced model (most commonly used)
+    // Claude Sonnet 4.5/4.6 - Balanced model (default in Claude Code)
     let sonnet_pricing = ModelPricing {
         input_price_per_million: 3.0,
         output_price_per_million: 15.0,
@@ -106,6 +108,11 @@ static PRICING_TABLE: Lazy<HashMap<&'static str, ModelPricing>> = Lazy::new(|| {
         cache_write_multiplier: 1.25, // $3.75/M (125% of $3)
     };
     m.insert("claude-sonnet-4-5-20250929", sonnet_pricing.clone());
+    m.insert("claude-sonnet-4-5", sonnet_pricing.clone());
+    m.insert("claude-sonnet-4.5", sonnet_pricing.clone()); // dot-style alias (newer CC versions)
+    m.insert("claude-sonnet-4-6-20250514", sonnet_pricing.clone()); // Sonnet 4.6 (current default)
+    m.insert("claude-sonnet-4-6", sonnet_pricing.clone()); // Sonnet 4.6 alias
+    m.insert("claude-sonnet-4.6", sonnet_pricing.clone()); // dot-style alias
     m.insert("sonnet-4", sonnet_pricing.clone());
     m.insert("claude-sonnet-4", sonnet_pricing);
 
@@ -117,6 +124,8 @@ static PRICING_TABLE: Lazy<HashMap<&'static str, ModelPricing>> = Lazy::new(|| {
         cache_write_multiplier: 1.25, // $1.25/M (125% of $1)
     };
     m.insert("claude-haiku-4-5-20251001", haiku_pricing.clone());
+    m.insert("claude-haiku-4-5", haiku_pricing.clone());
+    m.insert("claude-haiku-4.5", haiku_pricing.clone()); // dot-style alias (newer CC versions)
     m.insert("haiku-4", haiku_pricing.clone());
     m.insert("claude-haiku-4", haiku_pricing);
 

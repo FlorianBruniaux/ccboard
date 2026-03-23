@@ -288,10 +288,7 @@ pub fn render_search_tab(
                 ]),
                 Line::from(vec![
                     Span::styled("Messages:", Style::default().fg(p.muted)),
-                    Span::styled(
-                        format!(" {}", r.message_count),
-                        Style::default().fg(p.fg),
-                    ),
+                    Span::styled(format!(" {}", r.message_count), Style::default().fg(p.fg)),
                 ]),
                 Line::from(""),
                 Line::from(Span::styled(

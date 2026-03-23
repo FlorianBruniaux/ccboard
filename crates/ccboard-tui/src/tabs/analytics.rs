@@ -257,7 +257,10 @@ impl AnalyticsTab {
             if *is_active {
                 period_text.push(Span::styled(
                     format!(" {} ", label),
-                    Style::default().fg(p.bg).bg(p.focus).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(p.bg)
+                        .bg(p.focus)
+                        .add_modifier(Modifier::BOLD),
                 ));
             } else {
                 period_text.push(Span::styled(
@@ -944,7 +947,7 @@ impl AnalyticsTab {
         let cell_w = (grid_w / 24).max(1);
 
         let inner_h = area.height.saturating_sub(2) as usize; // minus block borders
-        // Reserve: 1 header + 2 blank + 1 legend = 4 fixed rows
+                                                              // Reserve: 1 header + 2 blank + 1 legend = 4 fixed rows
         let available_for_days = inner_h.saturating_sub(4);
         // Cap cell height at 5 lines so cells stay compact and readable
         let cell_h = (available_for_days / 7).clamp(1, 5);
@@ -953,7 +956,14 @@ impl AnalyticsTab {
 
         // --- Header: hour labels positioned at correct column offsets ---
         let mut header_chars: Vec<char> = vec![' '; label_w + 24 * cell_w];
-        for (hour, label) in [(0, "00"), (4, "04"), (8, "08"), (12, "12"), (16, "16"), (20, "20")] {
+        for (hour, label) in [
+            (0, "00"),
+            (4, "04"),
+            (8, "08"),
+            (12, "12"),
+            (16, "16"),
+            (20, "20"),
+        ] {
             let pos = label_w + hour * cell_w;
             if pos + 2 <= header_chars.len() {
                 header_chars[pos] = label.chars().next().unwrap_or(' ');
@@ -998,10 +1008,7 @@ impl AnalyticsTab {
                         3 => p.warning,
                         _ => p.important,
                     };
-                    row_spans.push(Span::styled(
-                        "█".repeat(cell_w),
-                        Style::default().fg(color),
-                    ));
+                    row_spans.push(Span::styled("█".repeat(cell_w), Style::default().fg(color)));
                 }
                 lines.push(Line::from(row_spans));
             }

@@ -466,10 +466,7 @@ impl Ui {
                     } else {
                         format!(" {} ", t.name())
                     };
-                    Line::from(Span::styled(
-                        inactive_label,
-                        Style::default().fg(p.muted),
-                    ))
+                    Line::from(Span::styled(inactive_label, Style::default().fg(p.muted)))
                 }
             })
             .collect();

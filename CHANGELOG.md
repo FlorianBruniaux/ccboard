@@ -5,6 +5,15 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.4] - 2026-03-23
+
+### Fixed
+
+- **Pricing — Unknown model IDs causing wrong cost estimates**: Added `claude-sonnet-4-6` (current Claude Code default), dot-style aliases (`claude-sonnet-4.5`, `claude-opus-4.5`, `claude-haiku-4.5`, etc.) to the pricing table. Sessions using these IDs fell back to a weighted average instead of exact pricing.
+- **Dashboard — "Unknown Plan" shown for all users**: ccboard now auto-detects subscription plan from `~/.claude.json` (`hasAvailableSubscription` + `hasOpusPlanDefault` fields). Pro and Max plans are detected automatically without requiring manual `subscription_plan` config. Manual override via `subscription_plan` in `settings.json` still takes priority.
+
+---
+
 ## [0.16.3] - 2026-03-23
 
 ### Fixed
