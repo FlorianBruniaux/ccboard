@@ -5354,3 +5354,209 @@ pre code {
   color: #ef4444;
   text-align: center;
 }
+
+/* ─── Analytics — Tools / Cost Optimization ──────────────────────────────── */
+
+.analytics-tools {
+  padding: 1.5rem 0;
+}
+
+.analytics-tools h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e6edf3;
+  margin-bottom: 0.25rem;
+}
+
+.tools-description {
+  color: #8b949e;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.suggestions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.suggestion-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  transition: border-color 0.15s;
+}
+
+.suggestion-card:hover {
+  border-color: #50e3c2;
+}
+
+.suggestion-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.suggestion-title {
+  font-weight: 600;
+  color: #e6edf3;
+  font-size: 0.9375rem;
+  flex: 1;
+}
+
+.suggestion-category {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(80, 227, 194, 0.1);
+  color: #50e3c2;
+  border: 1px solid rgba(80, 227, 194, 0.25);
+}
+
+.suggestion-savings {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #3fb950;
+  white-space: nowrap;
+}
+
+.suggestion-description {
+  color: #8b949e;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.suggestion-action {
+  font-size: 0.8125rem;
+  color: #c9d1d9;
+}
+
+.suggestion-action strong,
+.suggestion-action b {
+  color: #50e3c2;
+}
+
+/* "63 suggestions" summary line */
+.tools-summary {
+  font-size: 0.8125rem;
+  color: #8b949e;
+  margin-bottom: 1rem;
+}
+
+/* ─── Analytics — Insights summary ───────────────────────────────────────── */
+
+.insights-summary {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+/* ─── Analytics — metrics summary strip ──────────────────────────────────── */
+
+.metrics-summary {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+/* ─── Analytics — section headers ────────────────────────────────────────── */
+
+.section-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+
+/* ─── Loading / spinner ───────────────────────────────────────────────────── */
+
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem;
+  color: #8b949e;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #30363d;
+  border-top-color: #50e3c2;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Error state ─────────────────────────────────────────────────────────── */
+
+.error-state {
+  padding: 2rem;
+  text-align: center;
+}
+
+.error-message {
+  color: #ef4444;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.error-details {
+  color: #8b949e;
+  font-size: 0.875rem;
+}
+
+/* ─── Forecast section ────────────────────────────────────────────────────── */
+
+.forecast-section {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #21262d;
+}
+
+/* ─── Breakdown sections ──────────────────────────────────────────────────── */
+
+.breakdown-section {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+}
+
+.breakdown-left,
+.breakdown-right {
+  flex: 1;
+}
+
+/* ─── Action list ─────────────────────────────────────────────────────────── */
+
+.action-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.action-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #c9d1d9;
+}
