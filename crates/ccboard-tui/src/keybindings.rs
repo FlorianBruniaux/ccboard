@@ -314,20 +314,20 @@ impl KeyBindings {
             KeyAction::JumpTab9,
         );
 
-        // Toggle help (?)
+        // Toggle help (?) — crossterm sends the literal char with NONE modifiers
         defaults.insert(
             KeyWithMods {
                 code: KeyCode::Char('?'),
-                modifiers: KeyModifiers::SHIFT,
+                modifiers: KeyModifiers::NONE,
             },
             KeyAction::ToggleHelp,
         );
 
-        // Show command palette (:)
+        // Show command palette (:) — crossterm sends the literal char with NONE modifiers
         defaults.insert(
             KeyWithMods {
                 code: KeyCode::Char(':'),
-                modifiers: KeyModifiers::SHIFT,
+                modifiers: KeyModifiers::NONE,
             },
             KeyAction::ShowCommandPalette,
         );
