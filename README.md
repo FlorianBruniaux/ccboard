@@ -31,21 +31,22 @@
 
 ## Features
 
-### 11 Interactive Tabs (TUI + Web)
+### 12 Interactive Tabs (TUI + Web)
 
 | Tab | Key | Description | Highlights |
 |-----|-----|-------------|------------|
 | **Dashboard** | `1` | Overview stats, model usage, 7-day activity | API usage estimation, plan-based budgets, MCP server count |
-| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓/🟢), session type (CLI/IDE/Agent), hook-based real-time status, CPU/RAM/Tokens, search, detail view |
-| **Config** | `3` | Cascading configuration editor | 4-column diff (default/global/project/local), edit with `e` |
-| **Hooks** | `4` | Event-based hook management | Bash syntax highlighting, test mode, badge indicators |
-| **Agents** | `5` | Agents, commands, and skills browser | Frontmatter YAML parsing, invocation stats |
-| **Costs** | `6` | Token analytics (6 sub-views incl. Per Project (~/.claude.json)) | Overview, By Model, Daily chart, Billing Blocks (5h windows), Per Project |
-| **History** | `7` | Full-text search across sessions | Temporal patterns, CSV/JSON export |
-| **MCP** | `8` | MCP server management | Status detection (running/stopped), env vars masking |
-| **Analytics** | `9` | Advanced analytics (4 sub-views) | Budget tracking, 30-day forecast, heatmap, insights |
-| **Activity** | `Tab` | Security audit & violations feed | Credential detection, destructive command alerts, cross-session violations with remediation hints |
-| **Search** | `Tab` | Full-text search across all sessions | FTS5-powered, ranked results with snippets, query history |
+| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), CPU/RAM/Tokens, conversation viewer with regex search |
+| **Analytics** | `3` | Advanced analytics (6 sub-views) | Budget tracking, 30-day forecast, hourly heatmap, anomaly detection, usage patterns |
+| **Costs** | `4` | Token analytics (6 sub-views) | Overview, By Model, Daily, Usage Periods, Top Sessions, Per Project — 4-level budget alerts |
+| **History** | `5` | Chronological session timeline | CSV/JSON/Markdown export (`x`), full-text search |
+| **Audit Log** | `6` | Security audit & violations feed | Credential detection, destructive command alerts, cross-session violations with remediation hints |
+| **MCP** | `7` | MCP server management | Status detection (running/stopped), copy command to clipboard (`y`), env vars masking |
+| **Config** | `8` | Cascading configuration editor | 4-column diff (default/global/project/local), edit with `e`, reveal in file manager (`o`) |
+| **Hooks** | `9` | Event-based hook management | Bash syntax highlighting, badge indicators |
+| **Tools** | `0` | Agents, commands, and skills browser | Frontmatter YAML parsing, invocation stats |
+| **Plugins** | `p` | Plugin & capability usage analytics | Dead code detection, sort by usage/cost/name |
+| **Search** | `/` | Full-text search across all sessions | FTS5-powered, search-as-you-type (≥2 chars), ranked snippets, opens conversation viewer |
 
 ### Platform Capabilities
 
@@ -53,7 +54,7 @@
 |-----------|---------|
 | **Performance** | 89x faster startup (20s → 224ms) via SQLite cache, >99% hit rate, handles 10K+ sessions |
 | **Live Updates** | File watcher (500ms debounce), auto-refresh, Server-Sent Events (Web) |
-| **UX** | Command palette (`:`), vim keybindings (hjkl), breadcrumbs, scrollbar indicators, Light/Dark mode (`Ctrl+T`, persistent) |
+| **UX** | Command palette (`:`), contextual help (`?`), vim keybindings (hjkl), breadcrumbs, scrollbar indicators, Light/Dark mode (`Ctrl+T`, persistent) |
 | **File Operations** | Edit with `$EDITOR` (`e`), reveal in file manager (`o`), cross-platform |
 | **Zero Config** | Works out of the box with `~/.claude`, single 5.8MB binary, macOS/Linux/Windows |
 | **Hook Integration** | `ccboard setup` injects Claude Code hooks, live session status (Running/WaitingInput/Stopped), macOS notification on stop |
@@ -152,7 +153,7 @@ ccboard both --port 3333
 ccboard stats
 ```
 
-Navigate tabs with `1-9`, search with `/`, refresh with `r`, toggle light/dark theme with `Ctrl+T`, quit with `q`. Press `?` for all keybindings.
+Navigate tabs with `1-9`, `0`, `p`. Press `?` for contextual help, `:` to open the command palette. Refresh with `r`, toggle theme with `Ctrl+T`, quit with `q`. See [docs/GUIDE.md](docs/GUIDE.md) for the full feature reference.
 
 ---
 
@@ -268,7 +269,7 @@ Navigate tabs with `1-9`, search with `/`, refresh with `r`, toggle light/dark t
 ### Unique Position
 
 1. **All-local**: Reads `~/.claude` files, no SaaS/API required
-2. **Unified Dashboard**: 11 tabs (config, hooks, agents, MCP, analytics, security audit, search) vs basic CLI
+2. **Unified Dashboard**: 12 tabs (config, hooks, agents, MCP, analytics, security audit, search) vs basic CLI
 3. **Performance**: SQLite cache (89x speedup), handles 10K+ sessions
 4. **Dual Interface**: TUI + Web in single 5.8MB binary
 
@@ -287,7 +288,7 @@ ccboard vs ccusage vs agtrace vs claudelytics — Claude Code monitoring tools c
 | **Language** | Rust | Rust | Rust | TypeScript |
 | **Type** | TUI+Web | TUI | TUI | CLI |
 | | | | | |
-| **TUI Dashboard** | ✅ 9 tabs | ✅ Single view | ✅ 8 tabs | ❌ |
+| **TUI Dashboard** | ✅ 12 tabs | ✅ Single view | ✅ 8 tabs | ❌ |
 | **Config Viewer (3-level merge)** | ✅ | ❌ | ❌ | ❌ |
 | **Hooks Viewer + Test** | ✅ | ❌ | ❌ | ❌ |
 | **Agents/Commands/Skills Browser** | ✅ | ❌ | ❌ | ❌ |
@@ -830,7 +831,7 @@ Use Windows Terminal (not cmd.exe) for proper Unicode support:
 ```
 ccboard/                     # Binary CLI entry point
 ├── ccboard-core/            # Data layer (parsers, models, store, watcher)
-├── ccboard-tui/             # Ratatui frontend (9 tabs)
+├── ccboard-tui/             # Ratatui frontend (12 tabs)
 └── ccboard-web/             # Axum API backend + Leptos WASM frontend
 ```
 
@@ -927,36 +928,26 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Roadmap & Documentation
 
-**Current Status**: 🎉 **PRODUCTION-READY** (v0.12.0)
+**Current Status**: 🎉 **PRODUCTION-READY**
 
 ### Completed ✅
 
 - ✅ **Infrastructure**: Stats parser, Settings merge, Session metadata, DataStore, SQLite cache (89x speedup)
-- ✅ **TUI Dashboard**: 11 interactive tabs (Dashboard, Sessions, Config, Hooks, Agents, Costs, History, MCP, Analytics, Activity, Search)
-- ✅ **Web Frontend**: Full Leptos/WASM UI with 100% TUI parity (11 pages)
-- ✅ **Live Monitoring**: CPU/RAM/Tokens tracking for active Claude processes
-- ✅ **Cost Analytics**: 4 views (Overview, By Model, Daily, Billing Blocks) + budget alerts
-- ✅ **Advanced Analytics**: 30-day forecasting, usage patterns, actionable insights
-- ✅ **Conversation Viewer**: Full JSONL display with full-text search (`/` to search, `n/N` to navigate), syntax highlighting, dynamic rendering
+- ✅ **TUI Dashboard**: 12 interactive tabs with full keybinding navigation
+- ✅ **Web Frontend**: Full Leptos/WASM UI with 100% TUI parity (12 pages)
+- ✅ **Live Monitoring**: CPU/RAM/Tokens tracking for active Claude processes via hook injection
+- ✅ **Cost Analytics**: 6 views (Overview, By Model, Daily, Usage Periods, Top Sessions, Per Project) + 4-level budget alerts
+- ✅ **Advanced Analytics**: 30-day forecasting, hourly heatmap, anomaly detection, usage patterns, actionable insights
+- ✅ **Conversation Viewer**: Full JSONL replay with regex search (`/` + `n`/`N`), syntax highlighting, HTML export
 - ✅ **Dynamic Pricing**: LiteLLM integration with automatic price updates and local caching
-- ✅ **Budget Tracking** (v0.8.0): Month-to-date cost calculation, monthly projection, 4-level alerts (Safe/Warning/Critical/Exceeded)
-- ✅ **Export Features** (v0.10.0): CSV/JSON/Markdown export for sessions, stats, billing, conversations
-- ✅ **Activity Security Audit** (v0.11.0): Per-session tool audit, credential detection, destructive command alerts, cross-session violations feed with remediation hints
-- ✅ **Search Tab** (v0.11.0): FTS5-powered full-text search across all sessions with ranked snippets
-- ✅ **Discover** (v0.12.0): N-gram analysis across session history to suggest CLAUDE.md rules, skills, and commands
+- ✅ **Export Features**: CSV/JSON/Markdown export for sessions, stats, billing, conversations
+- ✅ **Activity Security Audit**: Per-session tool audit, credential detection, destructive command alerts, remediation hints
+- ✅ **Search Tab**: FTS5 full-text search across all sessions, search-as-you-type, ranked snippets
+- ✅ **Discover**: N-gram analysis across session history to suggest CLAUDE.md rules, skills, and commands
+- ✅ **Tool Cost Analytics**: Per-tool token tracking, tool chain analysis, cost suggestions engine
+- ✅ **Plugin Analytics**: Skill/MCP/agent usage, dead code detection
 
-**Total**: 383 tests passing, 0 clippy warnings
-
-### Coming Soon
-
-**v0.13.0: Advanced Analytics** (Phase K)
-- Anomaly detection: cost spikes, unusual activity hours
-- Usage pattern analysis: peak hours, day-of-week trends
-- Model recommendations: Opus ↔ Sonnet switches based on usage
-
-**v0.13.0: Plugin System** (Phase L)
-- Extensible architecture for community plugins
-- Custom tabs, data sources, metrics
+**Total**: 419 tests passing, 0 clippy warnings
 
 For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [NEXT_STEPS.md](claudedocs/NEXT_STEPS.md).
 
@@ -964,6 +955,7 @@ For detailed roadmap, see [ROADMAP.md](claudedocs/ROADMAP.md) and [NEXT_STEPS.md
 
 | Document | Description |
 |----------|-------------|
+| [User Guide](docs/GUIDE.md) | Complete feature reference: all tabs, keybindings, CLI, tips |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture, data flow, concurrency model |
 | [CHANGELOG.md](CHANGELOG.md) | Version history with detailed change descriptions |
 | [SECURITY.md](SECURITY.md) | Security policy, vulnerability reporting, best practices |
