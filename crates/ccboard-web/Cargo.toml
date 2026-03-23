@@ -16,6 +16,7 @@ include = [
     "static/**/*",
     "dist/**/*",
     "build.rs",
+    "build-placeholder.html",
     "index.html",
     "Cargo.toml",
     "Trunk.toml",
