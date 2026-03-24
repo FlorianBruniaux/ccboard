@@ -750,9 +750,37 @@ impl SessionsTab {
 
         frame.render_widget(search_input, main_chunks[0]);
 
-        // Render live sessions if any
+        // Render live sessions if any — split horizontally when WaitingInput sessions exist
         let content_chunk_idx = if live_height > 0 {
-            self.render_live_sessions(frame, main_chunks[1], live_sessions, self.focus == 0, &p);
+            let waiting: Vec<&ccboard_core::MergedLiveSession> = live_sessions
+                .iter()
+                .filter(|s| {
+                    s.effective_status() == ccboard_core::LiveSessionDisplayStatus::WaitingInput
+                })
+                .collect();
+
+            if !waiting.is_empty() {
+                let live_split = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+                    .split(main_chunks[1]);
+                self.render_live_sessions(
+                    frame,
+                    live_split[0],
+                    live_sessions,
+                    self.focus == 0,
+                    &p,
+                );
+                Self::render_waiting_answers(frame, live_split[1], &waiting, &p);
+            } else {
+                self.render_live_sessions(
+                    frame,
+                    main_chunks[1],
+                    live_sessions,
+                    self.focus == 0,
+                    &p,
+                );
+            }
             2
         } else {
             1
@@ -1082,6 +1110,67 @@ impl SessionsTab {
 
             frame.render_stateful_widget(scrollbar, inner, &mut scrollbar_state);
         }
+    }
+
+    /// Render the "Waiting Answers" panel — sessions waiting for user input.
+    fn render_waiting_answers(
+        frame: &mut Frame,
+        area: Rect,
+        waiting: &[&ccboard_core::MergedLiveSession],
+        p: &Palette,
+    ) {
+        use chrono::Local;
+        use ratatui::style::Color;
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::Yellow))
+            .style(Style::default().bg(p.surface))
+            .title(Span::styled(
+                format!(" ⏳ Waiting Answers ({}) ", waiting.len()),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ));
+
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let now = Local::now();
+
+        let items: Vec<ListItem> = waiting
+            .iter()
+            .map(|s| {
+                let project = s.project_name();
+
+                let idle_str = s
+                    .last_event_at
+                    .map(|t| {
+                        let secs = now.signed_duration_since(t).num_seconds();
+                        if secs < 60 {
+                            format!("{}s", secs)
+                        } else {
+                            format!("{}m", secs / 60)
+                        }
+                    })
+                    .unwrap_or_else(|| "—".to_string());
+
+                let line = Line::from(vec![
+                    Span::styled("◐ ", Style::default().fg(Color::Yellow)),
+                    Span::styled(project, Style::default().fg(p.fg).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        format!("  • idle {}", idle_str),
+                        Style::default().fg(p.muted),
+                    ),
+                ]);
+
+                ListItem::new(line)
+            })
+            .collect();
+
+        let list = List::new(items);
+        frame.render_widget(list, inner);
     }
 
     /// Format large numbers with K/M/B suffixes

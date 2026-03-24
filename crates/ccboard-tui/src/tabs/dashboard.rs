@@ -4,6 +4,7 @@ use crate::theme::{ContextSaturationColor, Palette};
 use ccboard_core::models::StatsCache;
 use ccboard_core::parsers::McpConfig;
 use ccboard_core::store::DataStore;
+use ccboard_core::SubscriptionPlan;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -495,11 +496,12 @@ impl DashboardTab {
     ) {
         let estimate = store.map(|s| s.usage_estimate());
 
-        let (plan_name, cost_today, cost_week, cost_month, budget, pct_month) = estimate
+        let (plan_name, plan, cost_today, cost_week, cost_month, budget, pct_month) = estimate
             .as_ref()
             .map(|est| {
                 (
                     est.plan.display_name(),
+                    est.plan,
                     est.cost_today,
                     est.cost_week,
                     est.cost_month,
@@ -507,7 +509,7 @@ impl DashboardTab {
                     est.percent_month(),
                 )
             })
-            .unwrap_or(("Unknown Plan", 0.0, 0.0, 0.0, None, None));
+            .unwrap_or(("Unknown Plan", SubscriptionPlan::default(), 0.0, 0.0, 0.0, None, None));
 
         // Create 3 lines: Today, Week, Month
         let today_line = if let Some(budget) = budget {
@@ -556,11 +558,19 @@ impl DashboardTab {
             vec![Span::raw(format!("This month: ${:>6.2}", cost_month))]
         };
 
-        let text = vec![
+        let mut text = vec![
             Line::from(today_line),
             Line::from(week_line),
             Line::from(month_line),
         ];
+
+        // Hint: Max 5x is auto-detected — user may actually be on 20x
+        if plan == SubscriptionPlan::Max5x {
+            text.push(Line::from(Span::styled(
+                "  Tip: On Max 20x? Set subscription_plan: \"max20x\" in .claude/settings.json",
+                Style::default().fg(p.muted),
+            )));
+        }
 
         let title = format!(" 💰 API Usage (Est.) - {} ", plan_name);
 

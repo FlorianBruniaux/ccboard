@@ -5,6 +5,15 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-03-24
+
+### Added
+
+- **Sessions tab — Waiting Answers panel**: When live sessions exist and at least one is waiting for user input, the Live Sessions block splits horizontally. The right panel (`⏳ Waiting Answers`) shows only WaitingInput sessions with project name and idle time at a glance, making it easy to spot which sessions need your attention.
+- **Dashboard — Max 20x tip**: When the subscription plan is auto-detected as Max (5x), a contextual hint now appears in the API Usage block: `Tip: On Max 20x? Set subscription_plan: "max20x" in .claude/settings.json`. Max 5x vs 20x cannot be distinguished from local files — this tip surfaces the manual override path.
+
+---
+
 ## [0.16.5] - 2026-03-24
 
 ### Fixed
