@@ -5,6 +5,14 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.5] - 2026-03-24
+
+### Fixed
+
+- **Dashboard — "API (Pay-as-you-go)" shown for Max/Pro users**: Reworked plan auto-detection priority. `hasOpusPlanDefault: true` now takes precedence over `hasAvailableSubscription` (which can be false even for active Max subscribers when quota is temporarily unavailable). Also reads `oauthAccount.subscriptionCreatedAt` as a last-resort fallback to detect subscribers whose quota is exhausted.
+
+---
+
 ## [0.16.4] - 2026-03-23
 
 ### Fixed

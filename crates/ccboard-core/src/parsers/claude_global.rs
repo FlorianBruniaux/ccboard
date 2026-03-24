@@ -81,15 +81,26 @@ struct RawProject {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct RawOauthAccount {
+    /// Non-null when user has (or had) a personal subscription
+    subscription_created_at: Option<String>,
+    #[allow(dead_code)]
+    billing_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RawClaudeJson {
     #[serde(default)]
     projects: HashMap<String, RawProject>,
-    /// True if user has an active Claude subscription (Pro or Max)
+    /// True when subscription quota is still available this period
     #[serde(default)]
     has_available_subscription: bool,
-    /// True if user's default model is Opus (indicates Max plan)
+    /// True when the user's default model is Opus (strong Max indicator)
     #[serde(default)]
     has_opus_plan_default: bool,
+    /// OAuth account metadata — present for authenticated users
+    oauth_account: Option<RawOauthAccount>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,13 +118,22 @@ pub fn parse_claude_global(home: &Path) -> Option<ClaudeGlobalStats> {
     let data = std::fs::read(&path).ok()?;
     let raw: RawClaudeJson = serde_json::from_slice(&data).ok()?;
 
-    // Detect plan from subscription flags
-    let detected_plan = Some(if raw.has_available_subscription {
-        if raw.has_opus_plan_default {
-            DetectedPlan::Max
-        } else {
-            DetectedPlan::Pro
-        }
+    // Detect plan — priority order matters:
+    //  1. hasOpusPlanDefault: true → Max (strongest signal, independent of quota availability)
+    //  2. hasAvailableSubscription: true → at minimum Pro
+    //  3. oauthAccount.subscriptionCreatedAt present → has/had a subscription (Pro or Max
+    //     with exhausted quota); show as Pro rather than Api to avoid false negatives
+    //  4. Otherwise → Api (API key / no subscription)
+    let has_subscription_record = raw
+        .oauth_account
+        .as_ref()
+        .map(|a| a.subscription_created_at.is_some())
+        .unwrap_or(false);
+
+    let detected_plan = Some(if raw.has_opus_plan_default {
+        DetectedPlan::Max
+    } else if raw.has_available_subscription || has_subscription_record {
+        DetectedPlan::Pro
     } else {
         DetectedPlan::Api
     });
