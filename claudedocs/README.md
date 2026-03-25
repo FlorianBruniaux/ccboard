@@ -1,60 +1,52 @@
 # ccboard Documentation
 
-This directory contains active documentation for ccboard development and design decisions.
+Active documentation for ccboard development. Current version: **v0.17.0**
 
-## Active Documentation
+---
 
-**Current State & Roadmap** ⭐
-- [RESUME.md](RESUME.md) - Session resume prompt (paste into new Claude Code session) — **START HERE**
-- [ROADMAP.md](ROADMAP.md) - Long-term features (Phases K-N) and planned improvements
-- [ROADMAP-post-0.9.md](ROADMAP-post-0.9.md) - Detailed phase breakdown with GitHub issues mapping
+## Active Files (racine)
 
-**Archived** (already shipped):
-- `VERSION_STATUS.md` - v0.9.0 state (archived, superseded by RESUME.md)
-- `NEXT_STEPS.md` - Phase J Export Features plan (✅ released in v0.10.0)
+| File | Purpose |
+|---|---|
+| [ROADMAP.md](ROADMAP.md) | Long-term phases, milestones, v1.0.0 target |
+| [OPPORTUNITIES.md](OPPORTUNITIES.md) | Feature opportunities catalog (44 items, 2026-03-24 analysis) |
+| [PLAN.md](PLAN.md) | Current implementation phases and post-mortems |
+| [VERSION_STATUS.md](VERSION_STATUS.md) | Current version state + release history |
+| [RESUME.md](RESUME.md) | Session resume prompt — paste into new Claude Code session |
 
-**Architecture & Development**
-- [PLAN.md](PLAN.md) - ⚠️ Historical: architecture phases 0→E (v0.4.0 era, for reference only)
-
-**Performance & Benchmarks**
-- [performance-benchmark.md](performance-benchmark.md) - v0.4.0 optimization results (SQLite cache, Arc migration)
-- [competitive-benchmark-2026-02-04.md](competitive-benchmark-2026-02-04.md) - Market positioning and competitive analysis
-
-**Design Learnings (xlaude Analysis)**
-- [xlaude-analysis.md](xlaude-analysis.md) - Deep dive into xlaude TUI design patterns
-- [xlaude-vs-ccboard-comparison.md](xlaude-vs-ccboard-comparison.md) - Feature comparison and differentiation
-- [xlaude-actionable-insights.md](xlaude-actionable-insights.md) - Actionable design insights for ccboard
+---
 
 ## Archives
 
-**archive/v0.8/** - v0.8.0 quota tracking plan (ROADMAP-v0.8.md)
-**archive/v0.7/** - v0.7.0 full-text search feature (2026-02-13)
-- `PLAN-v0.7.0.md` - Detailed implementation plan
-- `HANDOFF-v0.7.0.md` - Session handoff document
+### `archive/` — Historical docs
 
-**archive/fixes/** - Bug fix documentation
-- `PRICING_FIX.md` - Opus 4.5/4.6 pricing correction (2025-02)
+| Subdir | Contents |
+|---|---|
+| `competitive-old/` | xlaude analysis, competitive benchmarks (v0.2.0 era) |
+| `phases/` | CLAUDEWATCH plan, NEXT_STEPS (v0.15.0 era), github-issues-plan |
+| `reference/` | jreleaser evaluation, performance benchmarks, rust-patterns audit, PUBLICATION_PLAN |
+| `versions/` | ROADMAP-post-0.9.md and other superseded roadmap docs |
+| `fixes/` | Bug fix documentation |
+| `phase-plans/` | Per-phase implementation plans |
+| `phases/` | Completed phase artifacts |
+| `sessions/` · `sessions-history/` | Session handoff and status docs |
+| `tasks-completed/` | Completed task logs |
+| `templates/` | Session prompt templates |
+| `v0.7/` | v0.7.0 FTS feature artifacts |
 
-**archive/templates/** - Reusable templates
-- `SESSION-PROMPT.md` - Session handoff prompt template
+### `archive-v05/` — Phase G (Web UI) era
 
-**archive/** - Pre-v0.4.0 development artifacts and historical documentation
+Web UI development artifacts: wave plans, architecture analysis, session summaries.
 
-**archive-v05/** - Phase G (Web UI) development artifacts
-- `web-phases/` - Wave 1-7 implementation plans and web architecture analysis
-- `planning/` - Action plans and testing strategies
-- `sessions/` - Status reports and completion summaries
+### `launch/` — Launch strategy docs
 
-## Usage
+Marketing, messaging, social media posts, launch execution plan.
 
-For project-wide documentation, see:
-- [../README.md](../README.md) - Main project README
-- [../CLAUDE.md](../CLAUDE.md) - Claude Code instructions
-- [../ARCHITECTURE.md](../ARCHITECTURE.md) - Technical architecture overview
-- [../CHANGELOG.md](../CHANGELOG.md) - Version history
+---
 
-## Notes
+## Related (project root)
 
-- Active documentation files are referenced by CLAUDE.md and should not be moved without updating references
-- Archives preserve historical context and design decisions for future reference
-- Phase-specific artifacts are archived after completion (e.g., archive-v05/ for Phase G)
+- [../README.md](../README.md) — User-facing documentation
+- [../CLAUDE.md](../CLAUDE.md) — Claude Code dev instructions
+- [../ARCHITECTURE.md](../ARCHITECTURE.md) — Technical architecture
+- [../CHANGELOG.md](../CHANGELOG.md) — Version history

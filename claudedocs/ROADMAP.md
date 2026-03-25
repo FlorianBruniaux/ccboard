@@ -1,7 +1,7 @@
 # ccboard Roadmap
 
-**Last Updated**: 2026-03-23
-**Current Version**: v0.16.4
+**Last Updated**: 2026-03-24
+**Current Version**: v0.17.0
 **Target**: v1.0.0 (Phases L + N complete)
 
 ---
@@ -18,7 +18,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-## 📍 Current Status (v0.16.4)
+## 📍 Current Status (v0.17.0)
 
 ### ✅ Production Features
 
@@ -47,6 +47,11 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 - MA2 ✅ Regex search in replay viewer — `/`, `n`/`N` nav, highlights (11426b8)
 - MA3 ✅ Export HTML enrichi — syntect syntax highlighting, code-lang badge (d87a25d)
 - MA4 ✅ FTS5 extended + Search tab — date, detail pane, search-as-you-type (4520c2e)
+
+**Waiting Answers Panel + Max 20x tip (v0.17.0)**:
+- Sessions tab: "Waiting Answers" panel showing sessions pending user input (WaitingInput status)
+- Dashboard: Max 20x plan cost tip surfaced automatically
+- 458 tests passing, 0 clippy warnings
 
 **Bug Fixes & Polish (v0.16.0 → v0.16.4)**:
 - TUI keybindings `?` / `:` fixed on macOS (KeyModifiers::NONE vs SHIFT)
@@ -304,8 +309,9 @@ Delivered:
 | **K-Analytics** | 🟡 MEDIUM | 10-12h | v0.15.0 | Advanced analytics (anomaly, forecasts) | #14-21 | ✅ Done 2026-03-20 |
 | **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | ✅ Done 2026-03-20 |
 | **v0.16.x fixes** | — | — | v0.16.0–0.16.4 | Visual redesign, keybindings, web CSS, pricing, plan detection | — | ✅ Done 2026-03-23 |
-| **L** | 🟢 LOW | 12-15h | v0.17.0 | Plugin system | — | 📋 Backlog |
-| **N** | 🟢 LOW | 10-14h | v0.17.5 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
+| **v0.17.0** | — | — | v0.17.0 | Waiting Answers panel + Max 20x tip | — | ✅ Done 2026-03-24 |
+| **L** | 🟢 LOW | 12-15h | v0.18.0 | Plugin system | — | 📋 Backlog |
+| **N** | 🟢 LOW | 10-14h | v0.18.5 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
 **Total Estimated**: 46-59h for v1.0.0 completion
 
@@ -321,6 +327,20 @@ Delivered:
 | **Export Speed** | N/A | <2s for 1000 sessions |
 | **Test Coverage** | 344 tests | 500+ tests |
 | **Bug Reports** | 0 critical | <5% error rate |
+
+---
+
+## 🔭 Opportunities Backlog (v0.17.x+)
+
+A full feature opportunity analysis was conducted on 2026-03-24. See **[OPPORTUNITIES.md](OPPORTUNITIES.md)** for the complete catalog (44 opportunities across 3 categories).
+
+**Quick summary**:
+
+| Category | Count | Examples |
+|---|---|---|
+| 🟢 Quick Wins (S, 2-4h) | 7 | Invocation counts, settings hot-reload, model switching timeline, context saturation trend |
+| 🟡 Medium Features (M, 4-8h) | 9 | Per-tool cost attribution, session bookmarks, MCP health dashboard, subagent graph |
+| 🔴 Strategic (L, 8-15h) | 4 | Git integration (Phase N prereq), activity timeline, Prometheus metrics, LLM summaries |
 
 ---
 
