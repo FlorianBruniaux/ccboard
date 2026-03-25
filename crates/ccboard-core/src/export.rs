@@ -1116,6 +1116,7 @@ mod tests {
         let timestamp = Utc.with_ymd_and_hms(2026, 2, 3, 14, 30, 0).unwrap();
         SessionMetadata {
             id: id.into(),
+            source_tool: None,
             file_path: PathBuf::from(format!("/test/{}.jsonl", id)),
             project_path: project.into(),
             first_timestamp: Some(timestamp),

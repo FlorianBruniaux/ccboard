@@ -136,6 +136,11 @@ pub struct SessionMetadata {
     /// Session ID (from filename or content)
     pub id: String,
 
+    /// Source tool that generated this session.
+    /// None = Claude Code (default). Some("gemini"), Some("copilot"), etc.
+    #[serde(default)]
+    pub source_tool: Option<String>,
+
     /// Full path to the JSONL file
     pub file_path: PathBuf,
 
@@ -201,6 +206,7 @@ impl SessionMetadata {
 
         Self {
             id,
+            source_tool: None,
             file_path: path,
             project_path,
             first_timestamp: None,

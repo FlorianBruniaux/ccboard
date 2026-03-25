@@ -1441,6 +1441,21 @@ impl SessionsTab {
                     ));
                 }
 
+                // Add source tool badge for non-Claude sessions
+                if let Some(ref tool) = session.source_tool {
+                    let badge = match tool.as_str() {
+                        "gemini" => "[G] ".to_string(),
+                        "copilot" => "[C] ".to_string(),
+                        other => format!("[{}] ", other.chars().next().unwrap_or('?')),
+                    };
+                    preview_spans.push(Span::styled(
+                        badge,
+                        Style::default()
+                            .fg(ratatui::style::Color::Blue)
+                            .add_modifier(Modifier::BOLD),
+                    ));
+                }
+
                 // Add highlighted preview if searching, otherwise plain preview
                 if !self.search_filter.is_empty() {
                     let highlighted = highlight_matches(&preview, &self.search_filter);
