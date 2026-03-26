@@ -35,6 +35,7 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
                 cache_creation_tokens: 0,
                 cache_read_tokens: 0,
                 models_used: vec!["sonnet".to_string()],
+                model_segments: Vec::new(),
                 file_size_bytes: 1024 * (i as u64 + 1),
                 first_user_message: None,
                 has_subagents: false,

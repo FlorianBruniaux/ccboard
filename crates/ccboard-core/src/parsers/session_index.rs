@@ -274,6 +274,9 @@ impl SessionIndexParser {
         let mut lines = reader.lines();
         let mut line_number = 0;
         let mut models_seen: HashSet<String> = HashSet::new();
+        let mut model_segments: Vec<(String, usize)> = Vec::new();
+        let mut current_segment_model: Option<String> = None;
+        let mut current_segment_count: usize = 0;
         let mut first_timestamp = None;
         let mut last_timestamp = None;
         let mut message_count = 0u64;
@@ -349,9 +352,19 @@ impl SessionIndexParser {
                 }
             }
 
-            // Track models
+            // Track models and compute switching segments
             if let Some(ref model) = session_line.model {
                 models_seen.insert(model.clone());
+                // Segment tracking: detect transitions between models
+                if current_segment_model.as_deref() == Some(model.as_str()) {
+                    current_segment_count += 1;
+                } else {
+                    if let Some(prev) = current_segment_model.take() {
+                        model_segments.push((prev, current_segment_count));
+                    }
+                    current_segment_model = Some(model.clone());
+                    current_segment_count = 1;
+                }
             }
 
             // Track subagents
@@ -488,10 +501,16 @@ impl SessionIndexParser {
             }
         }
 
+        // Flush the last model segment
+        if let Some(model) = current_segment_model {
+            model_segments.push((model, current_segment_count));
+        }
+
         // Apply collected data
         metadata.first_timestamp = first_timestamp;
         metadata.last_timestamp = last_timestamp;
         metadata.models_used = models_seen.into_iter().collect();
+        metadata.model_segments = model_segments;
 
         // Only use counted values if summary didn't provide them
         if metadata.message_count == 0 {
@@ -1034,5 +1053,58 @@ mod tests {
             !preview.contains("[Request interrupted"),
             "Should not contain noise patterns"
         );
+    }
+
+    #[tokio::test]
+    async fn test_scan_session_model_segments_single() {
+        let mut file = NamedTempFile::new().unwrap();
+        // 3 assistant messages with the same model
+        for _ in 0..3 {
+            writeln!(
+                file,
+                r#"{{"type": "assistant", "model": "claude-sonnet-4-6", "sessionId": "seg-test", "usage": {{"input_tokens": 10, "output_tokens": 5}}}}"#
+            ).unwrap();
+        }
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(file.path()).await.unwrap();
+
+        assert_eq!(meta.model_segments, vec![("claude-sonnet-4-6".to_string(), 3)]);
+    }
+
+    #[tokio::test]
+    async fn test_scan_session_model_segments_switch() {
+        let mut file = NamedTempFile::new().unwrap();
+        // Opus × 2, then Sonnet × 3, then Haiku × 1
+        for _ in 0..2 {
+            writeln!(
+                file,
+                r#"{{"type": "assistant", "model": "claude-opus-4-5", "sessionId": "seg-switch", "usage": {{"input_tokens": 10, "output_tokens": 5}}}}"#
+            ).unwrap();
+        }
+        for _ in 0..3 {
+            writeln!(
+                file,
+                r#"{{"type": "assistant", "model": "claude-sonnet-4-5", "sessionId": "seg-switch", "usage": {{"input_tokens": 10, "output_tokens": 5}}}}"#
+            ).unwrap();
+        }
+        writeln!(
+            file,
+            r#"{{"type": "assistant", "model": "claude-haiku-4-5", "sessionId": "seg-switch", "usage": {{"input_tokens": 5, "output_tokens": 2}}}}"#
+        ).unwrap();
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(file.path()).await.unwrap();
+
+        assert_eq!(
+            meta.model_segments,
+            vec![
+                ("claude-opus-4-5".to_string(), 2),
+                ("claude-sonnet-4-5".to_string(), 3),
+                ("claude-haiku-4-5".to_string(), 1),
+            ]
+        );
+        // models_used still has all three (unordered)
+        assert_eq!(meta.models_used.len(), 3);
     }
 }

@@ -268,6 +268,30 @@ Follow Rust-specific error handling rules from RULES.md:
 - **Graceful degradation**: Display partial UI if some data unavailable
 - **Shared state**: `Arc<DataStore>` passed to both TUI and web frontends
 
+## Known Gotchas
+
+### JSONL files locked during Claude Code writes
+
+`~/.claude/projects/**/*.jsonl` files are actively written by Claude Code during sessions. Reading them can yield partial JSON lines at the end. The `SessionIndexParser` handles this with `skip malformed` logic — never remove that guard.
+
+### SQLite cache vs JSONL source
+
+The SQLite metadata cache can go stale if you manually delete or move JSONL files. If sessions show wrong counts or missing entries, run `cargo run -- clear-cache` to force a full rescan.
+
+### Leptos WASM: `trunk` is NOT `cargo run`
+
+`cargo run -- web` starts the Axum API backend (port 8080). `trunk serve` starts the Leptos WASM frontend (port 3333). They're two separate processes. Running only one gives a blank page or 404 on `/api/*`. Full stack = both terminals.
+
+### `parking_lot::RwLock` — write locks block readers
+
+`parking_lot` uses a fair queuing policy. A long write operation (e.g. full rescan) blocks all read accessors until complete. If the TUI feels frozen during reload, this is why. Keep write locks short — swap data atomically.
+
+### Stats-cache.json partial writes
+
+Claude Code writes `stats-cache.json` incrementally. The `StatsParser` has retry logic with a short sleep for exactly this reason. Do not remove the retry — parsing on first read can fail during a Claude Code session.
+
+---
+
 ## Common Pitfalls
 
 - **Don't** parse full JSONL sessions at startup → Use SQLite cache for metadata, lazy full-content loading

@@ -328,6 +328,7 @@ mod tests {
             cache_creation_tokens: 0,
             cache_read_tokens: 0,
             models_used: vec![],
+            model_segments: Vec::new(),
             file_size_bytes: 256,
             first_user_message: None,
             has_subagents: false,

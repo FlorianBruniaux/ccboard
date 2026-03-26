@@ -27,6 +27,7 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
                 cache_creation_tokens: 50 + (i as u64 * 5),
                 cache_read_tokens: 50 + (i as u64 * 5),
                 models_used: vec!["sonnet".to_string()],
+                model_segments: Vec::new(),
                 file_size_bytes: 1024 * (i as u64 + 1),
                 first_user_message: None,
                 has_subagents: false,
@@ -217,6 +218,7 @@ fn test_patterns_multi_model_session_no_double_count() {
         cache_creation_tokens: 0,
         cache_read_tokens: 0,
         models_used: vec!["sonnet".to_string(), "haiku".to_string()], // 2 models
+        model_segments: Vec::new(),
         file_size_bytes: 1024,
         first_user_message: None,
         has_subagents: false,

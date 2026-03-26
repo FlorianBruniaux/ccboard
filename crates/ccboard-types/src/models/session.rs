@@ -163,6 +163,10 @@ pub struct SessionMetadata {
     /// Models used in this session
     pub models_used: Vec<String>,
 
+    /// Ordered model segments: (model_id, assistant_message_count).
+    #[serde(default)]
+    pub model_segments: Vec<(String, usize)>,
+
     /// File size in bytes
     pub file_size_bytes: u64,
 
@@ -212,6 +216,7 @@ impl SessionMetadata {
             cache_creation_tokens: 0,
             cache_read_tokens: 0,
             models_used: Vec::new(),
+            model_segments: Vec::new(),
             file_size_bytes,
             first_user_message: None,
             has_subagents: false,

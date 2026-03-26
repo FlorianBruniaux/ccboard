@@ -1274,6 +1274,7 @@ mod tests {
                 cache_read_tokens: total_tokens
                     - (total_tokens / 2 + total_tokens / 3 + total_tokens / 10),
                 models_used: vec!["sonnet".to_string()],
+                model_segments: Vec::new(),
                 file_size_bytes: 1024,
                 first_user_message: None,
                 has_subagents: false,
@@ -1339,6 +1340,7 @@ mod tests {
                 cache_creation_tokens: 0,
                 cache_read_tokens: 0,
                 models_used: vec![model.to_string()],
+                model_segments: Vec::new(),
                 file_size_bytes: 1024,
                 first_user_message: None,
                 has_subagents: false,

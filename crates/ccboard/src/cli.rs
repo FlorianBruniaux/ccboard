@@ -498,6 +498,7 @@ mod tests {
             cache_creation_tokens: 0,
             cache_read_tokens: 0,
             models_used: vec!["sonnet".to_string()],
+            model_segments: Vec::new(),
             file_size_bytes: 1024,
             first_user_message: Some("Test message".to_string()),
             has_subagents: false,

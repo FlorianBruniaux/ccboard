@@ -1127,6 +1127,7 @@ mod tests {
             cache_creation_tokens: tokens / 10,
             cache_read_tokens: tokens - (tokens / 2 + tokens / 3 + tokens / 10),
             models_used: vec!["sonnet".to_string(), "opus".to_string()],
+            model_segments: Vec::new(),
             file_size_bytes: 1024,
             first_user_message: Some("Test message".to_string()),
             has_subagents: false,

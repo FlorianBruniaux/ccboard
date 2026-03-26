@@ -1669,18 +1669,43 @@ impl SessionsTab {
                 ),
             ]),
             Line::from(""),
-            Line::from(vec![
+        ]);
+
+        // Model switching timeline
+        if !session.model_segments.is_empty() {
+            // Build timeline: "Opus 4.5 (8) → Sonnet 4.5 (15) → Haiku 4.5 (3)"
+            let mut timeline_spans: Vec<Span> = vec![
+                Span::styled("Models: ", Style::default().fg(p.muted)),
+            ];
+            for (i, (model, count)) in session.model_segments.iter().enumerate() {
+                if i > 0 {
+                    timeline_spans.push(Span::styled(" → ", Style::default().fg(p.muted)));
+                }
+                timeline_spans.push(Span::styled(
+                    Self::shorten_model_name(model),
+                    Style::default().fg(p.important),
+                ));
+                timeline_spans.push(Span::styled(
+                    format!(" ({})", count),
+                    Style::default().fg(p.muted),
+                ));
+            }
+            lines.push(Line::from(timeline_spans));
+        } else if !session.models_used.is_empty() {
+            // Fallback for sessions parsed before model_segments was added
+            lines.push(Line::from(vec![
                 Span::styled("Models: ", Style::default().fg(p.muted)),
                 Span::styled(
-                    if session.models_used.is_empty() {
-                        "unknown".to_string()
-                    } else {
-                        session.models_used.join(", ")
-                    },
+                    session
+                        .models_used
+                        .iter()
+                        .map(|m| Self::shorten_model_name(m))
+                        .collect::<Vec<_>>()
+                        .join(", "),
                     Style::default().fg(p.important),
                 ),
-            ]),
-        ]);
+            ]));
+        }
 
         // Tool usage (top 5 if available)
         if !session.tool_usage.is_empty() {
@@ -1725,6 +1750,33 @@ impl SessionsTab {
             path.to_string()
         } else {
             format!(".../{}", parts[parts.len() - 2..].join("/"))
+        }
+    }
+
+    /// Shorten a full model ID to a compact display name.
+    /// e.g. "claude-opus-4-5-20251101" → "Opus 4.5"
+    fn shorten_model_name(model: &str) -> String {
+        let m = model.to_lowercase();
+        let family = if m.contains("opus") {
+            "Opus"
+        } else if m.contains("sonnet") {
+            "Sonnet"
+        } else if m.contains("haiku") {
+            "Haiku"
+        } else {
+            return model.to_string();
+        };
+        // Extract version number: look for digits like "4-5", "4.5", "4-6"
+        let version = m
+            .split('-')
+            .skip_while(|s| !s.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
+            .take(2)
+            .collect::<Vec<_>>()
+            .join(".");
+        if version.is_empty() {
+            family.to_string()
+        } else {
+            format!("{} {}", family, version)
         }
     }
 
@@ -2777,5 +2829,26 @@ mod tests {
         assert_eq!(text, "Let me read this.");
         assert!(!text.contains("tool_use"));
         assert!(!text.contains("tool_result"));
+    }
+
+    #[test]
+    fn test_shorten_model_name() {
+        assert_eq!(
+            SessionsTab::shorten_model_name("claude-opus-4-5-20251101"),
+            "Opus 4.5"
+        );
+        assert_eq!(
+            SessionsTab::shorten_model_name("claude-sonnet-4-6"),
+            "Sonnet 4.6"
+        );
+        assert_eq!(
+            SessionsTab::shorten_model_name("claude-haiku-4-5-20251001"),
+            "Haiku 4.5"
+        );
+        // Unknown model passes through unchanged
+        assert_eq!(
+            SessionsTab::shorten_model_name("gpt-4o"),
+            "gpt-4o"
+        );
     }
 }
