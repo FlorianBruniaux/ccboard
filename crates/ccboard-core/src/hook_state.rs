@@ -118,6 +118,19 @@ impl LiveSessionFile {
             .retain(|_, s| s.status != HookSessionStatus::Stopped || s.updated_at >= cutoff);
     }
 
+    /// Remove `Running` / `WaitingInput` sessions not updated within `max_age`.
+    ///
+    /// Handles Claude processes that crashed or were killed without sending a Stop hook.
+    /// Default recommended value: 10 minutes.
+    pub fn prune_stale_running(&mut self, max_age: std::time::Duration) {
+        let cutoff =
+            Utc::now() - Duration::from_std(max_age).unwrap_or_else(|_| Duration::minutes(10));
+        self.sessions.retain(|_, s| {
+            // Stopped sessions are handled by prune_stopped — leave them alone here
+            s.status == HookSessionStatus::Stopped || s.updated_at >= cutoff
+        });
+    }
+
     /// Upsert a session: create if new, update status/timestamp if existing.
     /// Special rule: `UserPromptSubmit` on a `Stopped` session revives it to `Running`.
     pub fn upsert(
@@ -244,6 +257,80 @@ mod tests {
         );
 
         assert_eq!(file.sessions[&key].status, HookSessionStatus::Running);
+    }
+
+    #[test]
+    fn test_prune_stale_running_removes_stale() {
+        let mut file = LiveSessionFile {
+            version: 1,
+            ..Default::default()
+        };
+
+        let stale_time = Utc::now() - Duration::from_secs(11 * 60);
+        let recent_time = Utc::now() - Duration::from_secs(60);
+
+        // Stale Running session — should be removed
+        file.sessions.insert(
+            "s1:tty1".to_string(),
+            HookSession {
+                session_id: "s1".to_string(),
+                cwd: "/tmp".to_string(),
+                tty: "tty1".to_string(),
+                status: HookSessionStatus::Running,
+                created_at: stale_time,
+                updated_at: stale_time,
+                last_event: "PreToolUse".to_string(),
+            },
+        );
+
+        // Stale WaitingInput session — should be removed
+        file.sessions.insert(
+            "s2:tty2".to_string(),
+            HookSession {
+                session_id: "s2".to_string(),
+                cwd: "/tmp".to_string(),
+                tty: "tty2".to_string(),
+                status: HookSessionStatus::WaitingInput,
+                created_at: stale_time,
+                updated_at: stale_time,
+                last_event: "Notification".to_string(),
+            },
+        );
+
+        // Recent Running session — should survive
+        file.sessions.insert(
+            "s3:tty3".to_string(),
+            HookSession {
+                session_id: "s3".to_string(),
+                cwd: "/tmp".to_string(),
+                tty: "tty3".to_string(),
+                status: HookSessionStatus::Running,
+                created_at: recent_time,
+                updated_at: recent_time,
+                last_event: "PreToolUse".to_string(),
+            },
+        );
+
+        // Old Stopped session — prune_stale_running should NOT touch it
+        file.sessions.insert(
+            "s4:tty4".to_string(),
+            HookSession {
+                session_id: "s4".to_string(),
+                cwd: "/tmp".to_string(),
+                tty: "tty4".to_string(),
+                status: HookSessionStatus::Stopped,
+                created_at: stale_time,
+                updated_at: stale_time,
+                last_event: "Stop".to_string(),
+            },
+        );
+
+        file.prune_stale_running(Duration::from_secs(10 * 60));
+
+        assert!(!file.sessions.contains_key("s1:tty1"), "stale Running should be pruned");
+        assert!(!file.sessions.contains_key("s2:tty2"), "stale WaitingInput should be pruned");
+        assert!(file.sessions.contains_key("s3:tty3"), "recent Running should survive");
+        assert!(file.sessions.contains_key("s4:tty4"), "Stopped handled by prune_stopped, not touched here");
     }
 
     #[test]
