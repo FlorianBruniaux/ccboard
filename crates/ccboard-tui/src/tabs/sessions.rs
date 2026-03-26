@@ -119,11 +119,9 @@ pub struct SessionsTab {
     session_state: ListState,
     /// Live sessions list state (for scrolling)
     live_sessions_state: ListState,
-    /// Waiting Answers list state (for cursor)
-    waiting_state: ListState,
     /// Snapshot of waiting sessions (updated during render, used by handle_key)
     waiting_sessions_cache: Vec<ccboard_core::MergedLiveSession>,
-    /// Current focus: Live Sessions (0), Projects (1), Sessions (2), Waiting Answers (3)
+    /// Current focus: Live Sessions (0), Projects (1), or Sessions (2)
     focus: usize,
     /// Cached project list (sorted)
     projects: Vec<String>,
@@ -188,14 +186,10 @@ impl SessionsTab {
         let mut replay_scroll = ListState::default();
         replay_scroll.select(Some(0));
 
-        let mut waiting_state = ListState::default();
-        waiting_state.select(Some(0));
-
         Self {
             project_state,
             session_state,
             live_sessions_state,
-            waiting_state,
             waiting_sessions_cache: Vec::new(),
             focus: 1, // Start with Projects focused (1), not Live Sessions (0)
             projects: Vec::new(),
@@ -278,34 +272,20 @@ impl SessionsTab {
 
         match key {
             KeyCode::Tab => {
-                // Cycle focus: Live Sessions (0) → Projects (1) → Sessions (2) → Waiting (3 if any) → Live Sessions
-                let max = if self.waiting_sessions_cache.is_empty() {
-                    3
-                } else {
-                    4
-                };
-                self.focus = (self.focus + 1) % max;
+                // Cycle focus: Live Sessions (0) → Projects (1) → Sessions (2) → Live Sessions
+                self.focus = (self.focus + 1) % 3;
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                // Move focus left
+                // Move focus left: Live Sessions ← Projects ← Sessions
                 if self.focus == 0 {
-                    self.focus = if self.waiting_sessions_cache.is_empty() {
-                        2
-                    } else {
-                        3
-                    };
+                    self.focus = 2;
                 } else {
                     self.focus -= 1;
                 }
             }
             KeyCode::Right | KeyCode::Char('l') => {
-                // Move focus right
-                let max = if self.waiting_sessions_cache.is_empty() {
-                    3
-                } else {
-                    4
-                };
-                self.focus = (self.focus + 1) % max;
+                // Move focus right: Live Sessions → Projects → Sessions
+                self.focus = (self.focus + 1) % 3;
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 if self.show_replay {
@@ -319,7 +299,6 @@ impl SessionsTab {
                             self.session_state.select(Some(0));
                         }
                         2 => self.move_session_selection(-1),
-                        3 => self.move_waiting_selection(-1),
                         _ => {}
                     }
                 }
@@ -335,7 +314,6 @@ impl SessionsTab {
                             self.session_state.select(Some(0));
                         }
                         2 => self.move_session_selection(1),
-                        3 => self.move_waiting_selection(1),
                         _ => {}
                     }
                 }
@@ -356,46 +334,41 @@ impl SessionsTab {
                 } else if self.focus == 2 {
                     // Toggle historical session detail
                     self.show_detail = !self.show_detail;
-                } else if self.focus == 3 {
-                    // Open replay for selected waiting session
-                    if let Some(idx) = self.waiting_state.selected() {
-                        if let Some(session) = self.waiting_sessions_cache.get(idx) {
-                            // Find JSONL file via session_id in sessions_by_project
-                            let file_path = session.session_id.as_ref().and_then(|sid| {
-                                _sessions_by_project
-                                    .values()
-                                    .flat_map(|v| v.iter())
-                                    .find(|s| s.id == *sid)
-                                    .map(|s| s.file_path.clone())
-                            });
-                            if let Some(path) = file_path {
-                                match tokio::task::block_in_place(|| {
-                                    tokio::runtime::Handle::current().block_on(
-                                        SessionContentParser::parse_session_lines(&path),
-                                    )
-                                }) {
-                                    Ok(mut messages) => {
-                                        messages =
-                                            SessionContentParser::filter_messages(messages);
-                                        self.replay_messages = messages;
-                                        // Jump to last message so user sees what's awaiting
-                                        let last = self
-                                            .replay_messages
-                                            .len()
-                                            .saturating_sub(1);
-                                        self.replay_scroll.select(Some(last));
-                                        self.replay_expanded.clear();
-                                        self.show_replay = true;
-                                    }
-                                    Err(e) => {
-                                        self.error_message =
-                                            Some(format!("Failed to load session: {}", e));
-                                    }
+                }
+            }
+            KeyCode::Char('w') => {
+                // Open replay for the first waiting session (shortcut from anywhere)
+                if !self.show_replay {
+                    if let Some(session) = self.waiting_sessions_cache.first() {
+                        let file_path = session.session_id.as_ref().and_then(|sid| {
+                            _sessions_by_project
+                                .values()
+                                .flat_map(|v| v.iter())
+                                .find(|s| s.id == *sid)
+                                .map(|s| s.file_path.clone())
+                        });
+                        if let Some(path) = file_path {
+                            match tokio::task::block_in_place(|| {
+                                tokio::runtime::Handle::current().block_on(
+                                    SessionContentParser::parse_session_lines(&path),
+                                )
+                            }) {
+                                Ok(mut messages) => {
+                                    messages = SessionContentParser::filter_messages(messages);
+                                    self.replay_messages = messages;
+                                    let last = self.replay_messages.len().saturating_sub(1);
+                                    self.replay_scroll.select(Some(last));
+                                    self.replay_expanded.clear();
+                                    self.show_replay = true;
                                 }
-                            } else {
-                                self.error_message =
-                                    Some("Session file not found in history".to_string());
+                                Err(e) => {
+                                    self.error_message =
+                                        Some(format!("Failed to load session: {}", e));
+                                }
                             }
+                        } else {
+                            self.error_message =
+                                Some("Session file not found in history".to_string());
                         }
                     }
                 }
@@ -639,16 +612,6 @@ impl SessionsTab {
         self.live_sessions_state.select(Some(new_idx));
     }
 
-    fn move_waiting_selection(&mut self, delta: i32) {
-        if self.waiting_sessions_cache.is_empty() {
-            return;
-        }
-        let current = self.waiting_state.selected().unwrap_or(0) as i32;
-        let new_idx = (current + delta)
-            .clamp(0, self.waiting_sessions_cache.len() as i32 - 1) as usize;
-        self.waiting_state.select(Some(new_idx));
-    }
-
     fn move_replay_selection(&mut self, delta: i32) {
         if self.replay_messages.is_empty() {
             return;
@@ -861,15 +824,7 @@ impl SessionsTab {
                 self.focus == 0,
                 &p,
             );
-            let focused_waiting = self.focus == 3;
-            Self::render_waiting_answers(
-                frame,
-                live_split[1],
-                &waiting,
-                &mut self.waiting_state,
-                focused_waiting,
-                &p,
-            );
+            Self::render_waiting_answers(frame, live_split[1], &waiting, &p);
             2
         } else {
             1
@@ -1206,23 +1161,16 @@ impl SessionsTab {
         frame: &mut Frame,
         area: Rect,
         waiting: &[&ccboard_core::MergedLiveSession],
-        state: &mut ListState,
-        focused: bool,
         p: &Palette,
     ) {
         use chrono::Local;
         use ratatui::style::Color;
 
-        let border_color = if focused { p.focus } else { Color::Yellow };
-        let hint = if waiting.is_empty() {
-            ""
-        } else {
-            " Enter: view "
-        };
+        let hint = if waiting.is_empty() { "" } else { " w: view " };
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(border_color))
+            .border_style(Style::default().fg(Color::Yellow))
             .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 format!(" ⏳ Waiting Answers ({}) ", waiting.len()),
@@ -1230,10 +1178,7 @@ impl SessionsTab {
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
             ))
-            .title_bottom(Span::styled(
-                hint,
-                Style::default().fg(p.muted),
-            ));
+            .title_bottom(Span::styled(hint, Style::default().fg(p.muted)));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -1270,13 +1215,8 @@ impl SessionsTab {
             })
             .collect();
 
-        let list = List::new(items).highlight_style(
-            Style::default()
-                .bg(p.focus)
-                .fg(p.bg)
-                .add_modifier(Modifier::BOLD),
-        );
-        frame.render_stateful_widget(list, inner, state);
+        let list = List::new(items);
+        frame.render_widget(list, inner);
     }
 
     /// Format large numbers with K/M/B suffixes
@@ -2526,6 +2466,7 @@ impl SessionsTab {
 
     /// Render refresh notification overlay (bottom banner)
     fn render_keyboard_hints(&self, frame: &mut Frame, area: Rect, p: &Palette) {
+        use ratatui::style::Color;
         // Calculate position at bottom of area
         let hint_area = Rect {
             x: area.x,
@@ -2552,6 +2493,11 @@ impl SessionsTab {
                     Span::styled("Enter", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("detail", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
+                    Span::raw("["),
+                    Span::styled("w", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
+                    Span::raw("] "),
+                    Span::styled("view waiting", Style::default().fg(p.fg)),
                 ]
             }
             1 => {
@@ -2566,6 +2512,11 @@ impl SessionsTab {
                     Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("navigate", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
+                    Span::raw("["),
+                    Span::styled("w", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
+                    Span::raw("] "),
+                    Span::styled("view waiting", Style::default().fg(p.fg)),
                 ]
             }
             2 => {
@@ -2592,9 +2543,9 @@ impl SessionsTab {
                     Span::styled("replay", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled("e", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::styled("w", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
                     Span::raw("] "),
-                    Span::styled("edit", Style::default().fg(p.fg)),
+                    Span::styled("view waiting", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled("r", Style::default().fg(p.bg).bg(p.focus).bold()),
@@ -2605,25 +2556,6 @@ impl SessionsTab {
                     Span::styled("d", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("date filter", Style::default().fg(p.fg)),
-                ]
-            }
-            3 => {
-                // Waiting Answers
-                vec![
-                    Span::raw(" ["),
-                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
-                    Span::raw("] "),
-                    Span::styled("switch pane", Style::default().fg(p.fg)),
-                    Span::styled(" │ ", Style::default().fg(p.muted)),
-                    Span::raw("["),
-                    Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
-                    Span::raw("] "),
-                    Span::styled("navigate", Style::default().fg(p.fg)),
-                    Span::styled(" │ ", Style::default().fg(p.muted)),
-                    Span::raw("["),
-                    Span::styled("Enter", Style::default().fg(p.bg).bg(p.focus).bold()),
-                    Span::raw("] "),
-                    Span::styled("view last message", Style::default().fg(p.fg)),
                 ]
             }
             _ => vec![],
