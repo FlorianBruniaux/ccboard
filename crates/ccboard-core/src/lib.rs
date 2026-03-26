@@ -3,6 +3,7 @@
 //! Provides parsers, models, store, and file watcher for Claude Code data.
 
 pub mod analytics;
+pub mod bookmarks;
 pub mod cache;
 pub mod error;
 pub mod event;

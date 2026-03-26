@@ -113,6 +113,20 @@ impl Ui {
                     }
                 }
 
+                // 'b' — toggle bookmark on selected session
+                if let KeyCode::Char('b') = key {
+                    if let Some(session_id) =
+                        self.sessions.selected_session_id(&sessions_by_project)
+                    {
+                        match app.store.toggle_bookmark(&session_id) {
+                            Ok(true) => self.sessions.set_notification("Bookmarked ★"),
+                            Ok(false) => self.sessions.set_notification("Bookmark removed"),
+                            Err(e) => self.sessions.set_notification(&format!("Bookmark error: {}", e)),
+                        }
+                        return;
+                    }
+                }
+
                 self.sessions.handle_key(key, &sessions_by_project);
             }
             Tab::Config => {
@@ -563,7 +577,7 @@ impl Ui {
                 let session_count: usize = sessions_by_project.values().map(|v| v.len()).sum();
                 self.sessions.mark_refreshed(session_count);
                 self.sessions
-                    .render(frame, area, &sessions_by_project, live_sessions, scheme);
+                    .render(frame, area, &sessions_by_project, live_sessions, scheme, &app.store);
             }
             Tab::Config => {
                 let config = app.store.settings();

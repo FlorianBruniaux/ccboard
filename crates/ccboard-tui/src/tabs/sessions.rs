@@ -167,6 +167,9 @@ pub struct SessionsTab {
     prev_session_count: usize,
     /// Vim-style: waiting for second 'g' press
     pending_gg: bool,
+
+    /// When true, only bookmarked sessions are shown
+    show_bookmarks_only: bool,
 }
 
 impl Default for SessionsTab {
@@ -214,7 +217,14 @@ impl SessionsTab {
             notification_time: None,
             prev_session_count: 0,
             pending_gg: false,
+            show_bookmarks_only: false,
         }
+    }
+
+    /// Set a short notification message (auto-clears after 2s)
+    pub fn set_notification(&mut self, msg: &str) {
+        self.refresh_message = Some(msg.to_string());
+        self.notification_time = Some(Instant::now());
     }
 
     /// Check if replay viewer is currently open
@@ -454,6 +464,18 @@ impl SessionsTab {
                         }
                     }
                 }
+            }
+            KeyCode::Char('B') => {
+                // Toggle bookmarks-only filter
+                self.show_bookmarks_only = !self.show_bookmarks_only;
+                let msg = if self.show_bookmarks_only {
+                    "★ Showing bookmarks only"
+                } else {
+                    "Showing all sessions"
+                };
+                self.refresh_message = Some(msg.to_string());
+                self.notification_time = Some(Instant::now());
+                self.session_state.select(Some(0));
             }
             KeyCode::Char('d') => {
                 // Cycle date filter (works from any pane)
@@ -724,6 +746,7 @@ impl SessionsTab {
         sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
         live_sessions: &[ccboard_core::MergedLiveSession],
         _scheme: ccboard_core::models::config::ColorScheme,
+        store: &ccboard_core::store::DataStore,
     ) {
         let p = Palette::new(_scheme);
 
@@ -908,10 +931,15 @@ impl SessionsTab {
             &all_sessions_vec
         };
 
-        // Filter sessions based on search and date filter (Arc clone is cheap: 8 bytes)
+        // Filter sessions based on search, date filter, and bookmark filter
         let mut sessions: Vec<Arc<SessionMetadata>> = all_sessions
             .iter()
             .filter(|s| {
+                // Apply bookmark filter
+                if self.show_bookmarks_only && !store.is_bookmarked(&s.id) {
+                    return false;
+                }
+
                 // Apply date filter
                 if !self.date_filter.matches(s) {
                     return false;
@@ -977,12 +1005,12 @@ impl SessionsTab {
         }
 
         // Render session list
-        self.render_sessions(frame, chunks[1], &sessions, &p);
+        self.render_sessions(frame, chunks[1], &sessions, &p, store);
 
         // Render detail popup if open
         if self.show_detail && chunks.len() > 2 {
             let selected_session = self.session_state.selected().and_then(|i| sessions.get(i));
-            self.render_detail(frame, chunks[2], selected_session, &p);
+            self.render_detail(frame, chunks[2], selected_session, &p, store);
         }
 
         // Render keyboard hints at bottom
@@ -1296,7 +1324,9 @@ impl SessionsTab {
         area: Rect,
         sessions: &[Arc<SessionMetadata>],
         p: &Palette,
+        store: &ccboard_core::store::DataStore,
     ) {
+        use ratatui::style::Color;
         let is_focused = self.focus == 2; // Sessions focus
         let border_color = if is_focused { p.focus } else { p.border };
 
@@ -1321,6 +1351,11 @@ impl SessionsTab {
         // Add sort mode if not default
         if self.sort_mode != SessionSortMode::DateDesc {
             title_parts.push(format!("[{}]", self.sort_mode.display()));
+        }
+
+        // Add bookmark filter indicator
+        if self.show_bookmarks_only {
+            title_parts.push("★".to_string());
         }
 
         let title_prefix = title_parts.join(" ");
@@ -1453,11 +1488,22 @@ impl SessionsTab {
                 let tokens_str = Self::format_tokens(session.total_tokens);
                 let msgs_str = format!("{}msg", session.message_count);
 
+                // Bookmark indicator (star before selection arrow)
+                let is_bookmarked = store.is_bookmarked(&session.id);
+                let bookmark_span = if is_bookmarked {
+                    Span::styled("★ ", Style::default().fg(Color::Yellow))
+                } else {
+                    Span::raw("  ")
+                };
+
                 // Build preview spans with optional highlighting
-                let mut preview_spans = vec![Span::styled(
-                    format!(" {} ", if is_selected { "▶" } else { " " }),
-                    style,
-                )];
+                let mut preview_spans = vec![
+                    bookmark_span,
+                    Span::styled(
+                        format!("{} ", if is_selected { "▶" } else { " " }),
+                        style,
+                    ),
+                ];
 
                 // Add project prefix if global search is active
                 if self.search_global && self.search_active {
@@ -1527,6 +1573,7 @@ impl SessionsTab {
         area: Rect,
         session: Option<&Arc<SessionMetadata>>,
         p: &Palette,
+        store: &ccboard_core::store::DataStore,
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
@@ -1723,6 +1770,24 @@ impl SessionsTab {
                     Span::styled("  • ", Style::default().fg(p.muted)),
                     Span::styled(tool.as_str(), Style::default().fg(p.focus)),
                     Span::styled(format!(" ({})", count), Style::default().fg(p.warning)),
+                ]));
+            }
+        }
+
+        // Bookmark section — clone to avoid lifetime issues with lines Vec
+        if let Some(entry) = store.bookmark_entry(&session.id) {
+            use ratatui::style::Color;
+            let tag = entry.tag.clone();
+            let note = entry.note.clone();
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("★ Bookmarked: ", Style::default().fg(Color::Yellow).bold()),
+                Span::styled(tag, Style::default().fg(Color::Yellow)),
+            ]));
+            if let Some(note) = note {
+                lines.push(Line::from(vec![
+                    Span::styled("  Note: ", Style::default().fg(p.muted)),
+                    Span::styled(note, Style::default().fg(p.fg)),
                 ]));
             }
         }
@@ -2608,6 +2673,16 @@ impl SessionsTab {
                     Span::styled("d", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("date filter", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
+                    Span::raw("["),
+                    Span::styled("b", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
+                    Span::raw("] "),
+                    Span::styled("bookmark", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
+                    Span::raw("["),
+                    Span::styled("B", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
+                    Span::raw("] "),
+                    Span::styled("★ only", Style::default().fg(p.fg)),
                 ]
             }
             _ => vec![],

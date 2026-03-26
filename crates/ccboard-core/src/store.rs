@@ -4,6 +4,7 @@
 //! for stats/settings (better fairness than std::sync::RwLock).
 
 use crate::analytics::{AnalyticsData, Period};
+use crate::bookmarks::BookmarkStore;
 use crate::cache::{MetadataCache, StoredAlert};
 use crate::error::{CoreError, DegradedState, LoadReport};
 use crate::event::{DataEvent, EventBus};
@@ -119,6 +120,9 @@ pub struct DataStore {
 
     /// Per-project last session stats from ~/.claude.json
     claude_global_stats: RwLock<Option<ClaudeGlobalStats>>,
+
+    /// Session bookmarks persisted to ~/.ccboard/bookmarks.json
+    bookmark_store: RwLock<BookmarkStore>,
 }
 
 /// Project leaderboard entry with aggregated metrics
@@ -142,6 +146,22 @@ impl DataStore {
             .max_capacity((config.max_session_content_cache_mb * 1024 * 1024 / 1000) as u64) // Rough estimate
             .time_to_idle(Duration::from_secs(300)) // 5 min idle expiry
             .build();
+
+        // Load bookmark store from ~/.ccboard/bookmarks.json
+        let bookmark_store = {
+            let bookmarks_path = claude_home
+                .parent()
+                .unwrap_or(&claude_home)
+                .join(".ccboard")
+                .join("bookmarks.json");
+            match BookmarkStore::load(&bookmarks_path) {
+                Ok(store) => store,
+                Err(e) => {
+                    warn!(error = %e, "Failed to load bookmark store, starting empty");
+                    BookmarkStore::default()
+                }
+            }
+        };
 
         // Create metadata cache in ~/.claude/cache/
         let metadata_cache = {
@@ -177,6 +197,7 @@ impl DataStore {
             activity_results: DashMap::new(),
             live_hook_sessions: RwLock::new(crate::hook_state::LiveSessionFile::default()),
             claude_global_stats: RwLock::new(None),
+            bookmark_store: RwLock::new(bookmark_store),
         }
     }
 
@@ -1180,6 +1201,47 @@ impl DataStore {
     ) -> anyhow::Result<()> {
         let cache_dir = self.claude_home.join("cache");
         prefs.save(&cache_dir)
+    }
+
+    // ── Bookmark accessors ───────────────────────────────────────────────────
+
+    /// Returns true if the session is bookmarked
+    pub fn is_bookmarked(&self, session_id: &str) -> bool {
+        self.bookmark_store.read().is_bookmarked(session_id)
+    }
+
+    /// Returns the bookmark entry for a session, if any.
+    /// Cloned to avoid holding the lock across an await point.
+    pub fn bookmark_entry(&self, session_id: &str) -> Option<crate::bookmarks::BookmarkEntry> {
+        self.bookmark_store.read().get(session_id).cloned()
+    }
+
+    /// Toggle bookmark (add with default tag "bookmarked", or remove).
+    /// Returns `true` if the session is now bookmarked.
+    pub fn toggle_bookmark(&self, session_id: &str) -> anyhow::Result<bool> {
+        self.bookmark_store
+            .write()
+            .toggle(session_id, "bookmarked")
+    }
+
+    /// Add or update a bookmark with a custom tag and optional note.
+    pub fn upsert_bookmark(
+        &self,
+        session_id: &str,
+        tag: impl Into<String>,
+        note: Option<String>,
+    ) -> anyhow::Result<()> {
+        self.bookmark_store.write().upsert(session_id, tag, note)
+    }
+
+    /// Remove a bookmark explicitly.
+    pub fn remove_bookmark(&self, session_id: &str) -> anyhow::Result<bool> {
+        self.bookmark_store.write().remove(session_id)
+    }
+
+    /// Number of bookmarked sessions
+    pub fn bookmark_count(&self) -> usize {
+        self.bookmark_store.read().len()
     }
 }
 
