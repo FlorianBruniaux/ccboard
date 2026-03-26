@@ -2539,9 +2539,9 @@ impl SessionsTab {
                 // Live Sessions
                 vec![
                     Span::raw(" ["),
-                    Span::styled("Tab", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
-                    Span::styled("cycle focus", Style::default().fg(p.fg)),
+                    Span::styled("switch pane", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
@@ -2558,28 +2558,23 @@ impl SessionsTab {
                 // Projects
                 vec![
                     Span::raw(" ["),
-                    Span::styled("Tab", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
-                    Span::styled("cycle focus", Style::default().fg(p.fg)),
+                    Span::styled("switch pane", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("navigate", Style::default().fg(p.fg)),
-                    Span::styled(" │ ", Style::default().fg(p.muted)),
-                    Span::raw("["),
-                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
-                    Span::raw("] "),
-                    Span::styled("switch pane", Style::default().fg(p.fg)),
                 ]
             }
             2 => {
                 // Sessions
                 vec![
                     Span::raw(" ["),
-                    Span::styled("Tab", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
-                    Span::styled("cycle focus", Style::default().fg(p.fg)),
+                    Span::styled("switch pane", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
@@ -2610,6 +2605,25 @@ impl SessionsTab {
                     Span::styled("d", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("date filter", Style::default().fg(p.fg)),
+                ]
+            }
+            3 => {
+                // Waiting Answers
+                vec![
+                    Span::raw(" ["),
+                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::raw("] "),
+                    Span::styled("switch pane", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
+                    Span::raw("["),
+                    Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::raw("] "),
+                    Span::styled("navigate", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
+                    Span::raw("["),
+                    Span::styled("Enter", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::raw("] "),
+                    Span::styled("view last message", Style::default().fg(p.fg)),
                 ]
             }
             _ => vec![],

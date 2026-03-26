@@ -416,16 +416,20 @@ impl App {
         }
     }
 
-    /// Refresh live sessions cache if needed (every 2 seconds when on Sessions tab)
+    /// Refresh live sessions cache if needed (every 2 seconds when on Sessions tab).
+    /// Always refreshes immediately on first call after switching to the Sessions tab.
     pub fn refresh_live_sessions_if_needed(&mut self) {
         // Only refresh if on Sessions tab
         if self.active_tab != Tab::Sessions {
             return;
         }
 
-        // Check if 2 seconds have elapsed since last refresh
         let now = std::time::Instant::now();
-        if now.duration_since(self.last_live_refresh).as_secs() >= 2 {
+        // Immediate refresh if cache is empty (first visit to Sessions tab)
+        // or if 2 seconds have elapsed since last refresh
+        if self.live_sessions_cache.is_empty()
+            || now.duration_since(self.last_live_refresh).as_secs() >= 2
+        {
             self.live_sessions_cache = self.store.merged_live_sessions();
             self.last_live_refresh = now;
         }
