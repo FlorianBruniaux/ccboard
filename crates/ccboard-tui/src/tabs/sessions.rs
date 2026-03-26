@@ -119,7 +119,11 @@ pub struct SessionsTab {
     session_state: ListState,
     /// Live sessions list state (for scrolling)
     live_sessions_state: ListState,
-    /// Current focus: Live Sessions (0), Projects (1), or Sessions (2)
+    /// Waiting Answers list state (for cursor)
+    waiting_state: ListState,
+    /// Snapshot of waiting sessions (updated during render, used by handle_key)
+    waiting_sessions_cache: Vec<ccboard_core::MergedLiveSession>,
+    /// Current focus: Live Sessions (0), Projects (1), Sessions (2), Waiting Answers (3)
     focus: usize,
     /// Cached project list (sorted)
     projects: Vec<String>,
@@ -184,10 +188,15 @@ impl SessionsTab {
         let mut replay_scroll = ListState::default();
         replay_scroll.select(Some(0));
 
+        let mut waiting_state = ListState::default();
+        waiting_state.select(Some(0));
+
         Self {
             project_state,
             session_state,
             live_sessions_state,
+            waiting_state,
+            waiting_sessions_cache: Vec::new(),
             focus: 1, // Start with Projects focused (1), not Live Sessions (0)
             projects: Vec::new(),
             search_filter: String::new(),
@@ -269,20 +278,34 @@ impl SessionsTab {
 
         match key {
             KeyCode::Tab => {
-                // Cycle focus: Live Sessions (0) → Projects (1) → Sessions (2) → Live Sessions
-                self.focus = (self.focus + 1) % 3;
+                // Cycle focus: Live Sessions (0) → Projects (1) → Sessions (2) → Waiting (3 if any) → Live Sessions
+                let max = if self.waiting_sessions_cache.is_empty() {
+                    3
+                } else {
+                    4
+                };
+                self.focus = (self.focus + 1) % max;
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                // Move focus left: Live Sessions ← Projects ← Sessions
+                // Move focus left
                 if self.focus == 0 {
-                    self.focus = 2;
+                    self.focus = if self.waiting_sessions_cache.is_empty() {
+                        2
+                    } else {
+                        3
+                    };
                 } else {
                     self.focus -= 1;
                 }
             }
             KeyCode::Right | KeyCode::Char('l') => {
-                // Move focus right: Live Sessions → Projects → Sessions
-                self.focus = (self.focus + 1) % 3;
+                // Move focus right
+                let max = if self.waiting_sessions_cache.is_empty() {
+                    3
+                } else {
+                    4
+                };
+                self.focus = (self.focus + 1) % max;
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 if self.show_replay {
@@ -296,6 +319,7 @@ impl SessionsTab {
                             self.session_state.select(Some(0));
                         }
                         2 => self.move_session_selection(-1),
+                        3 => self.move_waiting_selection(-1),
                         _ => {}
                     }
                 }
@@ -311,6 +335,7 @@ impl SessionsTab {
                             self.session_state.select(Some(0));
                         }
                         2 => self.move_session_selection(1),
+                        3 => self.move_waiting_selection(1),
                         _ => {}
                     }
                 }
@@ -331,6 +356,48 @@ impl SessionsTab {
                 } else if self.focus == 2 {
                     // Toggle historical session detail
                     self.show_detail = !self.show_detail;
+                } else if self.focus == 3 {
+                    // Open replay for selected waiting session
+                    if let Some(idx) = self.waiting_state.selected() {
+                        if let Some(session) = self.waiting_sessions_cache.get(idx) {
+                            // Find JSONL file via session_id in sessions_by_project
+                            let file_path = session.session_id.as_ref().and_then(|sid| {
+                                _sessions_by_project
+                                    .values()
+                                    .flat_map(|v| v.iter())
+                                    .find(|s| s.id == *sid)
+                                    .map(|s| s.file_path.clone())
+                            });
+                            if let Some(path) = file_path {
+                                match tokio::task::block_in_place(|| {
+                                    tokio::runtime::Handle::current().block_on(
+                                        SessionContentParser::parse_session_lines(&path),
+                                    )
+                                }) {
+                                    Ok(mut messages) => {
+                                        messages =
+                                            SessionContentParser::filter_messages(messages);
+                                        self.replay_messages = messages;
+                                        // Jump to last message so user sees what's awaiting
+                                        let last = self
+                                            .replay_messages
+                                            .len()
+                                            .saturating_sub(1);
+                                        self.replay_scroll.select(Some(last));
+                                        self.replay_expanded.clear();
+                                        self.show_replay = true;
+                                    }
+                                    Err(e) => {
+                                        self.error_message =
+                                            Some(format!("Failed to load session: {}", e));
+                                    }
+                                }
+                            } else {
+                                self.error_message =
+                                    Some("Session file not found in history".to_string());
+                            }
+                        }
+                    }
                 }
             }
             KeyCode::Char('e') => {
@@ -572,6 +639,16 @@ impl SessionsTab {
         self.live_sessions_state.select(Some(new_idx));
     }
 
+    fn move_waiting_selection(&mut self, delta: i32) {
+        if self.waiting_sessions_cache.is_empty() {
+            return;
+        }
+        let current = self.waiting_state.selected().unwrap_or(0) as i32;
+        let new_idx = (current + delta)
+            .clamp(0, self.waiting_sessions_cache.len() as i32 - 1) as usize;
+        self.waiting_state.select(Some(new_idx));
+    }
+
     fn move_replay_selection(&mut self, delta: i32) {
         if self.replay_messages.is_empty() {
             return;
@@ -770,6 +847,9 @@ impl SessionsTab {
                 })
                 .collect();
 
+            // Cache for handle_key access (cloned snapshot)
+            self.waiting_sessions_cache = waiting.iter().map(|s| (*s).clone()).collect();
+
             let live_split = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
@@ -781,7 +861,15 @@ impl SessionsTab {
                 self.focus == 0,
                 &p,
             );
-            Self::render_waiting_answers(frame, live_split[1], &waiting, &p);
+            let focused_waiting = self.focus == 3;
+            Self::render_waiting_answers(
+                frame,
+                live_split[1],
+                &waiting,
+                &mut self.waiting_state,
+                focused_waiting,
+                &p,
+            );
             2
         } else {
             1
@@ -1118,21 +1206,33 @@ impl SessionsTab {
         frame: &mut Frame,
         area: Rect,
         waiting: &[&ccboard_core::MergedLiveSession],
+        state: &mut ListState,
+        focused: bool,
         p: &Palette,
     ) {
         use chrono::Local;
         use ratatui::style::Color;
 
+        let border_color = if focused { p.focus } else { Color::Yellow };
+        let hint = if waiting.is_empty() {
+            ""
+        } else {
+            " Enter: view "
+        };
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::Yellow))
+            .border_style(Style::default().fg(border_color))
             .style(Style::default().bg(p.surface))
             .title(Span::styled(
                 format!(" ⏳ Waiting Answers ({}) ", waiting.len()),
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
+            ))
+            .title_bottom(Span::styled(
+                hint,
+                Style::default().fg(p.muted),
             ));
 
         let inner = block.inner(area);
@@ -1170,8 +1270,13 @@ impl SessionsTab {
             })
             .collect();
 
-        let list = List::new(items);
-        frame.render_widget(list, inner);
+        let list = List::new(items).highlight_style(
+            Style::default()
+                .bg(p.focus)
+                .fg(p.bg)
+                .add_modifier(Modifier::BOLD),
+        );
+        frame.render_stateful_widget(list, inner, state);
     }
 
     /// Format large numbers with K/M/B suffixes
