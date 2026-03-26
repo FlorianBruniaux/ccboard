@@ -118,24 +118,31 @@ impl DashboardTab {
         let mcp_count = mcp_config.map(|config| config.servers.len()).unwrap_or(0);
         let mcp_color = if mcp_count > 0 { p.success } else { p.muted };
 
-        // Context window saturation
-        let (context_display, context_color) = store
+        // Context window saturation + trend
+        let (context_display, context_color, context_subtitle) = store
             .map(|s| {
                 let ctx_stats = s.context_window_stats();
                 let pct = ctx_stats.avg_saturation_pct;
                 let color_theme = ContextSaturationColor::from_percentage(pct);
                 let icon = color_theme.icon();
 
-                // Format: "68.5%  ⚠️ 3" or "45.2%" (no icon/count if safe)
+                // Value: "68.5% ⚠️ 3" or "45.2%"
                 let display = if ctx_stats.high_load_count > 0 {
                     format!("{:.1}% {} {}", pct, icon, ctx_stats.high_load_count)
                 } else {
                     format!("{:.1}%", pct)
                 };
 
-                (display, color_theme.to_color(scheme))
+                // Subtitle: trend prediction if available, else static label
+                let subtitle = match ctx_stats.sessions_until_high {
+                    Some(n) => format!("↑ ~{} sessions", n),
+                    None if ctx_stats.trend_slope < -0.1 => "↓ declining".to_string(),
+                    _ => "avg 30d".to_string(),
+                };
+
+                (display, color_theme.to_color(scheme), subtitle)
             })
-            .unwrap_or_else(|| ("—".into(), p.muted));
+            .unwrap_or_else(|| ("—".into(), p.muted, "avg 30d".into()));
 
         self.render_stat_card(frame, chunks[0], "◆ Tokens", &tokens, p.focus, "total", p);
         self.render_stat_card(
@@ -180,7 +187,7 @@ impl DashboardTab {
             "◐ Context",
             &context_display,
             context_color,
-            "avg 30d",
+            &context_subtitle,
             p,
         );
     }

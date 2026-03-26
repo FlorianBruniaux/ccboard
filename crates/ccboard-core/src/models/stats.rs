@@ -261,29 +261,55 @@ impl StatsCache {
             return ContextWindowStats::default();
         }
 
-        // Calculate saturation percentages
-        let mut total_pct = 0.0;
-        let mut high_load_count = 0;
-        let mut peak_pct = 0.0;
+        // Calculate saturation percentages (recent is most-recent-first; reverse for chronological)
+        let n = recent.len();
+        let pct_values: Vec<f64> = recent
+            .iter()
+            .rev() // oldest first for regression index ordering
+            .map(|s| (s.total_tokens as f64 / Self::CONTEXT_WINDOW as f64) * 100.0)
+            .collect();
 
-        for session in &recent {
-            let saturation_pct =
-                (session.total_tokens as f64 / Self::CONTEXT_WINDOW as f64) * 100.0;
-            total_pct += saturation_pct;
+        let total_pct: f64 = pct_values.iter().sum();
+        let avg_pct = total_pct / n as f64;
+        let high_load_count = pct_values.iter().filter(|&&p| p > 85.0).count();
+        let peak_pct = pct_values.iter().cloned().fold(0.0f64, f64::max);
 
-            if saturation_pct > 85.0 {
-                high_load_count += 1;
+        // Linear regression: slope of saturation over session index
+        // x[i] = i, y[i] = pct_values[i]
+        let trend_slope = if n >= 3 {
+            let n_f = n as f64;
+            let sum_x: f64 = (0..n).map(|i| i as f64).sum();
+            let sum_y: f64 = total_pct;
+            let sum_xy: f64 = pct_values.iter().enumerate().map(|(i, &y)| i as f64 * y).sum();
+            let sum_x2: f64 = (0..n).map(|i| (i * i) as f64).sum();
+            let denom = n_f * sum_x2 - sum_x * sum_x;
+            if denom.abs() > f64::EPSILON {
+                (n_f * sum_xy - sum_x * sum_y) / denom
+            } else {
+                0.0
             }
+        } else {
+            0.0
+        };
 
-            if saturation_pct > peak_pct {
-                peak_pct = saturation_pct;
+        // Predict sessions until avg crosses 85% (only if trending up and currently below)
+        let sessions_until_high = if trend_slope > 0.1 && avg_pct < 85.0 {
+            let sessions_remaining = (85.0 - avg_pct) / trend_slope;
+            if sessions_remaining > 0.0 && sessions_remaining < 1000.0 {
+                Some(sessions_remaining.ceil() as usize)
+            } else {
+                None
             }
-        }
+        } else {
+            None
+        };
 
         ContextWindowStats {
-            avg_saturation_pct: total_pct / recent.len() as f64,
+            avg_saturation_pct: avg_pct,
             high_load_count,
             peak_saturation_pct: peak_pct,
+            trend_slope,
+            sessions_until_high,
         }
     }
 }
@@ -299,6 +325,14 @@ pub struct ContextWindowStats {
 
     /// Peak saturation percentage (max session, for future use)
     pub peak_saturation_pct: f64,
+
+    /// Linear regression slope over recent sessions (percentage points per session).
+    /// Positive = trending higher, negative = declining.
+    pub trend_slope: f64,
+
+    /// Predicted sessions until avg saturation crosses 85%.
+    /// `None` if slope is flat/negative or already above 85%.
+    pub sessions_until_high: Option<usize>,
 }
 
 #[cfg(test)]
@@ -460,5 +494,80 @@ mod tests {
         // Should calculate average of available 3 sessions
         // (30% + 40% + 60%) / 3 = 43.33%
         assert!((stats.avg_saturation_pct - 43.33).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_context_saturation_trend_increasing() {
+        use crate::models::SessionMetadata;
+        use chrono::Utc;
+        use std::path::PathBuf;
+
+        // Sessions with sharply increasing saturation: 20%, 30%, 40%, 50%, 60%
+        // avg = 40%, slope ≈ +10% per session → predict ~5 sessions to 85%
+        let now = Utc::now();
+        let tokens_for_pct = |pct: f64| (pct / 100.0 * 200_000.0) as u64;
+        let pcts = [20.0f64, 30.0, 40.0, 50.0, 60.0];
+
+        let sessions: Vec<SessionMetadata> = pcts
+            .iter()
+            .enumerate()
+            .map(|(i, &pct)| {
+                let mut meta = SessionMetadata::from_path(
+                    PathBuf::from(format!("/trend{}.jsonl", i)),
+                    "test".into(),
+                );
+                meta.total_tokens = tokens_for_pct(pct);
+                meta.last_timestamp =
+                    Some(now - chrono::Duration::seconds((4 - i) as i64 * 60));
+                meta
+            })
+            .collect();
+
+        let refs: Vec<_> = sessions.iter().collect();
+        let stats = StatsCache::calculate_context_saturation(&refs, 30);
+
+        assert!(stats.trend_slope > 0.0, "slope should be positive");
+        assert!(
+            stats.sessions_until_high.is_some(),
+            "should predict sessions until 85%"
+        );
+        let predicted = stats.sessions_until_high.unwrap();
+        assert!(
+            (3..=8).contains(&predicted),
+            "predicted {} sessions to 85%, expected ~5",
+            predicted
+        );
+    }
+
+    #[test]
+    fn test_context_saturation_trend_flat_no_prediction() {
+        use crate::models::SessionMetadata;
+        use chrono::Utc;
+        use std::path::PathBuf;
+
+        // Flat saturation at 40% — no upward trend, no prediction
+        let now = Utc::now();
+        let tokens = (0.40 * 200_000.0) as u64;
+
+        let sessions: Vec<SessionMetadata> = (0..5)
+            .map(|i| {
+                let mut meta = SessionMetadata::from_path(
+                    PathBuf::from(format!("/flat{}.jsonl", i)),
+                    "test".into(),
+                );
+                meta.total_tokens = tokens;
+                meta.last_timestamp =
+                    Some(now - chrono::Duration::seconds((4 - i) as i64 * 60));
+                meta
+            })
+            .collect();
+
+        let refs: Vec<_> = sessions.iter().collect();
+        let stats = StatsCache::calculate_context_saturation(&refs, 30);
+
+        assert!(
+            stats.sessions_until_high.is_none(),
+            "flat trend should not predict a breach"
+        );
     }
 }
