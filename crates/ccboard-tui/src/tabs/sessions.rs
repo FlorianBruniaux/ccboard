@@ -752,10 +752,21 @@ impl SessionsTab {
 
         // Render live sessions if any — always split horizontally: Live | Waiting Answers
         let content_chunk_idx = if live_height > 0 {
+            let now_local = chrono::Local::now();
             let waiting: Vec<&ccboard_core::MergedLiveSession> = live_sessions
                 .iter()
                 .filter(|s| {
-                    s.effective_status() == ccboard_core::LiveSessionDisplayStatus::WaitingInput
+                    if s.effective_status() != ccboard_core::LiveSessionDisplayStatus::WaitingInput
+                    {
+                        return false;
+                    }
+                    // Ignore stale WaitingInput sessions (hook file not cleaned up on exit)
+                    // Only show sessions with activity in the last 30 minutes
+                    s.last_event_at
+                        .map(|t| {
+                            now_local.signed_duration_since(t).num_minutes().abs() < 30
+                        })
+                        .unwrap_or(false)
                 })
                 .collect();
 
