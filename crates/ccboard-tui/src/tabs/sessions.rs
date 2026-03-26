@@ -750,7 +750,7 @@ impl SessionsTab {
 
         frame.render_widget(search_input, main_chunks[0]);
 
-        // Render live sessions if any — split horizontally when WaitingInput sessions exist
+        // Render live sessions if any — always split horizontally: Live | Waiting Answers
         let content_chunk_idx = if live_height > 0 {
             let waiting: Vec<&ccboard_core::MergedLiveSession> = live_sessions
                 .iter()
@@ -759,28 +759,18 @@ impl SessionsTab {
                 })
                 .collect();
 
-            if !waiting.is_empty() {
-                let live_split = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
-                    .split(main_chunks[1]);
-                self.render_live_sessions(
-                    frame,
-                    live_split[0],
-                    live_sessions,
-                    self.focus == 0,
-                    &p,
-                );
-                Self::render_waiting_answers(frame, live_split[1], &waiting, &p);
-            } else {
-                self.render_live_sessions(
-                    frame,
-                    main_chunks[1],
-                    live_sessions,
-                    self.focus == 0,
-                    &p,
-                );
-            }
+            let live_split = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+                .split(main_chunks[1]);
+            self.render_live_sessions(
+                frame,
+                live_split[0],
+                live_sessions,
+                self.focus == 0,
+                &p,
+            );
+            Self::render_waiting_answers(frame, live_split[1], &waiting, &p);
             2
         } else {
             1
