@@ -6,7 +6,7 @@
 use crate::analytics::{AnalyticsData, Period};
 use crate::cache::{MetadataCache, StoredAlert};
 use crate::error::{CoreError, DegradedState, LoadReport};
-use crate::event::{ConfigScope, DataEvent, EventBus};
+use crate::event::{DataEvent, EventBus};
 use crate::models::activity::ActivitySummary;
 use crate::models::{
     BillingBlockManager, InvocationStats, MergedConfig, SessionId, SessionMetadata, StatsCache,
@@ -993,8 +993,7 @@ impl DataStore {
             *guard = merged;
         }
 
-        self.event_bus
-            .publish(DataEvent::ConfigChanged(ConfigScope::Global));
+        // Note: caller (watcher handle_event) publishes ConfigChanged after this returns.
         debug!("Settings reloaded");
     }
 

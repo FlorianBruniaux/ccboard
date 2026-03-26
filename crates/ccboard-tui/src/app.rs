@@ -395,9 +395,12 @@ impl App {
                 DataEvent::StatsUpdated
                 | DataEvent::SessionCreated(_)
                 | DataEvent::SessionUpdated(_)
-                | DataEvent::ConfigChanged(_)
                 | DataEvent::AnalyticsUpdated => {
                     self.needs_refresh = true;
+                }
+                DataEvent::ConfigChanged(_) => {
+                    self.needs_refresh = true;
+                    self.info_toast("Settings reloaded");
                 }
                 DataEvent::WatcherError(msg) => {
                     self.status_message = Some(format!("Watcher error: {}", msg));
