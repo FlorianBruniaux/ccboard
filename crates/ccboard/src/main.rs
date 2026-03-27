@@ -136,6 +136,17 @@ enum Mode {
         /// Session ID or prefix (min 8 chars)
         session_id: String,
     },
+    /// Generate and cache an LLM summary for a session
+    Summarize {
+        /// Session ID or prefix (min 8 chars)
+        session_id: String,
+        /// Claude model for summarisation (default: system default)
+        #[arg(long, default_value = "")]
+        model: String,
+        /// Regenerate even if a cached summary exists
+        #[arg(long)]
+        force: bool,
+    },
     /// Export data to files (sessions, stats, billing, or a single conversation)
     Export {
         #[command(subcommand)]
@@ -297,6 +308,13 @@ async fn main() -> Result<()> {
         }
         Mode::Resume { session_id } => {
             run_resume(claude_home, project, session_id).await?;
+        }
+        Mode::Summarize {
+            session_id,
+            model,
+            force,
+        } => {
+            run_summarize(claude_home, project, session_id, model, force, no_color).await?;
         }
         Mode::Export { command } => match command {
             ExportCommand::Conversation {
@@ -850,6 +868,114 @@ async fn run_resume(
             .status()
             .context("Failed to spawn claude (is 'claude' in PATH?)")?;
         std::process::exit(status.code().unwrap_or(1));
+    }
+}
+
+async fn run_summarize(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    session_id: String,
+    model: String,
+    force: bool,
+    no_color: bool,
+) -> Result<()> {
+    let ccboard_dir = dirs::home_dir()
+        .context("Cannot determine home directory")?
+        .join(".ccboard");
+
+    let store = DataStore::with_defaults(claude_home, project);
+    eprint!("Loading sessions... ");
+    store.initial_load().await;
+    eprintln!("done");
+
+    let all = store.recent_sessions(usize::MAX);
+    let session = cli::find_by_id_or_prefix(&all, &session_id)?;
+
+    let summary_store = ccboard_core::summaries::SummaryStore::new(&ccboard_dir);
+
+    // Return cached summary unless --force
+    if !force && summary_store.has_summary(&session.id) {
+        let summary = summary_store.load(&session.id).unwrap_or_default();
+        let meta = summary_store.load_meta(&session.id);
+        eprintln!(
+            "Cached summary for {} ({})",
+            &session.id[..8.min(session.id.len())],
+            meta.map(|m| m.generated_at.format("%Y-%m-%d").to_string())
+                .unwrap_or_else(|| "unknown date".to_string())
+        );
+        println!("{}", summary);
+        return Ok(());
+    }
+
+    // Load full session content
+    eprint!("Loading session content... ");
+    let lines = ccboard_core::parsers::SessionContentParser::parse_session_lines(&session.file_path)
+        .await
+        .with_context(|| format!("Failed to read session {}", session.id))?;
+
+    // Build a plain-text transcript for the summarisation prompt
+    let mut transcript = String::new();
+    let mut msg_count = 0usize;
+    for line in &lines {
+        if let Some(ref msg) = line.message {
+            let role = msg.role.as_deref().unwrap_or("unknown");
+            let text = extract_text_from_content(msg.content.as_ref());
+            if !text.is_empty() {
+                transcript.push_str(role);
+                transcript.push_str(": ");
+                transcript.push_str(&text);
+                transcript.push_str("\n\n");
+                msg_count += 1;
+            }
+        }
+    }
+    eprintln!("done ({} messages, {} chars)", msg_count, transcript.len());
+
+    eprintln!(
+        "Calling claude --print{}...",
+        if model.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", model)
+        }
+    );
+
+    let summary = ccboard_core::summaries::call_claude_summarize(&transcript, &model)
+        .context("claude --print failed")?;
+
+    summary_store
+        .save(&session.id, &summary, &model)
+        .context("Failed to cache summary")?;
+
+    let _ = no_color; // reserved for future coloured output
+    println!("{}", summary);
+    eprintln!(
+        "Summary cached to ~/.ccboard/summaries/{}.md",
+        &session.id[..8.min(session.id.len())]
+    );
+
+    Ok(())
+}
+
+/// Extract plain text from a JSON content value (string or content-block array)
+fn extract_text_from_content(content: Option<&serde_json::Value>) -> String {
+    match content {
+        None => String::new(),
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(serde_json::Value::Array(blocks)) => {
+            blocks
+                .iter()
+                .filter_map(|b| {
+                    if b.get("type").and_then(|t| t.as_str()) == Some("text") {
+                        b.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+        _ => String::new(),
     }
 }
 

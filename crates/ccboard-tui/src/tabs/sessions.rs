@@ -1837,6 +1837,28 @@ impl SessionsTab {
             }
         }
 
+        // LLM summary (if cached via `ccboard summarize <id>`)
+        if let Some(summary) = store.load_summary(&session.id) {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "AI Summary:",
+                Style::default().fg(p.focus).bold(),
+            )));
+            // Wrap long summary lines at ~60 chars
+            for raw_line in summary.lines().take(12) {
+                lines.push(Line::from(Span::styled(
+                    raw_line.to_string(),
+                    Style::default().fg(p.fg),
+                )));
+            }
+        } else {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "No summary — run: ccboard summarize <id>",
+                Style::default().fg(p.muted),
+            )));
+        }
+
         lines.extend(vec![
             Line::from(""),
             Line::from(Span::styled("First message:", Style::default().fg(p.muted))),

@@ -18,6 +18,7 @@ pub mod preferences;
 pub mod pricing;
 pub mod quota;
 pub mod store;
+pub mod summaries;
 pub mod usage_estimator;
 pub mod watcher;
 

@@ -123,6 +123,9 @@ pub struct DataStore {
 
     /// Session bookmarks persisted to ~/.ccboard/bookmarks.json
     bookmark_store: RwLock<BookmarkStore>,
+
+    /// Summary store — reads cached summaries from ~/.ccboard/summaries/
+    summary_store: crate::summaries::SummaryStore,
 }
 
 /// Project leaderboard entry with aggregated metrics
@@ -147,13 +150,15 @@ impl DataStore {
             .time_to_idle(Duration::from_secs(300)) // 5 min idle expiry
             .build();
 
+        // Resolve ~/.ccboard dir (sibling of claude_home which is ~/.claude)
+        let ccboard_dir = claude_home
+            .parent()
+            .unwrap_or(&claude_home)
+            .join(".ccboard");
+
         // Load bookmark store from ~/.ccboard/bookmarks.json
         let bookmark_store = {
-            let bookmarks_path = claude_home
-                .parent()
-                .unwrap_or(&claude_home)
-                .join(".ccboard")
-                .join("bookmarks.json");
+            let bookmarks_path = ccboard_dir.join("bookmarks.json");
             match BookmarkStore::load(&bookmarks_path) {
                 Ok(store) => store,
                 Err(e) => {
@@ -198,6 +203,7 @@ impl DataStore {
             live_hook_sessions: RwLock::new(crate::hook_state::LiveSessionFile::default()),
             claude_global_stats: RwLock::new(None),
             bookmark_store: RwLock::new(bookmark_store),
+            summary_store: crate::summaries::SummaryStore::new(&ccboard_dir),
         }
     }
 
@@ -1245,6 +1251,16 @@ impl DataStore {
     /// Number of bookmarked sessions
     pub fn bookmark_count(&self) -> usize {
         self.bookmark_store.read().len()
+    }
+
+    /// True if a cached LLM summary exists for this session
+    pub fn has_summary(&self, session_id: &str) -> bool {
+        self.summary_store.has_summary(session_id)
+    }
+
+    /// Load cached summary text, or None if not yet generated
+    pub fn load_summary(&self, session_id: &str) -> Option<String> {
+        self.summary_store.load(session_id)
     }
 
     /// Returns all direct subagent sessions of the given parent session ID.
