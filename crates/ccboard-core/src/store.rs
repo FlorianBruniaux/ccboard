@@ -260,6 +260,9 @@ impl DataStore {
             "Initial load complete"
         );
 
+        // Backfill has_subagents after all sessions are indexed
+        self.compute_has_subagents();
+
         report
     }
 
@@ -1243,6 +1246,51 @@ impl DataStore {
     pub fn bookmark_count(&self) -> usize {
         self.bookmark_store.read().len()
     }
+
+    /// Returns all direct subagent sessions of the given parent session ID.
+    /// A session is a subagent if its `parent_session_id` == `parent_id`.
+    pub fn subagent_children(&self, parent_id: &str) -> Vec<Arc<SessionMetadata>> {
+        self.sessions
+            .iter()
+            .filter(|entry| {
+                entry
+                    .value()
+                    .parent_session_id
+                    .as_deref()
+                    .map(|pid| pid == parent_id)
+                    .unwrap_or(false)
+            })
+            .map(|entry| Arc::clone(entry.value()))
+            .collect()
+    }
+
+    /// Backfills `has_subagents` on all sessions based on cross-references.
+    /// A session has subagents if any other session has `parent_session_id == this_id`.
+    /// Called once after initial_load() completes.
+    pub fn compute_has_subagents(&self) {
+        // Collect all parent IDs referenced by child sessions
+        let parent_ids: std::collections::HashSet<String> = self
+            .sessions
+            .iter()
+            .filter_map(|entry| entry.value().parent_session_id.clone())
+            .collect();
+
+        if parent_ids.is_empty() {
+            return;
+        }
+
+        // For each session that is referenced as a parent, set has_subagents = true
+        for mut entry in self.sessions.iter_mut() {
+            if parent_ids.contains(entry.value().id.as_str()) {
+                let current: &SessionMetadata = entry.value();
+                let updated = SessionMetadata {
+                    has_subagents: true,
+                    ..current.clone()
+                };
+                *entry.value_mut() = Arc::new(updated);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1340,6 +1388,7 @@ mod tests {
                 file_size_bytes: 1024,
                 first_user_message: None,
                 has_subagents: false,
+                parent_session_id: None,
                 duration_seconds: Some(1800),
                 branch: None,
                 tool_usage: std::collections::HashMap::new(),
@@ -1406,6 +1455,7 @@ mod tests {
                 file_size_bytes: 1024,
                 first_user_message: None,
                 has_subagents: false,
+                parent_session_id: None,
                 duration_seconds: Some(1800),
                 branch: None,
                 tool_usage: std::collections::HashMap::new(),

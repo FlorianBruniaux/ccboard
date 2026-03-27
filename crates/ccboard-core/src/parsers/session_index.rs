@@ -367,9 +367,11 @@ impl SessionIndexParser {
                 }
             }
 
-            // Track subagents
-            if session_line.parent_session_id.is_some() {
-                metadata.has_subagents = true;
+            // Capture parent session ID (first non-null occurrence wins)
+            if metadata.parent_session_id.is_none() {
+                if let Some(ref pid) = session_line.parent_session_id {
+                    metadata.parent_session_id = Some(pid.clone());
+                }
             }
 
             // Extract git branch (first occurrence wins)

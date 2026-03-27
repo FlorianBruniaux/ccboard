@@ -1704,19 +1704,64 @@ impl SessionsTab {
                 Span::styled("File Size: ", Style::default().fg(p.muted)),
                 Span::styled(session.size_display(), Style::default().fg(p.fg)),
             ]),
-            Line::from(vec![
-                Span::styled("Subagents: ", Style::default().fg(p.muted)),
-                Span::styled(
-                    if session.has_subagents { "Yes" } else { "No" },
-                    if session.has_subagents {
-                        Style::default().fg(p.success)
-                    } else {
-                        Style::default().fg(p.muted)
-                    },
-                ),
-            ]),
-            Line::from(""),
         ]);
+
+        // Subagent tree: show parent link or children list
+        let children = store.subagent_children(&session.id);
+        if let Some(ref parent_id) = session.parent_session_id {
+            let short_parent = parent_id[..parent_id.len().min(16)].to_string();
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("⤴ Subagent of: ", Style::default().fg(p.muted)),
+                Span::styled(short_parent, Style::default().fg(p.warning)),
+            ]));
+        } else if !children.is_empty() {
+            let child_total_tokens: u64 = children.iter().map(|c| c.total_tokens).sum();
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("⤵ Subagents ({}):", children.len()),
+                    Style::default().fg(p.success).bold(),
+                ),
+                Span::styled(
+                    format!("  {} tokens total", Self::format_tokens(child_total_tokens)),
+                    Style::default().fg(p.muted),
+                ),
+            ]));
+            let mut sorted_children = children;
+            sorted_children.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
+            let child_count = sorted_children.len();
+            for (i, child) in sorted_children.iter().take(5).enumerate() {
+                let connector = if i + 1 == child_count.min(5) {
+                    "  └─ "
+                } else {
+                    "  ├─ "
+                };
+                let short_id = child.id[..child.id.len().min(16)].to_string();
+                let msg_count = format!(" {} msgs", child.message_count);
+                let token_str = format!(" {}", Self::format_tokens(child.total_tokens));
+                let model_hint = child
+                    .models_used
+                    .first()
+                    .map(|m| format!(" [{}]", Self::shorten_model_name(m)))
+                    .unwrap_or_default();
+                lines.push(Line::from(vec![
+                    Span::styled(connector, Style::default().fg(p.muted)),
+                    Span::styled(short_id, Style::default().fg(p.focus)),
+                    Span::styled(msg_count, Style::default().fg(p.muted)),
+                    Span::styled(token_str, Style::default().fg(p.warning)),
+                    Span::styled(model_hint, Style::default().fg(p.important)),
+                ]));
+            }
+            if child_count > 5 {
+                lines.push(Line::from(vec![Span::styled(
+                    format!("  … and {} more", child_count - 5),
+                    Style::default().fg(p.muted),
+                )]));
+            }
+        }
+
+        lines.push(Line::from(""));
 
         // Model switching timeline
         if !session.model_segments.is_empty() {

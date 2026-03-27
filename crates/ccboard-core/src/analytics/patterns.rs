@@ -332,6 +332,7 @@ mod tests {
             file_size_bytes: 256,
             first_user_message: None,
             has_subagents: false,
+            parent_session_id: None,
             duration_seconds: Some(10),
             branch: None,
             tool_usage: std::collections::HashMap::new(),

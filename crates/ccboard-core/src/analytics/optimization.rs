@@ -313,6 +313,7 @@ mod tests {
             file_size_bytes: 1024,
             first_user_message: None,
             has_subagents: false,
+            parent_session_id: None,
             duration_seconds: Some(60),
             branch: None,
             tool_usage,

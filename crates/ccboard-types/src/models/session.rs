@@ -176,6 +176,10 @@ pub struct SessionMetadata {
     /// Whether this session spawned subagents
     pub has_subagents: bool,
 
+    /// Parent session ID if this session is a subagent (derived from JSONL parentSessionId field)
+    #[serde(default)]
+    pub parent_session_id: Option<String>,
+
     /// Duration in seconds (from summary)
     pub duration_seconds: Option<u64>,
 
@@ -220,6 +224,7 @@ impl SessionMetadata {
             file_size_bytes,
             first_user_message: None,
             has_subagents: false,
+            parent_session_id: None,
             duration_seconds: None,
             branch: None,
             tool_usage: std::collections::HashMap::new(),

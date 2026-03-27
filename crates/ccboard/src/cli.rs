@@ -502,6 +502,7 @@ mod tests {
             file_size_bytes: 1024,
             first_user_message: Some("Test message".to_string()),
             has_subagents: false,
+            parent_session_id: None,
             duration_seconds: Some(1800),
             branch: Some("main".to_string()),
             tool_usage: std::collections::HashMap::new(),
