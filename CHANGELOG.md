@@ -5,6 +5,16 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-03-27
+
+### Added
+
+- **Agents — Real Invocation Counts** (QW1): Agents and tools used in sessions but without local frontmatter files are now discovered automatically and shown in the Agents/Capabilities tab with a real invocation count. Previously all entries showed `0`. Discovered entries display `"Discovered from sessions"` as description. Unlocks dead plugin detection — any agent with count 0 is truly unused.
+- **Sessions — Replay Complexity Warning** (QW6): Opening a session with ≥2000 total tool calls now shows a "High Complexity Session" modal before loading the replay viewer. Prevents accidental freezes on very large sessions. `[Enter]` or `y` to confirm loading, any other key cancels. Threshold is based on the `tool_usage` count sum already stored in `SessionMetadata`.
+- **Analytics — Configurable Anomaly Thresholds** (QW7): Anomaly detection thresholds are now configurable via `anomalyThresholds` in `settings.json`. Supported keys: `warningZScore` (default 2.0), `criticalZScore` (default 3.0), `spike2x` (default 2.0), `spike3x` (default 3.0), `minSessions` (default 10). Active thresholds are shown in the Analytics → Anomalies sub-tab with a `[custom]` badge when non-default values are active.
+
+---
+
 ## [0.18.0] - 2026-03-27
 
 ### Added

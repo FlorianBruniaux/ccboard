@@ -25,7 +25,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Solution**: Aggregate counts from existing `InvocationStats` → display in Tools tab.
 **Files**: `ccboard-core/src/analytics/invocations.rs`, `ccboard-tui/src/tabs/agents.rs`
 **Impact**: Unlocks dead plugin detection + `ccboard export recommendations` cleanup.
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.19.0 (session stats cross-indexed; agents/tools without local files appear as "Discovered from sessions" entries with real invocation counts)
 
 ---
 
@@ -65,15 +65,15 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: Opening a session with 5000+ tool calls can freeze the viewer. No pre-flight warning.
 **Solution**: Complexity score (tool call count) in SessionMetadata → warning modal before loading.
 **Files**: `ccboard-tui/src/tabs/sessions.rs`, `ccboard-core/src/models/session.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.19.0 (≥2000 tool calls shows "High Complexity Session" modal; `[Enter/y]` to confirm, any other key cancels; uses existing `tool_usage` map sum)
 
 ---
 
 ### QW7 · Configurable Anomaly Thresholds
 **Problem**: Anomaly detection hardcoded (2x spike, 3-sigma outlier). Doesn't fit all usage patterns.
-**Solution**: `anomaly_config` section in `settings.json` + TUI modal for live adjustment.
+**Solution**: `anomalyThresholds` section in `settings.json` → read at compute time, shown in Analytics Anomalies sub-tab.
 **Files**: `ccboard-core/src/analytics/anomalies.rs`, `ccboard-core/src/models/config.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.19.0 (`AnomalyThresholds` in `settings.json`; active thresholds shown in Analytics with `[custom]` badge when non-default)
 
 ---
 
@@ -215,10 +215,12 @@ These don't add features but improve reliability and maintainability across the 
   MF6  Subagent graph            ✅
   SF4  LLM summaries             ✅
 
-Sprint 3 (v0.19.x) — candidates:
-  QW1  Invocation counts         ← unblocks dead plugin detection
-  QW6  Session replay warning    ← safety UX
-  QW7  Configurable thresholds   ← low risk, user-requested pattern
+✅ Sprint 3 (v0.19.0) — DONE:
+  QW1  Invocation counts         ✅
+  QW6  Session replay warning    ✅
+  QW7  Configurable thresholds   ✅
+
+Sprint 4 (v0.20.x) — candidates:
   MF1  Per-tool cost attribution  ← highest analytics impact
   MF3  MCP health dashboard       ← differentiator vs competitors
   MF9  TUI test coverage          ← quality infrastructure
