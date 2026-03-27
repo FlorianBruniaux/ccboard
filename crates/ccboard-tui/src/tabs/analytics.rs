@@ -1530,12 +1530,43 @@ impl AnalyticsTab {
         let anomalies = &data.anomalies;
         let daily_spikes = &data.daily_spikes;
         let session_count = data.sessions_in_period;
+        let thresholds = &data.anomaly_thresholds;
 
-        // Split area: daily cost spikes panel (top) + session anomaly table (bottom)
+        // Split area: thresholds hint (1 line) + daily cost spikes (6 lines) + anomaly table (rest)
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(6), Constraint::Min(0)])
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(6),
+                Constraint::Min(0),
+            ])
             .split(area);
+
+        // Render active thresholds hint
+        let is_custom = thresholds.warning_z_score != 2.0
+            || thresholds.critical_z_score != 3.0
+            || thresholds.spike_2x != 2.0
+            || thresholds.spike_3x != 3.0;
+        let hint_style = if is_custom {
+            Style::default().fg(p.important)
+        } else {
+            Style::default().fg(p.muted)
+        };
+        let hint = format!(
+            " Thresholds: warn >{:.1}σ  crit >{:.1}σ  spike ≥{:.1}x/≥{:.1}x  min {} sessions{}",
+            thresholds.warning_z_score,
+            thresholds.critical_z_score,
+            thresholds.spike_2x,
+            thresholds.spike_3x,
+            thresholds.min_sessions,
+            if is_custom { "  [custom]" } else { "" },
+        );
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(Line::from(Span::styled(hint, hint_style))),
+            chunks[0],
+        );
+
+        let chunks = &chunks[1..];
 
         // Render daily cost spikes panel
         {

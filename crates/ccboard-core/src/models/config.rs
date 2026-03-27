@@ -62,6 +62,10 @@ pub struct Settings {
     #[serde(default)]
     pub keybindings: Option<HashMap<String, String>>,
 
+    /// Anomaly detection thresholds (optional overrides)
+    #[serde(default)]
+    pub anomaly_thresholds: Option<AnomalyThresholds>,
+
     /// Additional untyped fields
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
@@ -89,6 +93,68 @@ fn default_warning_threshold() -> f64 {
 
 fn default_critical_threshold() -> f64 {
     90.0
+}
+
+/// Configurable thresholds for anomaly detection.
+///
+/// Add an `"anomalyThresholds"` object to `settings.json` to override defaults:
+/// ```json
+/// {
+///   "anomalyThresholds": {
+///     "warningZScore": 2.0,
+///     "criticalZScore": 3.0,
+///     "spike2x": 2.0,
+///     "spike3x": 3.0,
+///     "minSessions": 10
+///   }
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnomalyThresholds {
+    /// Z-score for warning severity (default: 2.0)
+    #[serde(default = "default_anomaly_warning_z")]
+    pub warning_z_score: f64,
+    /// Z-score for critical severity (default: 3.0)
+    #[serde(default = "default_anomaly_critical_z")]
+    pub critical_z_score: f64,
+    /// Daily cost spike ratio for warning (default: 2.0 = 2x average)
+    #[serde(default = "default_spike_2x")]
+    pub spike_2x: f64,
+    /// Daily cost spike ratio for critical (default: 3.0 = 3x average)
+    #[serde(default = "default_spike_3x")]
+    pub spike_3x: f64,
+    /// Minimum sessions required before anomaly detection kicks in (default: 10)
+    #[serde(default = "default_min_sessions")]
+    pub min_sessions: usize,
+}
+
+impl Default for AnomalyThresholds {
+    fn default() -> Self {
+        Self {
+            warning_z_score: default_anomaly_warning_z(),
+            critical_z_score: default_anomaly_critical_z(),
+            spike_2x: default_spike_2x(),
+            spike_3x: default_spike_3x(),
+            min_sessions: default_min_sessions(),
+        }
+    }
+}
+
+fn default_anomaly_warning_z() -> f64 {
+    2.0
+}
+fn default_anomaly_critical_z() -> f64 {
+    3.0
+}
+fn default_spike_2x() -> f64 {
+    2.0
+}
+fn default_spike_3x() -> f64 {
+    3.0
+}
+fn default_min_sessions() -> usize {
+    10
 }
 
 impl Settings {

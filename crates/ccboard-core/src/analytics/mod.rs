@@ -6,6 +6,7 @@
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
+use crate::models::config::AnomalyThresholds;
 use crate::models::session::SessionMetadata;
 
 pub mod anomalies;
@@ -113,6 +114,8 @@ pub struct AnalyticsData {
     pub computed_at: DateTime<Utc>,
     /// Period analyzed
     pub period: Period,
+    /// Effective anomaly thresholds used for this computation
+    pub anomaly_thresholds: AnomalyThresholds,
 }
 
 impl AnalyticsData {
@@ -124,6 +127,23 @@ impl AnalyticsData {
     /// # Performance
     /// Target: <100ms for 1000 sessions over 30 days
     pub fn compute(sessions: &[Arc<SessionMetadata>], period: Period) -> Self {
+        Self::compute_inner(sessions, period, &AnomalyThresholds::default())
+    }
+
+    /// Compute analytics using custom anomaly thresholds from settings.json.
+    pub fn compute_with_thresholds(
+        sessions: &[Arc<SessionMetadata>],
+        period: Period,
+        thresholds: &AnomalyThresholds,
+    ) -> Self {
+        Self::compute_inner(sessions, period, thresholds)
+    }
+
+    fn compute_inner(
+        sessions: &[Arc<SessionMetadata>],
+        period: Period,
+        thresholds: &AnomalyThresholds,
+    ) -> Self {
         use chrono::Local;
 
         let trends = compute_trends(sessions, period.days());
@@ -131,7 +151,6 @@ impl AnalyticsData {
         let patterns = detect_patterns(sessions, period.days());
         let insights = generate_insights(&trends, &patterns, &forecast);
 
-        // Filter sessions to the period for anomaly detection
         let cutoff = Local::now() - chrono::Duration::days(period.days() as i64);
         let period_sessions: Vec<Arc<SessionMetadata>> = sessions
             .iter()
@@ -144,9 +163,10 @@ impl AnalyticsData {
             .collect();
 
         let sessions_in_period = period_sessions.len();
-        let anomalies_detected = anomalies::detect_anomalies(&period_sessions);
+        let anomalies_detected =
+            anomalies::detect_anomalies_with_thresholds(&period_sessions, thresholds);
         let daily_spikes_detected =
-            anomalies::detect_daily_cost_spikes(&period_sessions, period.days());
+            anomalies::detect_daily_cost_spikes_with_thresholds(&period_sessions, period.days(), thresholds);
 
         // Aggregate per-tool token usage across all sessions
         let mut aggregated_tool_tokens: std::collections::HashMap<String, u64> =
@@ -192,6 +212,7 @@ impl AnalyticsData {
             sessions_in_period,
             computed_at: Utc::now(),
             period,
+            anomaly_thresholds: thresholds.clone(),
         }
     }
 
@@ -214,6 +235,7 @@ impl AnalyticsData {
             sessions_in_period: sessions.len(),
             computed_at: Utc::now(),
             period,
+            anomaly_thresholds: AnomalyThresholds::default(),
         }
     }
 }

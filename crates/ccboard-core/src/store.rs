@@ -605,9 +605,19 @@ impl DataStore {
             "compute_analytics() ENTRY"
         );
 
+        // Pick up custom anomaly thresholds from merged settings (if configured)
+        let thresholds = self
+            .settings()
+            .global
+            .as_ref()
+            .and_then(|s| s.anomaly_thresholds.clone())
+            .unwrap_or_default();
+
         // Offload to blocking task for CPU-intensive computation
-        let analytics =
-            tokio::task::spawn_blocking(move || AnalyticsData::compute(&sessions, period)).await;
+        let analytics = tokio::task::spawn_blocking(move || {
+            AnalyticsData::compute_with_thresholds(&sessions, period, &thresholds)
+        })
+        .await;
 
         match analytics {
             Ok(data) => {

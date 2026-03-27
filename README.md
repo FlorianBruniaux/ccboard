@@ -3,6 +3,7 @@
 **A free, open-source TUI/Web dashboard for Claude Code session monitoring, cost tracking & config management**
 <p align="center">
   <a href="https://github.com/FlorianBruniaux/ccboard/stargazers"><img src="https://img.shields.io/github/stars/FlorianBruniaux/ccboard?style=for-the-badge" alt="GitHub stars"/></a>
+  <a href="https://starmapper.bruniaux.com/FlorianBruniaux/ccboard"><img src="https://starmapper.bruniaux.com/api/badge/FlorianBruniaux/ccboard" alt="StarMapper"/></a>
   <a href="https://crates.io/crates/ccboard"><img src="https://img.shields.io/crates/v/ccboard?style=for-the-badge&logo=rust" alt="crates.io"/></a>
   <a href="https://crates.io/crates/ccboard"><img src="https://img.shields.io/crates/d/ccboard?style=for-the-badge" alt="Downloads"/></a>
 </p>
@@ -65,6 +66,20 @@
 ### Hook-Based Live Monitoring
 
 Run `ccboard setup` once to inject hooks into `~/.claude/settings.json`. After that, ccboard tracks every Claude session in real time — which session is running, which is waiting for your permission, which just finished — visible in the Sessions tab with ●/◐/✓ indicators and macOS notifications.
+
+---
+
+## StarMapper
+
+<p align="center">
+  <a href="https://starmapper.bruniaux.com/FlorianBruniaux/ccboard">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://starmapper.bruniaux.com/api/map-image/FlorianBruniaux/ccboard?theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://starmapper.bruniaux.com/api/map-image/FlorianBruniaux/ccboard?theme=light" />
+      <img alt="StarMapper — see who stars this repo on a world map" src="https://starmapper.bruniaux.com/api/map-image/FlorianBruniaux/ccboard" />
+    </picture>
+  </a>
+</p>
 
 ---
 

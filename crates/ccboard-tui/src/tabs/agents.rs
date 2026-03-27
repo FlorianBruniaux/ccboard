@@ -21,7 +21,7 @@ pub struct AgentEntry {
     pub file_path: String,
     pub description: Option<String>,
     pub entry_type: AgentType,
-    /// Number of times this agent/command/skill has been invoked (TODO: implement counting)
+    /// Number of times this agent/command/skill has been invoked across all sessions
     pub invocation_count: usize,
 }
 
@@ -139,21 +139,67 @@ impl AgentsTab {
 
     /// Update invocation counts from stats and sort by usage
     pub fn update_invocation_counts(&mut self, stats: &ccboard_core::models::InvocationStats) {
-        // Update agent counts
+        // Update counts for entries that have local frontmatter files
         for agent in &mut self.agents {
             agent.invocation_count = stats.agents.get(&agent.name).copied().unwrap_or(0);
         }
-
-        // Update command counts (need to add / prefix for matching)
         for command in &mut self.commands {
             let key = format!("/{}", command.name);
             command.invocation_count = stats.commands.get(&key).copied().unwrap_or(0);
         }
-
-        // Update skill counts
         for skill in &mut self.skills {
             skill.invocation_count = stats.skills.get(&skill.name).copied().unwrap_or(0);
         }
+
+        // Add entries discovered from sessions that have no local frontmatter file.
+        // Collect new entries first (borrow checker: can't borrow self.* mutably while iterating it).
+        let known_agents: std::collections::HashSet<String> =
+            self.agents.iter().map(|a| a.name.clone()).collect();
+        let new_agents: Vec<AgentEntry> = stats
+            .agents
+            .iter()
+            .filter(|(name, &count)| !known_agents.contains(*name) && count > 0)
+            .map(|(name, &count)| AgentEntry {
+                name: name.clone(),
+                file_path: String::new(),
+                description: Some("Discovered from sessions".to_string()),
+                entry_type: AgentType::Agent,
+                invocation_count: count,
+            })
+            .collect();
+        self.agents.extend(new_agents);
+
+        let known_commands: std::collections::HashSet<String> =
+            self.commands.iter().map(|c| format!("/{}", c.name)).collect();
+        let new_commands: Vec<AgentEntry> = stats
+            .commands
+            .iter()
+            .filter(|(key, &count)| !known_commands.contains(*key) && count > 0)
+            .map(|(key, &count)| AgentEntry {
+                name: key.strip_prefix('/').unwrap_or(key).to_string(),
+                file_path: String::new(),
+                description: Some("Discovered from sessions".to_string()),
+                entry_type: AgentType::Command,
+                invocation_count: count,
+            })
+            .collect();
+        self.commands.extend(new_commands);
+
+        let known_skills: std::collections::HashSet<String> =
+            self.skills.iter().map(|s| s.name.clone()).collect();
+        let new_skills: Vec<AgentEntry> = stats
+            .skills
+            .iter()
+            .filter(|(name, &count)| !known_skills.contains(*name) && count > 0)
+            .map(|(name, &count)| AgentEntry {
+                name: name.clone(),
+                file_path: String::new(),
+                description: Some("Discovered from sessions".to_string()),
+                entry_type: AgentType::Skill,
+                invocation_count: count,
+            })
+            .collect();
+        self.skills.extend(new_skills);
 
         // Sort by usage (descending), then by name (ascending) as tie-breaker
         self.agents.sort_by(|a, b| {

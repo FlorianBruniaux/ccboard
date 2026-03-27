@@ -170,6 +170,10 @@ pub struct SessionsTab {
 
     /// When true, only bookmarked sessions are shown
     show_bookmarks_only: bool,
+    /// Pending high-complexity session: (file_path, total_tool_calls).
+    /// Set when user tries to open a session above the complexity threshold.
+    /// Awaits [Enter] to confirm load or [Esc]/[n] to cancel.
+    complexity_warning: Option<(std::path::PathBuf, usize)>,
 }
 
 impl Default for SessionsTab {
@@ -218,6 +222,7 @@ impl SessionsTab {
             prev_session_count: 0,
             pending_gg: false,
             show_bookmarks_only: false,
+            complexity_warning: None,
         }
     }
 
@@ -232,6 +237,43 @@ impl SessionsTab {
         self.show_replay
     }
 
+    /// Try to open the replay viewer for a session file.
+    ///
+    /// If the session has more than COMPLEXITY_THRESHOLD tool calls, sets
+    /// `complexity_warning` instead of loading immediately, so the user can
+    /// confirm before the TUI potentially freezes.
+    fn try_open_replay(&mut self, path: std::path::PathBuf, tool_calls: usize) {
+        const COMPLEXITY_THRESHOLD: usize = 2_000;
+        if tool_calls >= COMPLEXITY_THRESHOLD {
+            self.complexity_warning = Some((path, tool_calls));
+            return;
+        }
+        self.do_open_replay(path);
+    }
+
+    /// Unconditionally load and open the replay viewer for a session file.
+    fn do_open_replay(&mut self, path: std::path::PathBuf) {
+        match tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(SessionContentParser::parse_session_lines(&path))
+        }) {
+            Ok(mut messages) => {
+                messages = SessionContentParser::filter_messages(messages);
+                let last = messages.len().saturating_sub(1);
+                self.replay_messages = messages;
+                self.replay_scroll.select(Some(last));
+                self.replay_expanded.clear();
+                self.replay_search_query.clear();
+                self.replay_search_hits.clear();
+                self.replay_search_hit_idx = 0;
+                self.show_replay = true;
+            }
+            Err(e) => {
+                self.error_message = Some(format!("Failed to load session: {}", e));
+            }
+        }
+    }
+
     /// Handle key input for this tab
     pub fn handle_key(
         &mut self,
@@ -239,6 +281,22 @@ impl SessionsTab {
         _sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
     ) {
         use crossterm::event::KeyCode;
+
+        // Complexity warning popup has top priority — intercept all keys
+        if self.complexity_warning.is_some() {
+            match key {
+                KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    if let Some((path, _)) = self.complexity_warning.take() {
+                        self.do_open_replay(path);
+                    }
+                }
+                _ => {
+                    // Any other key (Esc, n, q, …) cancels the warning
+                    self.complexity_warning = None;
+                }
+            }
+            return;
+        }
 
         // Replay search mode has priority when replay is open
         if self.replay_search_active {
@@ -350,32 +408,15 @@ impl SessionsTab {
                 // Open replay for the first waiting session (shortcut from anywhere)
                 if !self.show_replay {
                     if let Some(session) = self.waiting_sessions_cache.first() {
-                        let file_path = session.session_id.as_ref().and_then(|sid| {
+                        let found = session.session_id.as_ref().and_then(|sid| {
                             _sessions_by_project
                                 .values()
                                 .flat_map(|v| v.iter())
                                 .find(|s| s.id == *sid)
-                                .map(|s| s.file_path.clone())
+                                .map(|s| (s.file_path.clone(), s.tool_usage.values().sum::<usize>()))
                         });
-                        if let Some(path) = file_path {
-                            match tokio::task::block_in_place(|| {
-                                tokio::runtime::Handle::current().block_on(
-                                    SessionContentParser::parse_session_lines(&path),
-                                )
-                            }) {
-                                Ok(mut messages) => {
-                                    messages = SessionContentParser::filter_messages(messages);
-                                    self.replay_messages = messages;
-                                    let last = self.replay_messages.len().saturating_sub(1);
-                                    self.replay_scroll.select(Some(last));
-                                    self.replay_expanded.clear();
-                                    self.show_replay = true;
-                                }
-                                Err(e) => {
-                                    self.error_message =
-                                        Some(format!("Failed to load session: {}", e));
-                                }
-                            }
+                        if let Some((path, tool_calls)) = found {
+                            self.try_open_replay(path, tool_calls);
                         } else {
                             self.error_message =
                                 Some("Session file not found in history".to_string());
@@ -421,24 +462,9 @@ impl SessionsTab {
                 // Toggle replay viewer for selected session (works from Sessions pane)
                 if self.focus == 2 && !self.show_replay {
                     if let Some(session) = self.get_selected_session(_sessions_by_project) {
-                        // Use block_in_place to safely block within existing runtime
                         let path = session.file_path.clone();
-                        match tokio::task::block_in_place(|| {
-                            tokio::runtime::Handle::current()
-                                .block_on(SessionContentParser::parse_session_lines(&path))
-                        }) {
-                            Ok(mut messages) => {
-                                // Filter to only user/assistant/tool messages
-                                messages = SessionContentParser::filter_messages(messages);
-                                self.replay_messages = messages;
-                                self.replay_scroll.select(Some(0));
-                                self.replay_expanded.clear();
-                                self.show_replay = true;
-                            }
-                            Err(e) => {
-                                self.error_message = Some(format!("Failed to load session: {}", e));
-                            }
-                        }
+                        let tool_calls: usize = session.tool_usage.values().sum();
+                        self.try_open_replay(path, tool_calls);
                     }
                 }
             }
@@ -1015,6 +1041,11 @@ impl SessionsTab {
 
         // Render keyboard hints at bottom
         self.render_keyboard_hints(frame, area, &p);
+
+        // Render complexity warning popup if present
+        if self.complexity_warning.is_some() {
+            self.render_complexity_warning_popup(frame, area, &p);
+        }
 
         // Render error popup if present
         if self.error_message.is_some() {
@@ -2560,6 +2591,56 @@ impl SessionsTab {
             }
         }
         String::new()
+    }
+
+    fn render_complexity_warning_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
+        let Some((_, tool_calls)) = &self.complexity_warning else {
+            return;
+        };
+
+        let popup_width = (area.width as f32 * 0.5).max(50.0) as u16;
+        let popup_height = 9_u16;
+        let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+        let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+        let popup_area = Rect {
+            x: area.x + popup_x,
+            y: area.y + popup_y,
+            width: popup_width,
+            height: popup_height,
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(p.warning))
+            .title(Span::styled(
+                " High Complexity Session ",
+                Style::default().fg(p.warning).bold(),
+            ));
+
+        let inner = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+
+        let lines = vec![
+            Line::from(Span::styled(
+                format!("This session has {} tool calls.", tool_calls),
+                Style::default().fg(p.fg),
+            )),
+            Line::from(Span::styled(
+                "Loading may take a few seconds.",
+                Style::default().fg(p.muted),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("[Enter/y]", Style::default().fg(p.success).bold()),
+                Span::styled(" Load anyway  ", Style::default().fg(p.fg)),
+                Span::styled("[Esc/n]", Style::default().fg(p.error).bold()),
+                Span::styled(" Cancel", Style::default().fg(p.fg)),
+            ]),
+        ];
+
+        let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(paragraph, inner);
     }
 
     fn render_error_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {

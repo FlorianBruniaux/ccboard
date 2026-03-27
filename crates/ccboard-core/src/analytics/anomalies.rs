@@ -3,6 +3,7 @@
 //! Uses Z-score based statistical analysis to flag sessions that deviate
 //! significantly from normal behavior patterns.
 
+use crate::models::config::AnomalyThresholds;
 use crate::models::session::{SessionId, SessionMetadata};
 use chrono::{Local, NaiveDate};
 use std::collections::BTreeMap;
@@ -151,11 +152,15 @@ impl Statistics {
 /// # Returns
 /// Vec of anomalies sorted by severity (critical first), then by z-score (descending)
 pub fn detect_anomalies(sessions: &[Arc<SessionMetadata>]) -> Vec<Anomaly> {
-    const MIN_SESSIONS: usize = 10;
-    const WARNING_THRESHOLD: f64 = 2.0;
-    const CRITICAL_THRESHOLD: f64 = 3.0;
+    detect_anomalies_with_thresholds(sessions, &AnomalyThresholds::default())
+}
 
-    if sessions.len() < MIN_SESSIONS {
+/// Same as [`detect_anomalies`] but uses caller-supplied thresholds.
+pub fn detect_anomalies_with_thresholds(
+    sessions: &[Arc<SessionMetadata>],
+    thresholds: &AnomalyThresholds,
+) -> Vec<Anomaly> {
+    if sessions.len() < thresholds.min_sessions {
         return vec![];
     }
 
@@ -172,8 +177,8 @@ pub fn detect_anomalies(sessions: &[Arc<SessionMetadata>]) -> Vec<Anomaly> {
                 let z_score = stats.z_score(value);
                 let abs_z = z_score.abs();
 
-                if abs_z > WARNING_THRESHOLD {
-                    let severity = if abs_z > CRITICAL_THRESHOLD {
+                if abs_z > thresholds.warning_z_score {
+                    let severity = if abs_z > thresholds.critical_z_score {
                         AnomalySeverity::Critical
                     } else {
                         AnomalySeverity::Warning
@@ -255,9 +260,18 @@ pub fn detect_daily_cost_spikes(
     sessions: &[Arc<SessionMetadata>],
     window_days: usize,
 ) -> Vec<DailyCostAnomaly> {
+    detect_daily_cost_spikes_with_thresholds(sessions, window_days, &AnomalyThresholds::default())
+}
+
+/// Same as [`detect_daily_cost_spikes`] but uses caller-supplied thresholds.
+pub fn detect_daily_cost_spikes_with_thresholds(
+    sessions: &[Arc<SessionMetadata>],
+    window_days: usize,
+    thresholds: &AnomalyThresholds,
+) -> Vec<DailyCostAnomaly> {
     const MIN_DAYS: usize = 7;
-    const SPIKE_2X: f64 = 2.0;
-    const SPIKE_3X: f64 = 3.0;
+    let spike_2x = thresholds.spike_2x;
+    let spike_3x = thresholds.spike_3x;
     // Rough cost estimate: $0.01 per 1K tokens
     const COST_PER_1K_TOKENS: f64 = 0.01;
 
@@ -294,8 +308,8 @@ pub fn detect_daily_cost_spikes(
         .iter()
         .filter_map(|(date, &cost)| {
             let ratio = cost / stats.mean;
-            if ratio >= SPIKE_2X {
-                let severity = if ratio >= SPIKE_3X {
+            if ratio >= spike_2x {
+                let severity = if ratio >= spike_3x {
                     AnomalySeverity::Critical
                 } else {
                     AnomalySeverity::Warning
