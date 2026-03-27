@@ -210,6 +210,9 @@ Three-pane layout: project tree on the left, session list in the middle, detail 
 | `j` / `k` | Move up/down in the focused pane |
 | `Enter` | Open conversation viewer for selected session |
 | `/` | Filter sessions by text |
+| `b` | Toggle bookmark on the selected session |
+| `B` | Toggle "bookmarked only" filter (show `★` sessions only) |
+| `s` | Cycle sort mode (newest / oldest / tokens / duration / messages) |
 
 **Session status indicators:**
 
@@ -218,16 +221,33 @@ Three-pane layout: project tree on the left, session list in the middle, detail 
 | `●` | Running (active Claude process) |
 | `◐` | Waiting for input / permission |
 | `✓` | Completed |
+| `★` | Bookmarked |
 
 Live status requires `ccboard setup` (see [Live session monitoring](#live-session-monitoring)).
 
 **Detail panel** shows:
 - Session ID, timestamps, duration
 - Token counts (input / output / cache read / cache write)
-- Model used
-- Message count
+- Model switching timeline: `Opus 4.5 (8) → Sonnet 4.6 (15)` (computed at scan time)
+- Message count, file size
+- Subagent tree: `⤵ Subagents (N): X tokens total` with per-child breakdown; or `⤴ Subagent of: <parent_id>` for child sessions
+- Bookmark tag and note (if bookmarked)
+- AI Summary section (if cached via `ccboard summarize <id>`)
+- First user message preview
 - CPU / RAM usage for live sessions
 - Session type: CLI, IDE, or Agent
+
+**Bookmarks** persist to `~/.ccboard/bookmarks.json`. Each bookmark stores a tag (label), an optional note, and the creation date. Bookmarks survive restarts and are independent of Claude Code's own data.
+
+**AI Summaries** are generated on demand:
+
+```bash
+ccboard summarize <session-id>           # Generate and cache
+ccboard summarize <session-id> --force   # Regenerate
+ccboard summarize <session-id> --model claude-haiku-4-5  # Faster/cheaper model
+```
+
+Once cached to `~/.ccboard/summaries/<id>.md`, the summary appears automatically in the detail panel.
 
 **Conversation viewer** opens when you press `Enter` on a session. See [Conversation viewer](#conversation-viewer) for full details.
 

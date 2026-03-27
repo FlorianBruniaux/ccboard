@@ -1,7 +1,7 @@
 # ccboard Roadmap
 
-**Last Updated**: 2026-03-24
-**Current Version**: v0.17.0
+**Last Updated**: 2026-03-27
+**Current Version**: v0.18.0
 **Target**: v1.0.0 (Phases L + N complete)
 
 ---
@@ -18,7 +18,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-## 📍 Current Status (v0.17.0)
+## 📍 Current Status (v0.18.0)
 
 ### ✅ Production Features
 
@@ -28,6 +28,16 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 - **Activity** — security audit, violations feed, on-demand session analysis, batch scan (4 concurrent)
 - **Search** — FTS5 full-text search with date, message count, detail pane, search-as-you-type
 - **Visual redesign (v0.16.0)**: palette system, rounded borders, responsive heatmap, sub-tabs
+
+**Session Intelligence (v0.18.0)** ✅:
+- **Bookmarks** — `b` toggles, `B` filters to starred only, persisted to `~/.ccboard/bookmarks.json`
+- **Subagent graph** — parent/child tree in Sessions detail pane with token/msg breakdown; `has_subagents` backfilled at load via cross-reference; `subagent_children()` DataStore API
+- **LLM summaries** — `ccboard summarize <id>` via `claude --print`, cached to `~/.ccboard/summaries/`, shown in detail pane
+- **Model switching timeline** — `Opus 4.5 (8) → Sonnet 4.6 (15)` computed inline during JSONL scan
+- **Context saturation trend** — linear regression predicts sessions until 85% breach
+- **Hook state TTL** — stale Running/WaitingInput sessions pruned after 10 min
+- **Settings hot-reload toast** — "Settings reloaded" info toast on settings.json change
+- 472 tests passing, 0 clippy warnings
 
 **Live Session Monitoring** (v0.14.0):
 - `ccboard hook <EventName>` ingests Claude Code hook JSON, updates `~/.ccboard/live-sessions.json` with file locking + atomic save
@@ -51,9 +61,8 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 **Waiting Answers Panel + Max 20x tip (v0.17.0)**:
 - Sessions tab: "Waiting Answers" panel showing sessions pending user input (WaitingInput status)
 - Dashboard: Max 20x plan cost tip surfaced automatically
-- 458 tests passing, 0 clippy warnings
 
-**Bug Fixes & Polish (v0.16.0 → v0.16.4)**:
+**Bug Fixes & Polish (v0.16.0 → v0.16.5)**:
 - TUI keybindings `?` / `:` fixed on macOS (KeyModifiers::NONE vs SHIFT)
 - Web Activity + Analytics Tools pages fully styled (440+ CSS lines added)
 - Web session tooltip positioning fixed (invalid HTML in `<tr>` → `<td>`)
@@ -65,7 +74,7 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 **Performance**:
 - 89x faster startup (SQLite cache: 20s → 33ms)
 - 50x memory reduction (Arc migration: 1.4GB → 28MB)
-- 458 tests passing, 0 clippy warnings
+- 472 tests passing, 0 clippy warnings
 
 **`ccboard discover`** (v0.12.0):
 - Analyzes session history to suggest CLAUDE.md rules, skills, or commands

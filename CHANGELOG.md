@@ -5,6 +5,25 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-03-27
+
+### Added
+
+- **Sessions — Bookmarks** (`b` to toggle, `B` to filter): Tag any session with a short label (e.g. "important", "bug-fix"). Bookmarks persist to `~/.ccboard/bookmarks.json` via atomic write. Bookmarked sessions show a `★` icon in the list; `[B]` toggles a "starred only" filter. Detail pane shows the tag and optional note. `BookmarkStore` API: upsert, remove, toggle, is\_bookmarked, all persistent across restarts.
+- **Sessions — Subagent Session Graph** (MF6): Sessions that spawned subagents now show a tree in the detail pane — `⤵ Subagents (N): X tokens total` with per-child breakdown (msg count, tokens, model). Child sessions show `⤴ Subagent of: <parent_id>`. `parent_session_id` captured from JSONL `parentSessionId` field during metadata scan; `has_subagents` backfilled at load time via cross-reference. `DataStore::subagent_children(id)` API for tree queries.
+- **Sessions — LLM Summaries** (`ccboard summarize <id>`): Generate an AI summary of any session via `claude --print`. Cached to `~/.ccboard/summaries/<id>.md` + metadata JSON (atomic write). Sessions detail pane shows the cached summary under "AI Summary:" header, or a hint to run `ccboard summarize <id>` if not yet generated. `--force` flag regenerates; `--model` flag selects model. `SummaryStore` module with load/save/delete/has\_summary API and 3 unit tests.
+- **Sessions — Model Switching Timeline**: Detail pane now shows ordered model segments instead of a flat model list — `Opus 4.5 (8) → Sonnet 4.6 (15)` — computed inline during JSONL metadata scan with zero extra I/O. Falls back to `models_used` for sessions parsed before this version.
+- **Dashboard — Context Saturation Trend**: Context window card subtitle is now dynamic. Linear regression over last N sessions' saturation percentages predicts `↑ ~N sessions` until 85% breach, or `↓ declining` when trend is negative. Flat trend shows `avg 30d`. `ContextWindowStats` gains `trend_slope: f64` and `sessions_until_high: Option<usize>`.
+- **Hook State TTL**: Stale `Running` / `WaitingInput` sessions (no update in >10 min) are now pruned from live session state. Prevents ghost sessions persisting indefinitely after crashes. `prune_stale_running(max_age)` method on `LiveSessionFile`.
+- **Settings Hot-Reload Toast**: Changing `settings.json` while ccboard is running now shows a brief "Settings reloaded" info toast in the TUI. Fixed double `ConfigChanged` publish that was emitting two events per file change.
+
+### Changed
+
+- Sessions detail pane layout reorganized: subagent tree and LLM summary sections added between tool usage and first message.
+- `SessionMetadata` gains two new fields (`model_segments: Vec<(String, usize)>`, `parent_session_id: Option<String>`), both `#[serde(default)]` for backward compatibility with cached metadata.
+
+---
+
 ## [0.17.0] - 2026-03-24
 
 ### Added

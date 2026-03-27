@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-419_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-472_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
   <img src="https://img.shields.io/badge/Clippy-0_warnings-success?style=for-the-badge&logo=rust" alt="Clippy"/>
   <img src="https://img.shields.io/badge/Binary-5.8MB-blue?style=for-the-badge" alt="Binary Size"/>
   <img src="https://img.shields.io/badge/Cache_Speedup-89x-orange?style=for-the-badge&logo=sqlite" alt="Speedup"/>
@@ -25,7 +25,7 @@
   <img src="assets/demo.gif" alt="ccboard demo" width="800"/>
 </p>
 
-> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 383 tests, 0 clippy warnings.
+> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 472 tests, 0 clippy warnings.
 
 ---
 
@@ -36,7 +36,7 @@
 | Tab | Key | Description | Highlights |
 |-----|-----|-------------|------------|
 | **Dashboard** | `1` | Overview stats, model usage, 7-day activity | API usage estimation, plan-based budgets, MCP server count |
-| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), CPU/RAM/Tokens, conversation viewer with regex search |
+| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), bookmarks (`b`/`B`), subagent tree, model timeline, AI summaries (`ccboard summarize`), conversation viewer with regex search |
 | **Analytics** | `3` | Advanced analytics (6 sub-views) | Budget tracking, 30-day forecast, hourly heatmap, anomaly detection, usage patterns |
 | **Costs** | `4` | Token analytics (6 sub-views) | Overview, By Model, Daily, Usage Periods, Top Sessions, Per Project — 4-level budget alerts |
 | **History** | `5` | Chronological session timeline | CSV/JSON/Markdown export (`x`), full-text search |
@@ -57,7 +57,8 @@
 | **UX** | Command palette (`:`), contextual help (`?`), vim keybindings (hjkl), breadcrumbs, scrollbar indicators, Light/Dark mode (`Ctrl+T`, persistent) |
 | **File Operations** | Edit with `$EDITOR` (`e`), reveal in file manager (`o`), cross-platform |
 | **Zero Config** | Works out of the box with `~/.claude`, single 5.8MB binary, macOS/Linux/Windows |
-| **Hook Integration** | `ccboard setup` injects Claude Code hooks, live session status (Running/WaitingInput/Stopped), macOS notification on stop |
+| **Hook Integration** | `ccboard setup` injects Claude Code hooks, live session status (Running/WaitingInput/Stopped), macOS notification on stop, 10-min TTL pruning for stale sessions |
+| **Session Intelligence** | Bookmarks with tags/notes, subagent parent/child tree, model switching timeline, LLM summaries via `ccboard summarize` |
 
 > Missing a feature? [Request it here](https://github.com/FlorianBruniaux/ccboard/issues/new?template=feature_request.yml) | Found a bug? [Report it](https://github.com/FlorianBruniaux/ccboard/issues/new?template=bug_report.yml)
 
@@ -540,6 +541,23 @@ ccboard both --port 3333
 - `/activity` - Security audit & violations feed
 - `/search` - Full-text session search
 
+### Session Summaries
+
+Generate and cache an AI summary of any session using `claude --print`:
+
+```bash
+# Generate summary (cached to ~/.ccboard/summaries/<id>.md)
+ccboard summarize <session-id>
+
+# Regenerate even if cached
+ccboard summarize <session-id> --force
+
+# Use a specific model
+ccboard summarize <session-id> --model claude-haiku-4-5
+```
+
+Once cached, the summary appears automatically in the Sessions detail pane under **AI Summary**. Summaries are plain-text, under 200 words, and cover what was accomplished and key decisions.
+
 ### Discover — Config Optimization
 
 Analyze your session history to surface recurring patterns and suggest what to extract as **CLAUDE.md rules**, **skills**, or **commands**.
@@ -691,6 +709,9 @@ ccboard export conversation <session-id> --output conv.html --format html
 **Sessions**
 - `/` - Search sessions
 - `Enter` - Show session detail
+- `b` - Toggle bookmark on selected session
+- `B` - Toggle "bookmarked only" filter
+- `s` - Cycle sort mode (date/tokens/duration/messages)
 
 **Config**
 - `m` - Show MCP detail modal
