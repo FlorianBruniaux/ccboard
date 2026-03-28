@@ -5,6 +5,23 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-03-28
+
+### Added
+
+- **Analytics — Per-Tool Cost Breakdown** (MF1): New `Costs` sub-tab in Analytics (replaces the previous `Plugins` proxy view). Shows a scrollable table — Tool | Calls | Tokens | % Total | Est. Cost | $/Call — aggregated from period sessions. Rows colored red (≥20% of token budget) and yellow (≥10%) for fast hotspot identification. `j/k` to scroll. `ToolTokenStat` struct added to `AnalyticsData`.
+- **Analytics — Pattern Discovery** (Discover sub-tab): New `Discover` view in Analytics. Press `r` to scan recent session JSONL files, extract recurring user message patterns via n-gram analysis and Jaccard clustering, and surface suggestions categorized as 📋 CLAUDE.md rule, 🧩 Skill, or ⚡ Command with session count and relevance score. Results cached in `DataStore.discover_cache`. Uses existing `discover_patterns()` engine — no API key required.
+- **MCP — Server Usage Stats**: Press `s` in the MCP tab to toggle a usage stats table — Server | Calls | Sessions | Last Seen — aggregated from all analyzed sessions via `DataStore.mcp_call_stats()`. Row coloring: green = used today, default = this week, muted = older or never. `s` or `Esc` to return to the server list. `McpCallStat` struct exported from `ccboard-core`.
+- **TUI Smoke Tests** (MF9): 12 smoke tests added under `ccboard-tui::tests` using `ratatui::backend::TestBackend` (120×40). One test per tab — constructs with `new()`, renders with `None`/empty data, asserts non-empty buffer. Catches render panics on empty state. Total: 492 tests (was 472).
+
+### Changed
+
+- Analytics `Plugins` sub-tab renamed to `Costs` — content replaced with real per-tool cost breakdown table instead of bigram proxy chart.
+- `AnalyticsData` gains `tool_token_stats: Vec<ToolTokenStat>` field (period-scoped aggregation).
+- `DataStore` gains `discover_cache`, `compute_discover()`, and `mcp_call_stats()`.
+
+---
+
 ## [0.19.0] - 2026-03-27
 
 ### Added

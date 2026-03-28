@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-472_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-492_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
   <img src="https://img.shields.io/badge/Clippy-0_warnings-success?style=for-the-badge&logo=rust" alt="Clippy"/>
   <img src="https://img.shields.io/badge/Binary-5.8MB-blue?style=for-the-badge" alt="Binary Size"/>
   <img src="https://img.shields.io/badge/Cache_Speedup-89x-orange?style=for-the-badge&logo=sqlite" alt="Speedup"/>
@@ -26,7 +26,7 @@
   <img src="assets/demo.gif" alt="ccboard demo" width="800"/>
 </p>
 
-> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 472 tests, 0 clippy warnings.
+> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 492 tests, 0 clippy warnings.
 
 ---
 
@@ -38,14 +38,14 @@
 |-----|-----|-------------|------------|
 | **Dashboard** | `1` | Overview stats, model usage, 7-day activity | API usage estimation, plan-based budgets, MCP server count |
 | **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), bookmarks (`b`/`B`), subagent tree, model timeline, AI summaries (`ccboard summarize`), conversation viewer with regex search |
-| **Analytics** | `3` | Advanced analytics (6 sub-views) | Budget tracking, 30-day forecast, hourly heatmap, anomaly detection, usage patterns |
+| **Analytics** | `3` | Advanced analytics (8 sub-views) | Budget tracking, 30-day forecast, hourly heatmap, anomaly detection (configurable thresholds), usage patterns, per-tool cost breakdown, pattern discovery (`r`) |
 | **Costs** | `4` | Token analytics (6 sub-views) | Overview, By Model, Daily, Usage Periods, Top Sessions, Per Project — 4-level budget alerts |
 | **History** | `5` | Chronological session timeline | CSV/JSON/Markdown export (`x`), full-text search |
 | **Audit Log** | `6` | Security audit & violations feed | Credential detection, destructive command alerts, cross-session violations with remediation hints |
-| **MCP** | `7` | MCP server management | Status detection (running/stopped), copy command to clipboard (`y`), env vars masking |
+| **MCP** | `7` | MCP server management | Status detection (running/stopped), copy command to clipboard (`y`), env vars masking, usage stats by server (`s`) |
 | **Config** | `8` | Cascading configuration editor | 4-column diff (default/global/project/local), edit with `e`, reveal in file manager (`o`) |
 | **Hooks** | `9` | Event-based hook management | Bash syntax highlighting, badge indicators |
-| **Tools** | `0` | Agents, commands, and skills browser | Frontmatter YAML parsing, invocation stats |
+| **Tools** | `0` | Agents, commands, and skills browser | Frontmatter YAML parsing, real invocation counts (includes session-discovered agents) |
 | **Plugins** | `p` | Plugin & capability usage analytics | Dead code detection, sort by usage/cost/name |
 | **Search** | `/` | Full-text search across all sessions | FTS5-powered, search-as-you-type (≥2 chars), ranked snippets, opens conversation viewer |
 
