@@ -133,14 +133,19 @@ impl BookmarkStore {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("Failed to create {}", parent.display()))?;
         }
-        let json = serde_json::to_string_pretty(&self.entries)
-            .context("Failed to serialise bookmarks")?;
+        let json =
+            serde_json::to_string_pretty(&self.entries).context("Failed to serialise bookmarks")?;
         // Atomic write: tmp file → rename
         let tmp = self.path.with_extension("json.tmp");
         std::fs::write(&tmp, &json)
             .with_context(|| format!("Failed to write {}", tmp.display()))?;
-        std::fs::rename(&tmp, &self.path)
-            .with_context(|| format!("Failed to rename {} → {}", tmp.display(), self.path.display()))?;
+        std::fs::rename(&tmp, &self.path).with_context(|| {
+            format!(
+                "Failed to rename {} → {}",
+                tmp.display(),
+                self.path.display()
+            )
+        })?;
         Ok(())
     }
 }
@@ -202,7 +207,9 @@ mod tests {
 
         {
             let mut store = BookmarkStore::load(&path).unwrap();
-            store.upsert("sess-persist", "keep", Some("a note".into())).unwrap();
+            store
+                .upsert("sess-persist", "keep", Some("a note".into()))
+                .unwrap();
         }
 
         // Reload from disk

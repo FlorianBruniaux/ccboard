@@ -280,7 +280,11 @@ impl StatsCache {
             let n_f = n as f64;
             let sum_x: f64 = (0..n).map(|i| i as f64).sum();
             let sum_y: f64 = total_pct;
-            let sum_xy: f64 = pct_values.iter().enumerate().map(|(i, &y)| i as f64 * y).sum();
+            let sum_xy: f64 = pct_values
+                .iter()
+                .enumerate()
+                .map(|(i, &y)| i as f64 * y)
+                .sum();
             let sum_x2: f64 = (0..n).map(|i| (i * i) as f64).sum();
             let denom = n_f * sum_x2 - sum_x * sum_x;
             if denom.abs() > f64::EPSILON {
@@ -517,8 +521,7 @@ mod tests {
                     "test".into(),
                 );
                 meta.total_tokens = tokens_for_pct(pct);
-                meta.last_timestamp =
-                    Some(now - chrono::Duration::seconds((4 - i) as i64 * 60));
+                meta.last_timestamp = Some(now - chrono::Duration::seconds((4 - i) as i64 * 60));
                 meta
             })
             .collect();
@@ -556,8 +559,7 @@ mod tests {
                     "test".into(),
                 );
                 meta.total_tokens = tokens;
-                meta.last_timestamp =
-                    Some(now - chrono::Duration::seconds((4 - i) as i64 * 60));
+                meta.last_timestamp = Some(now - chrono::Duration::seconds((4 - i) as i64 * 60));
                 meta
             })
             .collect();

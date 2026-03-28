@@ -516,7 +516,15 @@ impl DashboardTab {
                     est.percent_month(),
                 )
             })
-            .unwrap_or(("Unknown Plan", SubscriptionPlan::default(), 0.0, 0.0, 0.0, None, None));
+            .unwrap_or((
+                "Unknown Plan",
+                SubscriptionPlan::default(),
+                0.0,
+                0.0,
+                0.0,
+                None,
+                None,
+            ));
 
         // Create 3 lines: Today, Week, Month
         let today_line = if let Some(budget) = budget {

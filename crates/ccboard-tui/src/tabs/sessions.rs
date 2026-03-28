@@ -413,7 +413,9 @@ impl SessionsTab {
                                 .values()
                                 .flat_map(|v| v.iter())
                                 .find(|s| s.id == *sid)
-                                .map(|s| (s.file_path.clone(), s.tool_usage.values().sum::<usize>()))
+                                .map(|s| {
+                                    (s.file_path.clone(), s.tool_usage.values().sum::<usize>())
+                                })
                         });
                         if let Some((path, tool_calls)) = found {
                             self.try_open_replay(path, tool_calls);
@@ -852,9 +854,7 @@ impl SessionsTab {
                     // Ignore stale WaitingInput sessions (hook file not cleaned up on exit)
                     // Only show sessions with activity in the last 30 minutes
                     s.last_event_at
-                        .map(|t| {
-                            now_local.signed_duration_since(t).num_minutes().abs() < 30
-                        })
+                        .map(|t| now_local.signed_duration_since(t).num_minutes().abs() < 30)
                         .unwrap_or(false)
                 })
                 .collect();
@@ -866,13 +866,7 @@ impl SessionsTab {
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
                 .split(main_chunks[1]);
-            self.render_live_sessions(
-                frame,
-                live_split[0],
-                live_sessions,
-                self.focus == 0,
-                &p,
-            );
+            self.render_live_sessions(frame, live_split[0], live_sessions, self.focus == 0, &p);
             Self::render_waiting_answers(frame, live_split[1], &waiting, &p);
             2
         } else {
@@ -1263,7 +1257,10 @@ impl SessionsTab {
 
                 let line = Line::from(vec![
                     Span::styled("◐ ", Style::default().fg(Color::Yellow)),
-                    Span::styled(project, Style::default().fg(p.fg).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        project,
+                        Style::default().fg(p.fg).add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(
                         format!("  • idle {}", idle_str),
                         Style::default().fg(p.muted),
@@ -1530,10 +1527,7 @@ impl SessionsTab {
                 // Build preview spans with optional highlighting
                 let mut preview_spans = vec![
                     bookmark_span,
-                    Span::styled(
-                        format!("{} ", if is_selected { "▶" } else { " " }),
-                        style,
-                    ),
+                    Span::styled(format!("{} ", if is_selected { "▶" } else { " " }), style),
                 ];
 
                 // Add project prefix if global search is active
@@ -1730,12 +1724,10 @@ impl SessionsTab {
             }
         }
 
-        lines.extend(vec![
-            Line::from(vec![
-                Span::styled("File Size: ", Style::default().fg(p.muted)),
-                Span::styled(session.size_display(), Style::default().fg(p.fg)),
-            ]),
-        ]);
+        lines.extend(vec![Line::from(vec![
+            Span::styled("File Size: ", Style::default().fg(p.muted)),
+            Span::styled(session.size_display(), Style::default().fg(p.fg)),
+        ])]);
 
         // Subagent tree: show parent link or children list
         let children = store.subagent_children(&session.id);
@@ -1797,9 +1789,8 @@ impl SessionsTab {
         // Model switching timeline
         if !session.model_segments.is_empty() {
             // Build timeline: "Opus 4.5 (8) → Sonnet 4.5 (15) → Haiku 4.5 (3)"
-            let mut timeline_spans: Vec<Span> = vec![
-                Span::styled("Models: ", Style::default().fg(p.muted)),
-            ];
+            let mut timeline_spans: Vec<Span> =
+                vec![Span::styled("Models: ", Style::default().fg(p.muted))];
             for (i, (model, count)) in session.model_segments.iter().enumerate() {
                 if i > 0 {
                     timeline_spans.push(Span::styled(" → ", Style::default().fg(p.muted)));
@@ -1932,7 +1923,12 @@ impl SessionsTab {
         // Extract version number: look for digits like "4-5", "4.5", "4-6"
         let version = m
             .split('-')
-            .skip_while(|s| !s.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
+            .skip_while(|s| {
+                !s.chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+            })
             .take(2)
             .collect::<Vec<_>>()
             .join(".");
@@ -3069,9 +3065,6 @@ mod tests {
             "Haiku 4.5"
         );
         // Unknown model passes through unchanged
-        assert_eq!(
-            SessionsTab::shorten_model_name("gpt-4o"),
-            "gpt-4o"
-        );
+        assert_eq!(SessionsTab::shorten_model_name("gpt-4o"), "gpt-4o");
     }
 }

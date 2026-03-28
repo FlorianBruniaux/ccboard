@@ -1071,7 +1071,10 @@ mod tests {
         let parser = SessionIndexParser::new();
         let meta = parser.scan_session(file.path()).await.unwrap();
 
-        assert_eq!(meta.model_segments, vec![("claude-sonnet-4-6".to_string(), 3)]);
+        assert_eq!(
+            meta.model_segments,
+            vec![("claude-sonnet-4-6".to_string(), 3)]
+        );
     }
 
     #[tokio::test]

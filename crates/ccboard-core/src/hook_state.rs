@@ -327,10 +327,22 @@ mod tests {
 
         file.prune_stale_running(Duration::from_secs(10 * 60));
 
-        assert!(!file.sessions.contains_key("s1:tty1"), "stale Running should be pruned");
-        assert!(!file.sessions.contains_key("s2:tty2"), "stale WaitingInput should be pruned");
-        assert!(file.sessions.contains_key("s3:tty3"), "recent Running should survive");
-        assert!(file.sessions.contains_key("s4:tty4"), "Stopped handled by prune_stopped, not touched here");
+        assert!(
+            !file.sessions.contains_key("s1:tty1"),
+            "stale Running should be pruned"
+        );
+        assert!(
+            !file.sessions.contains_key("s2:tty2"),
+            "stale WaitingInput should be pruned"
+        );
+        assert!(
+            file.sessions.contains_key("s3:tty3"),
+            "recent Running should survive"
+        );
+        assert!(
+            file.sessions.contains_key("s4:tty4"),
+            "Stopped handled by prune_stopped, not touched here"
+        );
     }
 
     #[test]

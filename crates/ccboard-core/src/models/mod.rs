@@ -9,7 +9,9 @@ pub mod session;
 pub mod stats;
 
 pub use billing_block::{BillingBlock, BillingBlockManager, BillingBlockUsage};
-pub use config::{AnomalyThresholds, HookDefinition, HookGroup, MergedConfig, Permissions, Settings};
+pub use config::{
+    AnomalyThresholds, HookDefinition, HookGroup, MergedConfig, Permissions, Settings,
+};
 pub use invocations::InvocationStats;
 pub use plan::{Phase, PhaseStatus, PlanFile, PlanMetadata, Task};
 pub use session::{

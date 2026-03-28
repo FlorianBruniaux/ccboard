@@ -909,9 +909,10 @@ async fn run_summarize(
 
     // Load full session content
     eprint!("Loading session content... ");
-    let lines = ccboard_core::parsers::SessionContentParser::parse_session_lines(&session.file_path)
-        .await
-        .with_context(|| format!("Failed to read session {}", session.id))?;
+    let lines =
+        ccboard_core::parsers::SessionContentParser::parse_session_lines(&session.file_path)
+            .await
+            .with_context(|| format!("Failed to read session {}", session.id))?;
 
     // Build a plain-text transcript for the summarisation prompt
     let mut transcript = String::new();
@@ -962,19 +963,19 @@ fn extract_text_from_content(content: Option<&serde_json::Value>) -> String {
     match content {
         None => String::new(),
         Some(serde_json::Value::String(s)) => s.clone(),
-        Some(serde_json::Value::Array(blocks)) => {
-            blocks
-                .iter()
-                .filter_map(|b| {
-                    if b.get("type").and_then(|t| t.as_str()) == Some("text") {
-                        b.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ")
-        }
+        Some(serde_json::Value::Array(blocks)) => blocks
+            .iter()
+            .filter_map(|b| {
+                if b.get("type").and_then(|t| t.as_str()) == Some("text") {
+                    b.get("text")
+                        .and_then(|t| t.as_str())
+                        .map(|s| s.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
         _ => String::new(),
     }
 }

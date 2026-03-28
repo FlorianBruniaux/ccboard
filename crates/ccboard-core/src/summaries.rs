@@ -134,7 +134,9 @@ pub fn call_claude_summarize(session_text: &str, model: &str) -> Result<String> 
 
     let mut child = cmd.spawn().map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
-            anyhow::anyhow!("'claude' CLI not found. Make sure Claude Code is installed and in PATH.")
+            anyhow::anyhow!(
+                "'claude' CLI not found. Make sure Claude Code is installed and in PATH."
+            )
         } else {
             anyhow::anyhow!("Failed to run claude CLI: {}", e)
         }
@@ -149,7 +151,9 @@ pub fn call_claude_summarize(session_text: &str, model: &str) -> Result<String> 
             .context("Failed to write prompt to claude stdin")?;
     }
 
-    let output = child.wait_with_output().context("Failed to wait for claude")?;
+    let output = child
+        .wait_with_output()
+        .context("Failed to wait for claude")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
