@@ -378,6 +378,29 @@ pub struct SessionSummary {
     pub models_used: Option<Vec<String>>,
 }
 
+/// Origin tool that produced this session
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SourceTool {
+    #[default]
+    ClaudeCode,
+    Cursor,
+    Codex,
+    OpenCode,
+}
+
+impl SourceTool {
+    /// Short badge label shown in TUI (e.g. "[Cu]")
+    pub fn badge(&self) -> &'static str {
+        match self {
+            SourceTool::ClaudeCode => "",
+            SourceTool::Cursor => "[Cu]",
+            SourceTool::Codex => "[Cx]",
+            SourceTool::OpenCode => "[Oc]",
+        }
+    }
+}
+
 /// Metadata extracted from a session without full parse
 ///
 /// Created by streaming the JSONL until session_end event.
@@ -446,6 +469,10 @@ pub struct SessionMetadata {
     /// Proportionally distributed from message-level token counts
     #[serde(default)]
     pub tool_token_usage: std::collections::HashMap<String, u64>,
+
+    /// Which AI coding tool produced this session
+    #[serde(default)]
+    pub source_tool: SourceTool,
 }
 
 impl SessionMetadata {
@@ -482,6 +509,7 @@ impl SessionMetadata {
             branch: None,
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
+            source_tool: SourceTool::ClaudeCode,
         }
     }
 

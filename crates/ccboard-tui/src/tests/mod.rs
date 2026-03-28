@@ -21,7 +21,14 @@ mod tab_smoke {
         let mut terminal = make_terminal();
         terminal
             .draw(|frame| {
-                tab.render(frame, frame.area(), None, None, None, ColorScheme::default());
+                tab.render(
+                    frame,
+                    frame.area(),
+                    None,
+                    None,
+                    None,
+                    ColorScheme::default(),
+                );
             })
             .expect("draw");
         let buf = terminal.backend().buffer().clone();

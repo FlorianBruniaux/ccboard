@@ -337,6 +337,7 @@ mod tests {
             branch: None,
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
+            source_tool: Default::default(),
         })
     }
 

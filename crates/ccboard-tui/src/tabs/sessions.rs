@@ -1525,8 +1525,16 @@ impl SessionsTab {
                 };
 
                 // Build preview spans with optional highlighting
+                let badge = session.source_tool.badge();
+                let badge_span = if !badge.is_empty() {
+                    Span::styled(format!("{} ", badge), Style::default().fg(Color::Yellow))
+                } else {
+                    Span::raw("")
+                };
+
                 let mut preview_spans = vec![
                     bookmark_span,
+                    badge_span,
                     Span::styled(format!("{} ", if is_selected { "▶" } else { " " }), style),
                 ];
 

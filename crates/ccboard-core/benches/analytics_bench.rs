@@ -44,6 +44,7 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
                 tool_token_usage: std::collections::HashMap::new(),
                 duration_seconds: Some(1800),
                 branch: None,
+                source_tool: Default::default(),
             })
         })
         .collect()

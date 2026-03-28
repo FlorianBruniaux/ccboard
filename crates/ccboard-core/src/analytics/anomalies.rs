@@ -361,6 +361,7 @@ mod tests {
             branch: Some("main".to_string()),
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
+            source_tool: Default::default(),
         })
     }
 
@@ -517,6 +518,7 @@ mod tests {
             branch: Some("main".to_string()),
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
+            source_tool: Default::default(),
         })
     }
 

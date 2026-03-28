@@ -318,6 +318,7 @@ mod tests {
             branch: None,
             tool_usage,
             tool_token_usage: HashMap::new(),
+            source_tool: Default::default(),
         })
     }
 

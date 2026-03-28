@@ -16,6 +16,6 @@ pub use invocations::InvocationStats;
 pub use plan::{Phase, PhaseStatus, PlanFile, PlanMetadata, Task};
 pub use session::{
     ConversationMessage, MessageRole, ProjectId, SessionContent, SessionId, SessionLine,
-    SessionMessage, SessionMetadata, SessionSummary, TokenUsage, ToolCall, ToolResult,
+    SessionMessage, SessionMetadata, SessionSummary, SourceTool, TokenUsage, ToolCall, ToolResult,
 };
 pub use stats::{ContextWindowStats, DailyActivity, ModelUsage, StatsCache};
