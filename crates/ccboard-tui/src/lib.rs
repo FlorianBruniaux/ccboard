@@ -12,6 +12,9 @@ pub mod widgets;
 
 pub use app::App;
 
+#[cfg(test)]
+mod tests;
+
 use anyhow::Result;
 use ccboard_core::DataStore;
 use crossterm::{
