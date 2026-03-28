@@ -126,7 +126,9 @@ impl Ui {
                         match app.store.toggle_bookmark(&session_id) {
                             Ok(true) => self.sessions.set_notification("Bookmarked ★"),
                             Ok(false) => self.sessions.set_notification("Bookmark removed"),
-                            Err(e) => self.sessions.set_notification(&format!("Bookmark error: {}", e)),
+                            Err(e) => self
+                                .sessions
+                                .set_notification(&format!("Bookmark error: {}", e)),
                         }
                         return;
                     }
@@ -198,13 +200,17 @@ impl Ui {
                     KeyCode::Left | KeyCode::Char('h') => self.analytics.prev_view(),
                     KeyCode::Char('j') | KeyCode::Down => {
                         use crate::tabs::analytics::AnalyticsView;
-                        let max_items = app.store.analytics().map(|a| {
-                            if self.analytics.current_view() == AnalyticsView::Costs {
-                                a.tool_token_stats.len()
-                            } else {
-                                a.insights.len()
-                            }
-                        }).unwrap_or(0);
+                        let max_items = app
+                            .store
+                            .analytics()
+                            .map(|a| {
+                                if self.analytics.current_view() == AnalyticsView::Costs {
+                                    a.tool_token_stats.len()
+                                } else {
+                                    a.insights.len()
+                                }
+                            })
+                            .unwrap_or(0);
                         self.analytics.scroll_down(max_items);
                     }
                     KeyCode::Char('k') | KeyCode::Up => self.analytics.scroll_up(),
@@ -587,8 +593,14 @@ impl Ui {
                                                          // Count total sessions for refresh tracking
                 let session_count: usize = sessions_by_project.values().map(|v| v.len()).sum();
                 self.sessions.mark_refreshed(session_count);
-                self.sessions
-                    .render(frame, area, &sessions_by_project, live_sessions, scheme, &app.store);
+                self.sessions.render(
+                    frame,
+                    area,
+                    &sessions_by_project,
+                    live_sessions,
+                    scheme,
+                    &app.store,
+                );
             }
             Tab::Config => {
                 let config = app.store.settings();
@@ -624,7 +636,9 @@ impl Ui {
             }
             Tab::Mcp => {
                 let mcp_config = app.store.mcp_config();
-                self.mcp.render(frame, area, mcp_config.as_ref(), scheme);
+                let mcp_stats = app.store.mcp_call_stats();
+                self.mcp
+                    .render(frame, area, mcp_config.as_ref(), &mcp_stats, scheme);
             }
             Tab::Analytics => {
                 use tracing::debug;
@@ -671,7 +685,7 @@ impl Ui {
                 Tab::Agents => "Tab switch │ Enter detail",
                 Tab::Costs => "Tab/←→/h/l switch views",
                 Tab::History => "/ search │ gg/G/Home/End jump │ c clear │ x export",
-                Tab::Mcp => "←→ focus │ ↑↓ select │ e edit │ o reveal │ r refresh",
+                Tab::Mcp => "←→ focus │ ↑↓ select │ s stats │ e edit │ o reveal │ r refresh",
                 Tab::Analytics => {
                     "F1-F4 period │ ←→/h/l switch views │ j/k scroll │ s sort │ o order │ r refresh"
                 }

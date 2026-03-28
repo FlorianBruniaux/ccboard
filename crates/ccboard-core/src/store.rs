@@ -56,6 +56,15 @@ impl Default for DataStoreConfig {
     }
 }
 
+/// Per-server MCP usage statistics aggregated from analyzed sessions
+#[derive(Debug, Clone)]
+pub struct McpCallStat {
+    pub server_name: String,
+    pub call_count: usize,
+    pub session_count: usize,
+    pub last_seen: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 /// Central data store for ccboard
 ///
 /// Thread-safe access to all Claude Code data.
@@ -789,6 +798,54 @@ impl DataStore {
         }
     }
 
+    /// Aggregate MCP call stats from all analyzed sessions.
+    ///
+    /// Returns one entry per server that has been called, sorted by
+    /// call_count descending. Servers with 0 calls are omitted.
+    pub fn mcp_call_stats(&self) -> Vec<McpCallStat> {
+        use crate::models::activity::NetworkTool;
+        use std::collections::{HashMap, HashSet};
+
+        let mut stats: HashMap<String, McpCallStat> = HashMap::new();
+
+        for entry in self.activity_results.iter() {
+            let summary = entry.value();
+            let mut servers_in_session: HashSet<String> = HashSet::new();
+
+            for call in &summary.network_calls {
+                if let NetworkTool::McpCall { server } = &call.tool {
+                    let stat = stats.entry(server.clone()).or_insert_with(|| McpCallStat {
+                        server_name: server.clone(),
+                        call_count: 0,
+                        session_count: 0,
+                        last_seen: None,
+                    });
+                    stat.call_count += 1;
+                    match stat.last_seen {
+                        Some(existing) if call.timestamp > existing => {
+                            stat.last_seen = Some(call.timestamp);
+                        }
+                        None => {
+                            stat.last_seen = Some(call.timestamp);
+                        }
+                        _ => {}
+                    }
+                    servers_in_session.insert(server.clone());
+                }
+            }
+
+            for server in servers_in_session {
+                if let Some(stat) = stats.get_mut(&server) {
+                    stat.session_count += 1;
+                }
+            }
+        }
+
+        let mut result: Vec<McpCallStat> = stats.into_values().collect();
+        result.sort_by(|a, b| b.call_count.cmp(&a.call_count));
+        result
+    }
+
     /// Consolidated violations feed: merges in-memory DashMap results (freshest) with
     /// SQLite-persisted alerts. DashMap takes priority for sessions analyzed this run.
     ///
@@ -1238,9 +1295,7 @@ impl DataStore {
     /// Toggle bookmark (add with default tag "bookmarked", or remove).
     /// Returns `true` if the session is now bookmarked.
     pub fn toggle_bookmark(&self, session_id: &str) -> anyhow::Result<bool> {
-        self.bookmark_store
-            .write()
-            .toggle(session_id, "bookmarked")
+        self.bookmark_store.write().toggle(session_id, "bookmarked")
     }
 
     /// Add or update a bookmark with a custom tag and optional note.

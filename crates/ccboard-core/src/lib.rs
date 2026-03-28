@@ -49,6 +49,6 @@ pub use models::activity::{
     NetworkCall, NetworkTool, ToolCall as ActivityToolCall,
 };
 pub use quota::{calculate_quota_status, AlertLevel, QuotaStatus};
-pub use store::{DataStore, ProjectLeaderboardEntry};
+pub use store::{DataStore, McpCallStat, ProjectLeaderboardEntry};
 pub use usage_estimator::{calculate_usage_estimate, SubscriptionPlan, UsageEstimate};
 pub use watcher::FileWatcher;

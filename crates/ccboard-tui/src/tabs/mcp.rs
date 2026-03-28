@@ -18,6 +18,7 @@
 use crate::empty_state;
 use crate::theme::{Palette, ServerStatusColor};
 use ccboard_core::parsers::mcp_config::{McpConfig, McpServer};
+use ccboard_core::store::McpCallStat;
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
@@ -34,6 +35,13 @@ use std::time::Instant;
 enum Focus {
     List,
     Detail,
+}
+
+/// Which view is active
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum McpView {
+    Servers,
+    Stats,
 }
 
 /// Server runtime status
@@ -82,6 +90,10 @@ pub struct McpTab {
     error_message: Option<String>,
     /// Copy success message to display
     copy_message: Option<String>,
+    /// Active view (Servers dual-pane or Stats table)
+    view: McpView,
+    /// Scroll offset for stats table
+    stats_scroll: usize,
 }
 
 impl Default for McpTab {
@@ -103,11 +115,40 @@ impl McpTab {
             last_refresh: Instant::now(),
             error_message: None,
             copy_message: None,
+            view: McpView::Servers,
+            stats_scroll: 0,
         }
     }
 
     /// Handle keyboard input
     pub fn handle_key(&mut self, key: KeyCode, mcp_config: Option<&McpConfig>) {
+        // Toggle stats view
+        if key == KeyCode::Char('s') {
+            self.view = match self.view {
+                McpView::Servers => McpView::Stats,
+                McpView::Stats => McpView::Servers,
+            };
+            self.stats_scroll = 0;
+            return;
+        }
+
+        // Stats view: j/k scroll, Esc to go back
+        if self.view == McpView::Stats {
+            match key {
+                KeyCode::Char('j') | KeyCode::Down => {
+                    self.stats_scroll = self.stats_scroll.saturating_add(1);
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    self.stats_scroll = self.stats_scroll.saturating_sub(1);
+                }
+                KeyCode::Esc => {
+                    self.view = McpView::Servers;
+                }
+                _ => {}
+            }
+            return;
+        }
+
         // Close error/copy message popup
         if key == KeyCode::Esc {
             if self.error_message.is_some() {
@@ -187,8 +228,14 @@ impl McpTab {
         frame: &mut Frame,
         area: Rect,
         mcp_config: Option<&McpConfig>,
+        mcp_stats: &[McpCallStat],
         scheme: ccboard_core::models::config::ColorScheme,
     ) {
+        if self.view == McpView::Stats {
+            self.render_stats(frame, area, mcp_stats, scheme);
+            return;
+        }
+
         let p = Palette::new(scheme);
 
         // Dual-pane layout: fixed list width | flexible details
@@ -212,6 +259,97 @@ impl McpTab {
         if self.error_message.is_some() {
             self.render_error_popup(frame, area, &p);
         }
+    }
+
+    /// Render the stats view showing per-server MCP usage
+    fn render_stats(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        mcp_stats: &[McpCallStat],
+        scheme: ccboard_core::models::config::ColorScheme,
+    ) {
+        use ratatui::layout::Constraint as C;
+        use ratatui::style::Modifier;
+        use ratatui::widgets::{Row, Table};
+
+        let p = Palette::new(scheme);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title(" MCP Server Usage Stats  —  [s] back to Servers ")
+            .style(Style::default().fg(p.border).bg(p.surface));
+
+        if mcp_stats.is_empty() {
+            let para = Paragraph::new(vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "No MCP call data yet.",
+                    Style::default().fg(p.muted),
+                )),
+                Line::from(Span::styled(
+                    "Stats populate as sessions are analyzed (open a session in Sessions tab).",
+                    Style::default().fg(p.muted),
+                )),
+            ])
+            .block(block)
+            .alignment(Alignment::Center);
+            frame.render_widget(para, area);
+            return;
+        }
+
+        let header = Row::new(vec!["Server", "Calls", "Sessions", "Last Seen"])
+            .style(Style::default().fg(p.focus).add_modifier(Modifier::BOLD))
+            .height(1);
+
+        let now = chrono::Utc::now();
+        let rows: Vec<Row> = mcp_stats
+            .iter()
+            .skip(self.stats_scroll)
+            .map(|stat| {
+                let last_seen = match stat.last_seen {
+                    Some(ts) => {
+                        let days = (now - ts).num_days();
+                        if days == 0 {
+                            "Today".to_string()
+                        } else if days == 1 {
+                            "Yesterday".to_string()
+                        } else {
+                            format!("{} days ago", days)
+                        }
+                    }
+                    None => "-".to_string(),
+                };
+                let row_style = match stat.last_seen {
+                    Some(ts) if (now - ts).num_days() <= 1 => Style::default().fg(p.success),
+                    Some(ts) if (now - ts).num_days() <= 7 => Style::default().fg(p.fg),
+                    Some(_) => Style::default().fg(p.muted),
+                    None => Style::default().fg(p.muted),
+                };
+                Row::new(vec![
+                    stat.server_name.clone(),
+                    stat.call_count.to_string(),
+                    stat.session_count.to_string(),
+                    last_seen,
+                ])
+                .style(row_style)
+            })
+            .collect();
+
+        let widths = [
+            C::Percentage(40),
+            C::Percentage(15),
+            C::Percentage(20),
+            C::Percentage(25),
+        ];
+
+        let table = Table::new(rows, widths)
+            .header(header)
+            .block(block)
+            .column_spacing(2);
+
+        frame.render_widget(table, area);
     }
 
     /// Render server list pane
