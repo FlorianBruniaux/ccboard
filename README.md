@@ -32,12 +32,12 @@
 
 ## Features
 
-### 12 Interactive Tabs (TUI + Web)
+### 13 Interactive Tabs (TUI + Web)
 
 | Tab | Key | Description | Highlights |
 |-----|-----|-------------|------------|
 | **Dashboard** | `1` | Overview stats, model usage, 7-day activity | API usage estimation, plan-based budgets, MCP server count |
-| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), bookmarks (`b`/`B`), subagent tree, model timeline, AI summaries (`ccboard summarize`), conversation viewer with regex search |
+| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), bookmarks (`b`/`B`), subagent tree, model timeline, AI summaries (`ccboard summarize`), conversation viewer with regex search, code metrics (+N/-N lines) |
 | **Analytics** | `3` | Advanced analytics (8 sub-views) | Budget tracking, 30-day forecast, hourly heatmap, anomaly detection (configurable thresholds), usage patterns, per-tool cost breakdown, pattern discovery (`r`) |
 | **Costs** | `4` | Token analytics (6 sub-views) | Overview, By Model, Daily, Usage Periods, Top Sessions, Per Project — 4-level budget alerts |
 | **History** | `5` | Chronological session timeline | CSV/JSON/Markdown export (`x`), full-text search |
@@ -48,6 +48,7 @@
 | **Tools** | `0` | Agents, commands, and skills browser | Frontmatter YAML parsing, real invocation counts (includes session-discovered agents) |
 | **Plugins** | `p` | Plugin & capability usage analytics | Dead code detection, sort by usage/cost/name |
 | **Search** | `/` | Full-text search across all sessions | FTS5-powered, search-as-you-type (≥2 chars), ranked snippets, opens conversation viewer |
+| **Brain** | `b` | Cross-session knowledge base | Insights captured by session-stop hook (progress/decision/blocked/pattern/fix/context), filter by type, archive, detail pane, `/ccboard-remember` skill for manual entries |
 
 ### Platform Capabilities
 
@@ -60,6 +61,7 @@
 | **Zero Config** | Works out of the box with `~/.claude`, single 5.8MB binary, macOS/Linux/Windows |
 | **Hook Integration** | `ccboard setup` injects Claude Code hooks, live session status (Running/WaitingInput/Stopped), macOS notification on stop, 10-min TTL pruning for stale sessions |
 | **Session Intelligence** | Bookmarks with tags/notes, subagent parent/child tree, model switching timeline, LLM summaries via `ccboard summarize` |
+| **Brain / Knowledge Base** | Session-stop hook captures progress, decisions, blockers, patterns, fixes after each meaningful session into `~/.ccboard/insights.db`. Context-injection hook injects relevant past knowledge at session start. Manual entries via `/ccboard-remember` skill. |
 
 > Missing a feature? [Request it here](https://github.com/FlorianBruniaux/ccboard/issues/new?template=feature_request.yml) | Found a bug? [Report it](https://github.com/FlorianBruniaux/ccboard/issues/new?template=bug_report.yml)
 
