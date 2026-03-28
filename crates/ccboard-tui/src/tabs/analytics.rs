@@ -25,8 +25,8 @@ pub enum AnalyticsView {
     Patterns,
     Insights,
     Anomalies,
-    /// Per-tool token usage and cost optimization suggestions (Phase K)
-    Plugins,
+    /// Per-tool token usage and cost optimization suggestions
+    Costs,
 }
 
 impl AnalyticsView {
@@ -37,20 +37,20 @@ impl AnalyticsView {
             Self::Trends => Self::Patterns,
             Self::Patterns => Self::Insights,
             Self::Insights => Self::Anomalies,
-            Self::Anomalies => Self::Plugins,
-            Self::Plugins => Self::Overview,
+            Self::Anomalies => Self::Costs,
+            Self::Costs => Self::Overview,
         }
     }
 
     /// Cycle to previous view
     pub fn prev(self) -> Self {
         match self {
-            Self::Overview => Self::Plugins,
+            Self::Overview => Self::Costs,
             Self::Trends => Self::Overview,
             Self::Patterns => Self::Trends,
             Self::Insights => Self::Patterns,
             Self::Anomalies => Self::Insights,
-            Self::Plugins => Self::Anomalies,
+            Self::Costs => Self::Anomalies,
         }
     }
 
@@ -62,7 +62,7 @@ impl AnalyticsView {
             Self::Patterns => "Patterns",
             Self::Insights => "Summary",
             Self::Anomalies => "Anomalies",
-            Self::Plugins => "Plugins",
+            Self::Costs => "Costs",
         }
     }
 }
@@ -113,6 +113,8 @@ pub struct AnalyticsTab {
     leaderboard_sort: LeaderboardSortColumn,
     /// Leaderboard sort descending
     leaderboard_sort_desc: bool,
+    /// Scroll offset for tool cost breakdown table (Costs view)
+    tool_cost_scroll: usize,
 }
 
 impl Default for AnalyticsTab {
@@ -129,6 +131,7 @@ impl AnalyticsTab {
             scroll_offset: 0,
             leaderboard_sort: LeaderboardSortColumn::TotalCost,
             leaderboard_sort_desc: true,
+            tool_cost_scroll: 0,
         }
     }
 
@@ -146,24 +149,34 @@ impl AnalyticsTab {
     pub fn next_view(&mut self) {
         self.current_view = self.current_view.next();
         self.scroll_offset = 0;
+        self.tool_cost_scroll = 0;
     }
 
     /// Cycle to previous view (Shift+Tab key)
     pub fn prev_view(&mut self) {
         self.current_view = self.current_view.prev();
         self.scroll_offset = 0;
+        self.tool_cost_scroll = 0;
     }
 
     /// Scroll down (j key)
     pub fn scroll_down(&mut self, max_items: usize) {
-        if self.scroll_offset + 10 < max_items {
+        if self.current_view == AnalyticsView::Costs {
+            if self.tool_cost_scroll + 1 < max_items {
+                self.tool_cost_scroll += 1;
+            }
+        } else if self.scroll_offset + 10 < max_items {
             self.scroll_offset += 1;
         }
     }
 
     /// Scroll up (k key)
     pub fn scroll_up(&mut self) {
-        if self.scroll_offset > 0 {
+        if self.current_view == AnalyticsView::Costs {
+            if self.tool_cost_scroll > 0 {
+                self.tool_cost_scroll -= 1;
+            }
+        } else if self.scroll_offset > 0 {
             self.scroll_offset -= 1;
         }
     }
@@ -176,6 +189,11 @@ impl AnalyticsTab {
     /// Toggle sort order (r key)
     pub fn toggle_sort_order(&mut self) {
         self.leaderboard_sort_desc = !self.leaderboard_sort_desc;
+    }
+
+    /// Get current view
+    pub fn current_view(&self) -> AnalyticsView {
+        self.current_view
     }
 
     /// Render the analytics tab
@@ -221,7 +239,7 @@ impl AnalyticsTab {
                     AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data, &p),
                     AnalyticsView::Insights => self.render_insights(frame, chunks[1], data, &p),
                     AnalyticsView::Anomalies => self.render_anomalies(frame, chunks[1], data, &p),
-                    AnalyticsView::Plugins => self.render_plugins(frame, chunks[1], data, &p),
+                    AnalyticsView::Costs => self.render_costs(frame, chunks[1], data, &p),
                 }
             }
             None => {
@@ -287,7 +305,7 @@ impl AnalyticsTab {
             AnalyticsView::Patterns,
             AnalyticsView::Insights,
             AnalyticsView::Anomalies,
-            AnalyticsView::Plugins,
+            AnalyticsView::Costs,
         ];
         let mut tab_spans: Vec<Span> = Vec::new();
         for (i, view) in views.iter().enumerate() {
@@ -1801,7 +1819,7 @@ impl AnalyticsTab {
     }
 
     /// Render Plugins sub-view: per-tool token usage + cost optimization suggestions
-    fn render_plugins(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
+    fn render_costs(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([

@@ -67,14 +67,19 @@ impl Ui {
         self.sessions.is_replay_open()
     }
 
-    /// Initialize tabs that need data scan
+    /// Initialize tabs with pre-scanned directory data.
+    ///
+    /// The scan result must be produced by `scan_all_blocking` running inside
+    /// `tokio::task::spawn_blocking` — never on the async executor thread.
     pub fn init(
         &mut self,
+        scan: crate::tabs::agents::ScanResult,
         claude_home: &std::path::Path,
         project_path: Option<&std::path::Path>,
         invocation_stats: &ccboard_core::models::InvocationStats,
     ) {
-        self.agents.scan_directories(claude_home, project_path);
+        let (agents, commands, skills) = scan;
+        self.agents.apply_scanned(agents, commands, skills);
         self.agents.update_invocation_counts(invocation_stats);
         self.config.init(claude_home, project_path);
     }
@@ -192,8 +197,14 @@ impl Ui {
                     KeyCode::Right | KeyCode::Char('l') => self.analytics.next_view(),
                     KeyCode::Left | KeyCode::Char('h') => self.analytics.prev_view(),
                     KeyCode::Char('j') | KeyCode::Down => {
-                        let max_items =
-                            app.store.analytics().map(|a| a.insights.len()).unwrap_or(0);
+                        use crate::tabs::analytics::AnalyticsView;
+                        let max_items = app.store.analytics().map(|a| {
+                            if self.analytics.current_view() == AnalyticsView::Costs {
+                                a.tool_token_stats.len()
+                            } else {
+                                a.insights.len()
+                            }
+                        }).unwrap_or(0);
                         self.analytics.scroll_down(max_items);
                     }
                     KeyCode::Char('k') | KeyCode::Up => self.analytics.scroll_up(),
