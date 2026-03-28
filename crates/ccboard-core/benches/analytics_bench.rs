@@ -45,6 +45,8 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
                 duration_seconds: Some(1800),
                 branch: None,
                 source_tool: Default::default(),
+                lines_added: 0,
+                lines_removed: 0,
             })
         })
         .collect()

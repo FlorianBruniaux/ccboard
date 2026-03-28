@@ -1137,6 +1137,8 @@ mod tests {
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
             source_tool: Default::default(),
+            lines_added: 0,
+            lines_removed: 0,
         }
     }
 

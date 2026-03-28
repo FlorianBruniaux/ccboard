@@ -473,6 +473,14 @@ pub struct SessionMetadata {
     /// Which AI coding tool produced this session
     #[serde(default)]
     pub source_tool: SourceTool,
+
+    /// Lines added in this session (from Edit/Write tool inputs)
+    #[serde(default)]
+    pub lines_added: u64,
+
+    /// Lines removed in this session (from Edit old_string)
+    #[serde(default)]
+    pub lines_removed: u64,
 }
 
 impl SessionMetadata {
@@ -510,6 +518,8 @@ impl SessionMetadata {
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
             source_tool: SourceTool::ClaudeCode,
+            lines_added: 0,
+            lines_removed: 0,
         }
     }
 
