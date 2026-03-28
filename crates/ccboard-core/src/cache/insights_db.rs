@@ -24,10 +24,7 @@ impl InsightsDb {
     /// Open (or create) the insights database at `<cache_dir>/insights.db`
     pub fn new(cache_dir: &Path) -> Result<Self> {
         std::fs::create_dir_all(cache_dir).with_context(|| {
-            format!(
-                "Failed to create cache directory: {}",
-                cache_dir.display()
-            )
+            format!("Failed to create cache directory: {}", cache_dir.display())
         })?;
 
         let db_path = cache_dir.join("insights.db");
@@ -82,7 +79,13 @@ impl InsightsDb {
         conn.execute(
             "INSERT INTO insights (session_id, project, type, content, reasoning)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![session_id, project, insight_type.as_str(), content, reasoning],
+            params![
+                session_id,
+                project,
+                insight_type.as_str(),
+                content,
+                reasoning
+            ],
         )
         .context("Failed to insert insight")?;
         Ok(conn.last_insert_rowid())
@@ -115,7 +118,11 @@ impl InsightsDb {
     }
 
     /// List non-archived insights of a given type across all projects, newest first
-    pub fn list_by_type_all(&self, insight_type: InsightType, limit: usize) -> Result<Vec<Insight>> {
+    pub fn list_by_type_all(
+        &self,
+        insight_type: InsightType,
+        limit: usize,
+    ) -> Result<Vec<Insight>> {
         let conn = self.conn.lock().expect("insights db mutex poisoned");
         self.query_insights(
             &conn,
@@ -230,8 +237,9 @@ impl InsightsDb {
 
     fn row_to_insight(row: &rusqlite::Row<'_>) -> rusqlite::Result<Insight> {
         let type_str: String = row.get(3)?;
-        let insight_type = InsightType::from_str(&type_str)
-            .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, e.into()))?;
+        let insight_type = InsightType::from_str(&type_str).map_err(|e| {
+            rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, e.into())
+        })?;
 
         let archived_int: i64 = row.get(6)?;
         let created_str: String = row.get(7)?;

@@ -13,16 +13,14 @@
 
 use crate::theme::Palette;
 use ccboard_core::cache::InsightsDb;
-use ccboard_core::models::insight::{Insight, InsightType};
 use ccboard_core::models::config::ColorScheme;
+use ccboard_core::models::insight::{Insight, InsightType};
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Wrap,
-    },
+    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
 };
 use std::path::PathBuf;
@@ -139,7 +137,10 @@ impl BrainTab {
                 // insights.db doesn't exist yet — no hook has fired
                 self.insights.clear();
                 self.list_state.select(None);
-                self.status = Some("No insights yet. insights.db will be created when session-stop.sh fires.".to_string());
+                self.status = Some(
+                    "No insights yet. insights.db will be created when session-stop.sh fires."
+                        .to_string(),
+                );
             }
         }
     }
@@ -294,8 +295,12 @@ impl BrainTab {
 
         // Split body into list | detail when expanded
         let (list_area, detail_area) = if self.expanded {
-            let [l, d] = Layout::horizontal([Constraint::Percentage(45), Constraint::Percentage(55)])
-                .split(area)[..] else { unreachable!() };
+            let [l, d] =
+                Layout::horizontal([Constraint::Percentage(45), Constraint::Percentage(55)])
+                    .split(area)[..]
+            else {
+                unreachable!()
+            };
             (l, Some(d))
         } else {
             (area, None)
@@ -349,12 +354,21 @@ impl BrainTab {
 
         // Detail pane
         if let (Some(d_area), Some(insight)) = (detail_area, self.insights.get(selected_idx)) {
-            let type_label = format!("{} {}", type_icon(&insight.insight_type), insight.insight_type.as_str().to_uppercase());
+            let type_label = format!(
+                "{} {}",
+                type_icon(&insight.insight_type),
+                insight.insight_type.as_str().to_uppercase()
+            );
             let date = insight.created_at.format("%Y-%m-%d %H:%M UTC").to_string();
             let project = &insight.project;
 
             let mut lines = vec![
-                Line::from(Span::styled(&type_label, Style::default().fg(type_color(&insight.insight_type, p)).add_modifier(Modifier::BOLD))),
+                Line::from(Span::styled(
+                    &type_label,
+                    Style::default()
+                        .fg(type_color(&insight.insight_type, p))
+                        .add_modifier(Modifier::BOLD),
+                )),
                 Line::from(Span::styled(date, Style::default().fg(p.muted))),
                 Line::from(Span::styled(project.as_str(), Style::default().fg(p.muted))),
                 Line::raw(""),
@@ -363,8 +377,14 @@ impl BrainTab {
 
             if let Some(reasoning) = &insight.reasoning {
                 lines.push(Line::raw(""));
-                lines.push(Line::from(Span::styled("Reasoning:", Style::default().fg(p.muted))));
-                lines.push(Line::from(Span::styled(reasoning.as_str(), Style::default().fg(p.fg))));
+                lines.push(Line::from(Span::styled(
+                    "Reasoning:",
+                    Style::default().fg(p.muted),
+                )));
+                lines.push(Line::from(Span::styled(
+                    reasoning.as_str(),
+                    Style::default().fg(p.fg),
+                )));
             }
 
             let detail = Paragraph::new(lines)
@@ -384,8 +404,7 @@ impl BrainTab {
 
     fn render_footer(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         let hints = "[j/k] nav  [Enter] expand  [f] filter  [d] archive  [r] reload";
-        let footer = Paragraph::new(hints)
-            .style(Style::default().fg(p.muted).bg(p.bg));
+        let footer = Paragraph::new(hints).style(Style::default().fg(p.muted).bg(p.bg));
         frame.render_widget(footer, area);
     }
 }

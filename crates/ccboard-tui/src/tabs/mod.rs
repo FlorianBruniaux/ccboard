@@ -17,8 +17,8 @@ pub mod sessions;
 
 pub use activity::ActivityTab;
 pub use agents::AgentsTab;
-pub use brain::BrainTab;
 pub use analytics::AnalyticsTab;
+pub use brain::BrainTab;
 pub use config::ConfigTab;
 pub use conversation::ConversationTab;
 pub use costs::CostsTab;

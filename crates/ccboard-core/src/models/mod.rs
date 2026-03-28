@@ -2,18 +2,18 @@
 
 pub mod activity;
 pub mod billing_block;
-pub mod insight;
 pub mod config;
+pub mod insight;
 pub mod invocations;
 pub mod plan;
 pub mod session;
 pub mod stats;
 
 pub use billing_block::{BillingBlock, BillingBlockManager, BillingBlockUsage};
-pub use insight::{Insight, InsightType};
 pub use config::{
     AnomalyThresholds, HookDefinition, HookGroup, MergedConfig, Permissions, Settings,
 };
+pub use insight::{Insight, InsightType};
 pub use invocations::InvocationStats;
 pub use plan::{Phase, PhaseStatus, PlanFile, PlanMetadata, Task};
 pub use session::{

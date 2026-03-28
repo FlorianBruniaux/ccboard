@@ -83,7 +83,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: Costs aggregated per session. Impossible to know if `WebFetch` costs 10x more than `Read`.
 **Solution**: Extend `ToolCall` with estimated token count, cross-reference pricing table. New sub-tab "Tool Cost Breakdown" in Analytics.
 **Files**: `ccboard-core/src/parsers/activity.rs`, `ccboard-core/src/analytics/`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.20.0 (`Costs` sub-tab in Analytics: Tool | Calls | Tokens | % Total | Est. Cost | $/Call; `ToolTokenStat` in `AnalyticsData`; red/yellow hotspot coloring)
 
 ---
 
@@ -99,7 +99,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: MCP servers listed but no latency/failure tracking. Impossible to identify which one slows sessions.
 **Solution**: Track MCP calls via hook events, aggregate avg latency + failure rate per server. New sub-tab in MCP tab.
 **Files**: `ccboard-core/src/hook_event.rs`, `ccboard-tui/src/tabs/mcp.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.20.0 (`[s]` toggles Stats view in MCP tab: Server | Calls | Sessions | Last Seen; `McpCallStat` + `mcp_call_stats()` on DataStore; recency-colored rows)
 
 ---
 
@@ -135,11 +135,11 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 
 ---
 
-### MF8 · Session Retry Pattern Analysis
-**Problem**: Retry loops (Read → Read → Read → fail) not detected. No reliability analytics.
-**Solution**: Analyze `ToolCall.name` sequences, flag repetitive patterns → alert in Activity tab.
-**Files**: `ccboard-core/src/parsers/activity.rs`
-**Status**: 📋 Backlog
+### MF8 · Analytics Discover Sub-Tab
+**Problem**: `discover.rs` pattern engine existed but was only accessible via CLI. No TUI exposure.
+**Solution**: New `Discover` sub-view in Analytics — press `r` to scan recent sessions, surface recurring patterns as CLAUDE.md rules / Skills / Commands with score and session count.
+**Files**: `ccboard-core/src/store.rs`, `ccboard-tui/src/tabs/analytics.rs`
+**Status**: ✅ Done — v0.20.0 (`Discover` sub-tab with `r` to run, `discover_cache` on DataStore, `compute_discover(max_sessions)` async; no API key needed)
 
 ---
 
@@ -147,7 +147,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: 0 unit tests in `ccboard-tui`. Regression risk on UI refactors.
 **Solution**: Snapshot tests for key tabs, keybinding tests for modals, pagination state tests.
 **Files**: `crates/ccboard-tui/tests/` (new)
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.20.0 (12 smoke tests with `TestBackend` 120×40; one per tab; 492 total tests)
 
 ---
 
@@ -220,14 +220,17 @@ These don't add features but improve reliability and maintainability across the 
   QW6  Session replay warning    ✅
   QW7  Configurable thresholds   ✅
 
-Sprint 4 (v0.20.x) — candidates:
-  MF1  Per-tool cost attribution  ← highest analytics impact
-  MF3  MCP health dashboard       ← differentiator vs competitors
-  MF9  TUI test coverage          ← quality infrastructure
+✅ Sprint 4 (v0.20.0) — DONE:
+  MF1  Per-tool cost attribution  ✅
+  MF3  MCP usage stats            ✅
+  MF8  Analytics Discover tab     ✅
+  MF9  TUI test coverage          ✅
 
-Strategic decision:
+Sprint 5 (v0.21.x) — candidates:
+  MF5  Session comparison view    ← UX differentiator
+  SF3  Export CLI (json/csv)      ← high demand
   SF1  Git integration            ← decide timing relative to Phase N
-  SF2  Activity timeline          ← Web UI, significant visual impact
+  SF2  Activity timeline Web UI   ← Leptos parity
 ```
 
 ---

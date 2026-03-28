@@ -499,10 +499,8 @@ impl SessionIndexParser {
                                                             .get("new_string")
                                                             .and_then(|v| v.as_str())
                                                             .unwrap_or("");
-                                                        lines_removed +=
-                                                            old.lines().count() as u64;
-                                                        lines_added +=
-                                                            new.lines().count() as u64;
+                                                        lines_removed += old.lines().count() as u64;
+                                                        lines_added += new.lines().count() as u64;
                                                     }
                                                     "Write" => {
                                                         let content = input
