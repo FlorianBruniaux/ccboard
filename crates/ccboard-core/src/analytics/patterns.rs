@@ -317,6 +317,7 @@ mod tests {
         let ts = chrono::Utc::now() - chrono::Duration::days(days_ago);
         Arc::new(SessionMetadata {
             id: format!("s{}", days_ago).into(),
+            source_tool: None,
             file_path: std::path::PathBuf::from(format!("/tmp/s{}.jsonl", days_ago)),
             project_path: "test".into(),
             first_timestamp: Some(ts),

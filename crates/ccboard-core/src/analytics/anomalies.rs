@@ -341,6 +341,7 @@ mod tests {
     fn create_test_session(id: &str, tokens: u64) -> Arc<SessionMetadata> {
         Arc::new(SessionMetadata {
             id: id.into(),
+            source_tool: None,
             file_path: PathBuf::from(format!("/tmp/{}.jsonl", id)),
             project_path: "test".into(),
             first_timestamp: Some(Utc::now()),
@@ -497,6 +498,7 @@ mod tests {
         let ts = chrono::Utc::now() - chrono::Duration::days(days_ago);
         Arc::new(SessionMetadata {
             id: id.into(),
+            source_tool: None,
             file_path: std::path::PathBuf::from(format!("/tmp/{}.jsonl", id)),
             project_path: "test".into(),
             first_timestamp: Some(ts),

@@ -16,6 +16,7 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
 
             Arc::new(SessionMetadata {
                 id: format!("session-{}", i).into(),
+                source_tool: None,
                 file_path: std::path::PathBuf::from(format!("/test/session-{}.jsonl", i)),
                 project_path: "/test".into(),
                 first_timestamp: Some(ts),
@@ -208,6 +209,7 @@ fn test_patterns_multi_model_session_no_double_count() {
     let now = Utc::now();
     let sessions = vec![Arc::new(SessionMetadata {
         id: "multi-model".into(),
+        source_tool: None,
         file_path: std::path::PathBuf::from("/test/multi.jsonl"),
         project_path: "/test".into(),
         first_timestamp: Some(now),

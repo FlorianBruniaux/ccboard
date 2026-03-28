@@ -298,6 +298,7 @@ mod tests {
         }
         Arc::new(SessionMetadata {
             id: id.into(),
+            source_tool: None,
             file_path: std::path::PathBuf::from(format!("/tmp/{}.jsonl", id)),
             project_path: "test".into(),
             first_timestamp: Some(chrono::Utc::now()),

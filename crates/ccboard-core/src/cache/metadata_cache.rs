@@ -51,7 +51,8 @@ use tracing::{debug, warn};
 /// - v5: Added activity_cache + activity_alerts tables
 /// - v6: Added aggregate_stats table with triggers + FTS5 session_fts table
 /// - v7: Added tool_token_usage field to SessionMetadata (Phase K analytics)
-const CACHE_VERSION: i32 = 7;
+/// - v8: Added source_tool field to SessionMetadata (multi-LLM support)
+const CACHE_VERSION: i32 = 8;
 
 /// SQLite-based metadata cache (thread-safe)
 pub struct MetadataCache {

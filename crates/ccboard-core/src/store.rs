@@ -14,8 +14,8 @@ use crate::models::{
 };
 use crate::parsers::{
     classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats,
-    InvocationParser, McpConfig, Rules, SessionContentParser, SessionIndexParser, SettingsParser,
-    StatsParser,
+    CopilotParser, GeminiParser, InvocationParser, McpConfig, Rules, SessionContentParser,
+    SessionIndexParser, SettingsParser, StatsParser,
 };
 use dashmap::DashMap;
 use moka::future::Cache;
@@ -394,6 +394,36 @@ impl DataStore {
         // Insert into DashMap (wrap in Arc for cheap cloning)
         for session in sessions_to_add {
             self.sessions.insert(session.id.clone(), Arc::new(session));
+        }
+
+        // Scan Gemini CLI sessions if available (auto-detected via ~/.gemini/tmp/)
+        if let Some(home) = dirs::home_dir() {
+            let gemini_home = home.join(".gemini");
+            if GeminiParser::is_available(&gemini_home) {
+                let gemini_sessions = GeminiParser::scan_all(&gemini_home, report);
+                let gemini_count = gemini_sessions.len();
+                for session in gemini_sessions {
+                    self.sessions.insert(session.id.clone(), Arc::new(session));
+                }
+                if gemini_count > 0 {
+                    debug!(count = gemini_count, "Gemini CLI sessions indexed");
+                }
+            }
+        }
+
+        // Scan Copilot CLI sessions if available (auto-detected via ~/.local/share/copilot-api/logs/)
+        if let Some(home) = dirs::home_dir() {
+            let copilot_log_dir = home.join(".local/share/copilot-api/logs");
+            if CopilotParser::is_available(&copilot_log_dir) {
+                let copilot_sessions = CopilotParser::scan_all(&copilot_log_dir, report);
+                let copilot_count = copilot_sessions.len();
+                for session in copilot_sessions {
+                    self.sessions.insert(session.id.clone(), Arc::new(session));
+                }
+                if copilot_count > 0 {
+                    debug!(count = copilot_count, "Copilot CLI sessions indexed");
+                }
+            }
         }
 
         debug!(count = self.sessions.len(), "Sessions indexed");
@@ -1453,6 +1483,7 @@ mod tests {
             let total_tokens = 1000 * (i as u64 + 1);
             let session = SessionMetadata {
                 id: format!("test-{}", i).into(),
+                source_tool: None,
                 file_path: std::path::PathBuf::from(format!("/test-{}.jsonl", i)),
                 project_path: "/test".into(),
                 first_timestamp: Some(now - chrono::Duration::days(i)),
@@ -1521,6 +1552,7 @@ mod tests {
         for (id, tokens, model, days_ago) in test_data {
             let session = SessionMetadata {
                 id: id.into(),
+                source_tool: None,
                 file_path: std::path::PathBuf::from(format!("/{}.jsonl", id)),
                 project_path: "/test".into(),
                 first_timestamp: Some(now - chrono::Duration::days(days_ago)),
