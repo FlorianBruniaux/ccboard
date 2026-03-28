@@ -223,12 +223,24 @@ impl Ui {
                         self.analytics.toggle_sort_order();
                     }
                     KeyCode::Char('r') => {
-                        // Recompute analytics with current period (async operation)
-                        let store = app.store.clone();
-                        let period = self.analytics.period();
-                        tokio::spawn(async move {
-                            store.compute_analytics(period).await;
-                        });
+                        use crate::tabs::analytics::AnalyticsView;
+                        if self.analytics.current_view() == AnalyticsView::Discover {
+                            // Run pattern discovery (async, stores results in DataStore).
+                            // The loading flag is an Arc<AtomicBool> shared with the task.
+                            let loading_flag = self.analytics.begin_discover_loading();
+                            let store = app.store.clone();
+                            tokio::spawn(async move {
+                                store.compute_discover(50, 2, 20).await;
+                                loading_flag.store(false, std::sync::atomic::Ordering::Relaxed);
+                            });
+                        } else {
+                            // Recompute analytics with current period (async operation)
+                            let store = app.store.clone();
+                            let period = self.analytics.period();
+                            tokio::spawn(async move {
+                                store.compute_analytics(period).await;
+                            });
+                        }
                     }
                     _ => {}
                 }

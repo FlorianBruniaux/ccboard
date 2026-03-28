@@ -13,9 +13,9 @@ use crate::models::{
     BillingBlockManager, InvocationStats, MergedConfig, SessionId, SessionMetadata, StatsCache,
 };
 use crate::parsers::{
-    classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats,
-    InvocationParser, McpConfig, Rules, SessionContentParser, SessionIndexParser, SettingsParser,
-    StatsParser,
+    classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats, CodexParser,
+    CursorParser, InvocationParser, McpConfig, OpenCodeParser, Rules, SessionContentParser,
+    SessionIndexParser, SettingsParser, StatsParser,
 };
 use dashmap::DashMap;
 use moka::future::Cache;
@@ -99,6 +99,9 @@ pub struct DataStore {
 
     /// Analytics data cache (invalidated on stats/sessions update)
     analytics_cache: RwLock<Option<AnalyticsData>>,
+
+    /// Discover pattern analysis cache
+    discover_cache: RwLock<Option<Vec<crate::analytics::DiscoverSuggestion>>>,
 
     /// Session metadata (high contention with many entries)
     /// Arc<SessionMetadata> for cheap cloning (8 bytes vs ~400 bytes)
@@ -203,6 +206,7 @@ impl DataStore {
             invocation_stats: RwLock::new(InvocationStats::new()),
             billing_blocks: RwLock::new(BillingBlockManager::new()),
             analytics_cache: RwLock::new(None),
+            discover_cache: RwLock::new(None),
             sessions: DashMap::new(),
             session_content_cache,
             event_bus: EventBus::default_capacity(),
@@ -259,6 +263,9 @@ impl DataStore {
 
         // Scan sessions
         self.scan_sessions(&mut report).await;
+
+        // Scan third-party AI tool sessions (Codex, OpenCode, Cursor)
+        self.scan_third_party_sessions(&mut report).await;
 
         // Determine degraded state
         self.update_degraded_state(&report);
@@ -397,6 +404,48 @@ impl DataStore {
         }
 
         debug!(count = self.sessions.len(), "Sessions indexed");
+    }
+
+    /// Scan third-party AI tool sessions (Codex, OpenCode, Cursor).
+    ///
+    /// Each parser is skipped silently when its data directory does not exist,
+    /// which is the common case for users who only use Claude Code.
+    async fn scan_third_party_sessions(&self, _report: &mut LoadReport) {
+        // Codex
+        if let Some(codex_dir) = CodexParser::default_path() {
+            if codex_dir.exists() {
+                let sessions = CodexParser::scan(&codex_dir).await;
+                let count = sessions.len();
+                for s in sessions {
+                    self.sessions.insert(s.id.clone(), Arc::new(s));
+                }
+                debug!(count, "Codex sessions indexed");
+            }
+        }
+
+        // OpenCode
+        if let Some(db_path) = OpenCodeParser::default_path() {
+            if db_path.exists() {
+                let sessions = OpenCodeParser::scan(&db_path);
+                let count = sessions.len();
+                for s in sessions {
+                    self.sessions.insert(s.id.clone(), Arc::new(s));
+                }
+                debug!(count, "OpenCode sessions indexed");
+            }
+        }
+
+        // Cursor
+        if let Some(cursor_dir) = CursorParser::default_dir() {
+            if cursor_dir.exists() {
+                let sessions = CursorParser::scan(&cursor_dir);
+                let count = sessions.len();
+                for s in sessions {
+                    self.sessions.insert(s.id.clone(), Arc::new(s));
+                }
+                debug!(count, "Cursor sessions indexed");
+            }
+        }
     }
 
     /// Update degraded state based on load report
@@ -641,6 +690,104 @@ impl DataStore {
             }
             Err(e) => {
                 warn!(error = %e, "Failed to compute analytics (task panicked)");
+            }
+        }
+    }
+
+    /// Get cached discover suggestions (None if not yet computed)
+    pub fn discover(&self) -> Option<Vec<crate::analytics::DiscoverSuggestion>> {
+        self.discover_cache.read().clone()
+    }
+
+    /// Extract user messages from recent sessions and run pattern discovery.
+    ///
+    /// Loads JSONL content for up to `max_sessions` most recent sessions,
+    /// extracts user message text, and stores results in `discover_cache`.
+    /// Publishes `DataEvent::AnalyticsUpdated` on completion so the TUI re-renders.
+    pub async fn compute_discover(&self, max_sessions: usize, min_count: usize, top: usize) {
+        let sessions = self.recent_sessions(max_sessions);
+
+        info!(session_count = sessions.len(), "compute_discover() ENTRY");
+
+        let session_data = tokio::task::spawn_blocking(move || {
+            use std::io::BufRead;
+
+            let mut result: Vec<crate::analytics::DiscoverSessionData> = Vec::new();
+            for session in &sessions {
+                let path = session.file_path.clone();
+                let session_id = session.id.as_str().to_string();
+                let project = session.project_path.as_str().to_string();
+
+                let messages: Option<Vec<String>> = (|| {
+                    let file = std::fs::File::open(&path).ok()?;
+                    let reader = std::io::BufReader::new(file);
+                    let mut msgs: Vec<String> = Vec::new();
+                    for line in reader.lines().map_while(|l| l.ok()) {
+                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
+                            if v.get("type").and_then(|t| t.as_str()) == Some("user") {
+                                if let Some(content) =
+                                    v.get("message").and_then(|m| m.get("content"))
+                                {
+                                    let text = match content {
+                                        serde_json::Value::String(s) => s.clone(),
+                                        serde_json::Value::Array(arr) => arr
+                                            .iter()
+                                            .filter_map(|item| {
+                                                if item.get("type").and_then(|t| t.as_str())
+                                                    == Some("text")
+                                                {
+                                                    item.get("text")
+                                                        .and_then(|t| t.as_str())
+                                                        .map(|s| s.to_string())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                            .collect::<Vec<_>>()
+                                            .join(" "),
+                                        _ => continue,
+                                    };
+                                    if !text.trim().is_empty() && text.len() > 10 {
+                                        msgs.push(text);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if msgs.is_empty() {
+                        None
+                    } else {
+                        Some(msgs)
+                    }
+                })();
+
+                if let Some(messages) = messages {
+                    result.push(crate::analytics::DiscoverSessionData {
+                        session_id,
+                        project,
+                        messages,
+                    });
+                }
+            }
+            result
+        })
+        .await;
+
+        match session_data {
+            Ok(data) => {
+                let sessions_analyzed = data.len();
+                let suggestions = crate::analytics::discover_patterns(&data, min_count, top);
+                info!(
+                    sessions_analyzed,
+                    suggestions_count = suggestions.len(),
+                    "compute_discover() completed"
+                );
+                let mut guard = self.discover_cache.write();
+                *guard = Some(suggestions);
+                self.event_bus.publish(DataEvent::AnalyticsUpdated);
+            }
+            Err(e) => {
+                warn!(error = %e, "compute_discover() task panicked");
             }
         }
     }
@@ -1474,6 +1621,7 @@ mod tests {
                 branch: None,
                 tool_usage: std::collections::HashMap::new(),
                 tool_token_usage: std::collections::HashMap::new(),
+                source_tool: Default::default(),
             };
             store.sessions.insert(session.id.clone(), Arc::new(session));
         }
@@ -1541,6 +1689,7 @@ mod tests {
                 branch: None,
                 tool_usage: std::collections::HashMap::new(),
                 tool_token_usage: std::collections::HashMap::new(),
+                source_tool: Default::default(),
             };
             store.sessions.insert(session.id.clone(), Arc::new(session));
         }
