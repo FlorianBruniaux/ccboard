@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/florianbruniaux/Sites/perso/ccboard/.claude/hooks/bash/session-start.sh"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

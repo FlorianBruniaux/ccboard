@@ -183,6 +183,12 @@ pub fn Sidebar(
                                 <span class="sidebar-link-label">"Search"</span>
                             </A>
                         </li>
+                        <li class="nav-item">
+                            <A href="/brain" attr:class="sidebar-link" on:click=close_sidebar>
+                                <span class="sidebar-link-icon">{"🧠"}</span>
+                                <span class="sidebar-link-label">"Brain"</span>
+                            </A>
+                        </li>
                     </ul>
                 </nav>
             </aside>
