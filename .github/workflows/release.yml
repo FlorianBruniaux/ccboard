@@ -291,3 +291,18 @@ jobs:
 
       - name: Publish ccboard
         run: cargo publish -p ccboard --no-verify --token ${{ secrets.CARGO_TOKEN }}
+
+  # Requires: WINGET_TOKEN secret — a GitHub PAT (classic) with `public_repo` scope,
+  # created on an account that has forked microsoft/winget-pkgs.
+  # The action opens a PR to winget-pkgs on each new tag automatically.
+  publish-winget:
+    name: Publish to WinGet
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Submit to WinGet
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: FlorianBruniaux.ccboard
+          token: ${{ secrets.WINGET_TOKEN }}
+          installers-regex: 'ccboard-windows-x86_64\.exe\.zip$'
