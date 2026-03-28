@@ -181,8 +181,11 @@ impl AnalyticsData {
         let sessions_in_period = period_sessions.len();
         let anomalies_detected =
             anomalies::detect_anomalies_with_thresholds(&period_sessions, thresholds);
-        let daily_spikes_detected =
-            anomalies::detect_daily_cost_spikes_with_thresholds(&period_sessions, period.days(), thresholds);
+        let daily_spikes_detected = anomalies::detect_daily_cost_spikes_with_thresholds(
+            &period_sessions,
+            period.days(),
+            thresholds,
+        );
 
         // Aggregate per-tool token usage across all sessions
         let mut aggregated_tool_tokens: std::collections::HashMap<String, u64> =
@@ -222,7 +225,11 @@ impl AnalyticsData {
                 };
                 let est_cost = total_cost_estimate * pct;
                 let calls = *period_tool_calls.get(name).unwrap_or(&0);
-                let cost_per_call = if calls > 0 { est_cost / calls as f64 } else { 0.0 };
+                let cost_per_call = if calls > 0 {
+                    est_cost / calls as f64
+                } else {
+                    0.0
+                };
                 ToolTokenStat {
                     tool_name: name.clone(),
                     call_count: calls,

@@ -58,6 +58,111 @@ impl AgentType {
     }
 }
 
+/// Result type from a blocking directory scan: (agents, commands, skills).
+pub type ScanResult = (Vec<AgentEntry>, Vec<AgentEntry>, Vec<AgentEntry>);
+
+/// Scan all agent/command/skill directories using blocking std::fs I/O.
+///
+/// Must be called from `tokio::task::spawn_blocking` — never on the async executor thread.
+/// With 45+ symlinked skill directories the blocking syscalls are enough to stall the
+/// tokio runtime and fill the broadcast channel (capacity 256), causing a deadlock.
+pub fn scan_all_blocking(claude_home: &Path, project_path: Option<&Path>) -> ScanResult {
+    let mut agents = Vec::new();
+    let mut commands = Vec::new();
+    let mut skills = Vec::new();
+
+    for base in [Some(claude_home), project_path].into_iter().flatten() {
+        collect_subdir(base, "agents", AgentType::Agent, &mut agents);
+        collect_subdir(base, "commands", AgentType::Command, &mut commands);
+        collect_subdir(base, "skills", AgentType::Skill, &mut skills);
+    }
+
+    agents.sort_by(|a, b| a.name.cmp(&b.name));
+    commands.sort_by(|a, b| a.name.cmp(&b.name));
+    skills.sort_by(|a, b| a.name.cmp(&b.name));
+
+    (agents, commands, skills)
+}
+
+fn collect_subdir(base: &Path, subdir: &str, entry_type: AgentType, out: &mut Vec<AgentEntry>) {
+    let dir = base.join(subdir);
+    if dir.exists() {
+        collect_recursive(&dir, entry_type, out);
+    }
+}
+
+fn collect_recursive(dir: &Path, entry_type: AgentType, out: &mut Vec<AgentEntry>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if path.is_file() && path.extension().is_some_and(|e| e == "md") {
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("README") || n.starts_with("_README"))
+            {
+                continue;
+            }
+            let name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let description = extract_description(&path);
+            out.push(AgentEntry {
+                name,
+                file_path: path.display().to_string(),
+                description,
+                entry_type,
+                invocation_count: 0,
+            });
+        } else if path.is_dir() {
+            let skill_md = path.join("SKILL.md");
+            if skill_md.exists() {
+                let name = path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let description = extract_description(&skill_md);
+                out.push(AgentEntry {
+                    name,
+                    file_path: skill_md.display().to_string(),
+                    description,
+                    entry_type,
+                    invocation_count: 0,
+                });
+            } else {
+                collect_recursive(&path, entry_type, out);
+            }
+        }
+    }
+}
+
+fn extract_description(path: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(path).ok()?;
+    if !content.starts_with("---") {
+        return None;
+    }
+    let parts: Vec<&str> = content.splitn(3, "---").collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    for line in parts[1].lines() {
+        let line = line.trim();
+        if line.starts_with("description:") {
+            let desc = line.strip_prefix("description:")?.trim();
+            return Some(desc.trim_matches('"').trim_matches('\'').to_string());
+        }
+    }
+    None
+}
+
 /// Agents tab state
 pub struct AgentsTab {
     /// Current sub-tab (0=Agents, 1=Commands, 2=Skills)
@@ -113,28 +218,16 @@ impl AgentsTab {
         }
     }
 
-    /// Scan directories for agents/commands/skills
-    pub fn scan_directories(&mut self, claude_home: &Path, project_path: Option<&Path>) {
-        self.agents.clear();
-        self.commands.clear();
-        self.skills.clear();
-
-        // Scan global and project directories
-        let dirs_to_scan: Vec<&Path> = [Some(claude_home), project_path]
-            .into_iter()
-            .flatten()
-            .collect();
-
-        for base_dir in dirs_to_scan {
-            self.scan_directory(base_dir, "agents", AgentType::Agent);
-            self.scan_directory(base_dir, "commands", AgentType::Command);
-            self.scan_directory(base_dir, "skills", AgentType::Skill);
-        }
-
-        // Sort all lists by name initially (will be re-sorted by usage later if stats available)
-        self.agents.sort_by(|a, b| a.name.cmp(&b.name));
-        self.commands.sort_by(|a, b| a.name.cmp(&b.name));
-        self.skills.sort_by(|a, b| a.name.cmp(&b.name));
+    /// Apply pre-scanned directory results (produced by `scan_all_blocking`).
+    pub fn apply_scanned(
+        &mut self,
+        agents: Vec<AgentEntry>,
+        commands: Vec<AgentEntry>,
+        skills: Vec<AgentEntry>,
+    ) {
+        self.agents = agents;
+        self.commands = commands;
+        self.skills = skills;
     }
 
     /// Update invocation counts from stats and sort by usage
@@ -169,8 +262,11 @@ impl AgentsTab {
             .collect();
         self.agents.extend(new_agents);
 
-        let known_commands: std::collections::HashSet<String> =
-            self.commands.iter().map(|c| format!("/{}", c.name)).collect();
+        let known_commands: std::collections::HashSet<String> = self
+            .commands
+            .iter()
+            .map(|c| format!("/{}", c.name))
+            .collect();
         let new_commands: Vec<AgentEntry> = stats
             .commands
             .iter()
@@ -217,117 +313,6 @@ impl AgentsTab {
                 .cmp(&a.invocation_count)
                 .then(a.name.cmp(&b.name))
         });
-    }
-
-    fn scan_directory(&mut self, base: &Path, subdir: &str, entry_type: AgentType) {
-        let dir = base.join(subdir);
-        if !dir.exists() {
-            return;
-        }
-
-        self.scan_recursive(&dir, entry_type);
-    }
-
-    fn scan_recursive(&mut self, dir: &Path, entry_type: AgentType) {
-        let entries = match std::fs::read_dir(dir) {
-            Ok(e) => e,
-            Err(_) => return,
-        };
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-
-            // Case 1: Direct .md file
-            if path.is_file() && path.extension().is_some_and(|e| e == "md") {
-                // Skip README files
-                if path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("README") || n.starts_with("_README"))
-                {
-                    continue;
-                }
-
-                let name = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-
-                let description = Self::extract_description(&path);
-
-                let target_list = match entry_type {
-                    AgentType::Agent => &mut self.agents,
-                    AgentType::Command => &mut self.commands,
-                    AgentType::Skill => &mut self.skills,
-                };
-
-                target_list.push(AgentEntry {
-                    name,
-                    file_path: path.display().to_string(),
-                    description,
-                    entry_type,
-                    invocation_count: 0, // TODO: implement counting from sessions
-                });
-            }
-            // Case 2: Directory containing SKILL.md (standard skill format)
-            else if path.is_dir() {
-                let skill_md = path.join("SKILL.md");
-                if skill_md.exists() {
-                    let name = path
-                        .file_name()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("unknown")
-                        .to_string();
-
-                    let description = Self::extract_description(&skill_md);
-
-                    let target_list = match entry_type {
-                        AgentType::Agent => &mut self.agents,
-                        AgentType::Command => &mut self.commands,
-                        AgentType::Skill => &mut self.skills,
-                    };
-
-                    target_list.push(AgentEntry {
-                        name,
-                        file_path: skill_md.display().to_string(),
-                        description,
-                        entry_type,
-                        invocation_count: 0, // TODO: implement counting from sessions
-                    });
-                } else {
-                    // Case 3: Directory without SKILL.md → scan recursively for .md files
-                    self.scan_recursive(&path, entry_type);
-                }
-            }
-        }
-    }
-
-    fn extract_description(path: &Path) -> Option<String> {
-        let content = std::fs::read_to_string(path).ok()?;
-
-        // Simple frontmatter extraction: look for description field
-        if !content.starts_with("---") {
-            return None;
-        }
-
-        let parts: Vec<&str> = content.splitn(3, "---").collect();
-        if parts.len() < 3 {
-            return None;
-        }
-
-        let frontmatter = parts[1];
-        for line in frontmatter.lines() {
-            let line = line.trim();
-            if line.starts_with("description:") {
-                let desc = line.strip_prefix("description:")?.trim();
-                // Remove quotes if present
-                let desc = desc.trim_matches('"').trim_matches('\'');
-                return Some(desc.to_string());
-            }
-        }
-
-        None
     }
 
     /// Handle key input

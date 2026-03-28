@@ -48,6 +48,10 @@ pub async fn run(
     // Channel to signal when loading completes
     let (load_tx, mut load_rx) = oneshot::channel();
 
+    // Clone paths for the background task (needed for the blocking directory scan)
+    let claude_home_for_scan = claude_home.clone();
+    let project_path_for_scan = project_path.clone();
+
     // Spawn background loading task
     let store_clone = store.clone();
     tokio::spawn(async move {
@@ -65,8 +69,21 @@ pub async fn run(
             .compute_analytics(ccboard_core::analytics::Period::last_30d())
             .await;
 
+        // Scan agent/command/skill directories in a blocking thread pool.
+        // Using std::fs on the async executor thread starves the tokio runtime
+        // when ~/.claude/skills/ contains 45+ symlinked directories, filling the
+        // broadcast channel and causing a deadlock (see issue #52).
+        let scan = tokio::task::spawn_blocking(move || {
+            crate::tabs::agents::scan_all_blocking(
+                &claude_home_for_scan,
+                project_path_for_scan.as_deref(),
+            )
+        })
+        .await
+        .unwrap_or_else(|_| (vec![], vec![], vec![]));
+
         // Signal completion
-        let _ = load_tx.send((report, store_clone.invocation_stats()));
+        let _ = load_tx.send((report, store_clone.invocation_stats(), scan));
     });
 
     // Main loop with loading check
@@ -99,6 +116,7 @@ async fn run_loop_with_loading<B: Backend>(
     load_rx: &mut oneshot::Receiver<(
         ccboard_core::LoadReport,
         ccboard_core::models::InvocationStats,
+        crate::tabs::agents::ScanResult,
     )>,
     claude_home: &std::path::Path,
     project_path: Option<&std::path::Path>,
@@ -109,10 +127,10 @@ where
     loop {
         // Check if loading completed
         if let Ok(result) = load_rx.try_recv() {
-            let (_report, invocation_stats) = result;
+            let (_report, invocation_stats, scan) = result;
 
-            // Initialize UI now that data is loaded
-            ui.init(claude_home, project_path, &invocation_stats);
+            // Initialize UI with pre-scanned data (scan ran in spawn_blocking, not on executor)
+            ui.init(scan, claude_home, project_path, &invocation_stats);
 
             // Mark loading as complete
             app.complete_loading();
