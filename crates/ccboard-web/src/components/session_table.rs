@@ -185,6 +185,7 @@ pub fn SessionTable(
                         <th on:click=move |_| toggle_sort(SortColumn::Tokens)>
                             {"Tokens"}{move || sort_indicator(SortColumn::Tokens)}
                         </th>
+                        <th>{"Lines"}</th>
                         <th on:click=move |_| toggle_sort(SortColumn::Cost)>
                             {"Cost"}{move || sort_indicator(SortColumn::Cost)}
                         </th>
@@ -213,6 +214,19 @@ pub fn SessionTable(
                                                 <td>{format_model(&session.model)}</td>
                                                 <td>{session.messages.to_string()}</td>
                                                 <td>{format_tokens(session.tokens)}</td>
+                                                <td>
+                                                    {if session.lines_added > 0 || session.lines_removed > 0 {
+                                                        view! {
+                                                            <span>
+                                                                <span class="lines-added">{format!("+{}", format_tokens(session.lines_added))}</span>
+                                                                <span class="lines-sep">{" / "}</span>
+                                                                <span class="lines-removed">{format!("-{}", format_tokens(session.lines_removed))}</span>
+                                                            </span>
+                                                        }.into_any()
+                                                    } else {
+                                                        view! { <span class="lines-none">{"—"}</span> }.into_any()
+                                                    }}
+                                                </td>
                                                 <td class={cost_color_class(session.cost)}>
                                                     {format!("${:.4}", session.cost)}
                                                 </td>

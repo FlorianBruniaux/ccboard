@@ -1553,6 +1553,18 @@ impl SessionsTab {
                     Span::styled(format!("{:>5} ", msgs_str), Style::default().fg(p.success)),
                 ]);
 
+                // Code metrics: show +N-N only when data is available (sessions parsed with v8+ cache)
+                if session.lines_added > 0 || session.lines_removed > 0 {
+                    preview_spans.push(Span::styled(
+                        format!(
+                            "+{}-{} ",
+                            Self::format_short(session.lines_added),
+                            Self::format_short(session.lines_removed)
+                        ),
+                        Style::default().fg(Color::Green),
+                    ));
+                }
+
                 // Add branch if available
                 if let Some(ref branch) = session.branch {
                     let branch_display = if branch.len() > 12 {
@@ -1695,6 +1707,28 @@ impl SessionsTab {
                 ),
             ]),
         ]);
+
+        // Code metrics (if available — sessions parsed with cache v8+)
+        if session.lines_added > 0 || session.lines_removed > 0 {
+            let net = session.lines_added as i64 - session.lines_removed as i64;
+            let net_color = if net >= 0 { p.success } else { p.error };
+            lines.push(Line::from(vec![
+                Span::styled("Lines: ", Style::default().fg(p.muted)),
+                Span::styled(
+                    format!("+{}", Self::format_short(session.lines_added)),
+                    Style::default().fg(p.success),
+                ),
+                Span::styled(" / ", Style::default().fg(p.muted)),
+                Span::styled(
+                    format!("-{}", Self::format_short(session.lines_removed)),
+                    Style::default().fg(p.error),
+                ),
+                Span::styled(
+                    format!("  net {}{}", if net >= 0 { "+" } else { "" }, net),
+                    Style::default().fg(net_color),
+                ),
+            ]));
+        }
 
         // Token breakdown (if available)
         if session.input_tokens > 0 || session.output_tokens > 0 {

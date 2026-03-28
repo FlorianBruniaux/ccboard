@@ -1,4 +1,16 @@
 {
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/florianbruniaux/Sites/perso/ccboard/.claude/hooks/bash/session-stop.sh"
+          }
+        ]
+      }
+    ]
+  },
   "budget": {
     "monthlyBudgetUsd": 50.0,
     "alertThresholdPct": 80.0

@@ -26,6 +26,8 @@ pub enum Tab {
     Activity,
     /// Full-text search tab — accessible via Tab/Shift+Tab
     Search,
+    /// Brain knowledge base — cross-session insights from session-stop hook
+    Brain,
 }
 
 impl Tab {
@@ -43,6 +45,7 @@ impl Tab {
             Tab::Agents,    // 9
             Tab::Plugins,   // 10
             Tab::Search,    // 11
+            Tab::Brain,     // 12
         ]
     }
 
@@ -60,6 +63,7 @@ impl Tab {
             Tab::Agents => 9,
             Tab::Plugins => 10,
             Tab::Search => 11,
+            Tab::Brain => 12,
         }
     }
 
@@ -77,6 +81,7 @@ impl Tab {
             9 => Tab::Agents,
             10 => Tab::Plugins,
             11 => Tab::Search,
+            12 => Tab::Brain,
             _ => Tab::Dashboard,
         }
     }
@@ -95,6 +100,7 @@ impl Tab {
             Tab::Plugins => "Plugins",
             Tab::Activity => "Audit Log",
             Tab::Search => "Search",
+            Tab::Brain => "Brain",
         }
     }
 
@@ -112,6 +118,7 @@ impl Tab {
             Tab::Agents => '0',
             Tab::Plugins => 'p', // decorative — beyond 0-9 range
             Tab::Search => 's',  // decorative — accessible via /
+            Tab::Brain => 'b',   // decorative — accessible via Tab
         }
     }
 
@@ -129,6 +136,7 @@ impl Tab {
             Tab::Plugins => "🎁",
             Tab::Activity => "🔍",
             Tab::Search => "🔎",
+            Tab::Brain => "🧠",
         }
     }
 }
@@ -191,6 +199,9 @@ pub struct App {
 
     /// Search tab state (FTS5 full-text search)
     pub search_tab: crate::tabs::SearchTab,
+
+    /// Brain tab state (insights knowledge base)
+    pub brain_tab: crate::tabs::BrainTab,
 }
 
 impl App {
@@ -227,6 +238,7 @@ impl App {
             color_scheme: prefs.color_scheme,
             keybindings,
             search_tab: crate::tabs::SearchTab::new(),
+            brain_tab: crate::tabs::BrainTab::new(),
         }
     }
 

@@ -197,6 +197,10 @@ pub struct SessionData {
     pub first_timestamp: Option<String>,
     pub duration_seconds: Option<u64>,
     pub preview: Option<String>,
+    #[serde(default)]
+    pub lines_added: u64,
+    #[serde(default)]
+    pub lines_removed: u64,
 }
 
 /// Recent sessions response from API

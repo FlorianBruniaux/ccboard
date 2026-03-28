@@ -350,6 +350,28 @@ impl HelpModal {
                     Span::raw("Exit input mode"),
                 ]));
             }
+            Tab::Brain => {
+                lines.push(Line::from(vec![
+                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(focus_color)),
+                    Span::raw("Navigate insights"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  Enter       ", Style::default().fg(focus_color)),
+                    Span::raw("Expand/collapse detail"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  f           ", Style::default().fg(focus_color)),
+                    Span::raw("Cycle type filter"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  d           ", Style::default().fg(focus_color)),
+                    Span::raw("Archive (soft-delete) selected insight"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  r           ", Style::default().fg(focus_color)),
+                    Span::raw("Reload from DB"),
+                ]));
+            }
         }
 
         lines.push(Line::from(""));

@@ -7,6 +7,7 @@ use crate::tabs::{
     ActivityTab, AgentsTab, AnalyticsTab, ConfigTab, ConversationTab, CostsTab, DashboardTab,
     HistoryTab, HooksTab, McpTab, PluginsTab, SessionsTab,
 };
+// BrainTab state lives in App; we just call render/handle_key via app.brain_tab
 use crate::theme::Palette;
 use ccboard_core::DegradedState;
 use ratatui::{
@@ -251,6 +252,9 @@ impl Ui {
             Tab::Activity => {
                 let sessions = app.store.recent_sessions(50);
                 self.activity.handle_key(key, &sessions, &app.store);
+            }
+            Tab::Brain => {
+                app.brain_tab.handle_key(key);
             }
             Tab::Search => {
                 use crossterm::event::KeyCode;
@@ -577,7 +581,7 @@ impl Ui {
         }
     }
 
-    fn render_tab_content(&mut self, frame: &mut Frame, area: Rect, app: &App) {
+    fn render_tab_content(&mut self, frame: &mut Frame, area: Rect, app: &mut App) {
         let scheme = app.color_scheme;
 
         // If conversation is open, render it as overlay
@@ -673,6 +677,9 @@ impl Ui {
             Tab::Search => {
                 render_search_tab(&app.search_tab, frame, area, scheme);
             }
+            Tab::Brain => {
+                app.brain_tab.render(frame, area, scheme);
+            }
         }
     }
 
@@ -704,6 +711,7 @@ impl Ui {
                 Tab::Plugins => "Tab cycle columns │ j/k navigate │ s sort │ r refresh",
                 Tab::Activity => "j/k navigate │ a analyze session │ Tab/Shift+Tab switch tabs",
                 Tab::Search => "i type query │ Enter search/open │ j/k navigate │ ESC exit input",
+                Tab::Brain => "j/k navigate │ Enter expand │ f filter │ d archive │ r reload",
             };
 
             Line::from(vec![

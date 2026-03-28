@@ -28,7 +28,7 @@ pub use analytics::{
     DiscoverConfig, DiscoverSessionData, DiscoverSuggestion, ForecastData, LlmSuggestion, Period,
     SuggestionCategory, TrendDirection, TrendsData, UsagePatterns,
 };
-pub use cache::{AggregateStats, SearchResult, StoredAlert};
+pub use cache::{AggregateStats, InsightsDb, SearchResult, StoredAlert};
 pub use error::{CoreError, DegradedState, LoadReport};
 pub use event::{DataEvent, EventBus};
 pub use export::{

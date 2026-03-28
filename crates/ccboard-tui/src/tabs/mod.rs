@@ -3,6 +3,7 @@
 pub mod activity;
 pub mod agents;
 pub mod analytics;
+pub mod brain;
 pub mod config;
 pub mod conversation;
 pub mod costs;
@@ -16,6 +17,7 @@ pub mod sessions;
 
 pub use activity::ActivityTab;
 pub use agents::AgentsTab;
+pub use brain::BrainTab;
 pub use analytics::AnalyticsTab;
 pub use config::ConfigTab;
 pub use conversation::ConversationTab;

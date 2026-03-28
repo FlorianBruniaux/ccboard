@@ -290,6 +290,8 @@ impl SessionIndexParser {
             std::collections::HashMap::new();
         let mut tool_token_usage: std::collections::HashMap<String, u64> =
             std::collections::HashMap::new();
+        let mut lines_added: u64 = 0;
+        let mut lines_removed: u64 = 0;
 
         while let Some(line_result) = lines.next_line().await.map_err(|e| CoreError::FileRead {
             path: path.to_path_buf(),
@@ -484,6 +486,35 @@ impl SessionIndexParser {
                                             block.get("name").and_then(|n| n.as_str())
                                         {
                                             *tool_usage.entry(name.to_string()).or_default() += 1;
+
+                                            // Extract code metrics from Edit/Write tool inputs
+                                            if let Some(input) = block.get("input") {
+                                                match name {
+                                                    "Edit" => {
+                                                        let old = input
+                                                            .get("old_string")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("");
+                                                        let new = input
+                                                            .get("new_string")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("");
+                                                        lines_removed +=
+                                                            old.lines().count() as u64;
+                                                        lines_added +=
+                                                            new.lines().count() as u64;
+                                                    }
+                                                    "Write" => {
+                                                        let content = input
+                                                            .get("content")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("");
+                                                        lines_added +=
+                                                            content.lines().count() as u64;
+                                                    }
+                                                    _ => {}
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -536,6 +567,10 @@ impl SessionIndexParser {
 
         // Apply per-tool token usage
         metadata.tool_token_usage = tool_token_usage;
+
+        // Apply code metrics
+        metadata.lines_added = lines_added;
+        metadata.lines_removed = lines_removed;
 
         Ok(metadata)
     }
