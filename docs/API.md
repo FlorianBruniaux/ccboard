@@ -557,6 +557,347 @@ curl http://localhost:8080/api/skills | jq
 
 ---
 
+### GET `/api/plugins`
+
+Returns plugin usage analytics aggregated across the last 10 000 sessions — invocation counts, token consumption, and dead-code detection for skills and commands.
+
+**Response** (200 OK):
+```json
+{
+  "analytics": {
+    "skill_usage": [
+      { "name": "ccboard", "invocations": 42, "tokens": 12345, "last_used": "2026-03-28T14:00:00Z" }
+    ],
+    "command_usage": [
+      { "name": "commit", "invocations": 15, "tokens": 4500, "last_used": "2026-03-29T10:00:00Z" }
+    ],
+    "dead_skills": ["unused-skill"],
+    "dead_commands": []
+  },
+  "generated_at": "2026-03-30T09:00:00Z"
+}
+```
+
+**Use Case**: Plugins tab — usage analytics, dead-code detection, sort by usage/cost/name
+
+**Example**:
+```bash
+curl http://localhost:8080/api/plugins | jq
+```
+
+---
+
+### GET `/api/analytics/suggestions`
+
+Returns actionable cost-optimization suggestions based on dead plugins and high-cost tools.
+
+**Response** (200 OK):
+```json
+{
+  "suggestions": [
+    {
+      "type": "dead_plugin",
+      "plugin": "unused-skill",
+      "message": "Skill 'unused-skill' has 0 invocations. Consider removing it.",
+      "potential_saving_usd": null
+    },
+    {
+      "type": "high_cost_tool",
+      "tool": "Bash",
+      "tokens": 782000,
+      "pct_of_total": 34.2,
+      "message": "Bash accounts for 34% of total tokens. Consider batching commands.",
+      "potential_saving_usd": 12.50
+    }
+  ],
+  "generated_at": "2026-03-30T09:00:00Z"
+}
+```
+
+**Use Case**: Analytics > Discover sub-view
+
+**Example**:
+```bash
+curl http://localhost:8080/api/analytics/suggestions | jq
+```
+
+---
+
+### GET `/api/quota`
+
+Returns current budget and quota status. Returns an error object if no budget is configured.
+
+**Response** (200 OK):
+```json
+{
+  "current_cost": 38.42,
+  "budget_limit": 50.0,
+  "usage_pct": 76.8,
+  "projected_monthly_cost": 61.5,
+  "projected_overage": 11.5,
+  "alert_level": "warning"
+}
+```
+
+**Fields**:
+- `current_cost` (float): Month-to-date cost in USD
+- `budget_limit` (float): Configured monthly budget in USD
+- `usage_pct` (float): Percentage of budget consumed (0–100+)
+- `projected_monthly_cost` (float): Forecasted end-of-month cost
+- `projected_overage` (float): Forecasted overage vs budget (0 if under budget)
+- `alert_level` (string): `"safe"` / `"warning"` / `"critical"` / `"exceeded"`
+
+**Error Response** (when no budget configured):
+```json
+{ "error": "No budget configured or stats not loaded" }
+```
+
+**Configuration**: Set `budget.monthlyBudgetUsd` in `~/.claude/settings.json` to enable.
+
+**Example**:
+```bash
+curl http://localhost:8080/api/quota | jq
+```
+
+---
+
+### GET `/api/search`
+
+Full-text search across all session content using SQLite FTS5.
+
+**Query Parameters**:
+- `q` (string, required): Search query (minimum 2 characters)
+- `limit` (integer, optional): Maximum results to return (default: 50)
+
+**Response** (200 OK):
+```json
+{
+  "results": [
+    {
+      "session_id": "ea23759a-...",
+      "path": "/Users/john/.claude/projects/-Users-john-code-myapp/ea23759a.jsonl",
+      "project": "-Users-john-code-myapp",
+      "first_user_message": "How do I implement authentication?",
+      "snippet": "...implement <b>authentication</b> with JWT tokens...",
+      "rank": 0.95
+    }
+  ],
+  "total": 3,
+  "query": "authentication"
+}
+```
+
+**Fields**:
+- `results` (array): Search results ranked by BM25 relevance
+- `snippet` (string): Highlighted excerpt with `<b>` tags around matches
+- `rank` (float): Relevance score (higher = more relevant)
+- `total` (integer): Number of results returned
+
+**Example**:
+```bash
+curl "http://localhost:8080/api/search?q=authentication&limit=10" | jq
+```
+
+---
+
+### GET `/api/activity/violations`
+
+Returns cross-session security violations feed (credential access, destructive commands).
+
+**Query Parameters**:
+- `min_severity` (string, optional): Minimum severity to return — `"Info"` (default, all), `"Warning"`, `"Critical"`
+- `limit` (integer, optional): Maximum number of violations to return (default: 100)
+
+**Response** (200 OK):
+```json
+{
+  "violations": [
+    {
+      "session_id": "ea23759a-...",
+      "timestamp": "2026-03-28T14:32:00Z",
+      "severity": "Warning",
+      "category": "CredentialAccess",
+      "detail": "Read ~/.aws/credentials",
+      "action_hint": "Verify no secrets were exposed; rotate credentials if in doubt"
+    }
+  ],
+  "total": 12,
+  "displayed": 12,
+  "critical_count": 2,
+  "warning_count": 7,
+  "info_count": 3
+}
+```
+
+**Severity levels**: `"Info"` → `"Warning"` → `"Critical"`
+
+**Example**:
+```bash
+curl "http://localhost:8080/api/activity/violations?min_severity=Warning" | jq
+```
+
+---
+
+### GET `/api/activity/{session_id}`
+
+On-demand security analysis of a single session's tool calls. Results are cached in SQLite after the first call.
+
+**Path Parameters**:
+- `session_id` (string): Session UUID
+
+**Response** (200 OK):
+```json
+{
+  "session_id": "ea23759a-...",
+  "file_accesses": [
+    { "path": "~/.aws/credentials", "operation": "Read" }
+  ],
+  "bash_commands": [
+    { "command": "rm -rf /tmp/foo", "risk_level": "Low" }
+  ],
+  "network_calls": [],
+  "alerts": [
+    {
+      "severity": "Warning",
+      "category": "CredentialAccess",
+      "detail": "Read ~/.aws/credentials",
+      "action_hint": "Verify no secrets were exposed"
+    }
+  ]
+}
+```
+
+**Example**:
+```bash
+curl http://localhost:8080/api/activity/ea23759a-1234-5678-90ab-cdef01234567 | jq
+```
+
+---
+
+### GET `/api/task-graph`
+
+Returns the task dependency graph parsed from a project `PLAN.md` file. Searches `claudedocs/PLAN.md`, `.claude/PLAN.md`, and `~/.claude/claudedocs/PLAN.md` in order.
+
+**Response** (200 OK, plan found):
+```json
+{
+  "found": true,
+  "plan_path": "/Users/john/code/myapp/claudedocs/PLAN.md",
+  "phases": [...],
+  "graph": {
+    "nodes": [...],
+    "edges": [...]
+  }
+}
+```
+
+**Response** (200 OK, no plan found):
+```json
+{ "found": false, "plan_path": null }
+```
+
+**Example**:
+```bash
+curl http://localhost:8080/api/task-graph | jq
+```
+
+---
+
+### GET `/api/claude-mem/summaries`
+
+Returns session summaries stored by the claude-mem integration (if enabled).
+
+**Response** (200 OK):
+```json
+{
+  "enabled": true,
+  "summaries": [
+    {
+      "id": 1,
+      "memory_session_id": "abc123",
+      "project": "/Users/john/code/myapp",
+      "request": "Implement user authentication",
+      "completed": "Added JWT middleware and login/logout routes",
+      "next_steps": "Add refresh token rotation",
+      "files_edited": ["src/auth.rs", "src/routes.rs"],
+      "created_at": "2026-03-28T14:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+**Example**:
+```bash
+curl http://localhost:8080/api/claude-mem/summaries | jq
+```
+
+---
+
+### POST `/api/claude-mem/toggle`
+
+Enable or disable the claude-mem integration at runtime.
+
+**Request Body**:
+```json
+{ "enabled": true }
+```
+
+**Response** (200 OK):
+```json
+{ "enabled": true }
+```
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/api/claude-mem/toggle \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true}' | jq
+```
+
+---
+
+### GET `/api/insights`
+
+Returns insights from `~/.ccboard/insights.db` — the cross-session knowledge base populated by the session-stop hook and `/ccboard-remember` skill.
+
+**Query Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `project` | string | — | Filter by project path (exact match) |
+| `type` | string | — | Filter by insight type: `progress`, `decision`, `blocked`, `pattern`, `fix`, `context` |
+| `limit` | integer | 50 | Maximum number of results |
+| `archived` | integer | 0 | Include archived insights (`1`) or not (`0`) |
+
+**Response** (200 OK):
+```json
+{
+  "insights": [
+    {
+      "id": 1,
+      "session_id": "abc123",
+      "project": "/Users/you/Sites/myproject",
+      "type": "progress",
+      "content": "Implemented Brain tab with filter bar and detail pane",
+      "reasoning": null,
+      "archived": false,
+      "created_at": "2026-03-30T06:46:52Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+**Use Case**: Brain tab — cross-session knowledge base
+
+**Example**:
+```bash
+curl "http://localhost:8080/api/insights?type=blocked&limit=10" | jq
+```
+
+---
+
 ### GET `/api/events` (Server-Sent Events)
 
 Live update stream for real-time monitoring. Pushes events when `~/.claude` files change.
@@ -808,50 +1149,10 @@ wrk -t4 -c100 -d30s http://localhost:8080/api/stats
 
 ---
 
-### GET `/api/insights`
-
-Returns insights from `~/.ccboard/insights.db` — the cross-session knowledge base populated by the session-stop hook and `/ccboard-remember` skill.
-
-**Query parameters**:
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `project` | string | — | Filter by project path (exact match) |
-| `type` | string | — | Filter by insight type: `progress`, `decision`, `blocked`, `pattern`, `fix`, `context` |
-| `limit` | integer | 50 | Maximum number of results |
-| `archived` | integer | 0 | Include archived insights (`1`) or not (`0`) |
-
-**Response** (200 OK):
-```json
-{
-  "insights": [
-    {
-      "id": 1,
-      "session_id": "abc123",
-      "project": "/Users/you/Sites/myproject",
-      "type": "progress",
-      "content": "Implemented Brain tab with filter bar and detail pane",
-      "reasoning": null,
-      "archived": false,
-      "created_at": "2026-03-30T06:46:52Z"
-    }
-  ],
-  "total": 1
-}
-```
-
-**Example**:
-```bash
-curl "http://localhost:8080/api/insights?type=blocked&limit=10"
-```
-
----
-
 ## Future API Additions
 
 Planned endpoints:
-- `GET /api/conversation/:session_id` (Conversation Viewer: full JSONL content display)
-- `GET /api/plan/:project` (Plan-Aware: PLAN.md parsing and task tracking)
+- `GET /api/conversation/:session_id` — Full JSONL session content for the conversation viewer
 
 ---
 

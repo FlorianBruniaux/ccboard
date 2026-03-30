@@ -1,7 +1,8 @@
 # ADR-002: Gemini CLI Support Evaluation
 
-**Status**: Evaluation (Pending User Input)
+**Status**: Closed — Option C Selected (ADR-001 maintained)
 **Date**: 2026-02-12
+**Closed**: 2026-03-30
 **Decision Makers**: Core team + Lab Google user
 **Context**: Challenge to ADR-001 based on Gemini CLI v0.28.2 feature discovery
 **Related**: [ADR-001: Single Provider Focus](./ADR-001-single-provider-focus.md)
@@ -648,7 +649,13 @@ This evaluation was triggered by:
 
 ---
 
-**Status**: 🟡 **Awaiting User Input**
-**Last Updated**: 2026-02-12
-**Next Review**: After user answers 4 critical questions
-**Decision Deadline**: 2026-02-13
+**Status**: 🔴 **Closed — Option C (ADR-001 maintained)**
+
+**Outcome**: The evaluation deadline (2026-02-13) passed without confirming the volume and sponsor conditions required to justify full integration (Option B). Option A (export script) was not prioritized either. ADR-001 remains in effect.
+
+**Partial movement**: Third-party session read-only imports (Cursor, Codex CLI, OpenCode) were added in v0.20 as unrelated scope — they do not constitute Gemini support and do not change this decision.
+
+**Re-evaluation trigger**: 50+ GitHub requests for Gemini support OR confirmed team adoption (10+ users) OR external contributor offering to own the parser maintenance.
+
+**Last Updated**: 2026-03-30
+**Decision Deadline**: 2026-02-13 (passed)

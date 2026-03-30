@@ -27,7 +27,9 @@ ccboard is tightly coupled to Claude Code's data structures:
 | **Claude Code** | `~/.claude/` | JSONL sessions, JSON stats | Local files |
 | **GitHub Copilot** | VSCode/JetBrains logs | Extension logs | Not persistently stored |
 | **Gemini** | Cloud-based | API logs | Cloud-side only |
-| **Cursor** | SQLite database | Custom schema | Different structure |
+| **Cursor** | SQLite database | Custom schema | Read-only import added (v0.20+) |
+| **Codex CLI** | `~/.codex/sessions/` | JSONL rollout files | Read-only import added (v0.20+) |
+| **OpenCode** | SQLite database | Custom schema | Read-only import added (v0.20+) |
 | **Aider** | `.aider/` | Git-based format | Custom format |
 
 ---
@@ -49,7 +51,7 @@ Multi-provider support is **deferred** pending:
 ### Why Claude Code-Only Is Better Now
 
 **1. Focus & Quality**
-- Current roadmap incomplete: Conversation viewer (Phase F), Plan tracking (Phase H), MCP server mode not yet delivered
+- Core roadmap largely delivered: Conversation viewer (Phase F ✅), Tool Cost Analytics (Phase K ✅), Live Session Monitoring (Phase K-HookMonitor ✅). Remaining: Plan tracking (Phase H), advanced analytics (Phase K-Analytics)
 - Better to have one excellent tool than multiple mediocre integrations
 - Claude Code users = early adopters who value depth over breadth
 
@@ -152,10 +154,11 @@ ccboard export --format csv > sessions.csv
 
 ## References
 
-- [PLAN.md](../../PLAN.md) - ccboard roadmap (Phases A-H)
 - [CLAUDE.md](../../CLAUDE.md) - Architecture overview
 - GitHub Copilot logs: No persistent session storage
-- Cursor architecture: SQLite-based, proprietary schema
+- Cursor architecture: SQLite-based, read-only import supported since v0.20
+- Codex CLI: JSONL rollout files, read-only import supported since v0.20
+- OpenCode: SQLite-based, read-only import supported since v0.20
 - Aider: Git-based session tracking in `.aider/`
 
 ---
@@ -176,5 +179,7 @@ If multi-provider support becomes necessary, the internal abstractions (Phase 1 
 
 ---
 
-**Last Updated**: 2026-02-12
+**Note (2026-03-30)**: Third-party session read-only imports (Cursor, Codex CLI, OpenCode) were added in v0.20 as a lightweight bridge — no live monitoring, no hooks/MCP integration, no write access. This aligns with the "prepare without implementing" mitigation strategy from Phase 1.
+
+**Last Updated**: 2026-03-30
 **Next Review**: 2027-02-01

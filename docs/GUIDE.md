@@ -297,18 +297,19 @@ All parsers are opt-in and silent — if the tool is not installed, its parser i
 
 ![Analytics — Discover](../assets/screenshots/tui/tui-09-analytics-discover.png)
 
-Six sub-views, switch with `Tab` / `←` / `→`:
+Seven sub-views, switch with `Tab` / `←` / `→`:
 
 | Sub-view | What it shows |
 |----------|---------------|
-| **Overview** | Budget status, MTD cost, monthly projection |
-| **Trends** | 30-day token and cost trend chart |
-| **Patterns** | Hourly heatmap of activity (fills terminal width), day-of-week distribution |
-| **Insights** | Actionable suggestions based on usage patterns |
+| **Overview** | Budget status, MTD cost, monthly projection, project breakdown |
+| **Trends** | 30-day token activity chart with 30-day forecast and confidence bands |
+| **Patterns** | Activity heatmap (fills terminal width), most-used tools, model distribution, session duration stats |
+| **Summary** | Actionable insights and suggestions based on usage patterns |
 | **Anomalies** | Detected spikes and unusual activity with timestamps |
-| **Forecast** | Token usage forecast with confidence bands |
+| **Costs** | Per-tool token cost bar chart with high-cost tool alerts |
+| **Discover** | AI-generated pattern suggestions from session history |
 
-The hourly heatmap is responsive: it uses your full terminal width and adjusts cell size accordingly.
+The activity heatmap is responsive: it uses your full terminal width and adjusts cell size accordingly.
 
 **Budget tracking** configuration (in `~/.claude/settings.json` or `.claude/settings.json`):
 
