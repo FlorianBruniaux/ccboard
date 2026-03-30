@@ -5571,3 +5571,194 @@ pre code {
   font-size: 0.875rem;
   color: #c9d1d9;
 }
+
+/* ─── Brain page — claude-mem section ────────────────────────────────────── */
+
+.brain-mem-toggle-wrap {
+  margin-left: auto;
+}
+
+.mem-toggle-btn {
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: #161b22;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.mem-toggle-btn:hover {
+  border-color: #06b6d4;
+  color: #06b6d4;
+}
+
+.mem-toggle-btn--on {
+  border-color: #06b6d4;
+  background: rgba(6, 182, 212, 0.1);
+  color: #06b6d4;
+  font-weight: 600;
+}
+
+.brain-mem-section {
+  margin-top: 2rem;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.brain-mem-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: rgba(6, 182, 212, 0.08);
+  border-bottom: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+.brain-mem-title {
+  color: #06b6d4;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.brain-mem-count {
+  color: #8b949e;
+  font-size: 0.8125rem;
+}
+
+.brain-mem-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 300px;
+}
+
+.brain-mem-list {
+  border-right: 1px solid #21262d;
+  overflow-y: auto;
+  max-height: 420px;
+}
+
+.mem-list-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #21262d;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 0.8125rem;
+}
+
+.mem-list-item:hover {
+  background: #161b22;
+}
+
+.mem-list-item.selected {
+  background: rgba(6, 182, 212, 0.12);
+  border-left: 2px solid #06b6d4;
+}
+
+.mem-icon {
+  color: #06b6d4;
+  flex-shrink: 0;
+}
+
+.mem-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.mem-date {
+  color: #8b949e;
+  font-size: 0.75rem;
+}
+
+.mem-project {
+  color: #8b949e;
+  font-size: 0.75rem;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mem-headline {
+  color: #c9d1d9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mem-list-item.selected .mem-headline {
+  color: #06b6d4;
+}
+
+.mem-detail-panel {
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: 420px;
+}
+
+.mem-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.mem-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #21262d;
+}
+
+.mem-detail-project {
+  color: #06b6d4;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.mem-detail-date {
+  color: #8b949e;
+  font-size: 0.8125rem;
+}
+
+.mem-detail-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mem-block-label {
+  color: #8b949e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mem-detail-block--done .mem-block-label {
+  color: #22c55e;
+}
+
+.mem-detail-block--next .mem-block-label {
+  color: #f59e0b;
+}
+
+.mem-block-text {
+  color: #c9d1d9;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.mem-block-text--mono {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  color: #8b949e;
+}

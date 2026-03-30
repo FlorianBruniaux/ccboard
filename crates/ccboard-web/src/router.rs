@@ -5,7 +5,7 @@ use axum::{
     extract::Query,
     http::{header, StatusCode, Uri},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use ccboard_core::AlertSeverity;
@@ -163,6 +163,11 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         )
         .route("/api/task-graph", get(task_graph_handler))
         .route("/api/insights", get(insights_handler))
+        .route(
+            "/api/claude-mem/summaries",
+            get(claude_mem_summaries_handler),
+        )
+        .route("/api/claude-mem/toggle", post(claude_mem_toggle_handler))
         .route("/api/health", get(health_handler))
         // Activity routes — literal path before parameterised path
         .route("/api/activity/violations", get(activity_violations_handler))
@@ -1382,4 +1387,46 @@ async fn insights_handler(
         "insights": insights,
         "total": total as u64
     }))
+}
+
+/// GET /api/claude-mem/summaries — returns recent session summaries + enabled state
+async fn claude_mem_summaries_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    let enabled = store.is_claude_mem_enabled();
+    let summaries: Vec<_> = store
+        .claude_mem_summaries()
+        .into_iter()
+        .map(|s| {
+            serde_json::json!({
+                "id": s.id,
+                "memory_session_id": s.memory_session_id,
+                "project": s.project,
+                "request": s.request,
+                "completed": s.completed,
+                "next_steps": s.next_steps,
+                "files_edited": s.files_edited,
+                "created_at": s.created_at,
+            })
+        })
+        .collect();
+
+    axum::Json(serde_json::json!({
+        "enabled": enabled,
+        "summaries": summaries,
+        "total": summaries.len() as u64
+    }))
+}
+
+/// POST /api/claude-mem/toggle — enable or disable claude-mem integration
+async fn claude_mem_toggle_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+    axum::Json(body): axum::Json<serde_json::Value>,
+) -> axum::Json<serde_json::Value> {
+    let enabled = body
+        .get("enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    store.toggle_claude_mem(enabled);
+    axum::Json(serde_json::json!({ "enabled": enabled }))
 }
