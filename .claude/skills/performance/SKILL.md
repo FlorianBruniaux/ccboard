@@ -1,6 +1,9 @@
 ---
 name: performance
 description: Optimize web performance for faster loading and better user experience. Use when asked to "speed up my site", "optimize performance", "reduce load time", "fix slow loading", "improve page speed", or "performance audit".
+allowed-tools: Read, Grep, Glob, Bash
+effort: medium
+tags: [performance, web, lighthouse, core-web-vitals, optimization]
 license: MIT
 metadata:
   author: web-quality-skills

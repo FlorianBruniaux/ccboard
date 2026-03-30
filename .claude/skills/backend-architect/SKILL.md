@@ -8,6 +8,8 @@ allowed-tools:
   - Bash
 context: fork
 agent: specialist
+effort: high
+tags: [architecture, backend, solid, ddd, refactoring]
 ---
 
 # Backend Architect

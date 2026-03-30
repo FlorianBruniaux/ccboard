@@ -8,6 +8,8 @@ allowed-tools:
   - Bash
 context: fork
 agent: specialist
+effort: high
+tags: [security, owasp, vulnerability, audit, authentication]
 ---
 
 # Security Guardian

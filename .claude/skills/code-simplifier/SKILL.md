@@ -7,6 +7,8 @@ description: |
 allowed-tools: [Read, Edit, Grep, Glob]
 context: fork
 agent: specialist
+effort: medium
+tags: [refactoring, simplification, code-quality, typescript]
 ---
 
 # Code Simplifier - Méthode Aristote

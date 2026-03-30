@@ -4,6 +4,8 @@ description: Analyze codebase for GoF design patterns - detection, suggestions, 
 allowed-tools: Read, Grep, Glob, mcp__grepai__grepai_search
 context: fork
 agent: specialist
+effort: high
+tags: [design-patterns, gof, typescript, refactoring, architecture]
 ---
 
 # Design Patterns Analyzer Skill

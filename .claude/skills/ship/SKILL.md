@@ -1,6 +1,8 @@
 ---
 name: ship
-description: Build, commit, push & version bump workflow - automates the complete release cycle
+description: Build, commit, push & version bump workflow. Use when you want to ship current changes — runs build verification (cargo), stages, commits with conventional message, bumps version optionally, and pushes.
+allowed-tools: Bash
+effort: low
 tags: [workflow, git, automation, release]
 ---
 

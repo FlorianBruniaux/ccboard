@@ -1,7 +1,11 @@
 ---
+name: pr-triage
 description: >
   PR triage: audit open PRs, deep review selected ones, draft and post review comments.
   Args: "all" to review all, PR numbers to focus (e.g. "42 57"), "en"/"fr" for language, no arg = audit only in French.
+allowed-tools: Bash
+effort: medium
+tags: [github, prs, triage, review, automation]
 ---
 
 # PR Triage
