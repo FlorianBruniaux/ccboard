@@ -3,10 +3,10 @@
 //!
 //! Keybindings:
 //! - j/k or ↑/↓: Navigate active section
-//! - Tab: Switch focus between ccboard insights and claude-mem summaries
+//! - ←/→ or h/l: Switch focus between ccboard insights and claude-mem summaries
+//! - [/]: Cycle type filter (ccboard section)
 //! - Enter: Expand/collapse detail
 //! - d: Archive selected insight (ccboard section only)
-//! - ←/→ or h/l: Cycle type filter (ccboard section)
 //! - r: Reload both sources
 //! - M: Toggle claude-mem integration (persists to ~/.ccboard/config.toml)
 
@@ -185,14 +185,15 @@ impl BrainTab {
         store: Option<&Arc<ccboard_core::store::DataStore>>,
     ) -> bool {
         match key {
-            // Tab switches focus between the two sections
-            KeyCode::Tab => {
+            // Left/Right (+ h/l): switch focus between sections (consistent with other tabs)
+            KeyCode::Right | KeyCode::Char('l') => {
                 if self.show_claude_mem {
-                    self.focus = match self.focus {
-                        FocusSection::Insights => FocusSection::ClaudeMem,
-                        FocusSection::ClaudeMem => FocusSection::Insights,
-                    };
+                    self.focus = FocusSection::ClaudeMem;
                 }
+                true
+            }
+            KeyCode::Left | KeyCode::Char('h') => {
+                self.focus = FocusSection::Insights;
                 true
             }
             KeyCode::Char('j') | KeyCode::Down => {
@@ -209,7 +210,8 @@ impl BrainTab {
                 }
                 true
             }
-            KeyCode::Right | KeyCode::Char('l') => {
+            // [ / ] cycle the filter (Insights section only)
+            KeyCode::Char(']') => {
                 if self.focus == FocusSection::Insights {
                     self.filter = self.filter.next();
                     self.expanded = false;
@@ -217,7 +219,7 @@ impl BrainTab {
                 }
                 true
             }
-            KeyCode::Left | KeyCode::Char('h') => {
+            KeyCode::Char('[') => {
                 if self.focus == FocusSection::Insights {
                     self.filter = self.filter.prev();
                     self.expanded = false;
@@ -688,21 +690,22 @@ impl BrainTab {
         store: Option<&Arc<ccboard_core::store::DataStore>>,
     ) {
         let mem_enabled = store.map(|s| s.is_claude_mem_enabled()).unwrap_or(false);
-        let section_hint = if self.show_claude_mem {
-            "  [Tab] switch section"
-        } else {
-            ""
-        };
         let mem_hint = if mem_enabled {
             "  [M] disable claude-mem"
         } else {
             "  [M] enable claude-mem"
         };
         let base = match self.focus {
-            FocusSection::Insights => "[j/k] nav  [←/→] filter  [Enter] expand  [d] archive",
-            FocusSection::ClaudeMem => "[j/k] nav  [Enter] expand detail",
+            FocusSection::Insights => {
+                if self.show_claude_mem {
+                    "[j/k] nav  [→] claude-mem  [[ /]] filter  [Enter] expand  [d] archive"
+                } else {
+                    "[j/k] nav  [[ /]] filter  [Enter] expand  [d] archive"
+                }
+            }
+            FocusSection::ClaudeMem => "[j/k] nav  [←] insights  [Enter] expand detail",
         };
-        let hints = format!("{base}{section_hint}  [r] reload{mem_hint}");
+        let hints = format!("{base}  [r] reload{mem_hint}");
         let footer = Paragraph::new(hints.as_str()).style(Style::default().fg(p.muted).bg(p.bg));
         frame.render_widget(footer, area);
     }
