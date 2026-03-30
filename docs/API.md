@@ -808,6 +808,45 @@ wrk -t4 -c100 -d30s http://localhost:8080/api/stats
 
 ---
 
+### GET `/api/insights`
+
+Returns insights from `~/.ccboard/insights.db` — the cross-session knowledge base populated by the session-stop hook and `/ccboard-remember` skill.
+
+**Query parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `project` | string | — | Filter by project path (exact match) |
+| `type` | string | — | Filter by insight type: `progress`, `decision`, `blocked`, `pattern`, `fix`, `context` |
+| `limit` | integer | 50 | Maximum number of results |
+| `archived` | integer | 0 | Include archived insights (`1`) or not (`0`) |
+
+**Response** (200 OK):
+```json
+{
+  "insights": [
+    {
+      "id": 1,
+      "session_id": "abc123",
+      "project": "/Users/you/Sites/myproject",
+      "type": "progress",
+      "content": "Implemented Brain tab with filter bar and detail pane",
+      "reasoning": null,
+      "archived": false,
+      "created_at": "2026-03-30T06:46:52Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+**Example**:
+```bash
+curl "http://localhost:8080/api/insights?type=blocked&limit=10"
+```
+
+---
+
 ## Future API Additions
 
 Planned endpoints:
@@ -816,7 +855,7 @@ Planned endpoints:
 
 ---
 
-**Last Updated**: 2026-02-11
-**API Version**: v0.5.2
+**Last Updated**: 2026-03-30
+**API Version**: v0.21.0
 **Backend**: Axum + Tokio
 **Frontend**: Leptos + WASM

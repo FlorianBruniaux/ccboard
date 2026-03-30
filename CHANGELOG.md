@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Brain tab** (tab 12, key `b`): Cross-session knowledge base powered by two hooks:
   - `session-stop.sh`: runs after each session, evaluates significance (skips sessions < 3KB), extracts structured insights (progress, decision, blocked, pattern, fix, context) and stores them in `~/.ccboard/insights.db` (WAL SQLite via `InsightsDb`).
   - `session-start.sh`: injects the most recent progress, blockers, and knowledge entries from `insights.db` into Claude's context at session start (guarded by a per-session marker to inject only once).
-  - TUI Brain tab: filterable list by insight type (`f`), expandable detail pane, archive (`a`), refresh (`r`).
+  - TUI Brain tab: filterable list by insight type (`←`/`→`), expandable detail pane (`Enter`), archive (`d`), refresh (`r`).
   - Web Brain page (Leptos): filter tabs, list + detail split panel, type icons and colors.
   - `/ccboard-remember` skill: stores fix/pattern/context/decision insights directly from any Claude session.
   - `GET /api/insights` Axum route with project/type/limit filters.

@@ -535,9 +535,9 @@ A `session-start` hook reads the most recent progress, blockers, and knowledge e
 | Key | Action |
 |-----|--------|
 | `j` / `k` | Navigate insight list |
+| `←` / `→` (or `h` / `l`) | Switch filter (All → Progress → Decision → Blocked → Pattern → Fix → Context) |
 | `Enter` | Expand/collapse detail pane |
-| `f` | Cycle type filter (All → Progress → Decision → ...) |
-| `a` | Archive selected insight |
+| `d` | Archive selected insight |
 | `r` | Refresh from database |
 
 **Manual entries**

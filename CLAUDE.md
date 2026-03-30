@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ccboard** is a unified dashboard for Claude Code management, providing both TUI and web interfaces from a single binary to visualize sessions, stats, configuration, hooks, agents, costs, and history from `~/.claude` directories.
 
-**Stack**: Rust workspace with 4 crates, Ratatui (11-tab TUI), Axum (Web API backend), Leptos (WASM frontend), Arc + parking_lot for concurrency.
+**Stack**: Rust workspace with 4 crates, Ratatui (13-tab TUI), Axum (Web API backend), Leptos (WASM frontend), Arc + parking_lot for concurrency.
 
 ## Workspace Architecture
 
@@ -15,7 +15,7 @@ This is a Cargo workspace with a layered architecture:
 ```
 ccboard/                     # Root binary - CLI entry point
 ├─ ccboard-core/             # Shared data layer (parsers, models, store, watcher)
-├─ ccboard-tui/              # Ratatui frontend (11 tabs)
+├─ ccboard-tui/              # Ratatui frontend (13 tabs)
 └─ ccboard-web/              # Axum API backend + Leptos WASM frontend
 ```
 
@@ -186,6 +186,7 @@ ccboard reads from `~/.claude` and optional project `.claude/`:
 | Tasks | `~/.claude/tasks/<list-id>/<task-id>.json` | `TaskParser` | JSON |
 | Agents/Commands/Skills | `.claude/{agents,commands,skills}/*.md` | Frontmatter | YAML + Markdown |
 | Hooks | `.claude/hooks/bash/*.sh` | `HooksParser` | Shell scripts |
+| Insights | `~/.ccboard/insights.db` | `InsightsDb` | SQLite WAL (written by hooks, read by Rust) |
 
 **Settings merge priority**: local > project > global > defaults
 
@@ -193,12 +194,12 @@ ccboard reads from `~/.claude` and optional project `.claude/`:
 
 Located in `ccboard-tui/src/`:
 
-- **11 tabs**: Dashboard, Sessions, Config, Hooks, Agents/Capabilities, Costs, History, MCP, Analytics, Activity, Search
+- **13 tabs**: Dashboard, Sessions, Config, Hooks, Agents/Capabilities, Costs, History, MCP, Analytics, Activity, Search, Plugins, Brain
 - **Key bindings**: `Tab`/`Shift+Tab` (nav tabs), `j/k` (nav lists), `Enter` (detail), `/` (search), `r` (refresh), `q` (quit), `1-9` (jump tabs)
 - **Event loop**: Crossterm events + DataStore EventBus subscriptions
 - **Widgets**: Sparkline, BarChart, Tree, List, Popup, Table (Ratatui components)
 
-**Current implementation status**: All 11 tabs fully functional.
+**Current implementation status**: All 13 tabs fully functional.
 
 ## Web Structure (Axum API + Leptos Frontend)
 
