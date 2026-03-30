@@ -212,6 +212,8 @@ Navigate tabs with `1-9`, `0`, `p`. Press `?` for contextual help, `:` to open t
 ![Costs Daily](assets/screenshots/tui/tui-06-costs-daily.png)
 ![Costs Billing Blocks](assets/screenshots/tui/tui-06-costs-billing-blocks.png)
 ![Costs Leaderboard](assets/screenshots/tui/tui-06-costs-leaderboard.png)
+![Costs Top Sessions](assets/screenshots/tui/tui-06-costs-top-sessions.png)
+![Costs Per Project](assets/screenshots/tui/tui-06-costs-per-project.png)
 
 #### History Search
 ![History](assets/screenshots/tui/tui-07-history.png)
@@ -225,6 +227,21 @@ Navigate tabs with `1-9`, `0`, `p`. Press `?` for contextual help, `:` to open t
 ![Analytics Patterns](assets/screenshots/tui/tui-09-analytics-patterns.png)
 ![Analytics Insights](assets/screenshots/tui/tui-09-analytics-insights.png)
 ![Analytics Anomalies](assets/screenshots/tui/tui-09-analytics-anomalies.png)
+![Analytics Summary](assets/screenshots/tui/tui-09-analytics-summary.png)
+![Analytics Costs](assets/screenshots/tui/tui-09-analytics-costs.png)
+![Analytics Discover](assets/screenshots/tui/tui-09-analytics-discover.png)
+
+#### Audit Log
+![Audit Log](assets/screenshots/tui/tui-10-audit-log.png)
+
+#### Plugins
+![Plugins](assets/screenshots/tui/tui-11-plugins.png)
+
+#### Search
+![Search](assets/screenshots/tui/tui-12-search.png)
+
+#### Brain — Cross-session Knowledge Base
+![Brain](assets/screenshots/tui/tui-13-brain.png)
 
 </details>
 

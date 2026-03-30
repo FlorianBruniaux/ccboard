@@ -176,6 +176,8 @@ Press `:` to open the command palette. Type to fuzzy-search available commands:
 
 **Key**: `1`
 
+![Dashboard](../assets/screenshots/tui/tui-01-dashboard.png)
+
 Overview of your Claude Code usage at a glance.
 
 **What you see:**
@@ -202,6 +204,10 @@ Overview of your Claude Code usage at a glance.
 ### 2 — Sessions
 
 **Key**: `2`
+
+![Sessions — list view](../assets/screenshots/tui/tui-02-sessions-list.png)
+
+![Sessions — detail pane](../assets/screenshots/tui/tui-02-sessions-detail.png)
 
 Three-pane layout: project tree on the left, session list in the middle, detail panel on the right.
 
@@ -277,6 +283,20 @@ All parsers are opt-in and silent — if the tool is not installed, its parser i
 
 **Key**: `3`
 
+![Analytics — Overview](../assets/screenshots/tui/tui-09-analytics-overview.png)
+
+![Analytics — Trends](../assets/screenshots/tui/tui-09-analytics-trends.png)
+
+![Analytics — Patterns](../assets/screenshots/tui/tui-09-analytics-patterns.png)
+
+![Analytics — Summary](../assets/screenshots/tui/tui-09-analytics-summary.png)
+
+![Analytics — Anomalies](../assets/screenshots/tui/tui-09-analytics-anomalies.png)
+
+![Analytics — Costs](../assets/screenshots/tui/tui-09-analytics-costs.png)
+
+![Analytics — Discover](../assets/screenshots/tui/tui-09-analytics-discover.png)
+
 Six sub-views, switch with `Tab` / `←` / `→`:
 
 | Sub-view | What it shows |
@@ -307,6 +327,18 @@ The hourly heatmap is responsive: it uses your full terminal width and adjusts c
 
 **Key**: `4`
 
+![Costs — Overview](../assets/screenshots/tui/tui-06-costs-overview.png)
+
+![Costs — By Model](../assets/screenshots/tui/tui-06-costs-by-model.png)
+
+![Costs — Daily](../assets/screenshots/tui/tui-06-costs-daily.png)
+
+![Costs — Usage Periods](../assets/screenshots/tui/tui-06-costs-billing-blocks.png)
+
+![Costs — Top Sessions](../assets/screenshots/tui/tui-06-costs-top-sessions.png)
+
+![Costs — Per Project](../assets/screenshots/tui/tui-06-costs-per-project.png)
+
 Six sub-views, switch with `Tab` / `←` / `→`:
 
 | Sub-view | What it shows |
@@ -330,6 +362,8 @@ Six sub-views, switch with `Tab` / `←` / `→`:
 
 **Key**: `5`
 
+![History](../assets/screenshots/tui/tui-07-history.png)
+
 Chronological timeline of all sessions with search and export.
 
 **Keys:**
@@ -348,6 +382,8 @@ Chronological timeline of all sessions with search and export.
 ### 6 — Audit Log
 
 **Key**: `6`
+
+![Audit Log](../assets/screenshots/tui/tui-10-audit-log.png)
 
 Security-focused view of session activity. Scans tool call history for risky patterns.
 
@@ -374,6 +410,8 @@ Each violation includes a remediation hint explaining what to check or change.
 
 **Key**: `7`
 
+![MCP](../assets/screenshots/tui/tui-08-mcp.png)
+
 MCP server configuration and status.
 
 **What you see:**
@@ -396,6 +434,8 @@ MCP server configuration and status.
 ### 8 — Config
 
 **Key**: `8`
+
+![Config](../assets/screenshots/tui/tui-03-config.png)
 
 Visualizes how Claude Code settings merge across four levels.
 
@@ -425,6 +465,8 @@ The active (merged) value is highlighted. Overrides are visible at a glance.
 
 **Key**: `9`
 
+![Hooks](../assets/screenshots/tui/tui-04-hooks.png)
+
 Bash hooks configured in your Claude Code settings, organized by event type.
 
 **Event types**: `PreToolUse`, `PostToolUse`, `Notification`, `Stop`, `SubagentStop`
@@ -449,6 +491,12 @@ Bash hooks configured in your Claude Code settings, organized by event type.
 
 **Key**: `0`
 
+![Tools — Agents](../assets/screenshots/tui/tui-05-agents.png)
+
+![Tools — Commands](../assets/screenshots/tui/tui-05-commands.png)
+
+![Tools — Skills](../assets/screenshots/tui/tui-05-skills.png)
+
 Browse agents, commands, and skills from your `.claude/` directories.
 
 **Three sub-views** (switch with `Tab`):
@@ -466,6 +514,8 @@ Frontmatter is parsed and displayed separately from the Markdown body.
 ### p — Plugins
 
 **Key**: `p`
+
+![Plugins](../assets/screenshots/tui/tui-11-plugins.png)
 
 Usage analytics for your skills, MCP servers, and agents.
 
@@ -486,6 +536,8 @@ Usage analytics for your skills, MCP servers, and agents.
 ### / — Search
 
 **Key**: `/` (or reach via `Tab`)
+
+![Search](../assets/screenshots/tui/tui-12-search.png)
 
 Full-text search across all sessions using SQLite FTS5.
 
@@ -510,6 +562,8 @@ Full-text search across all sessions using SQLite FTS5.
 ### 13 — Brain
 
 **Key**: `b`
+
+![Brain](../assets/screenshots/tui/tui-13-brain.png)
 
 Cross-session knowledge base that captures learning from every session via hooks.
 
