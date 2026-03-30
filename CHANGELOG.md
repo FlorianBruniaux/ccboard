@@ -5,6 +5,30 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-03-28
+
+### Added
+
+- **Third-party session parsers**: ccboard now imports sessions from Cursor, Codex CLI, and OpenCode alongside Claude Code sessions. New `SourceTool` enum (`ClaudeCode`, `Cursor`, `Codex`, `OpenCode`) added to `SessionMetadata`. Sessions from non-Claude tools display a yellow badge (`[Cu]`, `[Cx]`, `[Oc]`) in the Sessions tab. All parsers are opt-in and silently skipped if the tool is not installed.
+  - `cursor.rs`: scans `workspaceStorage/*/state.vscdb`, parses `ItemTable` JSON chat bubble arrays
+  - `codex.rs`: walks `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`, infers timestamps from path
+  - `opencode.rs`: queries `opencode.db` via rusqlite (joins Session + Message tables)
+- **Code Metrics**: `SessionMetadata` gains `lines_added` and `lines_removed` fields computed from Edit/Write tool inputs during session indexing (CACHE_VERSION v8). Sessions tab shows a `+N/-N` badge in the list and detail panel. Web session table shows a Lines column with green/red badges.
+- **Brain tab** (tab 12, key `b`): Cross-session knowledge base powered by two hooks:
+  - `session-stop.sh`: runs after each session, evaluates significance (skips sessions < 3KB), extracts structured insights (progress, decision, blocked, pattern, fix, context) and stores them in `~/.ccboard/insights.db` (WAL SQLite via `InsightsDb`).
+  - `session-start.sh`: injects the most recent progress, blockers, and knowledge entries from `insights.db` into Claude's context at session start (guarded by a per-session marker to inject only once).
+  - TUI Brain tab: filterable list by insight type (`f`), expandable detail pane, archive (`a`), refresh (`r`).
+  - Web Brain page (Leptos): filter tabs, list + detail split panel, type icons and colors.
+  - `/ccboard-remember` skill: stores fix/pattern/context/decision insights directly from any Claude session.
+  - `GET /api/insights` Axum route with project/type/limit filters.
+
+### Changed
+
+- `SessionMetadata` struct gains `source_tool: SourceTool` and `lines_added`/`lines_removed` fields (SQLite cache bumped to v8 — automatic rescan on first launch).
+- Sessions tab list and detail panel updated to show source tool badge and code metrics.
+
+---
+
 ## [0.20.0] - 2026-03-28
 
 ### Added

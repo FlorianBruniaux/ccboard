@@ -37,7 +37,7 @@
 | Tab | Key | Description | Highlights |
 |-----|-----|-------------|------------|
 | **Dashboard** | `1` | Overview stats, model usage, 7-day activity | API usage estimation, plan-based budgets, MCP server count |
-| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), bookmarks (`b`/`B`), subagent tree, model timeline, AI summaries (`ccboard summarize`), conversation viewer with regex search, code metrics (+N/-N lines) |
+| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), bookmarks (`b`/`B`), subagent tree, model timeline, AI summaries (`ccboard summarize`), conversation viewer with regex search, code metrics (+N/-N lines), third-party sessions (Cursor `[Cu]`, Codex `[Cx]`, OpenCode `[Oc]`) |
 | **Analytics** | `3` | Advanced analytics (8 sub-views) | Budget tracking, 30-day forecast, hourly heatmap, anomaly detection (configurable thresholds), usage patterns, per-tool cost breakdown, pattern discovery (`r`) |
 | **Costs** | `4` | Token analytics (6 sub-views) | Overview, By Model, Daily, Usage Periods, Top Sessions, Per Project — 4-level budget alerts |
 | **History** | `5` | Chronological session timeline | CSV/JSON/Markdown export (`x`), full-text search |
@@ -59,6 +59,7 @@
 | **UX** | Command palette (`:`), contextual help (`?`), vim keybindings (hjkl), breadcrumbs, scrollbar indicators, Light/Dark mode (`Ctrl+T`, persistent) |
 | **File Operations** | Edit with `$EDITOR` (`e`), reveal in file manager (`o`), cross-platform |
 | **Zero Config** | Works out of the box with `~/.claude`, single 5.8MB binary, macOS/Linux/Windows |
+| **Multi-tool** | Auto-imports sessions from Cursor, Codex CLI, and OpenCode alongside Claude Code — all parsers opt-in and silent if tool not installed |
 | **Hook Integration** | `ccboard setup` injects Claude Code hooks, live session status (Running/WaitingInput/Stopped), macOS notification on stop, 10-min TTL pruning for stale sessions |
 | **Session Intelligence** | Bookmarks with tags/notes, subagent parent/child tree, model switching timeline, LLM summaries via `ccboard summarize` |
 | **Brain / Knowledge Base** | Session-stop hook captures progress, decisions, blockers, patterns, fixes after each meaningful session into `~/.ccboard/insights.db`. Context-injection hook injects relevant past knowledge at session start. Manual entries via `/ccboard-remember` skill. |

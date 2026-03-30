@@ -23,6 +23,7 @@ Complete feature reference for ccboard — the TUI and Web dashboard for Claude 
   - [0 — Tools](#0--tools)
   - [p — Plugins](#p--plugins)
   - [/ — Search](#---search)
+  - [13 — Brain](#13--brain)
 - [Conversation viewer](#conversation-viewer)
 - [Live session monitoring](#live-session-monitoring)
 - [CLI reference](#cli-reference)
@@ -117,6 +118,7 @@ ccboard --claude-home /path/to/.claude
 | `0` | Tools |
 | `p` | Plugins |
 | `/` | Search |
+| `b` | Brain |
 | `Tab` / `Shift+Tab` | Next / previous tab |
 
 ### Universal keys
@@ -162,6 +164,7 @@ Press `:` to open the command palette. Type to fuzzy-search available commands:
 :config       Jump to Config tab
 :mcp          Jump to MCP tab
 :search       Jump to Search tab
+:brain        Jump to Brain tab
 :quit         Exit application
 ```
 
@@ -250,6 +253,23 @@ ccboard summarize <session-id> --model claude-haiku-4-5  # Faster/cheaper model
 Once cached to `~/.ccboard/summaries/<id>.md`, the summary appears automatically in the detail panel.
 
 **Conversation viewer** opens when you press `Enter` on a session. See [Conversation viewer](#conversation-viewer) for full details.
+
+#### Code metrics
+
+Sessions now show a `+N / -N` badge in the list and detail panel representing lines added and removed across all Edit and Write tool calls in that session. This metric is computed during session indexing and cached in SQLite.
+
+#### Third-party AI tool sessions
+
+ccboard automatically detects and imports sessions from other AI coding tools installed on your system. These sessions appear in the Sessions tab alongside Claude Code sessions, with a colored badge in the source column:
+
+| Tool | Badge | Data source |
+|------|-------|-------------|
+| Claude Code | (none) | `~/.claude/projects/**/*.jsonl` |
+| Cursor | `[Cu]` | `~/Library/Application Support/Cursor/User/workspaceStorage/*/state.vscdb` |
+| Codex CLI | `[Cx]` | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` |
+| OpenCode | `[Oc]` | `~/Library/Application Support/OpenCode/opencode.db` (macOS) or `~/.local/share/opencode/opencode.db` (Linux) |
+
+All parsers are opt-in and silent — if the tool is not installed, its parser is skipped without error. Session content from third-party tools is read-only.
 
 ---
 
@@ -484,6 +504,52 @@ Full-text search across all sessions using SQLite FTS5.
 | `Enter` | Open selected session in conversation viewer |
 | `j` / `k` | Navigate results |
 | `Esc` | Clear search |
+
+---
+
+### 13 — Brain
+
+**Key**: `b`
+
+Cross-session knowledge base that captures learning from every session via hooks.
+
+**How it works**
+
+A `session-stop` hook runs when Claude Code finishes a session. It reads the session JSONL, evaluates its significance (sessions under 3KB are skipped as trivial), extracts key information via structured prompting, and stores insights in `~/.ccboard/insights.db` (WAL SQLite).
+
+A `session-start` hook reads the most recent progress, blockers, and knowledge entries from insights.db and injects them into Claude's context at the start of each session, so Claude remembers where you left off without any manual context setting.
+
+**Insight types**
+
+| Type | Icon | Description |
+|------|------|-------------|
+| `progress` | 📍 | What was accomplished in the session |
+| `decision` | 🏛️ | Architectural or design decisions made |
+| `blocked` | 🚧 | Blockers encountered, unresolved issues |
+| `pattern` | 🔁 | Recurring patterns worth remembering |
+| `fix` | 🔧 | Bug fixes with root cause and solution |
+| `context` | 📌 | General context and background knowledge |
+
+**Key bindings (Brain tab)**
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Navigate insight list |
+| `Enter` | Expand/collapse detail pane |
+| `f` | Cycle type filter (All → Progress → Decision → ...) |
+| `a` | Archive selected insight |
+| `r` | Refresh from database |
+
+**Manual entries**
+
+Use the `/ccboard-remember` skill to store knowledge manually from any session:
+
+```
+/ccboard-remember fixed the auth bug by setting SESSION_SECRET in .env
+/ccboard-remember decided to use Axum over Actix for the web backend
+```
+
+**Database location**: `~/.ccboard/insights.db`
 
 ---
 
