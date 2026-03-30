@@ -2,6 +2,8 @@
 
 pub mod activity;
 pub mod billing_block;
+pub mod ccboard_config;
+pub mod claude_mem;
 pub mod config;
 pub mod insight;
 pub mod invocations;
@@ -10,6 +12,8 @@ pub mod session;
 pub mod stats;
 
 pub use billing_block::{BillingBlock, BillingBlockManager, BillingBlockUsage};
+pub use ccboard_config::CcboardConfig;
+pub use claude_mem::ClaudeMemObservation;
 pub use config::{
     AnomalyThresholds, HookDefinition, HookGroup, MergedConfig, Permissions, Settings,
 };

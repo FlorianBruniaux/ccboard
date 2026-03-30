@@ -1,29 +1,33 @@
 //! Brain tab — cross-session knowledge base from ~/.ccboard/insights.db
+//! + optional claude-mem observations from ~/.claude-mem/claude-mem.db
 //!
-//! Displays insights captured by session-stop.sh hook and /ccboard-remember.
-//! Supports filtering by type, archiving entries, and inline expand.
+//! Displays insights captured by session-stop.sh hook and /ccboard-remember,
+//! and optionally claude-mem observations when integration is enabled.
 //!
 //! Keybindings:
 //! - j/k or ↑/↓: Navigate list
 //! - Enter: Expand/collapse detail
 //! - d: Archive (soft-delete) selected insight
-//! - f: Cycle type filter (All → Progress → Decision → Blocked → Pattern → Fix → Context)
+//! - ←/→ or h/l: Cycle type filter
 //! - r: Reload from DB
+//! - M: Toggle claude-mem integration (persists to ~/.ccboard/config.toml)
 //! - q: Quit / back to parent
 
 use crate::theme::Palette;
 use ccboard_core::cache::InsightsDb;
+use ccboard_core::models::claude_mem::ClaudeMemObservation;
 use ccboard_core::models::config::ColorScheme;
 use ccboard_core::models::insight::{Insight, InsightType};
 use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
 };
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Active type filter in the Brain tab
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -102,6 +106,10 @@ pub struct BrainTab {
     db_dir: PathBuf,
     /// Status message
     pub status: Option<String>,
+    /// claude-mem observations (empty when integration is disabled)
+    claude_mem_obs: Vec<ClaudeMemObservation>,
+    /// Whether claude-mem section is currently visible (runtime only)
+    show_claude_mem: bool,
 }
 
 impl BrainTab {
@@ -116,6 +124,8 @@ impl BrainTab {
             expanded: false,
             db_dir,
             status: None,
+            claude_mem_obs: Vec::new(),
+            show_claude_mem: false,
         }
     }
 
@@ -157,8 +167,22 @@ impl BrainTab {
         }
     }
 
+    /// Sync claude-mem observations from the DataStore and update visibility flag
+    pub fn sync_claude_mem(&mut self, store: &Arc<ccboard_core::store::DataStore>) {
+        self.show_claude_mem = store.is_claude_mem_enabled();
+        if self.show_claude_mem {
+            self.claude_mem_obs = store.claude_mem_observations();
+        } else {
+            self.claude_mem_obs.clear();
+        }
+    }
+
     /// Handle keyboard input for this tab. Returns true if consumed.
-    pub fn handle_key(&mut self, key: KeyCode) -> bool {
+    pub fn handle_key(
+        &mut self,
+        key: KeyCode,
+        store: Option<&Arc<ccboard_core::store::DataStore>>,
+    ) -> bool {
         match key {
             KeyCode::Char('j') | KeyCode::Down => {
                 self.move_selection(1);
@@ -190,6 +214,20 @@ impl BrainTab {
             }
             KeyCode::Char('r') => {
                 self.reload();
+                if let Some(s) = store {
+                    s.reload_claude_mem_observations();
+                    self.sync_claude_mem(s);
+                }
+                true
+            }
+            KeyCode::Char('M') => {
+                if let Some(s) = store {
+                    let new_state = !s.is_claude_mem_enabled();
+                    s.toggle_claude_mem(new_state);
+                    self.sync_claude_mem(s);
+                    let label = if new_state { "enabled" } else { "disabled" };
+                    self.status = Some(format!("claude-mem integration {label}"));
+                }
                 true
             }
             _ => false,
@@ -231,10 +269,19 @@ impl BrainTab {
     }
 
     /// Render the Brain tab (auto-loads on first render)
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, scheme: ColorScheme) {
+    pub fn render(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        scheme: ColorScheme,
+        store: Option<&Arc<ccboard_core::store::DataStore>>,
+    ) {
         // Lazy load: if never loaded, fetch from DB now
         if self.status.is_none() {
             self.reload();
+            if let Some(s) = store {
+                self.sync_claude_mem(s);
+            }
         }
         let p = Palette::new(scheme);
 
@@ -248,7 +295,7 @@ impl BrainTab {
 
         self.render_filter_bar(frame, chunks[0], &p);
         self.render_body(frame, chunks[1], &p);
-        self.render_footer(frame, chunks[2], &p);
+        self.render_footer(frame, chunks[2], &p, store);
     }
 
     fn render_filter_bar(&self, frame: &mut Frame, area: Rect, p: &Palette) {
@@ -262,7 +309,7 @@ impl BrainTab {
             FilterType::Context,
         ];
 
-        let spans: Vec<Span> = filters
+        let mut spans: Vec<Span> = filters
             .iter()
             .flat_map(|&f| {
                 let is_active = f == self.filter;
@@ -279,6 +326,18 @@ impl BrainTab {
             })
             .collect();
 
+        // claude-mem badge
+        if self.show_claude_mem {
+            spans.push(Span::raw("  "));
+            spans.push(Span::styled(
+                " claude-mem ON ",
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ));
+        }
+
         let bar = Paragraph::new(Line::from(spans))
             .block(
                 Block::default()
@@ -293,6 +352,44 @@ impl BrainTab {
     }
 
     fn render_body(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
+        let has_insights = !self.insights.is_empty();
+        let has_mem = self.show_claude_mem && !self.claude_mem_obs.is_empty();
+
+        if !has_insights && !has_mem {
+            let msg = self
+                .status
+                .as_deref()
+                .unwrap_or("No insights captured yet.");
+            let para = Paragraph::new(msg)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .border_style(Style::default().fg(p.border)),
+                )
+                .style(Style::default().fg(p.muted).bg(p.bg))
+                .wrap(Wrap { trim: true });
+            frame.render_widget(para, area);
+            return;
+        }
+
+        if has_mem {
+            // Split: ccboard insights (top) | claude-mem section (bottom)
+            let mem_height = (self.claude_mem_obs.len().min(8) + 2) as u16;
+            let [insights_area, mem_area] =
+                Layout::vertical([Constraint::Min(3), Constraint::Length(mem_height)]).split(area)
+                    [..]
+            else {
+                unreachable!()
+            };
+            self.render_insights_list(frame, insights_area, p);
+            self.render_claude_mem_section(frame, mem_area, p);
+        } else {
+            self.render_insights_list(frame, area, p);
+        }
+    }
+
+    fn render_insights_list(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
         if self.insights.is_empty() {
             let msg = self
                 .status
@@ -420,9 +517,59 @@ impl BrainTab {
         }
     }
 
-    fn render_footer(&self, frame: &mut Frame, area: Rect, p: &Palette) {
-        let hints = "[j/k] nav  [←/→] filter  [Enter] expand  [d] archive  [r] reload";
-        let footer = Paragraph::new(hints).style(Style::default().fg(p.muted).bg(p.bg));
+    fn render_claude_mem_section(&self, frame: &mut Frame, area: Rect, p: &Palette) {
+        let items: Vec<ListItem> = self
+            .claude_mem_obs
+            .iter()
+            .take(8)
+            .map(|obs| {
+                let icon = obs.icon();
+                let date = format_claude_mem_date(&obs.created_at);
+                let project = basename(&obs.project);
+                let text: String = obs.display_text().chars().take(60).collect();
+                let text = if obs.display_text().len() > 60 {
+                    format!("{text}…")
+                } else {
+                    text
+                };
+
+                let line = Line::from(vec![
+                    Span::styled(format!("{icon} "), Style::default().fg(Color::Cyan)),
+                    Span::styled(format!("{date}  "), Style::default().fg(p.muted)),
+                    Span::styled(format!("{project:<12}  "), Style::default().fg(p.muted)),
+                    Span::styled(text, Style::default().fg(p.fg)),
+                ]);
+                ListItem::new(line)
+            })
+            .collect();
+
+        let title = format!(" claude-mem ({}) ", self.claude_mem_obs.len());
+        let list = List::new(items).block(
+            Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Cyan)),
+        );
+
+        frame.render_widget(list, area);
+    }
+
+    fn render_footer(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        p: &Palette,
+        store: Option<&Arc<ccboard_core::store::DataStore>>,
+    ) {
+        let mem_hint = if store.map(|s| s.is_claude_mem_enabled()).unwrap_or(false) {
+            "  [M] disable claude-mem"
+        } else {
+            "  [M] enable claude-mem"
+        };
+        let hints =
+            format!("[j/k] nav  [←/→] filter  [Enter] expand  [d] archive  [r] reload{mem_hint}");
+        let footer = Paragraph::new(hints.as_str()).style(Style::default().fg(p.muted).bg(p.bg));
         frame.render_widget(footer, area);
     }
 }
@@ -461,4 +608,15 @@ fn basename(path: &str) -> String {
         .and_then(|n| n.to_str())
         .unwrap_or(path)
         .to_string()
+}
+
+/// Format a claude-mem ISO timestamp to MM/DD
+fn format_claude_mem_date(created_at: &str) -> String {
+    // Timestamps are like "2026-03-30T09:42:12.719Z"
+    if created_at.len() >= 10 {
+        let date = &created_at[5..10]; // "MM-DD"
+        date.replace('-', "/")
+    } else {
+        created_at.to_string()
+    }
 }

@@ -254,7 +254,7 @@ impl Ui {
                 self.activity.handle_key(key, &sessions, &app.store);
             }
             Tab::Brain => {
-                app.brain_tab.handle_key(key);
+                app.brain_tab.handle_key(key, Some(&app.store));
             }
             Tab::Search => {
                 use crossterm::event::KeyCode;
@@ -678,7 +678,7 @@ impl Ui {
                 render_search_tab(&app.search_tab, frame, area, scheme);
             }
             Tab::Brain => {
-                app.brain_tab.render(frame, area, scheme);
+                app.brain_tab.render(frame, area, scheme, Some(&app.store));
             }
         }
     }

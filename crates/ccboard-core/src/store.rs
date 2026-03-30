@@ -5,12 +5,13 @@
 
 use crate::analytics::{AnalyticsData, Period};
 use crate::bookmarks::BookmarkStore;
-use crate::cache::{MetadataCache, StoredAlert};
+use crate::cache::{ClaudeMemDb, MetadataCache, StoredAlert};
 use crate::error::{CoreError, DegradedState, LoadReport};
 use crate::event::{DataEvent, EventBus};
 use crate::models::activity::ActivitySummary;
 use crate::models::{
-    BillingBlockManager, InvocationStats, MergedConfig, SessionId, SessionMetadata, StatsCache,
+    BillingBlockManager, CcboardConfig, ClaudeMemObservation, InvocationStats, MergedConfig,
+    SessionId, SessionMetadata, StatsCache,
 };
 use crate::parsers::{
     classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats, CodexParser,
@@ -138,6 +139,15 @@ pub struct DataStore {
 
     /// Summary store — reads cached summaries from ~/.ccboard/summaries/
     summary_store: crate::summaries::SummaryStore,
+
+    /// Path to ~/.ccboard directory
+    ccboard_dir: PathBuf,
+
+    /// ccboard-specific configuration (from ~/.ccboard/config.toml)
+    ccboard_config: RwLock<CcboardConfig>,
+
+    /// Observations loaded from claude-mem (when integration is enabled)
+    claude_mem_observations: RwLock<Vec<ClaudeMemObservation>>,
 }
 
 /// Project leaderboard entry with aggregated metrics
@@ -180,6 +190,9 @@ impl DataStore {
             }
         };
 
+        // Load ccboard config from ~/.ccboard/config.toml
+        let ccboard_config = CcboardConfig::load(&ccboard_dir);
+
         // Create metadata cache in ~/.claude/cache/
         let metadata_cache = {
             let cache_dir = claude_home.join("cache");
@@ -207,6 +220,9 @@ impl DataStore {
             billing_blocks: RwLock::new(BillingBlockManager::new()),
             analytics_cache: RwLock::new(None),
             discover_cache: RwLock::new(None),
+            ccboard_dir: ccboard_dir.clone(),
+            ccboard_config: RwLock::new(ccboard_config),
+            claude_mem_observations: RwLock::new(Vec::new()),
             sessions: DashMap::new(),
             session_content_cache,
             event_bus: EventBus::default_capacity(),
@@ -269,6 +285,9 @@ impl DataStore {
 
         // Determine degraded state
         self.update_degraded_state(&report);
+
+        // Load claude-mem observations if integration is enabled
+        self.reload_claude_mem_observations();
 
         // Notify subscribers
         self.event_bus.publish(DataEvent::LoadCompleted);
@@ -567,6 +586,68 @@ impl DataStore {
     /// Get per-project last session stats from ~/.claude.json
     pub fn claude_global_stats(&self) -> Option<ClaudeGlobalStats> {
         self.claude_global_stats.read().clone()
+    }
+
+    // ===================
+    // claude-mem integration
+    // ===================
+
+    /// Whether the claude-mem integration is currently enabled
+    pub fn is_claude_mem_enabled(&self) -> bool {
+        self.ccboard_config.read().claude_mem_enabled
+    }
+
+    /// Get a snapshot of claude-mem observations (empty if integration is disabled)
+    pub fn claude_mem_observations(&self) -> Vec<ClaudeMemObservation> {
+        self.claude_mem_observations.read().clone()
+    }
+
+    /// Get the ccboard configuration (for reading db_path, limit, etc.)
+    pub fn ccboard_config(&self) -> CcboardConfig {
+        self.ccboard_config.read().clone()
+    }
+
+    /// Toggle claude-mem integration on/off, persist to config.toml, and reload/clear observations.
+    ///
+    /// Write lock is held only briefly; disk I/O happens outside the lock.
+    pub fn toggle_claude_mem(&self, enabled: bool) {
+        // 1. Update in memory (brief write lock)
+        {
+            let mut cfg = self.ccboard_config.write();
+            cfg.claude_mem_enabled = enabled;
+        }
+        // 2. Persist to disk (lock released)
+        let cfg = self.ccboard_config.read().clone();
+        if let Err(e) = cfg.save(&self.ccboard_dir) {
+            warn!(error = %e, "Failed to save ccboard config.toml");
+        }
+        // 3. Reload or clear
+        if enabled {
+            self.reload_claude_mem_observations();
+        } else {
+            self.claude_mem_observations.write().clear();
+        }
+        info!(enabled, "claude-mem integration toggled");
+    }
+
+    /// Reload claude-mem observations from disk (no-op if disabled or DB absent)
+    pub fn reload_claude_mem_observations(&self) {
+        let cfg = self.ccboard_config.read().clone();
+        if !cfg.claude_mem_enabled {
+            return;
+        }
+        let db = ClaudeMemDb::new(cfg.db_path());
+        if !db.is_available() {
+            debug!(
+                path = %cfg.db_path().display(),
+                "claude-mem DB not found, skipping load"
+            );
+            return;
+        }
+        let observations = db.load_recent(cfg.claude_mem_limit);
+        let count = observations.len();
+        *self.claude_mem_observations.write() = observations;
+        debug!(count, "claude-mem observations loaded");
     }
 
     /// Get session count

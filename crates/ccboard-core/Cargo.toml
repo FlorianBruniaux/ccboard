@@ -53,6 +53,7 @@ dashmap.workspace = true
 moka.workspace = true
 once_cell.workspace = true
 rusqlite = { version = "0.32", features = ["bundled"] }
+toml = "0.8"
 bincode = "1.3"
 
 # Graph algorithms
