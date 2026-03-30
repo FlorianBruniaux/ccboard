@@ -63,6 +63,18 @@ impl FilterType {
         }
     }
 
+    fn prev(self) -> Self {
+        match self {
+            FilterType::All => FilterType::Context,
+            FilterType::Progress => FilterType::All,
+            FilterType::Decision => FilterType::Progress,
+            FilterType::Blocked => FilterType::Decision,
+            FilterType::Pattern => FilterType::Blocked,
+            FilterType::Fix => FilterType::Pattern,
+            FilterType::Context => FilterType::Fix,
+        }
+    }
+
     fn insight_type(self) -> Option<InsightType> {
         match self {
             FilterType::All => None,
@@ -156,18 +168,24 @@ impl BrainTab {
                 self.move_selection(-1);
                 true
             }
+            KeyCode::Right | KeyCode::Char('l') => {
+                self.filter = self.filter.next();
+                self.expanded = false;
+                self.reload();
+                true
+            }
+            KeyCode::Left | KeyCode::Char('h') => {
+                self.filter = self.filter.prev();
+                self.expanded = false;
+                self.reload();
+                true
+            }
             KeyCode::Enter => {
                 self.expanded = !self.expanded;
                 true
             }
             KeyCode::Char('d') => {
                 self.archive_selected();
-                true
-            }
-            KeyCode::Char('f') => {
-                self.filter = self.filter.next();
-                self.expanded = false;
-                self.reload();
                 true
             }
             KeyCode::Char('r') => {
@@ -403,7 +421,7 @@ impl BrainTab {
     }
 
     fn render_footer(&self, frame: &mut Frame, area: Rect, p: &Palette) {
-        let hints = "[j/k] nav  [Enter] expand  [f] filter  [d] archive  [r] reload";
+        let hints = "[j/k] nav  [←/→] filter  [Enter] expand  [d] archive  [r] reload";
         let footer = Paragraph::new(hints).style(Style::default().fg(p.muted).bg(p.bg));
         frame.render_widget(footer, area);
     }

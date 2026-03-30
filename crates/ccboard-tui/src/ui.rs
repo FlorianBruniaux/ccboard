@@ -711,7 +711,7 @@ impl Ui {
                 Tab::Plugins => "Tab cycle columns │ j/k navigate │ s sort │ r refresh",
                 Tab::Activity => "j/k navigate │ a analyze session │ Tab/Shift+Tab switch tabs",
                 Tab::Search => "i type query │ Enter search/open │ j/k navigate │ ESC exit input",
-                Tab::Brain => "j/k navigate │ Enter expand │ f filter │ d archive │ r reload",
+                Tab::Brain => "j/k navigate │ ←/→ filter │ Enter expand │ d archive │ r reload",
             };
 
             Line::from(vec![
