@@ -4,13 +4,13 @@
 //! read-only (SQLITE_OPEN_READ_ONLY) and gracefully falls back to an empty
 //! result set if the DB is absent, locked, or corrupted.
 
-use crate::models::claude_mem::ClaudeMemObservation;
+use crate::models::claude_mem::ClaudeMemSummary;
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OpenFlags};
 use std::path::PathBuf;
 use tracing::warn;
 
-/// Read-only access to the claude-mem observations database
+/// Read-only access to the claude-mem database
 pub struct ClaudeMemDb {
     db_path: PathBuf,
 }
@@ -25,23 +25,23 @@ impl ClaudeMemDb {
         self.db_path.exists()
     }
 
-    /// Load the most recent observations, newest first.
+    /// Load the most recent session summaries, newest first.
     /// Returns an empty Vec on any error (DB absent, locked, schema mismatch).
-    pub fn load_recent(&self, limit: usize) -> Vec<ClaudeMemObservation> {
-        match self.try_load_recent(limit) {
-            Ok(obs) => obs,
+    pub fn load_recent_summaries(&self, limit: usize) -> Vec<ClaudeMemSummary> {
+        match self.try_load_recent_summaries(limit) {
+            Ok(s) => s,
             Err(e) => {
                 warn!(
                     path = %self.db_path.display(),
                     error = %e,
-                    "claude-mem DB read error — returning empty observations"
+                    "claude-mem DB read error — returning empty summaries"
                 );
                 vec![]
             }
         }
     }
 
-    fn try_load_recent(&self, limit: usize) -> Result<Vec<ClaudeMemObservation>> {
+    fn try_load_recent_summaries(&self, limit: usize) -> Result<Vec<ClaudeMemSummary>> {
         let conn = Connection::open_with_flags(
             &self.db_path,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
@@ -50,29 +50,31 @@ impl ClaudeMemDb {
 
         let mut stmt = conn
             .prepare(
-                "SELECT id, memory_session_id, type, title, narrative, project, created_at
-                 FROM observations
+                "SELECT id, memory_session_id, project, request, completed, next_steps,
+                        files_edited, created_at
+                 FROM session_summaries
                  ORDER BY created_at_epoch DESC
                  LIMIT ?1",
             )
-            .context("Failed to prepare claude-mem query")?;
+            .context("Failed to prepare claude-mem summaries query")?;
 
-        let observations = stmt
+        let summaries = stmt
             .query_map([limit as i64], |row| {
-                Ok(ClaudeMemObservation {
+                Ok(ClaudeMemSummary {
                     id: row.get(0)?,
                     memory_session_id: row.get(1)?,
-                    obs_type: row.get::<_, String>(2).unwrap_or_default(),
-                    title: row.get(3)?,
-                    narrative: row.get(4)?,
-                    project: row.get::<_, String>(5).unwrap_or_default(),
-                    created_at: row.get::<_, String>(6).unwrap_or_default(),
+                    project: row.get::<_, String>(2).unwrap_or_default(),
+                    request: row.get(3)?,
+                    completed: row.get(4)?,
+                    next_steps: row.get(5)?,
+                    files_edited: row.get(6)?,
+                    created_at: row.get::<_, String>(7).unwrap_or_default(),
                 })
             })
-            .context("Failed to query claude-mem observations")?
+            .context("Failed to query claude-mem summaries")?
             .filter_map(|r| r.ok())
             .collect();
 
-        Ok(observations)
+        Ok(summaries)
     }
 }

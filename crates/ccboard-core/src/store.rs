@@ -10,8 +10,8 @@ use crate::error::{CoreError, DegradedState, LoadReport};
 use crate::event::{DataEvent, EventBus};
 use crate::models::activity::ActivitySummary;
 use crate::models::{
-    BillingBlockManager, CcboardConfig, ClaudeMemObservation, InvocationStats, MergedConfig,
-    SessionId, SessionMetadata, StatsCache,
+    BillingBlockManager, CcboardConfig, ClaudeMemSummary, InvocationStats, MergedConfig, SessionId,
+    SessionMetadata, StatsCache,
 };
 use crate::parsers::{
     classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats, CodexParser,
@@ -147,7 +147,7 @@ pub struct DataStore {
     ccboard_config: RwLock<CcboardConfig>,
 
     /// Observations loaded from claude-mem (when integration is enabled)
-    claude_mem_observations: RwLock<Vec<ClaudeMemObservation>>,
+    claude_mem_summaries: RwLock<Vec<ClaudeMemSummary>>,
 }
 
 /// Project leaderboard entry with aggregated metrics
@@ -222,7 +222,7 @@ impl DataStore {
             discover_cache: RwLock::new(None),
             ccboard_dir: ccboard_dir.clone(),
             ccboard_config: RwLock::new(ccboard_config),
-            claude_mem_observations: RwLock::new(Vec::new()),
+            claude_mem_summaries: RwLock::new(Vec::new()),
             sessions: DashMap::new(),
             session_content_cache,
             event_bus: EventBus::default_capacity(),
@@ -286,8 +286,8 @@ impl DataStore {
         // Determine degraded state
         self.update_degraded_state(&report);
 
-        // Load claude-mem observations if integration is enabled
-        self.reload_claude_mem_observations();
+        // Load claude-mem session summaries if integration is enabled
+        self.reload_claude_mem_summaries();
 
         // Notify subscribers
         self.event_bus.publish(DataEvent::LoadCompleted);
@@ -597,9 +597,9 @@ impl DataStore {
         self.ccboard_config.read().claude_mem_enabled
     }
 
-    /// Get a snapshot of claude-mem observations (empty if integration is disabled)
-    pub fn claude_mem_observations(&self) -> Vec<ClaudeMemObservation> {
-        self.claude_mem_observations.read().clone()
+    /// Get a snapshot of claude-mem session summaries (empty if integration is disabled)
+    pub fn claude_mem_summaries(&self) -> Vec<ClaudeMemSummary> {
+        self.claude_mem_summaries.read().clone()
     }
 
     /// Get the ccboard configuration (for reading db_path, limit, etc.)
@@ -623,15 +623,15 @@ impl DataStore {
         }
         // 3. Reload or clear
         if enabled {
-            self.reload_claude_mem_observations();
+            self.reload_claude_mem_summaries();
         } else {
-            self.claude_mem_observations.write().clear();
+            self.claude_mem_summaries.write().clear();
         }
         info!(enabled, "claude-mem integration toggled");
     }
 
-    /// Reload claude-mem observations from disk (no-op if disabled or DB absent)
-    pub fn reload_claude_mem_observations(&self) {
+    /// Reload claude-mem session summaries from disk (no-op if disabled or DB absent)
+    pub fn reload_claude_mem_summaries(&self) {
         let cfg = self.ccboard_config.read().clone();
         if !cfg.claude_mem_enabled {
             return;
@@ -644,10 +644,10 @@ impl DataStore {
             );
             return;
         }
-        let observations = db.load_recent(cfg.claude_mem_limit);
-        let count = observations.len();
-        *self.claude_mem_observations.write() = observations;
-        debug!(count, "claude-mem observations loaded");
+        let summaries = db.load_recent_summaries(cfg.claude_mem_limit);
+        let count = summaries.len();
+        *self.claude_mem_summaries.write() = summaries;
+        debug!(count, "claude-mem summaries loaded");
     }
 
     /// Get session count

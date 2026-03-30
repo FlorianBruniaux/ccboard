@@ -13,7 +13,7 @@ pub mod stats;
 
 pub use billing_block::{BillingBlock, BillingBlockManager, BillingBlockUsage};
 pub use ccboard_config::CcboardConfig;
-pub use claude_mem::ClaudeMemObservation;
+pub use claude_mem::ClaudeMemSummary;
 pub use config::{
     AnomalyThresholds, HookDefinition, HookGroup, MergedConfig, Permissions, Settings,
 };

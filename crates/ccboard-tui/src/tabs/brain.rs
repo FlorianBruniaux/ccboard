@@ -1,21 +1,18 @@
 //! Brain tab — cross-session knowledge base from ~/.ccboard/insights.db
-//! + optional claude-mem observations from ~/.claude-mem/claude-mem.db
-//!
-//! Displays insights captured by session-stop.sh hook and /ccboard-remember,
-//! and optionally claude-mem observations when integration is enabled.
+//! + optional claude-mem session summaries from ~/.claude-mem/claude-mem.db
 //!
 //! Keybindings:
-//! - j/k or ↑/↓: Navigate list
+//! - j/k or ↑/↓: Navigate active section
+//! - Tab: Switch focus between ccboard insights and claude-mem summaries
 //! - Enter: Expand/collapse detail
-//! - d: Archive (soft-delete) selected insight
-//! - ←/→ or h/l: Cycle type filter
-//! - r: Reload from DB
+//! - d: Archive selected insight (ccboard section only)
+//! - ←/→ or h/l: Cycle type filter (ccboard section)
+//! - r: Reload both sources
 //! - M: Toggle claude-mem integration (persists to ~/.ccboard/config.toml)
-//! - q: Quit / back to parent
 
 use crate::theme::Palette;
 use ccboard_core::cache::InsightsDb;
-use ccboard_core::models::claude_mem::ClaudeMemObservation;
+use ccboard_core::models::claude_mem::ClaudeMemSummary;
 use ccboard_core::models::config::ColorScheme;
 use ccboard_core::models::insight::{Insight, InsightType};
 use crossterm::event::KeyCode;
@@ -29,7 +26,6 @@ use ratatui::{
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// Active type filter in the Brain tab
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 enum FilterType {
     #[default]
@@ -92,23 +88,26 @@ impl FilterType {
     }
 }
 
-/// Brain tab state
+/// Which section has keyboard focus
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum FocusSection {
+    #[default]
+    Insights,
+    ClaudeMem,
+}
+
 pub struct BrainTab {
-    /// Loaded insights (filtered)
     insights: Vec<Insight>,
-    /// List selection state
     list_state: ListState,
-    /// Active type filter
     filter: FilterType,
-    /// Expanded detail view for selected insight
     expanded: bool,
-    /// Path to insights.db cache dir
     db_dir: PathBuf,
-    /// Status message
     pub status: Option<String>,
-    /// claude-mem observations (empty when integration is disabled)
-    claude_mem_obs: Vec<ClaudeMemObservation>,
-    /// Whether claude-mem section is currently visible (runtime only)
+    /// claude-mem session summaries
+    summaries: Vec<ClaudeMemSummary>,
+    mem_list_state: ListState,
+    mem_expanded: bool,
+    focus: FocusSection,
     show_claude_mem: bool,
 }
 
@@ -124,12 +123,14 @@ impl BrainTab {
             expanded: false,
             db_dir,
             status: None,
-            claude_mem_obs: Vec::new(),
+            summaries: Vec::new(),
+            mem_list_state: ListState::default(),
+            mem_expanded: false,
+            focus: FocusSection::Insights,
             show_claude_mem: false,
         }
     }
 
-    /// (Re)load insights from disk — called on tab activation and `r`
     pub fn reload(&mut self) {
         match InsightsDb::new(&self.db_dir) {
             Ok(db) => {
@@ -141,7 +142,6 @@ impl BrainTab {
                     Ok(insights) => {
                         self.insights = insights;
                         self.status = Some(format!("{} insights", self.insights.len()));
-                        // Reset selection if out of bounds
                         if self.insights.is_empty() {
                             self.list_state.select(None);
                         } else {
@@ -156,7 +156,6 @@ impl BrainTab {
                 }
             }
             Err(_) => {
-                // insights.db doesn't exist yet — no hook has fired
                 self.insights.clear();
                 self.list_state.select(None);
                 self.status = Some(
@@ -167,55 +166,82 @@ impl BrainTab {
         }
     }
 
-    /// Sync claude-mem observations from the DataStore and update visibility flag
     pub fn sync_claude_mem(&mut self, store: &Arc<ccboard_core::store::DataStore>) {
         self.show_claude_mem = store.is_claude_mem_enabled();
         if self.show_claude_mem {
-            self.claude_mem_obs = store.claude_mem_observations();
+            self.summaries = store.claude_mem_summaries();
+            if !self.summaries.is_empty() && self.mem_list_state.selected().is_none() {
+                self.mem_list_state.select(Some(0));
+            }
         } else {
-            self.claude_mem_obs.clear();
+            self.summaries.clear();
+            self.mem_list_state.select(None);
         }
     }
 
-    /// Handle keyboard input for this tab. Returns true if consumed.
     pub fn handle_key(
         &mut self,
         key: KeyCode,
         store: Option<&Arc<ccboard_core::store::DataStore>>,
     ) -> bool {
         match key {
+            // Tab switches focus between the two sections
+            KeyCode::Tab => {
+                if self.show_claude_mem {
+                    self.focus = match self.focus {
+                        FocusSection::Insights => FocusSection::ClaudeMem,
+                        FocusSection::ClaudeMem => FocusSection::Insights,
+                    };
+                }
+                true
+            }
             KeyCode::Char('j') | KeyCode::Down => {
-                self.move_selection(1);
+                match self.focus {
+                    FocusSection::Insights => self.move_insight_selection(1),
+                    FocusSection::ClaudeMem => self.move_mem_selection(1),
+                }
                 true
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                self.move_selection(-1);
+                match self.focus {
+                    FocusSection::Insights => self.move_insight_selection(-1),
+                    FocusSection::ClaudeMem => self.move_mem_selection(-1),
+                }
                 true
             }
             KeyCode::Right | KeyCode::Char('l') => {
-                self.filter = self.filter.next();
-                self.expanded = false;
-                self.reload();
+                if self.focus == FocusSection::Insights {
+                    self.filter = self.filter.next();
+                    self.expanded = false;
+                    self.reload();
+                }
                 true
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                self.filter = self.filter.prev();
-                self.expanded = false;
-                self.reload();
+                if self.focus == FocusSection::Insights {
+                    self.filter = self.filter.prev();
+                    self.expanded = false;
+                    self.reload();
+                }
                 true
             }
             KeyCode::Enter => {
-                self.expanded = !self.expanded;
+                match self.focus {
+                    FocusSection::Insights => self.expanded = !self.expanded,
+                    FocusSection::ClaudeMem => self.mem_expanded = !self.mem_expanded,
+                }
                 true
             }
             KeyCode::Char('d') => {
-                self.archive_selected();
+                if self.focus == FocusSection::Insights {
+                    self.archive_selected();
+                }
                 true
             }
             KeyCode::Char('r') => {
                 self.reload();
                 if let Some(s) = store {
-                    s.reload_claude_mem_observations();
+                    s.reload_claude_mem_summaries();
                     self.sync_claude_mem(s);
                 }
                 true
@@ -225,8 +251,13 @@ impl BrainTab {
                     let new_state = !s.is_claude_mem_enabled();
                     s.toggle_claude_mem(new_state);
                     self.sync_claude_mem(s);
+                    if new_state {
+                        self.focus = FocusSection::ClaudeMem;
+                    } else {
+                        self.focus = FocusSection::Insights;
+                    }
                     let label = if new_state { "enabled" } else { "disabled" };
-                    self.status = Some(format!("claude-mem integration {label}"));
+                    self.status = Some(format!("claude-mem {label}"));
                 }
                 true
             }
@@ -234,7 +265,7 @@ impl BrainTab {
         }
     }
 
-    fn move_selection(&mut self, delta: i64) {
+    fn move_insight_selection(&mut self, delta: i64) {
         if self.insights.is_empty() {
             return;
         }
@@ -242,6 +273,18 @@ impl BrainTab {
         let next = (current + delta).max(0).min(self.insights.len() as i64 - 1) as usize;
         self.list_state.select(Some(next));
         self.expanded = false;
+    }
+
+    fn move_mem_selection(&mut self, delta: i64) {
+        if self.summaries.is_empty() {
+            return;
+        }
+        let current = self.mem_list_state.selected().unwrap_or(0) as i64;
+        let next = (current + delta)
+            .max(0)
+            .min(self.summaries.len() as i64 - 1) as usize;
+        self.mem_list_state.select(Some(next));
+        self.mem_expanded = false;
     }
 
     fn archive_selected(&mut self) {
@@ -252,7 +295,6 @@ impl BrainTab {
             return;
         };
         let id = insight.id;
-
         match InsightsDb::new(&self.db_dir) {
             Ok(db) => {
                 if let Err(e) = db.archive(id) {
@@ -268,7 +310,6 @@ impl BrainTab {
         }
     }
 
-    /// Render the Brain tab (auto-loads on first render)
     pub fn render(
         &mut self,
         frame: &mut Frame,
@@ -276,7 +317,6 @@ impl BrainTab {
         scheme: ColorScheme,
         store: Option<&Arc<ccboard_core::store::DataStore>>,
     ) {
-        // Lazy load: if never loaded, fetch from DB now
         if self.status.is_none() {
             self.reload();
             if let Some(s) = store {
@@ -285,11 +325,10 @@ impl BrainTab {
         }
         let p = Palette::new(scheme);
 
-        // Header row + main body + footer
         let chunks = Layout::vertical([
-            Constraint::Length(3), // filter bar
-            Constraint::Min(5),    // list + detail
-            Constraint::Length(1), // keybind hint
+            Constraint::Length(3),
+            Constraint::Min(5),
+            Constraint::Length(1),
         ])
         .split(area);
 
@@ -326,16 +365,19 @@ impl BrainTab {
             })
             .collect();
 
-        // claude-mem badge
         if self.show_claude_mem {
             spans.push(Span::raw("  "));
-            spans.push(Span::styled(
-                " claude-mem ON ",
+            let mem_style = if self.focus == FocusSection::ClaudeMem {
                 Style::default()
                     .fg(Color::Black)
                     .bg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            ));
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+            };
+            spans.push(Span::styled(" claude-mem ON ", mem_style));
         }
 
         let bar = Paragraph::new(Line::from(spans))
@@ -352,44 +394,43 @@ impl BrainTab {
     }
 
     fn render_body(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
-        let has_insights = !self.insights.is_empty();
-        let has_mem = self.show_claude_mem && !self.claude_mem_obs.is_empty();
-
-        if !has_insights && !has_mem {
-            let msg = self
-                .status
-                .as_deref()
-                .unwrap_or("No insights captured yet.");
-            let para = Paragraph::new(msg)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_type(BorderType::Rounded)
-                        .border_style(Style::default().fg(p.border)),
-                )
-                .style(Style::default().fg(p.muted).bg(p.bg))
-                .wrap(Wrap { trim: true });
-            frame.render_widget(para, area);
-            return;
-        }
-
-        if has_mem {
-            // Split: ccboard insights (top) | claude-mem section (bottom)
-            let mem_height = (self.claude_mem_obs.len().min(8) + 2) as u16;
+        if self.show_claude_mem && !self.summaries.is_empty() {
+            // Split: insights (top 55%) | claude-mem summaries (bottom 45%)
             let [insights_area, mem_area] =
-                Layout::vertical([Constraint::Min(3), Constraint::Length(mem_height)]).split(area)
-                    [..]
+                Layout::vertical([Constraint::Percentage(55), Constraint::Percentage(45)])
+                    .split(area)[..]
             else {
                 unreachable!()
             };
-            self.render_insights_list(frame, insights_area, p);
-            self.render_claude_mem_section(frame, mem_area, p);
+            self.render_insights_panel(frame, insights_area, p);
+            self.render_mem_panel(frame, mem_area, p);
+        } else if self.show_claude_mem {
+            // claude-mem enabled but no summaries yet
+            let [insights_area, mem_area] =
+                Layout::vertical([Constraint::Min(3), Constraint::Length(3)]).split(area)[..]
+            else {
+                unreachable!()
+            };
+            self.render_insights_panel(frame, insights_area, p);
+            let para = Paragraph::new("No session summaries yet in claude-mem DB.")
+                .block(
+                    Block::default()
+                        .title(" claude-mem ")
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .border_style(Style::default().fg(Color::Cyan)),
+                )
+                .style(Style::default().fg(p.muted).bg(p.bg));
+            frame.render_widget(para, mem_area);
         } else {
-            self.render_insights_list(frame, area, p);
+            self.render_insights_panel(frame, area, p);
         }
     }
 
-    fn render_insights_list(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
+    fn render_insights_panel(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
+        let is_focused = self.focus == FocusSection::Insights;
+        let border_color = if is_focused { p.focus } else { p.border };
+
         if self.insights.is_empty() {
             let msg = self
                 .status
@@ -398,9 +439,10 @@ impl BrainTab {
             let para = Paragraph::new(msg)
                 .block(
                     Block::default()
+                        .title(" ccboard insights ")
                         .borders(Borders::ALL)
                         .border_type(BorderType::Rounded)
-                        .border_style(Style::default().fg(p.border)),
+                        .border_style(Style::default().fg(border_color)),
                 )
                 .style(Style::default().fg(p.muted).bg(p.bg))
                 .wrap(Wrap { trim: true });
@@ -408,8 +450,7 @@ impl BrainTab {
             return;
         }
 
-        // Split body into list | detail when expanded
-        let (list_area, detail_area) = if self.expanded {
+        let (list_area, detail_area) = if self.expanded && is_focused {
             let [l, d] =
                 Layout::horizontal([Constraint::Percentage(45), Constraint::Percentage(55)])
                     .split(area)[..]
@@ -421,53 +462,55 @@ impl BrainTab {
             (area, None)
         };
 
-        // Build list items
         let selected_idx = self.list_state.selected().unwrap_or(usize::MAX);
         let items: Vec<ListItem> = self
             .insights
             .iter()
             .enumerate()
             .map(|(i, insight)| {
-                let type_icon = type_icon(&insight.insight_type);
-                let type_color = type_color(&insight.insight_type, p);
+                let icon = type_icon(&insight.insight_type);
+                let color = type_color(&insight.insight_type, p);
                 let date = insight.created_at.format("%m/%d").to_string();
                 let project = basename(&insight.project);
-                // Truncate content to fit
                 let content: String = insight.content.chars().take(60).collect();
                 let content = if insight.content.len() > 60 {
                     format!("{content}…")
                 } else {
                     content
                 };
-
-                let style = if i == selected_idx {
+                let style = if i == selected_idx && is_focused {
                     Style::default().fg(p.bg).bg(p.focus)
+                } else if i == selected_idx {
+                    Style::default().fg(p.fg).bg(p.surface)
                 } else {
                     Style::default().fg(p.fg).bg(p.bg)
                 };
-
-                let line = Line::from(vec![
-                    Span::styled(format!("{type_icon} "), Style::default().fg(type_color)),
+                ListItem::new(Line::from(vec![
+                    Span::styled(format!("{icon} "), Style::default().fg(color)),
                     Span::styled(format!("{date}  "), Style::default().fg(p.muted)),
                     Span::styled(format!("{project:<12}  "), Style::default().fg(p.muted)),
                     Span::styled(content, style),
-                ]);
-                ListItem::new(line)
+                ]))
             })
             .collect();
 
+        let title = if self.show_claude_mem {
+            " ccboard insights "
+        } else {
+            " Brain "
+        };
         let list = List::new(items)
             .block(
                 Block::default()
+                    .title(title)
                     .borders(Borders::ALL)
                     .border_type(BorderType::Rounded)
-                    .border_style(Style::default().fg(p.border)),
+                    .border_style(Style::default().fg(border_color)),
             )
             .highlight_style(Style::default().fg(p.bg).bg(p.focus));
 
         frame.render_stateful_widget(list, list_area, &mut self.list_state);
 
-        // Detail pane
         if let (Some(d_area), Some(insight)) = (detail_area, self.insights.get(selected_idx)) {
             let type_label = format!(
                 "{} {}",
@@ -475,8 +518,6 @@ impl BrainTab {
                 insight.insight_type.as_str().to_uppercase()
             );
             let date = insight.created_at.format("%Y-%m-%d %H:%M UTC").to_string();
-            let project = &insight.project;
-
             let mut lines = vec![
                 Line::from(Span::styled(
                     &type_label,
@@ -485,11 +526,13 @@ impl BrainTab {
                         .add_modifier(Modifier::BOLD),
                 )),
                 Line::from(Span::styled(date, Style::default().fg(p.muted))),
-                Line::from(Span::styled(project.as_str(), Style::default().fg(p.muted))),
+                Line::from(Span::styled(
+                    insight.project.as_str(),
+                    Style::default().fg(p.muted),
+                )),
                 Line::raw(""),
                 Line::from(Span::styled(&insight.content, Style::default().fg(p.fg))),
             ];
-
             if let Some(reasoning) = &insight.reasoning {
                 lines.push(Line::raw(""));
                 lines.push(Line::from(Span::styled(
@@ -501,7 +544,6 @@ impl BrainTab {
                     Style::default().fg(p.fg),
                 )));
             }
-
             let detail = Paragraph::new(lines)
                 .block(
                     Block::default()
@@ -512,47 +554,130 @@ impl BrainTab {
                 )
                 .style(Style::default().bg(p.surface))
                 .wrap(Wrap { trim: false });
-
             frame.render_widget(detail, d_area);
         }
     }
 
-    fn render_claude_mem_section(&self, frame: &mut Frame, area: Rect, p: &Palette) {
-        let items: Vec<ListItem> = self
-            .claude_mem_obs
-            .iter()
-            .take(8)
-            .map(|obs| {
-                let icon = obs.icon();
-                let date = format_claude_mem_date(&obs.created_at);
-                let project = basename(&obs.project);
-                let text: String = obs.display_text().chars().take(60).collect();
-                let text = if obs.display_text().len() > 60 {
-                    format!("{text}…")
-                } else {
-                    text
-                };
+    fn render_mem_panel(&mut self, frame: &mut Frame, area: Rect, p: &Palette) {
+        let is_focused = self.focus == FocusSection::ClaudeMem;
+        let border_color = if is_focused { Color::Cyan } else { p.border };
 
-                let line = Line::from(vec![
-                    Span::styled(format!("{icon} "), Style::default().fg(Color::Cyan)),
+        let selected_idx = self.mem_list_state.selected().unwrap_or(usize::MAX);
+
+        // When expanded and focused, show list + detail side by side
+        let (list_area, detail_area) = if self.mem_expanded && is_focused {
+            let [l, d] =
+                Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)])
+                    .split(area)[..]
+            else {
+                unreachable!()
+            };
+            (l, Some(d))
+        } else {
+            (area, None)
+        };
+
+        let items: Vec<ListItem> = self
+            .summaries
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                let date = format_mem_date(&s.created_at);
+                let project = basename(&s.project);
+                let headline: String = s.headline().chars().take(65).collect();
+                let headline = if s.headline().len() > 65 {
+                    format!("{headline}…")
+                } else {
+                    headline
+                };
+                let style = if i == selected_idx && is_focused {
+                    Style::default().fg(Color::Black).bg(Color::Cyan)
+                } else if i == selected_idx {
+                    Style::default().fg(Color::Cyan).bg(p.surface)
+                } else {
+                    Style::default().fg(p.fg).bg(p.bg)
+                };
+                ListItem::new(Line::from(vec![
+                    Span::styled("◈ ", Style::default().fg(Color::Cyan)),
                     Span::styled(format!("{date}  "), Style::default().fg(p.muted)),
                     Span::styled(format!("{project:<12}  "), Style::default().fg(p.muted)),
-                    Span::styled(text, Style::default().fg(p.fg)),
-                ]);
-                ListItem::new(line)
+                    Span::styled(headline, style),
+                ]))
             })
             .collect();
 
-        let title = format!(" claude-mem ({}) ", self.claude_mem_obs.len());
-        let list = List::new(items).block(
-            Block::default()
-                .title(title)
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(Color::Cyan)),
-        );
+        let title = format!(" claude-mem ({}) ", self.summaries.len());
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .title(title)
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(border_color)),
+            )
+            .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan));
 
-        frame.render_widget(list, area);
+        frame.render_stateful_widget(list, list_area, &mut self.mem_list_state);
+
+        // Detail pane — shows what was asked, what was done, next steps
+        if let (Some(d_area), Some(summary)) = (detail_area, self.summaries.get(selected_idx)) {
+            let date = format_mem_date_full(&summary.created_at);
+            let project = &summary.project;
+
+            let mut lines = vec![
+                Line::from(Span::styled(
+                    format!("◈  {project}  ·  {date}"),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::raw(""),
+            ];
+
+            if let Some(ref req) = summary.request {
+                lines.push(Line::from(Span::styled(
+                    "Asked:",
+                    Style::default().fg(p.muted).add_modifier(Modifier::BOLD),
+                )));
+                for line in wrap_text(req, 55) {
+                    lines.push(Line::from(Span::styled(line, Style::default().fg(p.fg))));
+                }
+                lines.push(Line::raw(""));
+            }
+
+            if let Some(ref done) = summary.completed {
+                lines.push(Line::from(Span::styled(
+                    "Done:",
+                    Style::default().fg(p.success).add_modifier(Modifier::BOLD),
+                )));
+                for line in wrap_text(done, 55) {
+                    lines.push(Line::from(Span::styled(line, Style::default().fg(p.fg))));
+                }
+                lines.push(Line::raw(""));
+            }
+
+            if let Some(ref next) = summary.next_steps {
+                lines.push(Line::from(Span::styled(
+                    "Next:",
+                    Style::default().fg(p.warning).add_modifier(Modifier::BOLD),
+                )));
+                for line in wrap_text(next, 55) {
+                    lines.push(Line::from(Span::styled(line, Style::default().fg(p.fg))));
+                }
+            }
+
+            let detail = Paragraph::new(lines)
+                .block(
+                    Block::default()
+                        .title(" Session detail ")
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .border_style(Style::default().fg(Color::Cyan)),
+                )
+                .style(Style::default().bg(p.surface))
+                .wrap(Wrap { trim: false });
+            frame.render_widget(detail, d_area);
+        }
     }
 
     fn render_footer(
@@ -562,13 +687,22 @@ impl BrainTab {
         p: &Palette,
         store: Option<&Arc<ccboard_core::store::DataStore>>,
     ) {
-        let mem_hint = if store.map(|s| s.is_claude_mem_enabled()).unwrap_or(false) {
+        let mem_enabled = store.map(|s| s.is_claude_mem_enabled()).unwrap_or(false);
+        let section_hint = if self.show_claude_mem {
+            "  [Tab] switch section"
+        } else {
+            ""
+        };
+        let mem_hint = if mem_enabled {
             "  [M] disable claude-mem"
         } else {
             "  [M] enable claude-mem"
         };
-        let hints =
-            format!("[j/k] nav  [←/→] filter  [Enter] expand  [d] archive  [r] reload{mem_hint}");
+        let base = match self.focus {
+            FocusSection::Insights => "[j/k] nav  [←/→] filter  [Enter] expand  [d] archive",
+            FocusSection::ClaudeMem => "[j/k] nav  [Enter] expand detail",
+        };
+        let hints = format!("{base}{section_hint}  [r] reload{mem_hint}");
         let footer = Paragraph::new(hints.as_str()).style(Style::default().fg(p.muted).bg(p.bg));
         frame.render_widget(footer, area);
     }
@@ -610,13 +744,50 @@ fn basename(path: &str) -> String {
         .to_string()
 }
 
-/// Format a claude-mem ISO timestamp to MM/DD
-fn format_claude_mem_date(created_at: &str) -> String {
-    // Timestamps are like "2026-03-30T09:42:12.719Z"
+/// Format ISO timestamp to MM/DD
+fn format_mem_date(created_at: &str) -> String {
     if created_at.len() >= 10 {
-        let date = &created_at[5..10]; // "MM-DD"
-        date.replace('-', "/")
+        created_at[5..10].replace('-', "/")
     } else {
         created_at.to_string()
     }
+}
+
+/// Format ISO timestamp to YYYY-MM-DD HH:MM
+fn format_mem_date_full(created_at: &str) -> String {
+    if created_at.len() >= 16 {
+        created_at[..16].replace('T', " ")
+    } else {
+        created_at.to_string()
+    }
+}
+
+/// Naive word-wrap: split text into lines of at most `width` chars
+fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    for paragraph in text.split('\n') {
+        let paragraph = paragraph.trim();
+        if paragraph.is_empty() {
+            continue;
+        }
+        let mut current = String::new();
+        for word in paragraph.split_whitespace() {
+            if current.is_empty() {
+                current.push_str(word);
+            } else if current.len() + 1 + word.len() <= width {
+                current.push(' ');
+                current.push_str(word);
+            } else {
+                lines.push(current.clone());
+                current = word.to_string();
+            }
+        }
+        if !current.is_empty() {
+            lines.push(current);
+        }
+    }
+    if lines.is_empty() {
+        lines.push(text.chars().take(width).collect());
+    }
+    lines
 }
