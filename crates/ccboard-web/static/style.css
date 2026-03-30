@@ -5572,6 +5572,101 @@ pre code {
   color: #c9d1d9;
 }
 
+/* ─── Dashboard — Live Sessions ──────────────────────────────────────────── */
+
+.live-sessions-section {
+  margin-bottom: 1.5rem;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.live-sessions-header {
+  padding: 0.5rem 1rem;
+  background: #0d1117;
+  border-bottom: 1px solid #21262d;
+}
+
+.live-sessions-header h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #c9d1d9;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #30363d;
+  flex-shrink: 0;
+}
+
+.live-dot--active {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+  animation: pulse-green 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 4px rgba(34, 197, 94, 0.5); }
+  50% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.9); }
+}
+
+.live-sessions-empty {
+  padding: 0.75rem 1rem;
+  color: #8b949e;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.live-sessions-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.live-session-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #21262d;
+  font-size: 0.8125rem;
+}
+
+.live-session-row:last-child {
+  border-bottom: none;
+}
+
+.live-session-project {
+  color: #58a6ff;
+  font-weight: 600;
+  min-width: 120px;
+}
+
+.live-session-elapsed {
+  color: #8b949e;
+  min-width: 50px;
+}
+
+.live-session-tokens {
+  color: #c9d1d9;
+  min-width: 80px;
+}
+
+.live-session-cpu {
+  color: #f59e0b;
+  min-width: 60px;
+}
+
+.live-session-mem {
+  color: #8b949e;
+}
+
 /* ─── Brain page — claude-mem section ────────────────────────────────────── */
 
 .brain-mem-toggle-wrap {
