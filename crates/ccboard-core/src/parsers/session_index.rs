@@ -354,8 +354,12 @@ impl SessionIndexParser {
                 }
             }
 
-            // Track models and compute switching segments
-            if let Some(ref model) = session_line.model {
+            // Track models and compute switching segments.
+            // Claude Code v2.1.92+ moved model from top-level to message.model;
+            // fall back to the nested field when the top-level field is absent.
+            let effective_model = session_line.model.as_ref()
+                .or_else(|| session_line.message.as_ref().and_then(|m| m.model.as_ref()));
+            if let Some(model) = effective_model {
                 models_seen.insert(model.clone());
                 // Segment tracking: detect transitions between models
                 if current_segment_model.as_deref() == Some(model.as_str()) {
