@@ -201,6 +201,8 @@ pub struct SessionData {
     pub lines_added: u64,
     #[serde(default)]
     pub lines_removed: u64,
+    #[serde(default)]
+    pub session_name: Option<String>,
 }
 
 /// Recent sessions response from API

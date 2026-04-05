@@ -486,6 +486,11 @@ pub struct SessionMetadata {
     /// Lines removed in this session (from Edit old_string)
     #[serde(default)]
     pub lines_removed: u64,
+
+    /// Human-readable session name from ~/.claude/sessions/<pid>.json
+    /// (the title shown in `claude --resume`)
+    #[serde(default)]
+    pub session_name: Option<String>,
 }
 
 impl SessionMetadata {
@@ -525,6 +530,7 @@ impl SessionMetadata {
             source_tool: SourceTool::ClaudeCode,
             lines_added: 0,
             lines_removed: 0,
+            session_name: None,
         }
     }
 

@@ -195,8 +195,11 @@ fn parse_ps_line(line: &str) -> Option<LiveSession> {
     // Try to get working directory for this PID
     let working_directory = get_cwd_for_pid(pid);
 
-    // Try to extract session metadata (tokens, ID, name)
+    // Try to extract session metadata (tokens, ID)
     let session_metadata = get_session_metadata(&working_directory);
+
+    // Read session name from ~/.claude/sessions/<pid>.json (written by Claude Code)
+    let session_name = read_session_name(pid);
 
     Some(LiveSession {
         pid,
@@ -207,13 +210,28 @@ fn parse_ps_line(line: &str) -> Option<LiveSession> {
         memory_mb,
         tokens: session_metadata.as_ref().and_then(|m| m.tokens),
         session_id: session_metadata.as_ref().and_then(|m| m.session_id.clone()),
-        session_name: session_metadata
-            .as_ref()
-            .and_then(|m| m.session_name.clone()),
+        session_name,
         session_type: flags.session_type,
         model: flags.model,
         resume_id: flags.resume_id,
     })
+}
+
+/// Read the human-readable session name from ~/.claude/sessions/<pid>.json.
+/// Claude Code writes this file when a session starts; the `name` field
+/// contains the descriptive title shown in `claude --resume`.
+fn read_session_name(pid: u32) -> Option<String> {
+    let home = dirs::home_dir()?;
+    let path = home
+        .join(".claude")
+        .join("sessions")
+        .join(format!("{}.json", pid));
+    let content = std::fs::read_to_string(path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+    json.get("name")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from)
 }
 
 #[cfg(unix)]
@@ -400,14 +418,7 @@ fn get_session_metadata(working_directory: &Option<String>) -> Option<LiveSessio
         let Ok(line) = line else { continue };
 
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-            // Extract session name from session_start event
-            if session_name.is_none() {
-                if let Some(event_type) = json.get("type").and_then(|v| v.as_str()) {
-                    if event_type == "session_start" {
-                        session_name = json.get("name").and_then(|v| v.as_str()).map(String::from);
-                    }
-                }
-            }
+            // Session name is read from ~/.claude/sessions/<pid>.json, not from JSONL.
 
             // Usage is nested in .message.usage, not at root level
             if let Some(message) = json.get("message") {

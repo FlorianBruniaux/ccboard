@@ -556,6 +556,7 @@ fn session_to_json(s: &ccboard_core::models::SessionMetadata) -> serde_json::Val
         "first_timestamp": s.first_timestamp.map(|t: chrono::DateTime<chrono::Utc>| t.to_rfc3339()),
         "duration_seconds": s.duration_seconds,
         "preview": s.first_user_message,
+        "session_name": s.session_name,
     })
 }
 

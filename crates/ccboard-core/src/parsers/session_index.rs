@@ -10,7 +10,7 @@ use crate::cache::MetadataCache;
 use crate::error::{CoreError, LoadError, LoadReport};
 use crate::models::{session::SessionSummary, SessionLine, SessionMetadata};
 use crate::parsers::filters::is_meaningful_user_message;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs::File;
@@ -704,8 +704,50 @@ impl SessionIndexParser {
             "Session scan complete"
         );
 
+        // Enrich with human-readable names from ~/.claude/sessions/<pid>.json
+        let names = load_session_names();
+        for meta in &mut results {
+            if meta.session_name.is_none() {
+                meta.session_name = names.get(meta.id.as_str()).cloned();
+            }
+        }
+
         results
     }
+}
+
+/// Build a sessionId → name map from ~/.claude/sessions/<pid>.json files.
+/// Claude Code writes one file per session containing the human-readable
+/// title shown in `claude --resume`.
+pub fn load_session_names() -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    let Some(home) = dirs::home_dir() else {
+        return map;
+    };
+    let sessions_dir = home.join(".claude").join("sessions");
+    let Ok(entries) = std::fs::read_dir(&sessions_dir) else {
+        return map;
+    };
+    for entry in entries.flatten() {
+        if entry.path().extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(entry.path()) else {
+            continue;
+        };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) else {
+            continue;
+        };
+        if let (Some(id), Some(name)) = (
+            json.get("sessionId").and_then(|v| v.as_str()),
+            json.get("name").and_then(|v| v.as_str()),
+        ) {
+            if !name.is_empty() {
+                map.insert(id.to_string(), name.to_string());
+            }
+        }
+    }
+    map
 }
 
 #[cfg(test)]

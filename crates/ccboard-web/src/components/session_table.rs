@@ -173,6 +173,7 @@ pub fn SessionTable(
                         <th on:click=move |_| toggle_sort(SortColumn::Date)>
                             {"Date"}{move || sort_indicator(SortColumn::Date)}
                         </th>
+                        <th>{"Name"}</th>
                         <th on:click=move |_| toggle_sort(SortColumn::Project)>
                             {"Project"}{move || sort_indicator(SortColumn::Project)}
                         </th>
@@ -210,6 +211,7 @@ pub fn SessionTable(
                                             >
 
                                                 <td>{format_date(&session.date)}</td>
+                                                <td>{session.session_name.clone().unwrap_or_default()}</td>
                                                 <td>{session.project.clone()}</td>
                                                 <td>{format_model(&session.model)}</td>
                                                 <td>{session.messages.to_string()}</td>
