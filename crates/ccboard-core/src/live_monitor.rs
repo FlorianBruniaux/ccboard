@@ -9,6 +9,9 @@
 use crate::hook_state::{HookSessionStatus, LiveSessionFile};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Local, TimeZone};
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::path::Path;
 use std::process::Command;
 
 /// Type of Claude Code session, detected from CLI flags
@@ -98,10 +101,33 @@ pub struct LiveSession {
     pub session_name: Option<String>,
     /// Type of session (CLI / IDE / Agent), detected from CLI flags
     pub session_type: SessionType,
-    /// Model in use (from --model flag, if present)
+    /// Model in use (from --model flag or transcript, if present)
     pub model: Option<String>,
     /// Resume session ID (from --resume flag, may differ from session_id)
     pub resume_id: Option<String>,
+    // ── Live transcript fields (populated by LiveMonitorState, zero by default) ──
+    /// Context window fill: (input + cache_read) / context_window * 100
+    pub context_percent: f64,
+    /// Maximum context window for this session's model (200K or 1M tokens)
+    pub context_window: u64,
+    /// Compaction events detected (context dropped >30% between turns)
+    pub compaction_count: u32,
+    /// Per-turn context sizes (last 200 turns)
+    pub context_history: Vec<u64>,
+    /// Per-turn total token counts (last 200 turns)
+    pub token_history: Vec<u64>,
+    /// Total turns parsed from transcript
+    pub turn_count: u32,
+    /// Last tool_use name from most-recent assistant turn
+    pub current_task: Option<String>,
+    /// Total input tokens (cumulative)
+    pub total_input_tokens: u64,
+    /// Total output tokens (cumulative)
+    pub total_output_tokens: u64,
+    /// Total cache read tokens (cumulative)
+    pub total_cache_read: u64,
+    /// Total cache write tokens (cumulative)
+    pub total_cache_create: u64,
 }
 
 /// Detect all running Claude Code processes on the system
@@ -213,6 +239,17 @@ fn parse_ps_line(line: &str) -> Option<LiveSession> {
         session_type: flags.session_type,
         model: flags.model,
         resume_id: flags.resume_id,
+        context_percent: 0.0,
+        context_window: 0,
+        compaction_count: 0,
+        context_history: Vec::new(),
+        token_history: Vec::new(),
+        turn_count: 0,
+        current_task: None,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_cache_read: 0,
+        total_cache_create: 0,
     })
 }
 
@@ -330,6 +367,17 @@ fn parse_tasklist_csv(line: &str) -> Option<LiveSession> {
         session_type: SessionType::Cli,
         model: None,
         resume_id: None,
+        context_percent: 0.0,
+        context_window: 0,
+        compaction_count: 0,
+        context_history: Vec::new(),
+        token_history: Vec::new(),
+        turn_count: 0,
+        current_task: None,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_cache_read: 0,
+        total_cache_create: 0,
     })
 }
 
@@ -641,6 +689,320 @@ pub fn merge_live_sessions(
     }
 
     result
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Incremental transcript parsing + LiveMonitorState
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Accumulated transcript data for one session, used as an incremental cache.
+#[derive(Default)]
+struct TranscriptCache {
+    /// Byte offset after the last fully-parsed line
+    new_offset: u64,
+    /// File identity (inode, mtime_nanos) — detects file rotation/replacement
+    file_identity: (u64, u64),
+    total_input: u64,
+    total_output: u64,
+    total_cache_read: u64,
+    total_cache_create: u64,
+    /// input_tokens + cache_read_input_tokens of the last assistant turn
+    last_context_tokens: u64,
+    /// High-water mark: largest context seen across all turns
+    max_context_tokens: u64,
+    context_history: Vec<u64>,
+    token_history: Vec<u64>,
+    compaction_count: u32,
+    turn_count: u32,
+    model: String,
+    current_task: String,
+}
+
+/// Determine context window size from model string and observed token count.
+/// Returns 1M if the model name contains "[1m]" or we've seen more than 200K tokens.
+fn context_window_for_model(model: &str, max_context_tokens: u64) -> u64 {
+    if model.contains("[1m]") || max_context_tokens > 200_000 {
+        1_000_000
+    } else {
+        200_000
+    }
+}
+
+/// Get file identity as (inode, mtime_nanos).  Returns (0,0) on error.
+fn file_identity_of(path: &Path) -> (u64, u64) {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return (0, 0);
+    };
+    let mtime_ns = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0);
+    #[cfg(unix)]
+    let ino = {
+        use std::os::unix::fs::MetadataExt;
+        meta.ino()
+    };
+    #[cfg(not(unix))]
+    let ino = 0u64;
+    (ino, mtime_ns)
+}
+
+/// Parse new bytes appended to a JSONL transcript since `from_offset`.
+/// Returns a `TranscriptCache` containing only the delta (counts since from_offset).
+fn parse_transcript_delta(path: &Path, from_offset: u64) -> TranscriptCache {
+    let identity = file_identity_of(path);
+    let mut result = TranscriptCache {
+        new_offset: from_offset,
+        file_identity: identity,
+        ..Default::default()
+    };
+
+    let Ok(file) = std::fs::File::open(path) else {
+        return result;
+    };
+    let file_len = file.metadata().map(|m| m.len()).unwrap_or(0);
+    if file_len == from_offset {
+        result.new_offset = file_len;
+        return result;
+    }
+    // File shrank or rotated — reparse from start
+    let effective_offset = if file_len < from_offset { 0 } else { from_offset };
+
+    let mut reader = BufReader::new(file);
+    if effective_offset > 0 {
+        let _ = reader.seek(SeekFrom::Start(effective_offset));
+    }
+
+    const MAX_LINE: usize = 10 * 1024 * 1024; // 10 MB guard
+    let mut bytes_read = effective_offset;
+    let mut line_buf = String::new();
+
+    loop {
+        line_buf.clear();
+        match reader.by_ref().take(MAX_LINE as u64 + 1).read_line(&mut line_buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                if line_buf.len() > MAX_LINE && !line_buf.ends_with('\n') {
+                    bytes_read = file_len;
+                    break;
+                }
+                let has_newline = line_buf.ends_with('\n');
+                let line = line_buf.trim();
+                if line.is_empty() {
+                    if has_newline {
+                        bytes_read += n as u64;
+                    }
+                    continue;
+                }
+                let val = match serde_json::from_str::<serde_json::Value>(line) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        if has_newline {
+                            bytes_read += n as u64;
+                        } else {
+                            break; // incomplete line, defer to next poll
+                        }
+                        continue;
+                    }
+                };
+                bytes_read += n as u64;
+
+                if let Some("assistant") = val.get("type").and_then(|t| t.as_str()) {
+                        result.turn_count += 1;
+                        result.current_task = String::new();
+                        if let Some(msg) = val.get("message") {
+                            if let Some(m) = msg.get("model").and_then(|m| m.as_str()) {
+                                result.model = m.to_string();
+                            }
+                            if let Some(usage) = msg.get("usage") {
+                                let inp = usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                                let out = usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                                let cr = usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                                let cc = usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                                result.total_input += inp;
+                                result.total_output += out;
+                                result.total_cache_read += cr;
+                                result.total_cache_create += cc;
+                                let prev = result.last_context_tokens;
+                                result.last_context_tokens = inp + cr;
+                                if result.last_context_tokens > result.max_context_tokens {
+                                    result.max_context_tokens = result.last_context_tokens;
+                                }
+                                if prev > 0 && result.last_context_tokens < prev * 7 / 10 {
+                                    result.compaction_count += 1;
+                                }
+                                if result.context_history.len() < 200 {
+                                    result.context_history.push(result.last_context_tokens);
+                                }
+                                if result.token_history.len() < 200 {
+                                    result.token_history.push(inp + out + cr + cc);
+                                }
+                            }
+                            // Last tool_use name as current task
+                            if let Some(content) = msg.get("content").and_then(|c| c.as_array()) {
+                                for item in content {
+                                    if item.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
+                                        let tool = item.get("name").and_then(|n| n.as_str()).unwrap_or("?");
+                                        result.current_task = tool.to_string();
+                                    }
+                                }
+                            }
+                        }
+                }
+            }
+            Err(_) => break,
+        }
+    }
+
+    result.new_offset = bytes_read;
+    result
+}
+
+/// Stateful live session monitor with incremental JSONL transcript parsing.
+///
+/// Maintains a per-session `TranscriptCache` so each poll only reads new bytes
+/// (O(delta) instead of O(file_size)). Persist this struct across calls.
+pub struct LiveMonitorState {
+    cache: HashMap<String, TranscriptCache>,
+}
+
+impl LiveMonitorState {
+    pub fn new() -> Self {
+        Self { cache: HashMap::new() }
+    }
+
+    /// Detect live sessions and enrich them with incremental transcript data.
+    /// Call this instead of `detect_live_sessions()` for efficient repeated polling.
+    pub fn detect_sessions(&mut self) -> Vec<LiveSession> {
+        let mut sessions = detect_live_sessions().unwrap_or_default();
+
+        // Evict cache entries for sessions no longer alive
+        let active_ids: std::collections::HashSet<String> = sessions
+            .iter()
+            .filter_map(|s| s.session_id.clone())
+            .collect();
+        self.cache.retain(|k, _| active_ids.contains(k));
+
+        for session in &mut sessions {
+            let Some(ref session_id) = session.session_id else { continue };
+            let Some(ref cwd) = session.working_directory else { continue };
+
+            // Locate the transcript JSONL for this session
+            let transcript_path = find_transcript_path(cwd, session_id);
+            let Some(ref tp) = transcript_path else { continue };
+
+            // Check if file was rotated (identity changed) → reset cache
+            let current_identity = file_identity_of(tp);
+            let from_offset = match self.cache.get(session_id) {
+                Some(c) if c.file_identity == current_identity => c.new_offset,
+                _ => 0,
+            };
+
+            let delta = parse_transcript_delta(tp, from_offset);
+
+            let entry = self.cache.entry(session_id.clone()).or_default();
+
+            // File replaced or reset → replace cache entirely
+            if from_offset == 0 || delta.new_offset < from_offset {
+                *entry = delta;
+            } else {
+                // Merge delta into existing cache
+                if !delta.model.is_empty() {
+                    entry.model = delta.model.clone();
+                }
+                entry.total_input += delta.total_input;
+                entry.total_output += delta.total_output;
+                entry.total_cache_read += delta.total_cache_read;
+                entry.total_cache_create += delta.total_cache_create;
+                if delta.last_context_tokens > 0 {
+                    entry.last_context_tokens = delta.last_context_tokens;
+                }
+                if delta.max_context_tokens > entry.max_context_tokens {
+                    entry.max_context_tokens = delta.max_context_tokens;
+                }
+                if delta.turn_count > 0 {
+                    entry.current_task = delta.current_task.clone();
+                }
+                entry.turn_count += delta.turn_count;
+                entry.compaction_count += delta.compaction_count;
+                entry.context_history.extend_from_slice(&delta.context_history);
+                if entry.context_history.len() > 200 {
+                    let drain = entry.context_history.len() - 200;
+                    entry.context_history.drain(..drain);
+                }
+                entry.token_history.extend_from_slice(&delta.token_history);
+                if entry.token_history.len() > 200 {
+                    let drain = entry.token_history.len() - 200;
+                    entry.token_history.drain(..drain);
+                }
+                entry.new_offset = delta.new_offset;
+                entry.file_identity = delta.file_identity;
+            }
+
+            // Apply enriched data to the LiveSession
+            let ctx_window = context_window_for_model(&entry.model, entry.max_context_tokens);
+            session.context_window = ctx_window;
+            session.context_percent = if ctx_window > 0 {
+                (entry.last_context_tokens as f64 / ctx_window as f64) * 100.0
+            } else {
+                0.0
+            };
+            session.compaction_count = entry.compaction_count;
+            session.context_history = entry.context_history.clone();
+            session.token_history = entry.token_history.clone();
+            session.turn_count = entry.turn_count;
+            session.current_task = if entry.current_task.is_empty() {
+                None
+            } else {
+                Some(entry.current_task.clone())
+            };
+            session.total_input_tokens = entry.total_input;
+            session.total_output_tokens = entry.total_output;
+            session.total_cache_read = entry.total_cache_read;
+            session.total_cache_create = entry.total_cache_create;
+            // Update model from transcript if available (more reliable than --model flag)
+            if !entry.model.is_empty() {
+                session.model = Some(entry.model.clone());
+            }
+            // Also update the legacy tokens field for backward compat
+            let total = entry.total_input + entry.total_output + entry.total_cache_read + entry.total_cache_create;
+            if total > 0 {
+                session.tokens = Some(total);
+            }
+        }
+
+        sessions
+    }
+}
+
+impl Default for LiveMonitorState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Find the JSONL transcript file for a session given its cwd and session_id.
+fn find_transcript_path(cwd: &str, session_id: &str) -> Option<std::path::PathBuf> {
+    let encoded = cwd.chars().map(|c| if matches!(c, '/' | '_' | '.') { '-' } else { c }).collect::<String>();
+    let home = dirs::home_dir()?;
+    let path = home.join(".claude").join("projects").join(&encoded).join(format!("{}.jsonl", session_id));
+    if path.exists() {
+        return Some(path);
+    }
+    // Fallback: scan all project subdirs for the session file (worktree sessions)
+    let projects_dir = home.join(".claude").join("projects");
+    if let Ok(entries) = std::fs::read_dir(&projects_dir) {
+        for entry in entries.flatten() {
+            if !entry.path().is_dir() { continue; }
+            let candidate = entry.path().join(format!("{}.jsonl", session_id));
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]

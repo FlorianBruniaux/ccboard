@@ -1173,9 +1173,20 @@ impl SessionsTab {
                             .as_deref()
                             .map(|m| format!("{}  ", m))
                             .unwrap_or_default();
+                        // Context % bar (only when data is available)
+                        let ctx_str = if proc.context_percent > 0.0 {
+                            let bar_len = 10usize;
+                            let filled = ((proc.context_percent / 100.0) * bar_len as f64).round() as usize;
+                            let filled = filled.min(bar_len);
+                            let bar: String = "█".repeat(filled) + &"░".repeat(bar_len - filled);
+                            let compact_mark = if proc.compaction_count > 0 { "⚡" } else { " " };
+                            format!(" Ctx:[{}]{:.0}%{}", bar, proc.context_percent, compact_mark)
+                        } else {
+                            String::new()
+                        };
                         parts.push(format!(
-                            "{}{}CPU:{:.1}% RAM:{}MB Tok:{}",
-                            type_str, model_str, proc.cpu_percent, proc.memory_mb, tokens_str
+                            "{}{}CPU:{:.1}% RAM:{}MB Tok:{}{}",
+                            type_str, model_str, proc.cpu_percent, proc.memory_mb, tokens_str, ctx_str
                         ));
                     }
                     parts
@@ -2138,6 +2149,49 @@ impl SessionsTab {
                     Span::styled("Tokens: ", Style::default().fg(p.muted)),
                     Span::styled(Self::format_tokens(tokens), Style::default().fg(p.focus)),
                 ]));
+            }
+
+            // Context window section (shown when transcript data is available)
+            if proc.context_window > 0 {
+                let ctx_color = if proc.context_percent >= 85.0 {
+                    p.error
+                } else if proc.context_percent >= 65.0 {
+                    p.warning
+                } else {
+                    p.success
+                };
+                let bar_len = 20usize;
+                let filled = ((proc.context_percent / 100.0) * bar_len as f64).round() as usize;
+                let filled = filled.min(bar_len);
+                let bar: String = "█".repeat(filled) + &"░".repeat(bar_len - filled);
+                lines.push(Line::from(vec![
+                    Span::styled("Context: ", Style::default().fg(p.muted)),
+                    Span::styled(
+                        format!("[{}] {:.1}% of {}K", bar, proc.context_percent, proc.context_window / 1000),
+                        Style::default().fg(ctx_color).bold(),
+                    ),
+                ]));
+                if proc.compaction_count > 0 {
+                    lines.push(Line::from(vec![
+                        Span::styled("Compactions: ", Style::default().fg(p.muted)),
+                        Span::styled(
+                            format!("⚡ {} (context was reset {} time{})", proc.compaction_count, proc.compaction_count, if proc.compaction_count == 1 { "" } else { "s" }),
+                            Style::default().fg(p.warning),
+                        ),
+                    ]));
+                }
+                if proc.turn_count > 0 {
+                    lines.push(Line::from(vec![
+                        Span::styled("Turns: ", Style::default().fg(p.muted)),
+                        Span::styled(proc.turn_count.to_string(), Style::default().fg(p.fg)),
+                    ]));
+                }
+                if let Some(ref task) = proc.current_task {
+                    lines.push(Line::from(vec![
+                        Span::styled("Current: ", Style::default().fg(p.muted)),
+                        Span::styled(task, Style::default().fg(p.focus)),
+                    ]));
+                }
             }
             lines.push(Line::from(""));
         }

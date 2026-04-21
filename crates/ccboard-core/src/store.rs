@@ -148,6 +148,9 @@ pub struct DataStore {
 
     /// Observations loaded from claude-mem (when integration is enabled)
     claude_mem_summaries: RwLock<Vec<ClaudeMemSummary>>,
+
+    /// Stateful live session monitor with incremental transcript parsing
+    live_monitor_state: parking_lot::Mutex<crate::live_monitor::LiveMonitorState>,
 }
 
 /// Project leaderboard entry with aggregated metrics
@@ -233,6 +236,9 @@ impl DataStore {
             claude_global_stats: RwLock::new(None),
             bookmark_store: RwLock::new(bookmark_store),
             summary_store: crate::summaries::SummaryStore::new(&ccboard_dir),
+            live_monitor_state: parking_lot::Mutex::new(
+                crate::live_monitor::LiveMonitorState::new(),
+            ),
         }
     }
 
@@ -553,20 +559,20 @@ impl DataStore {
         Some(crate::quota::calculate_quota_status(&stats, budget))
     }
 
-    /// Get live Claude Code sessions (running processes, ps-based)
+    /// Get live Claude Code sessions enriched with incremental transcript data.
     ///
-    /// Detects active Claude processes on the system and returns metadata.
-    /// Returns empty vector if detection fails or no processes are running.
+    /// Uses `LiveMonitorState` to parse only new JSONL bytes since last call —
+    /// O(delta) instead of O(file_size). Returns empty vec if no processes found.
     pub fn live_sessions(&self) -> Vec<crate::live_monitor::LiveSession> {
-        crate::live_monitor::detect_live_sessions().unwrap_or_default()
+        self.live_monitor_state.lock().detect_sessions()
     }
 
-    /// Get merged live sessions: hook data + ps-based fallback
+    /// Get merged live sessions: hook data + ps-based fallback with transcript enrichment.
     ///
     /// Hook sessions are prioritized; unmatched ps sessions appear as ProcessOnly.
     pub fn merged_live_sessions(&self) -> Vec<crate::live_monitor::MergedLiveSession> {
         let hook_file = self.live_hook_sessions.read().clone();
-        let ps_sessions = crate::live_monitor::detect_live_sessions().unwrap_or_default();
+        let ps_sessions = self.live_monitor_state.lock().detect_sessions();
         crate::live_monitor::merge_live_sessions(&hook_file, &ps_sessions)
     }
 
