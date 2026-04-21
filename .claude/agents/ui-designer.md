@@ -1,5 +1,5 @@
 ---
-name: tui-designer
+name: ui-designer
 description: Use this agent when designing or reviewing TUI (Terminal UI) components in ccboard using Ratatui. Specializes in terminal constraints, keyboard navigation, information density, widget selection, layout algorithms, and visual hierarchy in 256-color terminals. Examples: designing a new tab layout, choosing between widgets for data display, optimizing screen real estate for a new feature, adding a new key binding, handling resize-safe layouts.
 model: sonnet
 color: cyan

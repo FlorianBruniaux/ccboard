@@ -5,6 +5,28 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-04-21
+
+### Added
+
+- **Live context window monitoring**: Sessions tab now shows an inline context pressure bar (`[████░░░░░░] 42% ⚡`) for active Claude sessions. The detail panel displays a 20-character color-coded bar (green < 65%, orange < 85%, red above), compaction count, turn count, and current active tool. Compaction events (triggered by `/compact`) are detected automatically and marked with `⚡`.
+- **Incremental JSONL transcript parsing** (`LiveMonitorState`): Live session monitoring now reads only new bytes since the last poll (O(delta) vs O(file_size)). On long sessions with 50MB+ JSONL files, this eliminates multi-second per-tick re-parsing. The `LiveMonitorState` struct persists across 2-second TUI refresh cycles via `parking_lot::Mutex` in `DataStore`. File rotation is detected via inode + mtime identity tuple.
+- **Live sessions panel (Web Dashboard)**: The web Dashboard page now shows active Claude sessions in a live panel, polling `/api/sessions/live` every 5 seconds. Displays project name, elapsed time, token count, CPU%, and memory per session. Animated green dot when sessions are running.
+- **claude-mem integration (Brain tab/page)**: Brain tab and web Brain page now optionally surface `claude-mem` observations alongside session insights. `feat(brain): add optional claude-mem integration` — toggle with `m` in the TUI. Web Brain page shows a dedicated observations section.
+- **ccboard-ffi crate**: New `crates/ccboard-ffi` workspace member — UniFFI bindings exposing `ccboard-core` to Swift/iOS via a `staticlib`/`cdylib`. Provides `ccboard_init()`, `FfiProject`, `FfiSession`, `FfiStats`, and SSE-like event streaming for native mobile dashboards.
+- **uniffi-bindgen crate**: New `crates/uniffi-bindgen` workspace member — `uniffi-bindgen` binary for generating Swift/Kotlin bindings from the FFI crate.
+
+### Changed
+
+- `LiveSession` struct gains 11 new fields: `context_percent`, `context_window`, `compaction_count`, `context_history` (ring buffer 200 pts), `token_history` (ring buffer 200 pts), `total_input_tokens`, `total_output_tokens`, `total_cache_read_tokens`, `total_cache_create_tokens`, `turn_count`, `current_task`.
+- Brain tab section switching uses `←`/`→` (consistent with Config, Agents, and other multi-section tabs) instead of `h`/`l`.
+
+### Fixed
+
+- Brain tab section navigation keys unified with the rest of the TUI (`←`/`→`).
+
+---
+
 ## [0.21.0] - 2026-03-28
 
 ### Added

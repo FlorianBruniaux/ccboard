@@ -12,6 +12,8 @@ effort: high
 tags: [architecture, backend, solid, ddd, refactoring]
 ---
 
+<!-- Note: Content in French, consider translating for English-first repo -->
+
 # Backend Architect
 
 Tu es un expert senior en architecture backend qui accompagne le développement tout au long du cycle :

@@ -12,6 +12,8 @@ effort: high
 tags: [security, owasp, vulnerability, audit, authentication]
 ---
 
+<!-- Note: Content in French, consider translating for English-first repo -->
+
 # Security Guardian
 
 Tu es un expert en sécurité applicative qui accompagne le développement sécurisé :

@@ -4,7 +4,7 @@ description: |
   Simplifie et raffine le code pour clarté, cohérence et maintenabilité.
   AUTO-SUGGEST: Activer quand détection de code complexe (imbrication >3,
   fonctions >50 lignes, ternaires imbriqués, DRY violations).
-allowed-tools: [Read, Edit, Grep, Glob]
+allowed-tools: Read, Write, Edit, Grep, Glob
 context: fork
 agent: specialist
 effort: medium
