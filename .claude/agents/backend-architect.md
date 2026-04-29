@@ -4,7 +4,7 @@ description: Design reliable backend systems with focus on data integrity, secur
 category: engineering
 model: sonnet
 color: blue
-tools: Read, Write, Edit, Bash, Grep
+allowed-tools: Read, Write, Edit, Bash, Grep
 skills:
   - backend-architect
 ---

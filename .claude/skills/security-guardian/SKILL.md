@@ -1,6 +1,6 @@
 ---
 name: security-guardian
-description: Expert en sécurité applicative pour détecter les vulnérabilités, auditer le code, et guider les bonnes pratiques de sécurité. OWASP Top 10, authentification, autorisation, cryptographie, gestion de secrets. Utiliser pour audits sécurité, reviews de code sensible, conception de features sécurisées, ou résolution de failles.
+version: 1.0.0description: Expert en sécurité applicative pour détecter les vulnérabilités, auditer le code, et guider les bonnes pratiques de sécurité. OWASP Top 10, authentification, autorisation, cryptographie, gestion de secrets. Utiliser pour audits sécurité, reviews de code sensible, conception de features sécurisées, ou résolution de failles.
 allowed-tools:
   - Read
   - Grep

@@ -1,6 +1,6 @@
 ---
 name: tdd-rust
-description: Test-Driven Development workflow for Rust — write test first, watch it fail, implement minimal code. Use when implementing any feature in a Rust project using strict TDD (Red → Green → Refactor).
+version: 1.0.0description: Test-Driven Development workflow for Rust — write test first, watch it fail, implement minimal code. Use when implementing any feature in a Rust project using strict TDD (Red → Green → Refactor).
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 effort: medium
 invocation_pattern: "^/(tdd|test-first)\\b"

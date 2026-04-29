@@ -1,5 +1,6 @@
 ---
 name: performance
+version: "1.0.0"
 description: Optimize web performance for faster loading and better user experience. Use when asked to "speed up my site", "optimize performance", "reduce load time", "fix slow loading", "improve page speed", or "performance audit".
 allowed-tools: Read, Grep, Glob, Bash
 effort: medium

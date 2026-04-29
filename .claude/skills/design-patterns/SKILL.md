@@ -1,6 +1,6 @@
 ---
 name: design-patterns
-description: Analyze codebase for GoF design patterns - detection, suggestions, evaluation with stack-aware adaptations
+version: 1.0.0description: Analyze codebase for GoF design patterns - detection, suggestions, evaluation with stack-aware adaptations
 allowed-tools: Read, Grep, Glob, mcp__grepai__grepai_search
 context: fork
 agent: specialist

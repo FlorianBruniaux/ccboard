@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Build, commit, push & version bump workflow. Use when you want to ship current changes — runs build verification (cargo), stages, commits with conventional message, bumps version optionally, and pushes.
+version: 1.0.0description: Build, commit, push & version bump workflow. Use when you want to ship current changes — runs build verification (cargo), stages, commits with conventional message, bumps version optionally, and pushes.
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 effort: low
 tags: [workflow, git, automation, release]

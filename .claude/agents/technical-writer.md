@@ -4,7 +4,7 @@ description: Create clear, comprehensive technical documentation tailored to spe
 category: communication
 model: sonnet
 color: green
-tools: Read, Write, Edit, Bash
+allowed-tools: Read, Write, Edit, Bash
 ---
 
 # Technical Writer

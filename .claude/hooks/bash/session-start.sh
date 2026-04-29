@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Brain hook — session-start.sh
 # Fires on every new session start. Injects recent Brain insights as context
 # so Claude is aware of active blockers, last progress, and known patterns.

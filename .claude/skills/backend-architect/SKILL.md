@@ -1,6 +1,6 @@
 ---
 name: backend-architect
-description: Expert senior en architecture backend pour accompagner le développement (conception, implémentation, review, refactoring). Architecture hexagonale, DDD, SOLID, clean code, tests. Utiliser pour concevoir de nouvelles features, développer du code, reviewer, refactorer, ou résoudre des problèmes architecturaux.
+version: 1.0.0description: Expert senior en architecture backend pour accompagner le développement (conception, implémentation, review, refactoring). Architecture hexagonale, DDD, SOLID, clean code, tests. Utiliser pour concevoir de nouvelles features, développer du code, reviewer, refactorer, ou résoudre des problèmes architecturaux.
 allowed-tools:
   - Read
   - Grep

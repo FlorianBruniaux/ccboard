@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Brain hook — session-stop.sh
 # Fires on every session Stop. For meaningful sessions, asks Claude for a structured summary
 # then stores the insights in ~/.ccboard/insights.db (via a second Stop pass).

@@ -1,4 +1,5 @@
 ---
+name: diagnose
 model: haiku
 description: Diagnose dev environment — checks Cargo build, clippy, deps, binary. Auto-suggest on Rust/Cargo errors.
 ---

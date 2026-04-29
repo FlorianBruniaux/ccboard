@@ -1,6 +1,6 @@
 ---
 name: ccboard-remember
-description: Store a fix, pattern, or context note in Brain knowledge base (~/.ccboard/insights.db). Use when you want to remember a fix, pattern, decision, or context note across sessions.
+version: 1.0.0description: Store a fix, pattern, or context note in Brain knowledge base (~/.ccboard/insights.db). Use when you want to remember a fix, pattern, decision, or context note across sessions.
 allowed-tools: Read, Write, Bash
 effort: low
 tags: [brain, knowledge, memory, ccboard]

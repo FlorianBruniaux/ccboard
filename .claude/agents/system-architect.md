@@ -3,7 +3,7 @@ name: system-architect
 description: Design scalable system architecture with focus on maintainability and long-term technical decisions
 model: sonnet
 color: purple
-tools: Read, Grep, Glob, Write, Bash
+allowed-tools: Read, Grep, Glob, Write, Bash
 ---
 
 # System Architect

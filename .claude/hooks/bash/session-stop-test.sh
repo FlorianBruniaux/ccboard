@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Phase 0 — Test hook for decision:block mechanism
 #
 # PURPOSE: Validate that Claude Code Stop hooks can:
