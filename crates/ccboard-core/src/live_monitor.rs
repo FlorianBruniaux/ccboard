@@ -768,7 +768,11 @@ fn parse_transcript_delta(path: &Path, from_offset: u64) -> TranscriptCache {
         return result;
     }
     // File shrank or rotated — reparse from start
-    let effective_offset = if file_len < from_offset { 0 } else { from_offset };
+    let effective_offset = if file_len < from_offset {
+        0
+    } else {
+        from_offset
+    };
 
     let mut reader = BufReader::new(file);
     if effective_offset > 0 {
@@ -781,7 +785,11 @@ fn parse_transcript_delta(path: &Path, from_offset: u64) -> TranscriptCache {
 
     loop {
         line_buf.clear();
-        match reader.by_ref().take(MAX_LINE as u64 + 1).read_line(&mut line_buf) {
+        match reader
+            .by_ref()
+            .take(MAX_LINE as u64 + 1)
+            .read_line(&mut line_buf)
+        {
             Ok(0) => break,
             Ok(n) => {
                 if line_buf.len() > MAX_LINE && !line_buf.ends_with('\n') {
@@ -810,46 +818,59 @@ fn parse_transcript_delta(path: &Path, from_offset: u64) -> TranscriptCache {
                 bytes_read += n as u64;
 
                 if let Some("assistant") = val.get("type").and_then(|t| t.as_str()) {
-                        result.turn_count += 1;
-                        result.current_task = String::new();
-                        if let Some(msg) = val.get("message") {
-                            if let Some(m) = msg.get("model").and_then(|m| m.as_str()) {
-                                result.model = m.to_string();
+                    result.turn_count += 1;
+                    result.current_task = String::new();
+                    if let Some(msg) = val.get("message") {
+                        if let Some(m) = msg.get("model").and_then(|m| m.as_str()) {
+                            result.model = m.to_string();
+                        }
+                        if let Some(usage) = msg.get("usage") {
+                            let inp = usage
+                                .get("input_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            let out = usage
+                                .get("output_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            let cr = usage
+                                .get("cache_read_input_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            let cc = usage
+                                .get("cache_creation_input_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            result.total_input += inp;
+                            result.total_output += out;
+                            result.total_cache_read += cr;
+                            result.total_cache_create += cc;
+                            let prev = result.last_context_tokens;
+                            result.last_context_tokens = inp + cr;
+                            if result.last_context_tokens > result.max_context_tokens {
+                                result.max_context_tokens = result.last_context_tokens;
                             }
-                            if let Some(usage) = msg.get("usage") {
-                                let inp = usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                                let out = usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                                let cr = usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                                let cc = usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                                result.total_input += inp;
-                                result.total_output += out;
-                                result.total_cache_read += cr;
-                                result.total_cache_create += cc;
-                                let prev = result.last_context_tokens;
-                                result.last_context_tokens = inp + cr;
-                                if result.last_context_tokens > result.max_context_tokens {
-                                    result.max_context_tokens = result.last_context_tokens;
-                                }
-                                if prev > 0 && result.last_context_tokens < prev * 7 / 10 {
-                                    result.compaction_count += 1;
-                                }
-                                if result.context_history.len() < 200 {
-                                    result.context_history.push(result.last_context_tokens);
-                                }
-                                if result.token_history.len() < 200 {
-                                    result.token_history.push(inp + out + cr + cc);
-                                }
+                            if prev > 0 && result.last_context_tokens < prev * 7 / 10 {
+                                result.compaction_count += 1;
                             }
-                            // Last tool_use name as current task
-                            if let Some(content) = msg.get("content").and_then(|c| c.as_array()) {
-                                for item in content {
-                                    if item.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
-                                        let tool = item.get("name").and_then(|n| n.as_str()).unwrap_or("?");
-                                        result.current_task = tool.to_string();
-                                    }
+                            if result.context_history.len() < 200 {
+                                result.context_history.push(result.last_context_tokens);
+                            }
+                            if result.token_history.len() < 200 {
+                                result.token_history.push(inp + out + cr + cc);
+                            }
+                        }
+                        // Last tool_use name as current task
+                        if let Some(content) = msg.get("content").and_then(|c| c.as_array()) {
+                            for item in content {
+                                if item.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
+                                    let tool =
+                                        item.get("name").and_then(|n| n.as_str()).unwrap_or("?");
+                                    result.current_task = tool.to_string();
                                 }
                             }
                         }
+                    }
                 }
             }
             Err(_) => break,
@@ -870,7 +891,9 @@ pub struct LiveMonitorState {
 
 impl LiveMonitorState {
     pub fn new() -> Self {
-        Self { cache: HashMap::new() }
+        Self {
+            cache: HashMap::new(),
+        }
     }
 
     /// Detect live sessions and enrich them with incremental transcript data.
@@ -886,12 +909,18 @@ impl LiveMonitorState {
         self.cache.retain(|k, _| active_ids.contains(k));
 
         for session in &mut sessions {
-            let Some(ref session_id) = session.session_id else { continue };
-            let Some(ref cwd) = session.working_directory else { continue };
+            let Some(ref session_id) = session.session_id else {
+                continue;
+            };
+            let Some(ref cwd) = session.working_directory else {
+                continue;
+            };
 
             // Locate the transcript JSONL for this session
             let transcript_path = find_transcript_path(cwd, session_id);
-            let Some(ref tp) = transcript_path else { continue };
+            let Some(ref tp) = transcript_path else {
+                continue;
+            };
 
             // Check if file was rotated (identity changed) → reset cache
             let current_identity = file_identity_of(tp);
@@ -927,7 +956,9 @@ impl LiveMonitorState {
                 }
                 entry.turn_count += delta.turn_count;
                 entry.compaction_count += delta.compaction_count;
-                entry.context_history.extend_from_slice(&delta.context_history);
+                entry
+                    .context_history
+                    .extend_from_slice(&delta.context_history);
                 if entry.context_history.len() > 200 {
                     let drain = entry.context_history.len() - 200;
                     entry.context_history.drain(..drain);
@@ -967,7 +998,10 @@ impl LiveMonitorState {
                 session.model = Some(entry.model.clone());
             }
             // Also update the legacy tokens field for backward compat
-            let total = entry.total_input + entry.total_output + entry.total_cache_read + entry.total_cache_create;
+            let total = entry.total_input
+                + entry.total_output
+                + entry.total_cache_read
+                + entry.total_cache_create;
             if total > 0 {
                 session.tokens = Some(total);
             }
@@ -985,9 +1019,16 @@ impl Default for LiveMonitorState {
 
 /// Find the JSONL transcript file for a session given its cwd and session_id.
 fn find_transcript_path(cwd: &str, session_id: &str) -> Option<std::path::PathBuf> {
-    let encoded = cwd.chars().map(|c| if matches!(c, '/' | '_' | '.') { '-' } else { c }).collect::<String>();
+    let encoded = cwd
+        .chars()
+        .map(|c| if matches!(c, '/' | '_' | '.') { '-' } else { c })
+        .collect::<String>();
     let home = dirs::home_dir()?;
-    let path = home.join(".claude").join("projects").join(&encoded).join(format!("{}.jsonl", session_id));
+    let path = home
+        .join(".claude")
+        .join("projects")
+        .join(&encoded)
+        .join(format!("{}.jsonl", session_id));
     if path.exists() {
         return Some(path);
     }
@@ -995,7 +1036,9 @@ fn find_transcript_path(cwd: &str, session_id: &str) -> Option<std::path::PathBu
     let projects_dir = home.join(".claude").join("projects");
     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
         for entry in entries.flatten() {
-            if !entry.path().is_dir() { continue; }
+            if !entry.path().is_dir() {
+                continue;
+            }
             let candidate = entry.path().join(format!("{}.jsonl", session_id));
             if candidate.exists() {
                 return Some(candidate);

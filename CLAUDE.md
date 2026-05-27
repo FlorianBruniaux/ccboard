@@ -293,6 +293,50 @@ Claude Code writes `stats-cache.json` incrementally. The `StatsParser` has retry
 
 ---
 
+## Architecture Decision Records
+
+Key decisions that shaped the codebase. Read before proposing architectural changes.
+
+### ADR-001: Arc<DataStore> over DashMap (v0.4.0)
+
+**Decision**: Replace `DashMap<SessionId, Session>` with `Arc<DataStore>` holding `parking_lot::RwLock`.
+
+**Rationale**: DashMap holds one lock per shard — with 1000+ sessions, that's 1000+ heap allocations and 64 locks. Arc<DataStore> is a single allocation with one shared reader/writer lock. Result: ~50x memory reduction.
+
+**Consequence**: Write locks (reload) block all readers. Keep write operations short. Never hold a write lock across awaits.
+
+### ADR-002: SQLite metadata cache over full JSONL parse (v0.3.0)
+
+**Decision**: Cache session metadata (timestamps, message count, models) in SQLite. Load full JSONL content only on demand.
+
+**Rationale**: 1000+ sessions = 2.5GB of JSONL. Full parse at startup was 2.9s. SQLite metadata cache reduces startup to 33ms (89x faster).
+
+**Consequence**: The cache can go stale if JSONL files are moved/deleted externally. `cargo run -- clear-cache` forces a full rescan. Never bypass the cache by reading JSONL directly at startup.
+
+### ADR-003: parking_lot::RwLock over std::sync::RwLock
+
+**Decision**: Use `parking_lot::RwLock` everywhere in `ccboard-core`.
+
+**Rationale**: `parking_lot` has fairer queuing — a write lock does not starve indefinitely under heavy reads. `std::sync::RwLock` can deadlock under repeated write pressure.
+
+**Consequence**: `parking_lot::RwLock` is not in `std`. All lock usage must import from `parking_lot`. Do not mix with `std::sync::RwLock`.
+
+### ADR-004: axum over actix-web
+
+**Decision**: HTTP layer uses `axum` (Tokio-native).
+
+**Rationale**: `axum` is maintained by the Tokio team, composes with `tower` middleware, and has better `async_graphql` integration. `actix-web` has a separate runtime that complicates shared `Arc<DataStore>` ownership.
+
+**Consequence**: Middleware must be `tower::Layer`. No `actix`-specific extractors.
+
+### ADR-005: Incremental stats-cache.json writes
+
+**Decision**: `stats-cache.json` is written incrementally during Claude Code sessions, not atomically.
+
+**Rationale**: Claude Code writes stats incrementally as the session progresses. Atomic writes would require a separate file watcher with merge logic.
+
+**Consequence**: `StatsParser` has retry logic with a short sleep. Do not remove the retry — first-read failures during active sessions are expected.
+
 ## Common Pitfalls
 
 - **Don't** parse full JSONL sessions at startup → Use SQLite cache for metadata, lazy full-content loading

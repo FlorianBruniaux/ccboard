@@ -1,10 +1,6 @@
 uniffi::setup_scaffolding!("ccboard_ffi");
 
-use ccboard_core::{
-    event::DataEvent,
-    models::session::MessageRole,
-    store::DataStore,
-};
+use ccboard_core::{event::DataEvent, models::session::MessageRole, store::DataStore};
 use std::{
     path::PathBuf,
     sync::{Arc, OnceLock},
@@ -267,9 +263,7 @@ impl CcboardHandle {
                         FfiMessage {
                             role: role.to_string(),
                             content: m.content,
-                            timestamp: m
-                                .timestamp
-                                .map(|t| t.to_rfc3339()),
+                            timestamp: m.timestamp.map(|t| t.to_rfc3339()),
                             model: m.model,
                             tokens: m.tokens.map(|t| FfiTokenUsage {
                                 input_tokens: t.input_tokens,

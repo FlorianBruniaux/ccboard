@@ -1176,17 +1176,27 @@ impl SessionsTab {
                         // Context % bar (only when data is available)
                         let ctx_str = if proc.context_percent > 0.0 {
                             let bar_len = 10usize;
-                            let filled = ((proc.context_percent / 100.0) * bar_len as f64).round() as usize;
+                            let filled =
+                                ((proc.context_percent / 100.0) * bar_len as f64).round() as usize;
                             let filled = filled.min(bar_len);
                             let bar: String = "█".repeat(filled) + &"░".repeat(bar_len - filled);
-                            let compact_mark = if proc.compaction_count > 0 { "⚡" } else { " " };
+                            let compact_mark = if proc.compaction_count > 0 {
+                                "⚡"
+                            } else {
+                                " "
+                            };
                             format!(" Ctx:[{}]{:.0}%{}", bar, proc.context_percent, compact_mark)
                         } else {
                             String::new()
                         };
                         parts.push(format!(
                             "{}{}CPU:{:.1}% RAM:{}MB Tok:{}{}",
-                            type_str, model_str, proc.cpu_percent, proc.memory_mb, tokens_str, ctx_str
+                            type_str,
+                            model_str,
+                            proc.cpu_percent,
+                            proc.memory_mb,
+                            tokens_str,
+                            ctx_str
                         ));
                     }
                     parts
@@ -2167,7 +2177,12 @@ impl SessionsTab {
                 lines.push(Line::from(vec![
                     Span::styled("Context: ", Style::default().fg(p.muted)),
                     Span::styled(
-                        format!("[{}] {:.1}% of {}K", bar, proc.context_percent, proc.context_window / 1000),
+                        format!(
+                            "[{}] {:.1}% of {}K",
+                            bar,
+                            proc.context_percent,
+                            proc.context_window / 1000
+                        ),
                         Style::default().fg(ctx_color).bold(),
                     ),
                 ]));
@@ -2175,7 +2190,12 @@ impl SessionsTab {
                     lines.push(Line::from(vec![
                         Span::styled("Compactions: ", Style::default().fg(p.muted)),
                         Span::styled(
-                            format!("⚡ {} (context was reset {} time{})", proc.compaction_count, proc.compaction_count, if proc.compaction_count == 1 { "" } else { "s" }),
+                            format!(
+                                "⚡ {} (context was reset {} time{})",
+                                proc.compaction_count,
+                                proc.compaction_count,
+                                if proc.compaction_count == 1 { "" } else { "s" }
+                            ),
                             Style::default().fg(p.warning),
                         ),
                     ]));

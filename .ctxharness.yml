@@ -1,0 +1,73 @@
+version: 1
+
+files:
+  include:
+    - 'CLAUDE.md'
+    - 'docs/**/*.md'
+  exclude:
+    - 'target/**'
+
+assertions:
+  # L1 — fact drift
+  - id: crate-version
+    extractor: cargoToml
+    scanner: inlineRegex
+    scannerArgs:
+      pattern: 'v?(\d+\.\d+\.\d+)'
+
+  - id: tokio-version
+    extractor: cargoToml
+    extractorArgs:
+      package: tokio
+    scanner: inlineRegex
+    scannerArgs:
+      pattern: 'tokio\s+v?(\d+(?:\.\d+(?:\.\d+)?)?)'
+
+  - id: serde-version
+    extractor: cargoToml
+    extractorArgs:
+      package: serde
+    scanner: inlineRegex
+    scannerArgs:
+      pattern: 'serde\s+v?(\d+(?:\.\d+(?:\.\d+)?)?)'
+
+  - id: ratatui-version
+    extractor: cargoToml
+    extractorArgs:
+      package: ratatui
+    scanner: inlineRegex
+    scannerArgs:
+      pattern: 'ratatui\s+v?(\d+(?:\.\d+(?:\.\d+)?)?)'
+
+  - id: axum-version
+    extractor: cargoToml
+    extractorArgs:
+      package: axum
+    scanner: inlineRegex
+    scannerArgs:
+      pattern: 'axum\s+v?(\d+(?:\.\d+(?:\.\d+)?)?)'
+
+  # L2 — instruction quality
+  - id: no-vague-language
+    extractor: constant
+    extractorArgs:
+      value: check
+    scanner: vaguenessPattern
+
+  - id: instruction-balance
+    extractor: constant
+    extractorArgs:
+      value: check
+    scanner: negativeConstraintDensity
+    scannerArgs:
+      minRatio: 2.0
+
+  # L3 — context freshness
+  - id: claude-md-freshness
+    extractor: gitStaleness
+    extractorArgs:
+      path: CLAUDE.md
+    scanner: freshnessScore
+    scannerArgs:
+      warnAfter: 100
+      failAfter: 300
