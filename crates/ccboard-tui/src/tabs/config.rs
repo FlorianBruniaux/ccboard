@@ -454,6 +454,54 @@ impl ConfigTab {
             }
         }
 
+        // Auto Mode section (v2.1.136+)
+        if let Some(ref am) = settings.auto_mode {
+            items.push(ListItem::new(Line::from(Span::styled(
+                "─── Auto Mode ───",
+                Style::default().fg(p.muted),
+            ))));
+            items.push(self.make_item(
+                "  allow",
+                &format!("{} rules", am.allow.len()),
+                p.success,
+                p,
+            ));
+            items.push(self.make_item(
+                "  softDeny",
+                &format!("{} rules", am.soft_deny.len()),
+                p.warning,
+                p,
+            ));
+            items.push(self.make_item(
+                "  hardDeny",
+                &format!("{} rules", am.hard_deny.len()),
+                p.error,
+                p,
+            ));
+        }
+
+        // Worktree section (v2.1.133+)
+        if let Some(ref wt) = settings.worktree {
+            items.push(ListItem::new(Line::from(Span::styled(
+                "─── Worktree ───",
+                Style::default().fg(p.muted),
+            ))));
+            if let Some(ref base_ref) = wt.base_ref {
+                items.push(self.make_item("  baseRef", base_ref, p.focus, p));
+            }
+            if let Some(ref bg_isolation) = wt.bg_isolation {
+                items.push(self.make_item("  bgIsolation", bg_isolation, p.important, p));
+            }
+        }
+
+        // Enterprise: allowAllClaudeAiMcps (v2.1.149)
+        if settings.allow_all_claude_ai_mcps == Some(true) {
+            items.push(ListItem::new(Line::from(Span::styled(
+                "Enterprise: all Claude.ai MCPs trusted",
+                Style::default().fg(p.success).add_modifier(Modifier::BOLD),
+            ))));
+        }
+
         // Plugins section
         if let Some(ref plugins) = settings.enabled_plugins {
             if !plugins.is_empty() {
@@ -521,6 +569,36 @@ impl ConfigTab {
                     "  (No MCP config found)",
                     Style::default().fg(p.muted),
                 ))));
+            }
+        }
+
+        // Known env vars section (only in merged column)
+        if is_merged {
+            items.push(ListItem::new(Line::from(Span::styled(
+                "─── Known Env Vars ───",
+                Style::default().fg(p.muted),
+            ))));
+
+            let known_vars: &[(&str, &str)] = &[
+                ("CLAUDE_CODE_SESSION_ID", "v2.1.132"),
+                ("CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN", "v2.1.132"),
+                ("CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE", "v2.1.129"),
+                ("ANTHROPIC_WORKSPACE_ID", "v2.1.141"),
+            ];
+
+            let env_map = settings.env.as_ref();
+            for (var, since) in known_vars {
+                let is_set = env_map.map(|e| e.contains_key(*var)).unwrap_or(false);
+                let (status, color) = if is_set {
+                    ("set", p.success)
+                } else {
+                    ("not set", p.muted)
+                };
+                items.push(ListItem::new(Line::from(vec![
+                    Span::styled(format!("  {} ", var), Style::default().fg(p.fg)),
+                    Span::styled(format!("({}) ", since), Style::default().fg(p.muted)),
+                    Span::styled(status, Style::default().fg(color)),
+                ])));
             }
         }
 

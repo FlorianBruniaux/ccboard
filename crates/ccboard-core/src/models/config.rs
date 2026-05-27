@@ -282,6 +282,14 @@ pub struct HookDefinition {
     #[serde(default)]
     pub env: Option<HashMap<String, String>>,
 
+    /// Terminal output sequence emitted after hook runs (v2.1.141)
+    #[serde(default)]
+    pub terminal_sequence: Option<String>,
+
+    /// PostToolUse only: continue even if hook exits non-zero (v2.1.120)
+    #[serde(default)]
+    pub continue_on_block: bool,
+
     /// Source file path (not from JSON, populated during scanning)
     #[serde(skip)]
     pub file_path: Option<std::path::PathBuf>,

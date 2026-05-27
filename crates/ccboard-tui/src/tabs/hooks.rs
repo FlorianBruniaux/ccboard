@@ -518,6 +518,12 @@ impl HooksTab {
                 if hook.r#async.unwrap_or(false) {
                     badges.push(Span::styled(" async ", Style::default().fg(p.focus)));
                 }
+                if hook.continue_on_block {
+                    badges.push(Span::styled(
+                        " continueOnBlock ",
+                        Style::default().fg(p.warning),
+                    ));
+                }
                 if let Some(timeout) = hook.timeout {
                     badges.push(Span::styled(
                         format!(" ⏱{}s ", timeout),
@@ -708,6 +714,52 @@ impl HooksTab {
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
+        // Build metadata header lines
+        let mut meta_lines: Vec<Line> = Vec::new();
+
+        // Command
+        meta_lines.push(Line::from(vec![
+            Span::styled("cmd: ", Style::default().fg(p.muted)),
+            Span::styled(hook.command.clone(), Style::default().fg(p.fg)),
+        ]));
+
+        // Flags row: async, timeout, continueOnBlock
+        let mut flag_spans: Vec<Span> = Vec::new();
+        if hook.r#async.unwrap_or(false) {
+            flag_spans.push(Span::styled(" async ", Style::default().fg(p.focus)));
+        }
+        if hook.continue_on_block {
+            flag_spans.push(Span::styled(
+                " continueOnBlock ",
+                Style::default().fg(p.warning),
+            ));
+        }
+        if let Some(t) = hook.timeout {
+            flag_spans.push(Span::styled(
+                format!(" ⏱ {}s ", t),
+                Style::default().fg(p.warning),
+            ));
+        }
+        if !flag_spans.is_empty() {
+            meta_lines.push(Line::from(flag_spans));
+        }
+
+        // terminal_sequence badge
+        if let Some(ref seq) = hook.terminal_sequence {
+            meta_lines.push(Line::from(vec![
+                Span::styled("seq: ", Style::default().fg(p.muted)),
+                Span::styled(seq.clone(), Style::default().fg(p.important)),
+            ]));
+        }
+
+        // Separator line before file content
+        meta_lines.push(Line::from(Span::styled(
+            "─".repeat(inner.width.saturating_sub(2) as usize),
+            Style::default().fg(p.muted),
+        )));
+
+        let meta_height = meta_lines.len() as u16;
+
         // Read file content
         let content = if let Some(ref path) = hook.file_path {
             std::fs::read_to_string(path).unwrap_or_else(|e| format!("Error reading file: {}", e))
@@ -716,18 +768,35 @@ impl HooksTab {
         };
 
         // Split content into lines and apply scroll offset with syntax highlighting
+        let available_for_code = inner.height.saturating_sub(meta_height);
         let lines: Vec<Line> = content
             .lines()
             .skip(self.content_scroll as usize)
-            .take(inner.height as usize)
+            .take(available_for_code as usize)
             .map(|line| Self::highlight_bash_line(line))
             .collect();
 
         // Display hint at bottom if focused
         let hint_height = if is_focused { 1 } else { 0 };
-        let content_area = Rect {
+
+        // Render meta header
+        let meta_area = Rect {
             y: inner.y,
-            height: inner.height.saturating_sub(hint_height),
+            height: meta_height.min(inner.height),
+            ..inner
+        };
+        let meta_paragraph = Paragraph::new(meta_lines);
+        frame.render_widget(meta_paragraph, meta_area);
+
+        // Render code content below meta header
+        let code_y = inner.y + meta_height.min(inner.height);
+        let code_height = inner
+            .height
+            .saturating_sub(meta_height)
+            .saturating_sub(hint_height);
+        let content_area = Rect {
+            y: code_y,
+            height: code_height,
             ..inner
         };
 
@@ -786,8 +855,12 @@ impl HooksTab {
             "PostToolUse" => ("✓", Color::Green),
             "PrePromptSubmit" | "PreSubmit" => ("→", Color::Cyan),
             "PostPromptSubmit" | "PostSubmit" => ("←", Color::Blue),
-            "Notification" => ("!", Color::Magenta),
+            "Notification" => ("🔔", Color::Magenta),
             "Stop" => ("■", Color::Red),
+            "SubagentStop" => ("◼", Color::LightRed),
+            "MessageDisplay" => ("💬", Color::Cyan),
+            "PreCompact" => ("⟪", Color::LightYellow),
+            "PostCompact" => ("⟫", Color::LightGreen),
             _ => ("●", Color::Gray),
         }
     }
