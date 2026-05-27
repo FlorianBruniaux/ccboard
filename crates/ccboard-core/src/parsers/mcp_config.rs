@@ -43,6 +43,10 @@ pub struct McpServer {
     /// Headers for HTTP servers - optional field from .mcp.json format
     #[serde(default)]
     pub headers: Option<HashMap<String, String>>,
+
+    /// Load server even when no tool is invoked (v2.1.121)
+    #[serde(rename = "alwaysLoad", default)]
+    pub always_load: bool,
 }
 
 impl McpServer {

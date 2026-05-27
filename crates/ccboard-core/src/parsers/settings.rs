@@ -163,20 +163,21 @@ impl SettingsParser {
 
         for hook in all_scanned_hooks {
             // Map HookType to event name
-            let event_name = match hook.hook_type {
+            let event_name = match &hook.hook_type {
                 crate::parsers::HookType::PreCommit => "PreCommit",
                 crate::parsers::HookType::PostCommit => "PostCommit",
                 crate::parsers::HookType::PrePush => "PrePush",
                 crate::parsers::HookType::UserPromptSubmit => "UserPromptSubmit",
                 crate::parsers::HookType::ToolResultReturn => "ToolResultReturn",
-                crate::parsers::HookType::Custom(ref name) => {
-                    // Try to infer event type from custom name
-                    if name.contains("pre") || name.contains("before") {
-                        "PreToolUse"
-                    } else {
-                        "Custom"
-                    }
-                }
+                crate::parsers::HookType::PreToolUse => "PreToolUse",
+                crate::parsers::HookType::PostToolUse => "PostToolUse",
+                crate::parsers::HookType::Stop => "Stop",
+                crate::parsers::HookType::SubagentStop => "SubagentStop",
+                crate::parsers::HookType::MessageDisplay => "MessageDisplay",
+                crate::parsers::HookType::PreCompact => "PreCompact",
+                crate::parsers::HookType::PostCompact => "PostCompact",
+                crate::parsers::HookType::Notification => "Notification",
+                crate::parsers::HookType::Custom(name) => name.as_str(),
             };
 
             // Create HookDefinition from scanned hook

@@ -66,9 +66,49 @@ pub struct Settings {
     #[serde(default)]
     pub anomaly_thresholds: Option<AnomalyThresholds>,
 
+    /// Auto mode permission rules (v2.1.136+)
+    #[serde(default)]
+    pub auto_mode: Option<AutoModeConfig>,
+
+    /// Worktree behaviour (v2.1.133+)
+    #[serde(default)]
+    pub worktree: Option<WorktreeConfig>,
+
+    /// Enterprise: trust all claude.ai MCP servers (v2.1.149)
+    #[serde(rename = "allowAllClaudeAiMcps", default)]
+    pub allow_all_claude_ai_mcps: Option<bool>,
+
     /// Additional untyped fields
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
+}
+
+/// Auto mode permission configuration (v2.1.136+)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoModeConfig {
+    /// Patterns always allowed without user confirmation
+    #[serde(default)]
+    pub allow: Vec<serde_json::Value>,
+    /// Patterns that trigger a soft warning before proceeding
+    #[serde(default)]
+    pub soft_deny: Vec<serde_json::Value>,
+    /// Patterns unconditionally blocked (v2.1.136)
+    #[serde(default)]
+    pub hard_deny: Vec<serde_json::Value>,
+    /// Trusted environment indicators
+    #[serde(default)]
+    pub environment: Vec<serde_json::Value>,
+}
+
+/// Worktree behaviour configuration (v2.1.133+)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeConfig {
+    /// Branch base for new worktrees: "fresh" (default since v2.1.133) or "head"
+    pub base_ref: Option<String>,
+    /// Background isolation mode: "none" or default (v2.1.143)
+    pub bg_isolation: Option<String>,
 }
 
 /// Budget configuration for cost tracking and alerts

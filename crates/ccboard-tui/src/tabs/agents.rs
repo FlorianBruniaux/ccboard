@@ -23,6 +23,19 @@ pub struct AgentEntry {
     pub entry_type: AgentType,
     /// Number of times this agent/command/skill has been invoked across all sessions
     pub invocation_count: usize,
+    // Frontmatter fields parsed from YAML header
+    /// Tools this entry is allowed to use
+    pub allowed_tools: Vec<String>,
+    /// Tools explicitly blocked (v2.1.152)
+    pub disallowed_tools: Vec<String>,
+    /// Execution context: "fork" runs skill in isolated subagent (v2.1.150)
+    pub context_mode: Option<String>,
+    /// Effort hint: low/medium/high/xhigh (v2.1.146)
+    pub effort: Option<String>,
+    /// Skills inherited by subagents spawned from this agent (v2.1.142)
+    pub skills: Vec<String>,
+    /// Whether the skill content uses ${CLAUDE_EFFORT} variable (v2.1.120)
+    pub uses_effort_var: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -113,13 +126,19 @@ fn collect_recursive(dir: &Path, entry_type: AgentType, out: &mut Vec<AgentEntry
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown")
                 .to_string();
-            let description = extract_description(&path);
+            let fm = parse_frontmatter(&path);
             out.push(AgentEntry {
                 name,
                 file_path: path.display().to_string(),
-                description,
+                description: fm.description,
                 entry_type,
                 invocation_count: 0,
+                allowed_tools: fm.allowed_tools,
+                disallowed_tools: fm.disallowed_tools,
+                context_mode: fm.context_mode,
+                effort: fm.effort,
+                skills: fm.skills,
+                uses_effort_var: fm.uses_effort_var,
             });
         } else if path.is_dir() {
             let skill_md = path.join("SKILL.md");
@@ -129,13 +148,19 @@ fn collect_recursive(dir: &Path, entry_type: AgentType, out: &mut Vec<AgentEntry
                     .and_then(|s| s.to_str())
                     .unwrap_or("unknown")
                     .to_string();
-                let description = extract_description(&skill_md);
+                let fm = parse_frontmatter(&skill_md);
                 out.push(AgentEntry {
                     name,
                     file_path: skill_md.display().to_string(),
-                    description,
+                    description: fm.description,
                     entry_type,
                     invocation_count: 0,
+                    allowed_tools: fm.allowed_tools,
+                    disallowed_tools: fm.disallowed_tools,
+                    context_mode: fm.context_mode,
+                    effort: fm.effort,
+                    skills: fm.skills,
+                    uses_effort_var: fm.uses_effort_var,
                 });
             } else {
                 collect_recursive(&path, entry_type, out);
@@ -144,23 +169,84 @@ fn collect_recursive(dir: &Path, entry_type: AgentType, out: &mut Vec<AgentEntry
     }
 }
 
-fn extract_description(path: &Path) -> Option<String> {
-    let content = std::fs::read_to_string(path).ok()?;
+/// Parsed frontmatter fields from a skill/agent/command .md file
+struct Frontmatter {
+    description: Option<String>,
+    allowed_tools: Vec<String>,
+    disallowed_tools: Vec<String>,
+    context_mode: Option<String>,
+    effort: Option<String>,
+    skills: Vec<String>,
+    uses_effort_var: bool,
+}
+
+fn parse_frontmatter(path: &Path) -> Frontmatter {
+    let mut fm = Frontmatter {
+        description: None,
+        allowed_tools: Vec::new(),
+        disallowed_tools: Vec::new(),
+        context_mode: None,
+        effort: None,
+        skills: Vec::new(),
+        uses_effort_var: false,
+    };
+
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return fm,
+    };
+
     if !content.starts_with("---") {
-        return None;
+        return fm;
     }
     let parts: Vec<&str> = content.splitn(3, "---").collect();
     if parts.len() < 3 {
-        return None;
+        return fm;
     }
-    for line in parts[1].lines() {
+
+    let yaml_block = parts[1];
+
+    // Check if body uses ${CLAUDE_EFFORT}
+    fm.uses_effort_var = parts
+        .get(2)
+        .map_or(false, |body| body.contains("${CLAUDE_EFFORT}"));
+
+    for line in yaml_block.lines() {
         let line = line.trim();
-        if line.starts_with("description:") {
-            let desc = line.strip_prefix("description:")?.trim();
-            return Some(desc.trim_matches('"').trim_matches('\'').to_string());
+
+        if let Some(v) = scalar_value(line, "description:") {
+            fm.description = Some(v);
+        } else if let Some(v) = scalar_value(line, "context:") {
+            fm.context_mode = Some(v);
+        } else if let Some(v) = scalar_value(line, "effort:") {
+            fm.effort = Some(v);
+        } else if let Some(v) = scalar_value(line, "allowed-tools:") {
+            fm.allowed_tools = split_tools(&v);
+        } else if let Some(v) = scalar_value(line, "disallowed-tools:") {
+            fm.disallowed_tools = split_tools(&v);
+        } else if let Some(v) = scalar_value(line, "skills:") {
+            fm.skills = split_tools(&v);
+        }
+        // List items for allowed-tools / disallowed-tools / skills
+        else if line.starts_with("- ") {
+            // We can't know which field we're under without tracking state,
+            // so skip bare list items — scalar parsing covers the common inline format.
         }
     }
-    None
+
+    fm
+}
+
+fn scalar_value<'a>(line: &'a str, key: &str) -> Option<String> {
+    let val = line.strip_prefix(key)?.trim();
+    Some(val.trim_matches('"').trim_matches('\'').to_string())
+}
+
+fn split_tools(raw: &str) -> Vec<String> {
+    raw.split([',', ' '])
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
 }
 
 /// Agents tab state
@@ -258,6 +344,12 @@ impl AgentsTab {
                 description: Some("Discovered from sessions".to_string()),
                 entry_type: AgentType::Agent,
                 invocation_count: count,
+                allowed_tools: Vec::new(),
+                disallowed_tools: Vec::new(),
+                context_mode: None,
+                effort: None,
+                skills: Vec::new(),
+                uses_effort_var: false,
             })
             .collect();
         self.agents.extend(new_agents);
@@ -277,6 +369,12 @@ impl AgentsTab {
                 description: Some("Discovered from sessions".to_string()),
                 entry_type: AgentType::Command,
                 invocation_count: count,
+                allowed_tools: Vec::new(),
+                disallowed_tools: Vec::new(),
+                context_mode: None,
+                effort: None,
+                skills: Vec::new(),
+                uses_effort_var: false,
             })
             .collect();
         self.commands.extend(new_commands);
@@ -293,6 +391,12 @@ impl AgentsTab {
                 description: Some("Discovered from sessions".to_string()),
                 entry_type: AgentType::Skill,
                 invocation_count: count,
+                allowed_tools: Vec::new(),
+                disallowed_tools: Vec::new(),
+                context_mode: None,
+                effort: None,
+                skills: Vec::new(),
+                uses_effort_var: false,
             })
             .collect();
         self.skills.extend(new_skills);
