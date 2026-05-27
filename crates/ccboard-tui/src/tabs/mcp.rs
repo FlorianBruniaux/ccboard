@@ -427,11 +427,16 @@ impl McpTab {
                     .take(40)
                     .collect::<String>();
 
+                let mut name_spans = vec![
+                    Span::styled(format!(" {} ", icon), Style::default().fg(color)),
+                    Span::styled(name.to_string(), Style::default().fg(p.fg).bold()),
+                ];
+                if server.always_load {
+                    name_spans.push(Span::styled(" [A]", Style::default().fg(p.warning).bold()));
+                }
+
                 ListItem::new(vec![
-                    Line::from(vec![
-                        Span::styled(format!(" {} ", icon), Style::default().fg(color)),
-                        Span::styled(name.to_string(), Style::default().fg(p.fg).bold()),
-                    ]),
+                    Line::from(name_spans),
                     Line::from(Span::styled(
                         format!("   {}", cmd_short),
                         Style::default().fg(p.muted),
@@ -522,6 +527,15 @@ impl McpTab {
             ),
             Span::styled(status_text, Style::default().fg(status_color)),
         ]));
+
+        // Always Load indicator
+        if server.always_load {
+            lines.push(Line::from(vec![
+                Span::styled("Always Load: ", Style::default().fg(p.warning).bold()),
+                Span::styled("yes", Style::default().fg(p.warning)),
+            ]));
+        }
+
         lines.push(Line::from(""));
 
         // Command or URL

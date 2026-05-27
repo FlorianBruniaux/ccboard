@@ -188,6 +188,8 @@ impl SettingsParser {
                 cwd: None,
                 env: None,
                 file_path: Some(hook.path.clone()),
+                continue_on_block: false,
+                terminal_sequence: None,
             };
 
             // Add to event group

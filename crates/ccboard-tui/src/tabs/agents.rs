@@ -749,7 +749,7 @@ impl AgentsTab {
             })
             .unwrap_or_else(|_| "Unable to read file".to_string());
 
-        let lines = vec![
+        let mut lines = vec![
             Line::from(vec![
                 Span::styled("Name: ", Style::default().fg(p.muted)),
                 Span::styled(
@@ -772,19 +772,80 @@ impl AgentsTab {
                 Style::default().fg(p.fg),
             )),
             Line::from(""),
-            Line::from(Span::styled(
-                "Content preview:",
-                Style::default().fg(p.muted),
-            )),
-            Line::from(Span::styled(
-                if content_preview.len() >= 500 {
-                    format!("{}...", content_preview)
-                } else {
-                    content_preview
-                },
-                Style::default().fg(p.muted),
-            )),
         ];
+
+        // Frontmatter metadata rows — only shown when the entry has parsed data
+        if !entry.allowed_tools.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Tools: ", Style::default().fg(p.muted)),
+                Span::styled(entry.allowed_tools.join(", "), Style::default().fg(p.fg)),
+            ]));
+        }
+
+        if !entry.disallowed_tools.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Blocked: ", Style::default().fg(p.muted)),
+                Span::styled(
+                    entry.disallowed_tools.join(", "),
+                    Style::default().fg(p.error),
+                ),
+            ]));
+        }
+
+        if let Some(ref mode) = entry.context_mode {
+            let mut mode_spans = vec![Span::styled("Context: ", Style::default().fg(p.muted))];
+            if mode == "fork" {
+                mode_spans.push(Span::styled("fork", Style::default().fg(p.focus).bold()));
+            } else {
+                mode_spans.push(Span::styled(mode.as_str(), Style::default().fg(p.fg)));
+            }
+            lines.push(Line::from(mode_spans));
+        }
+
+        if let Some(ref effort) = entry.effort {
+            lines.push(Line::from(vec![
+                Span::styled("Effort: ", Style::default().fg(p.muted)),
+                Span::styled(effort.as_str(), Style::default().fg(p.fg)),
+            ]));
+        }
+
+        if !entry.skills.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Skills: ", Style::default().fg(p.muted)),
+                Span::styled(entry.skills.join(", "), Style::default().fg(p.fg)),
+            ]));
+        }
+
+        if entry.uses_effort_var {
+            lines.push(Line::from(Span::styled(
+                "uses $EFFORT",
+                Style::default().fg(p.muted).italic(),
+            )));
+        }
+
+        // Separate metadata from content preview only if we added any metadata rows
+        let has_metadata = !entry.allowed_tools.is_empty()
+            || !entry.disallowed_tools.is_empty()
+            || entry.context_mode.is_some()
+            || entry.effort.is_some()
+            || !entry.skills.is_empty()
+            || entry.uses_effort_var;
+        if has_metadata {
+            lines.push(Line::from(""));
+        }
+
+        lines.push(Line::from(Span::styled(
+            "Content preview:",
+            Style::default().fg(p.muted),
+        )));
+        lines.push(Line::from(Span::styled(
+            if content_preview.len() >= 500 {
+                format!("{}...", content_preview)
+            } else {
+                content_preview
+            },
+            Style::default().fg(p.muted),
+        )));
 
         let detail = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(detail, inner);
