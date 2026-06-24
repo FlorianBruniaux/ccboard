@@ -1,6 +1,5 @@
 # Rust
 /target
-Cargo.lock
 
 # Trunk build artifacts (WASM frontend)
 crates/ccboard-web/dist/
