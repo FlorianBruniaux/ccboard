@@ -3,6 +3,7 @@
 use gloo_net::http::Request;
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 /// Task graph data structures matching backend API
@@ -11,6 +12,9 @@ use wasm_bindgen::prelude::*;
 pub struct TaskGraphData {
     pub nodes: Vec<TaskNode>,
     pub edges: Vec<TaskEdge>,
+    /// Maps task_id -> list of session IDs that worked on that task
+    #[serde(default)]
+    pub session_mappings: Option<HashMap<String, Vec<String>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -167,6 +171,42 @@ pub fn TaskDependencyGraph() -> impl IntoView {
                                 <div class="graph-instructions">
                                     <p>"💡 Tip: Drag nodes to rearrange. Zoom with mouse wheel. Pan by dragging background."</p>
                                 </div>
+
+                                {
+                                    let mappings_opt = data.session_mappings.clone();
+                                    move || {
+                                        if let Some(ref mappings) = mappings_opt {
+                                            let active: Vec<(String, usize)> = mappings
+                                                .iter()
+                                                .filter(|(_, sessions)| !sessions.is_empty())
+                                                .map(|(task_id, sessions)| (task_id.clone(), sessions.len()))
+                                                .collect();
+                                            if active.is_empty() {
+                                                return view! { <span></span> }.into_any();
+                                            }
+                                            let badges: Vec<_> = active
+                                                .into_iter()
+                                                .map(|(task_id, count)| {
+                                                    view! {
+                                                        <span class="task-session-badge">
+                                                            {task_id} ": " {count} " session(s)"
+                                                        </span>
+                                                    }
+                                                })
+                                                .collect();
+                                            view! {
+                                                <div class="session-mapping-legend">
+                                                    <div class="mapping-header">
+                                                        <strong>"Sessions mapped to tasks:"</strong>
+                                                        <div class="badges">{badges}</div>
+                                                    </div>
+                                                </div>
+                                            }.into_any()
+                                        } else {
+                                            view! { <span></span> }.into_any()
+                                        }
+                                    }
+                                }
                             </div>
                         }.into_any()
                     },

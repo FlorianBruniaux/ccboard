@@ -1033,11 +1033,12 @@ fn scan_skills_recursive(dir_path: &std::path::Path) -> Vec<serde_json::Value> {
 
 /// Task graph handler - returns task dependency graph from PLAN.md
 async fn task_graph_handler(
-    axum::extract::State(_store): axum::extract::State<Arc<DataStore>>,
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
 ) -> axum::Json<serde_json::Value> {
     use ccboard_core::graph::TaskGraph;
     use ccboard_core::models::plan::PhaseStatus;
     use ccboard_core::parsers::PlanParser;
+    use ccboard_core::parsers::TodoWriteParser;
 
     // Try multiple PLAN.md locations (prioritize working dir)
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
@@ -1058,6 +1059,38 @@ async fn task_graph_handler(
         .unwrap_or_else(|| cwd.join("PLAN.md"));
 
     let plan_result = PlanParser::parse_file(&plan_path);
+
+    // Build session-to-task mapping from recent sessions (limit 50 for performance)
+    let session_mappings: std::collections::HashMap<String, Vec<String>> = {
+        let mut all_events = Vec::new();
+        let sessions = store.all_sessions();
+        let mut sorted = sessions;
+        sorted.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+        for session in sorted.into_iter().take(50) {
+            if let Ok(events) = TodoWriteParser::parse_session(&session.file_path) {
+                all_events.extend(events);
+            }
+        }
+        let mapping = TodoWriteParser::build_mapping(all_events);
+        mapping
+            .task_timeline
+            .into_iter()
+            .map(|(task_id, events)| {
+                let mut seen = std::collections::HashSet::new();
+                let session_ids: Vec<String> = events
+                    .into_iter()
+                    .filter_map(|e| {
+                        if seen.insert(e.session_id.clone()) {
+                            Some(e.session_id)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                (task_id, session_ids)
+            })
+            .collect()
+    };
 
     match plan_result {
         Ok(Some(plan)) => {
@@ -1158,6 +1191,7 @@ async fn task_graph_handler(
             axum::Json(serde_json::json!({
                 "nodes": nodes,
                 "edges": edges,
+                "sessionMappings": session_mappings,
             }))
         }
         Ok(None) => {
@@ -1165,6 +1199,7 @@ async fn task_graph_handler(
             axum::Json(serde_json::json!({
                 "nodes": [],
                 "edges": [],
+                "sessionMappings": {},
                 "error": "PLAN.md not found",
             }))
         }
@@ -1173,6 +1208,7 @@ async fn task_graph_handler(
             axum::Json(serde_json::json!({
                 "nodes": [],
                 "edges": [],
+                "sessionMappings": {},
                 "error": format!("Failed to parse PLAN.md: {}", e),
             }))
         }
