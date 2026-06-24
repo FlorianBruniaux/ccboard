@@ -5,6 +5,19 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-06-24
+
+### Added
+
+- **`ccboard report` command** (`#39`): generates usage reports in Markdown (default), JSON, and HTML from existing analytics data. Flags: `--format json|markdown|html`, `--since <period>` (1d/7d/30d/90d/YYYY-MM-DD, default 7d), `--output <file>` to write to disk instead of stdout.
+- **Token budget enforcement for CI** (`#40`): `--budget <tokens>` flag on `ccboard report`. Exits with code 1 and prints to stderr when total token usage exceeds the limit. Enables `ccboard report --budget 500000` as a CI quality gate.
+- **Session quality gates** (`#41`): `--error-threshold <pct>` flag on `ccboard report`. Exits with code 1 when the session error rate exceeds the threshold. Multiple gates can be combined on the same command.
+- **Token heatmap TUI** (`#20`): new `Heatmap` sub-view in the Analytics tab. Shows a 24-bar hourly BarChart and a 7-bar weekday BarChart side by side, built from `UsagePatterns.hourly_distribution` and `weekday_distribution`.
+- **Tool efficiency metrics Web** (`#21`): `/api/analytics/tool-stats` endpoint returns per-tool call count, tokens, percentage of total, and estimated cost for the last 30 days. The Analytics web page now renders this as a sortable table.
+- **Session-to-task mapping via TodoWrite** (`#12`): `/api/task-graph` now scans the 50 most recent JSONL sessions for `TaskCreate`/`TaskUpdate`/`TodoWrite` tool calls, and returns a `sessionMappings` field (task_id → [session_ids]). The Leptos `TaskDependencyGraph` shows a session count legend below the D3 graph.
+
+---
+
 ## [0.23.0] - 2026-06-24
 
 ### Added

@@ -704,6 +704,69 @@ ccboard export conversation <session-id> --output conv.json --format json
 ccboard export conversation <session-id> --output conv.html --format html
 ```
 
+### Report (CI/CD)
+
+Generate a usage report with optional CI quality gates. Exits with code 1 when a gate is exceeded, so you can plug it directly into GitHub Actions, GitLab CI, or any shell script.
+
+```bash
+# Markdown report, last 7 days (default)
+ccboard report
+
+# JSON for machine parsing
+ccboard report --format json
+
+# HTML with embedded charts
+ccboard report --format html --output report.html
+
+# Last 30 days
+ccboard report --since 30d
+
+# Write to file
+ccboard report --output weekly-report.md
+
+# Fail CI if token budget exceeded
+ccboard report --budget 500000
+
+# Fail CI if error rate > 5%
+ccboard report --error-threshold 5
+
+# Combine gates
+ccboard report --budget 1000000 --error-threshold 10 --since 30d
+```
+
+**Output example (Markdown):**
+```markdown
+# ccboard Report
+
+**Period:** last 7d
+**Generated:** 2026-06-24 15:13 UTC
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Tokens | 14.49B |
+| Sessions (period) | 1441 |
+| Est. Cost | $54622.19 |
+| Error Rate | 0.0% |
+| Cache Hit Ratio | 99.9% |
+
+## Top Tools by Token Usage
+
+| Tool | Calls | Tokens | % of Total | Est. Cost |
+|------|-------|--------|------------|-----------|
+| Bash | 14050 | 1.46B | 47.6% | $26026.22 |
+| Read | 7475 | 677M | 22.1% | $12083.00 |
+| Edit | 3825 | 459M | 15.0% | $8205.99 |
+...
+```
+
+**CI gate behavior:**
+- `--budget` and `--error-threshold` can be combined
+- Exit code 0 when all gates pass, exit code 1 when any gate fails
+- Report is always printed to stdout (or `--output` file) regardless of gate result
+- Error details go to stderr so stdout remains parseable
+
 ---
 
 ## Keybindings & Shortcuts
