@@ -168,6 +168,31 @@ enum Mode {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Generate a usage report (JSON, Markdown, or HTML) with optional CI gates
+    ///
+    /// Examples:
+    ///   ccboard report                        # Markdown report, last 7 days
+    ///   ccboard report --format json          # JSON, machine-readable
+    ///   ccboard report --since 30d            # Last 30 days
+    ///   ccboard report --budget 500000        # Exit 1 if tokens > 500k
+    ///   ccboard report --error-threshold 5    # Exit 1 if error rate > 5%
+    Report {
+        /// Output format: json, markdown, html
+        #[arg(long, short = 'f', default_value = "markdown", value_parser = ["json", "markdown", "html"])]
+        format: String,
+        /// Time window: 1d, 7d, 30d, 90d, or YYYY-MM-DD (default: 7d)
+        #[arg(long, short = 'd', default_value = "7d")]
+        since: String,
+        /// Fail (exit 1) if total tokens exceed this budget
+        #[arg(long)]
+        budget: Option<u64>,
+        /// Fail (exit 1) if session error rate exceeds this percentage (0-100)
+        #[arg(long)]
+        error_threshold: Option<f64>,
+        /// Write output to file instead of stdout
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+    },
     /// Analyze session history to suggest skills, commands, and CLAUDE.md rules
     Discover {
         /// Time window: 7d, 30d, 90d, or YYYY-MM-DD (default: 90d)
@@ -353,6 +378,25 @@ async fn main() -> Result<()> {
         }
         Mode::Setup { dry_run } => {
             setup::run_setup(dry_run, claude_home).await?;
+        }
+        Mode::Report {
+            format,
+            since,
+            budget,
+            error_threshold,
+            output,
+        } => {
+            run_report(
+                claude_home,
+                project,
+                format,
+                since,
+                budget,
+                error_threshold,
+                output,
+                no_color,
+            )
+            .await?;
         }
         Mode::Discover {
             since,
@@ -1477,6 +1521,330 @@ async fn run_discover(
 
     println!("  Run with --json to pipe to jq for further processing.");
     println!();
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_report(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    format: String,
+    since: String,
+    budget: Option<u64>,
+    error_threshold: Option<f64>,
+    output: Option<PathBuf>,
+    _no_color: bool,
+) -> Result<()> {
+    use ccboard_core::analytics::{AnalyticsData, Period};
+
+    let spinner = create_spinner();
+    spinner.set_message("Loading data...");
+
+    let store = DataStore::with_defaults(claude_home, project);
+    store.initial_load().await;
+
+    let days = parse_since_to_days(&since)?;
+    let period = Period::Days(days as usize);
+    let sessions = store.all_sessions();
+
+    spinner.set_message("Computing analytics...");
+    let analytics = AnalyticsData::compute(&sessions, period);
+
+    // Derive error stats: sessions with non-zero tool errors as proxy
+    let total_sessions = sessions.len();
+    // Proxy: sessions with 0 messages (failed init) or containing "error" in tool_usage
+    let errored_sessions = sessions
+        .iter()
+        .filter(|s| s.message_count == 0 || s.tool_usage.contains_key("error"))
+        .count();
+    let error_rate = if total_sessions > 0 {
+        errored_sessions as f64 / total_sessions as f64 * 100.0
+    } else {
+        0.0
+    };
+
+    let total_tokens: u64 = sessions.iter().map(|s| s.total_tokens).sum();
+    let total_cost: f64 = analytics.trends.daily_cost.iter().sum();
+
+    spinner.finish_and_clear();
+
+    let content = match format.as_str() {
+        "json" => {
+            let top_models: Vec<serde_json::Value> = store
+                .stats()
+                .map(|s| {
+                    s.top_models(5)
+                        .into_iter()
+                        .map(|(name, usage)| {
+                            serde_json::json!({
+                                "model": name,
+                                "total_tokens": usage.total_tokens(),
+                                "input_tokens": usage.input_tokens,
+                                "output_tokens": usage.output_tokens,
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let top_tools: Vec<serde_json::Value> = analytics
+                .tool_token_stats
+                .iter()
+                .take(10)
+                .map(|t| {
+                    serde_json::json!({
+                        "tool": t.tool_name,
+                        "calls": t.call_count,
+                        "tokens": t.tokens,
+                        "pct_of_total": format!("{:.1}", t.pct_of_total * 100.0),
+                        "est_cost_usd": format!("{:.4}", t.est_cost_usd),
+                    })
+                })
+                .collect();
+
+            serde_json::to_string_pretty(&serde_json::json!({
+                "period": format!("{}d", days),
+                "generated_at": chrono::Utc::now().to_rfc3339(),
+                "summary": {
+                    "total_tokens": total_tokens,
+                    "total_sessions": total_sessions,
+                    "sessions_in_period": analytics.sessions_in_period,
+                    "total_cost_usd": format!("{:.4}", total_cost),
+                    "error_rate_pct": format!("{:.2}", error_rate),
+                    "cache_hit_ratio": store.stats().map(|s| format!("{:.1}", s.cache_ratio() * 100.0)).unwrap_or_else(|| "N/A".to_string()),
+                },
+                "models": top_models,
+                "top_tools": top_tools,
+                "insights": analytics.insights,
+                "gates": {
+                    "budget_token_limit": budget,
+                    "budget_exceeded": budget.map(|b| total_tokens > b),
+                    "error_threshold_pct": error_threshold,
+                    "error_threshold_exceeded": error_threshold.map(|t| error_rate > t),
+                },
+            }))?
+        }
+        "html" => {
+            let rows: String = analytics
+                .tool_token_stats
+                .iter()
+                .take(10)
+                .map(|t| {
+                    format!(
+                        "<tr><td>{}</td><td>{}</td><td>{}</td><td>{:.1}%</td><td>${:.4}</td></tr>",
+                        t.tool_name,
+                        t.call_count,
+                        format_number(t.tokens),
+                        t.pct_of_total * 100.0,
+                        t.est_cost_usd
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            let insights_html: String = analytics
+                .insights
+                .iter()
+                .map(|i| format!("<li>{}</li>", i))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            format!(
+                r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ccboard Report — last {days}d</title>
+<style>
+  body {{ font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 2rem; }}
+  h1 {{ color: #58a6ff; }} h2 {{ color: #79c0ff; border-bottom: 1px solid #30363d; padding-bottom: 0.4rem; }}
+  table {{ border-collapse: collapse; width: 100%; margin-bottom: 2rem; }}
+  th, td {{ padding: 0.5rem 1rem; text-align: left; border: 1px solid #30363d; }}
+  th {{ background: #161b22; color: #58a6ff; }}
+  .stat {{ display: inline-block; background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 1rem 1.5rem; margin: 0.5rem; }}
+  .stat-label {{ font-size: 0.85rem; color: #8b949e; }} .stat-value {{ font-size: 1.4rem; font-weight: bold; color: #58a6ff; }}
+  .gate-ok {{ color: #56d364; }} .gate-fail {{ color: #f85149; }}
+  ul {{ padding-left: 1.2rem; }} li {{ margin: 0.3rem 0; }}
+</style>
+</head>
+<body>
+<h1>ccboard Report</h1>
+<p>Period: last {days} days &nbsp;|&nbsp; Generated: {generated}</p>
+
+<h2>Summary</h2>
+<div>
+  <div class="stat"><div class="stat-label">Total Tokens</div><div class="stat-value">{tokens}</div></div>
+  <div class="stat"><div class="stat-label">Sessions (period)</div><div class="stat-value">{sessions_period}</div></div>
+  <div class="stat"><div class="stat-label">Total Sessions</div><div class="stat-value">{sessions_total}</div></div>
+  <div class="stat"><div class="stat-label">Est. Cost</div><div class="stat-value">${cost:.4}</div></div>
+  <div class="stat"><div class="stat-label">Error Rate</div><div class="stat-value">{error_rate:.1}%</div></div>
+</div>
+
+<h2>Top Tools by Token Usage</h2>
+<table>
+<tr><th>Tool</th><th>Calls</th><th>Tokens</th><th>% of Total</th><th>Est. Cost</th></tr>
+{rows}
+</table>
+
+<h2>Insights</h2>
+<ul>
+{insights_html}
+</ul>
+
+<h2>CI Gates</h2>
+<ul>
+{gates_html}
+</ul>
+</body>
+</html>"#,
+                days = days,
+                generated = chrono::Utc::now().format("%Y-%m-%d %H:%M UTC"),
+                tokens = format_number(total_tokens),
+                sessions_period = analytics.sessions_in_period,
+                sessions_total = total_sessions,
+                cost = total_cost,
+                error_rate = error_rate,
+                rows = rows,
+                insights_html = insights_html,
+                gates_html = {
+                    let mut gates = Vec::new();
+                    if let Some(b) = budget {
+                        let ok = total_tokens <= b;
+                        gates.push(format!(
+                            r#"<li class="{}">Budget: {} tokens / {} limit ({})</li>"#,
+                            if ok { "gate-ok" } else { "gate-fail" },
+                            format_number(total_tokens),
+                            format_number(b),
+                            if ok { "OK" } else { "EXCEEDED" }
+                        ));
+                    }
+                    if let Some(t) = error_threshold {
+                        let ok = error_rate <= t;
+                        gates.push(format!(
+                            r#"<li class="{}">Error rate: {:.1}% / {:.1}% threshold ({})</li>"#,
+                            if ok { "gate-ok" } else { "gate-fail" },
+                            error_rate,
+                            t,
+                            if ok { "OK" } else { "EXCEEDED" }
+                        ));
+                    }
+                    if gates.is_empty() {
+                        gates.push("<li>No CI gates configured</li>".to_string());
+                    }
+                    gates.join("\n")
+                }
+            )
+        }
+        _ => {
+            // Markdown (default)
+            let mut md = format!(
+                "# ccboard Report\n\n**Period:** last {days}d  \n**Generated:** {generated}\n\n",
+                days = days,
+                generated = chrono::Utc::now().format("%Y-%m-%d %H:%M UTC")
+            );
+
+            md.push_str("## Summary\n\n");
+            md.push_str(&format!("| Metric | Value |\n|--------|-------|\n"));
+            md.push_str(&format!(
+                "| Total Tokens | {} |\n",
+                format_number(total_tokens)
+            ));
+            md.push_str(&format!(
+                "| Sessions (period) | {} |\n",
+                analytics.sessions_in_period
+            ));
+            md.push_str(&format!("| Total Sessions | {} |\n", total_sessions));
+            md.push_str(&format!("| Est. Cost | ${:.4} |\n", total_cost));
+            md.push_str(&format!("| Error Rate | {:.1}% |\n", error_rate));
+            if let Some(stats) = store.stats() {
+                md.push_str(&format!(
+                    "| Cache Hit Ratio | {:.1}% |\n",
+                    stats.cache_ratio() * 100.0
+                ));
+            }
+
+            if !analytics.tool_token_stats.is_empty() {
+                md.push_str("\n## Top Tools by Token Usage\n\n");
+                md.push_str("| Tool | Calls | Tokens | % of Total | Est. Cost |\n");
+                md.push_str("|------|-------|--------|------------|-----------|\n");
+                for t in analytics.tool_token_stats.iter().take(10) {
+                    md.push_str(&format!(
+                        "| {} | {} | {} | {:.1}% | ${:.4} |\n",
+                        t.tool_name,
+                        t.call_count,
+                        format_number(t.tokens),
+                        t.pct_of_total * 100.0,
+                        t.est_cost_usd
+                    ));
+                }
+            }
+
+            if !analytics.insights.is_empty() {
+                md.push_str("\n## Insights\n\n");
+                for insight in &analytics.insights {
+                    md.push_str(&format!("- {}\n", insight));
+                }
+            }
+
+            if budget.is_some() || error_threshold.is_some() {
+                md.push_str("\n## CI Gates\n\n");
+                if let Some(b) = budget {
+                    let ok = total_tokens <= b;
+                    md.push_str(&format!(
+                        "- Budget: {} / {} tokens — **{}**\n",
+                        format_number(total_tokens),
+                        format_number(b),
+                        if ok { "OK" } else { "EXCEEDED" }
+                    ));
+                }
+                if let Some(t) = error_threshold {
+                    let ok = error_rate <= t;
+                    md.push_str(&format!(
+                        "- Error rate: {:.1}% / {:.1}% threshold — **{}**\n",
+                        error_rate,
+                        t,
+                        if ok { "OK" } else { "EXCEEDED" }
+                    ));
+                }
+            }
+
+            md
+        }
+    };
+
+    // Write output
+    match output {
+        Some(path) => {
+            std::fs::write(&path, &content)
+                .with_context(|| format!("Failed to write report to {}", path.display()))?;
+            println!("Report written to {}", path.display());
+        }
+        None => print!("{}", content),
+    }
+
+    // CI gate: exit 1 if any threshold exceeded
+    let budget_exceeded = budget.map(|b| total_tokens > b).unwrap_or(false);
+    let error_exceeded = error_threshold.map(|t| error_rate > t).unwrap_or(false);
+
+    if budget_exceeded || error_exceeded {
+        if budget_exceeded {
+            eprintln!(
+                "CI gate FAILED: token budget exceeded ({} > {})",
+                format_number(total_tokens),
+                format_number(budget.unwrap())
+            );
+        }
+        if error_exceeded {
+            eprintln!(
+                "CI gate FAILED: error rate exceeded ({:.1}% > {:.1}%)",
+                error_rate,
+                error_threshold.unwrap()
+            );
+        }
+        std::process::exit(1);
+    }
 
     Ok(())
 }
