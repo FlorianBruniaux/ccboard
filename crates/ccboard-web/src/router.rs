@@ -161,6 +161,7 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
             "/api/analytics/suggestions",
             get(analytics_suggestions_handler),
         )
+        .route("/api/analytics/tool-stats", get(tool_stats_handler))
         .route("/api/task-graph", get(task_graph_handler))
         .route("/api/insights", get(insights_handler))
         .route(
@@ -651,6 +652,44 @@ async fn analytics_suggestions_handler(
         "total_cost_analyzed": total_cost,
         "sessions_analyzed": sessions.len(),
         "generated_at": Utc::now().to_rfc3339(),
+    }))
+}
+
+/// Per-tool token and cost efficiency metrics handler
+///
+/// Returns per-tool breakdown of token usage, call counts, and cost attribution
+/// for the last 30 days, computed from AnalyticsData.
+///
+/// GET /api/analytics/tool-stats
+async fn tool_stats_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    let sessions = store.all_sessions();
+    let analytics = ccboard_core::analytics::AnalyticsData::compute(
+        &sessions,
+        ccboard_core::analytics::Period::last_30d(),
+    );
+
+    let total_tools = analytics.tool_token_stats.len();
+    let tool_stats: Vec<serde_json::Value> = analytics
+        .tool_token_stats
+        .iter()
+        .map(|s| {
+            serde_json::json!({
+                "tool_name": s.tool_name,
+                "call_count": s.call_count,
+                "tokens": s.tokens,
+                "pct_of_total": s.pct_of_total,
+                "est_cost_usd": s.est_cost_usd,
+                "cost_per_call": s.cost_per_call,
+            })
+        })
+        .collect();
+
+    axum::Json(serde_json::json!({
+        "tool_stats": tool_stats,
+        "total_tools": total_tools,
+        "period_days": 30,
     }))
 }
 

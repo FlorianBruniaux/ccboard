@@ -27,6 +27,8 @@ pub enum AnalyticsView {
     Anomalies,
     /// Per-tool token usage and cost optimization suggestions
     Costs,
+    /// Hourly and weekday activity heatmap charts
+    Heatmap,
     /// Pattern discovery from session history
     Discover,
 }
@@ -40,7 +42,8 @@ impl AnalyticsView {
             Self::Patterns => Self::Insights,
             Self::Insights => Self::Anomalies,
             Self::Anomalies => Self::Costs,
-            Self::Costs => Self::Discover,
+            Self::Costs => Self::Heatmap,
+            Self::Heatmap => Self::Discover,
             Self::Discover => Self::Overview,
         }
     }
@@ -54,7 +57,8 @@ impl AnalyticsView {
             Self::Insights => Self::Patterns,
             Self::Anomalies => Self::Insights,
             Self::Costs => Self::Anomalies,
-            Self::Discover => Self::Costs,
+            Self::Heatmap => Self::Costs,
+            Self::Discover => Self::Heatmap,
         }
     }
 
@@ -67,6 +71,7 @@ impl AnalyticsView {
             Self::Insights => "Summary",
             Self::Anomalies => "Anomalies",
             Self::Costs => "Costs",
+            Self::Heatmap => "Heatmap",
             Self::Discover => "Discover",
         }
     }
@@ -287,6 +292,7 @@ impl AnalyticsTab {
                     AnalyticsView::Insights => self.render_insights(frame, chunks[1], data, &p),
                     AnalyticsView::Anomalies => self.render_anomalies(frame, chunks[1], data, &p),
                     AnalyticsView::Costs => self.render_costs(frame, chunks[1], data, &p),
+                    AnalyticsView::Heatmap => self.render_heatmap(frame, chunks[1], data, &p),
                     AnalyticsView::Discover => unreachable!("handled above"),
                 }
             }
@@ -354,6 +360,7 @@ impl AnalyticsTab {
             AnalyticsView::Insights,
             AnalyticsView::Anomalies,
             AnalyticsView::Costs,
+            AnalyticsView::Heatmap,
             AnalyticsView::Discover,
         ];
         let mut tab_spans: Vec<Span> = Vec::new();
@@ -2046,6 +2053,71 @@ impl AnalyticsTab {
 
         let list = List::new(items).block(block);
         frame.render_widget(list, area);
+    }
+
+    /// Render Heatmap sub-view — hourly and weekday activity charts
+    fn render_heatmap(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area);
+
+        // --- Top half: Hourly distribution (24 bars) ---
+        let hour_title = format!(
+            " Activity by Hour (peak: {:02}h) ",
+            data.patterns.most_productive_hour
+        );
+        let hour_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title(hour_title)
+            .style(Style::default().fg(p.border).bg(p.surface));
+
+        // Build owned label strings first to satisfy lifetime requirements
+        let hour_labels: Vec<String> = (0..24u8).map(|h| format!("{:02}", h)).collect();
+        let hour_chart_data: Vec<(&str, u64)> = hour_labels
+            .iter()
+            .zip(data.patterns.hourly_distribution.iter())
+            .map(|(label, &count)| (label.as_str(), count as u64))
+            .collect();
+
+        let hour_chart = BarChart::default()
+            .block(hour_block)
+            .data(&hour_chart_data)
+            .bar_width(3)
+            .bar_gap(0)
+            .bar_style(Style::default().fg(p.focus))
+            .value_style(Style::default().fg(p.bg).add_modifier(Modifier::BOLD))
+            .label_style(Style::default().fg(p.muted));
+
+        frame.render_widget(hour_chart, chunks[0]);
+
+        // --- Bottom half: Weekday distribution (7 bars) ---
+        let weekday_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        let peak_day = format!("{:?}", data.patterns.most_productive_day);
+        let weekday_title = format!(" Activity by Weekday (peak: {}) ", peak_day);
+        let weekday_block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title(weekday_title)
+            .style(Style::default().fg(p.border).bg(p.surface));
+
+        let weekday_chart_data: Vec<(&str, u64)> = weekday_names
+            .iter()
+            .zip(data.patterns.weekday_distribution.iter())
+            .map(|(name, &count)| (*name, count as u64))
+            .collect();
+
+        let weekday_chart = BarChart::default()
+            .block(weekday_block)
+            .data(&weekday_chart_data)
+            .bar_width(7)
+            .bar_gap(2)
+            .bar_style(Style::default().fg(p.focus))
+            .value_style(Style::default().fg(p.bg).add_modifier(Modifier::BOLD))
+            .label_style(Style::default().fg(p.muted));
+
+        frame.render_widget(weekday_chart, chunks[1]);
     }
 
     /// Render Discover sub-view — pattern discovery from session history

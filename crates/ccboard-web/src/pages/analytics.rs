@@ -9,23 +9,23 @@ use crate::utils::export_as_csv;
 use leptos::prelude::*;
 use serde::{Deserialize, Serialize};
 
-/// A cost optimization suggestion from the backend API
+/// Per-tool efficiency metrics from /api/analytics/tool-stats
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CostSuggestionData {
-    pub category: String,
-    pub title: String,
-    pub description: String,
-    pub potential_savings: f64,
-    pub action: String,
+pub struct ToolStatItem {
+    pub tool_name: String,
+    pub call_count: usize,
+    pub tokens: u64,
+    pub pct_of_total: f64,
+    pub est_cost_usd: f64,
+    pub cost_per_call: f64,
 }
 
-/// Response from /api/analytics/suggestions
+/// Response from /api/analytics/tool-stats
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SuggestionsResponse {
-    pub suggestions: Vec<CostSuggestionData>,
-    pub total_cost_analyzed: f64,
-    pub sessions_analyzed: usize,
-    pub generated_at: String,
+pub struct ToolStatsResponse {
+    pub tool_stats: Vec<ToolStatItem>,
+    pub total_tools: usize,
+    pub period_days: u32,
 }
 
 /// Analytics page
@@ -566,13 +566,13 @@ fn AnalyticsInsights(data: crate::api::StatsData) -> impl IntoView {
     }
 }
 
-/// Tools tab — per-tool cost optimization suggestions from /api/analytics/suggestions
+/// Tools tab — per-tool efficiency metrics from /api/analytics/tool-stats
 #[component]
 fn AnalyticsTools() -> impl IntoView {
     use gloo_net::http::Request;
 
-    let suggestions_data = LocalResource::new(move || async move {
-        let url = "/api/analytics/suggestions";
+    let tool_stats_data = LocalResource::new(move || async move {
+        let url = "/api/analytics/tool-stats";
         let response = Request::get(url)
             .send()
             .await
@@ -581,60 +581,88 @@ fn AnalyticsTools() -> impl IntoView {
             return Err(format!("HTTP error: {}", response.status()));
         }
         response
-            .json::<SuggestionsResponse>()
+            .json::<ToolStatsResponse>()
             .await
             .map_err(|e| format!("Parse error: {}", e))
     });
 
     view! {
         <div class="analytics-tools">
-            <Suspense fallback=move || view! { <div class="loading">"Loading suggestions..."</div> }>
+            <Suspense fallback=move || view! { <div class="loading">"Loading tool metrics..."</div> }>
                 {move || {
-                    suggestions_data.get().map(|result| {
+                    tool_stats_data.get().map(|result| {
                         match result.as_ref() {
                             Err(e) => view! {
                                 <div class="error-message">
-                                    <p>{format!("Failed to load suggestions: {}", e)}</p>
+                                    <p>{format!("Failed to load tool metrics: {}", e)}</p>
                                 </div>
                             }.into_any(),
                             Ok(data) => {
-                                if data.suggestions.is_empty() {
+                                if data.tool_stats.is_empty() {
                                     view! {
                                         <div class="empty-state">
-                                            <p>"No optimization suggestions at this time."</p>
-                                            <p>"Keep using Claude Code and check back when more session data is available."</p>
+                                            <p>"No tool usage data available for the last 30 days."</p>
+                                            <p>"Keep using Claude Code and check back when session data accumulates."</p>
                                         </div>
                                     }.into_any()
                                 } else {
-                                    let suggestions = data.suggestions.clone();
+                                    let stats = data.tool_stats.clone();
+                                    let total_tools = data.total_tools;
+                                    let period_days = data.period_days;
                                     view! {
                                         <div>
                                             <div class="section-header">
-                                                <h3>"Cost Optimization Suggestions"</h3>
-                                                <span class="badge">{suggestions.len()} " suggestions"</span>
+                                                <h3>"Tool Efficiency Metrics"</h3>
+                                                <span class="badge">{total_tools} " tools — last " {period_days} " days"</span>
                                             </div>
-                                            <div class="suggestions-grid">
-                                                {suggestions.into_iter().map(|s| {
-                                                    let savings_label = if s.potential_savings > 0.0 {
-                                                        format!("~${:.2}/mo savings", s.potential_savings)
-                                                    } else {
-                                                        "Qualitative improvement".to_string()
-                                                    };
-                                                    view! {
-                                                        <div class="suggestion-card">
-                                                            <div class="suggestion-header">
-                                                                <span class="suggestion-category">{s.category.clone()}</span>
-                                                                <span class="suggestion-savings">{savings_label}</span>
-                                                            </div>
-                                                            <h4 class="suggestion-title">{s.title.clone()}</h4>
-                                                            <p class="suggestion-description">{s.description.clone()}</p>
-                                                            <div class="suggestion-action">
-                                                                <strong>"Action: "</strong>
-                                                                {s.action.clone()}
-                                                            </div>
-                                                        </div>
-                                                    }
-                                                }).collect::<Vec<_>>()}
+                                            <div class="tool-stats-table-wrapper">
+                                                <table class="tool-stats-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>"Tool"</th>
+                                                            <th class="text-right">"Calls"</th>
+                                                            <th class="text-right">"Tokens"</th>
+                                                            <th class="text-right">"% of Total"</th>
+                                                            <th class="text-right">"Cost/Call"</th>
+                                                            <th class="text-right">"Total Cost"</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {stats.into_iter().map(|s| {
+                                                            let pct_display = format!("{:.1}%", s.pct_of_total * 100.0);
+                                                            let cost_per_call = if s.cost_per_call < 0.00001 {
+                                                                "<$0.00001".to_string()
+                                                            } else {
+                                                                format!("${:.5}", s.cost_per_call)
+                                                            };
+                                                            let total_cost = if s.est_cost_usd < 0.001 {
+                                                                "<$0.001".to_string()
+                                                            } else {
+                                                                format!("${:.3}", s.est_cost_usd)
+                                                            };
+                                                            // Bar width capped at 100% for visual representation
+                                                            let bar_width = (s.pct_of_total * 100.0).min(100.0);
+                                                            view! {
+                                                                <tr class="tool-stats-row">
+                                                                    <td class="tool-name">
+                                                                        <span class="tool-label">{s.tool_name.clone()}</span>
+                                                                        <div class="tool-bar-bg">
+                                                                            <div
+                                                                                class="tool-bar-fill"
+                                                                                style=format!("width: {}%", bar_width)
+                                                                            ></div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td class="text-right">{s.call_count.to_string()}</td>
+                                                                    <td class="text-right">{format_number(s.tokens)}</td>
+                                                                    <td class="text-right pct-cell">{pct_display}</td>
+                                                                    <td class="text-right mono">{cost_per_call}</td>
+                                                                    <td class="text-right mono">{total_cost}</td>
+                                                                </tr>
+                                                            }
+                                                        }).collect::<Vec<_>>()}
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         </div>
                                     }.into_any()
