@@ -323,6 +323,11 @@ pub struct SessionMessage {
     /// Token usage (for assistant messages)
     #[serde(default)]
     pub usage: Option<TokenUsage>,
+
+    /// Model used — present in assistant messages in Claude Code v2.1.92+
+    /// (moved from top-level SessionLine.model to message.model)
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 /// Token usage for a message

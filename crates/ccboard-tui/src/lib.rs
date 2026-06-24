@@ -35,6 +35,15 @@ pub async fn run(
     claude_home: PathBuf,
     project_path: Option<PathBuf>,
 ) -> Result<()> {
+    // Install panic hook so any unexpected panic restores the terminal before printing
+    // the panic message — without this, raw mode is left active and the terminal breaks.
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = disable_raw_mode();
+        let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
+        original_hook(info);
+    }));
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();

@@ -18,6 +18,8 @@ pub struct StatsData {
     #[serde(default)]
     pub last_computed_date: Option<String>,
     #[serde(default)]
+    pub first_session_date: Option<String>,
+    #[serde(default)]
     pub total_sessions: u64,
     #[serde(default)]
     pub total_messages: u64,

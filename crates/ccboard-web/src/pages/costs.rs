@@ -13,6 +13,25 @@ pub fn Costs() -> impl IntoView {
         <div class="page costs-page">
             <div class="page-header">
                 <h1 class="page-title">"Cost Analysis"</h1>
+                <Suspense fallback=|| ()>
+                    {move || {
+                        stats_resource.get().and_then(|r| r.as_ref().ok().cloned()).map(|stats| {
+                            let first = stats.first_session_date
+                                .or_else(|| stats.daily_activity.first().map(|e| e.date.clone()));
+                            let last = stats.last_computed_date
+                                .or_else(|| stats.daily_activity.last().map(|e| e.date.clone()));
+                            match (first, last) {
+                                (Some(f), Some(l)) => view! {
+                                    <span class="page-subtitle">"All-time · " {f} " → " {l}</span>
+                                }.into_any(),
+                                (Some(f), None) => view! {
+                                    <span class="page-subtitle">"Since " {f}</span>
+                                }.into_any(),
+                                _ => ().into_any(),
+                            }
+                        })
+                    }}
+                </Suspense>
             </div>
 
             <div class="costs-tabs">
