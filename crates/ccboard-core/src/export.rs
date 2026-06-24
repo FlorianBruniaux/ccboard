@@ -1132,7 +1132,7 @@ mod tests {
             first_user_message: Some("Test message".to_string()),
             has_subagents: false,
             parent_session_id: None,
-            duration_seconds: Some(2700), // 45 minutes
+            duration_seconds: Some(2700),
             branch: None,
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),

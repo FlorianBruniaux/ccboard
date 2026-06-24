@@ -24,6 +24,7 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
 
             Arc::new(SessionMetadata {
                 id: format!("session-{}", i).into(),
+                source_tool: None,
                 file_path: std::path::PathBuf::from(format!("/test/session-{}.jsonl", i)),
                 project_path: "/test".into(),
                 first_timestamp: Some(ts),

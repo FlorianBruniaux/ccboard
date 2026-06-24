@@ -392,6 +392,8 @@ pub enum SourceTool {
     Cursor,
     Codex,
     OpenCode,
+    Gemini,
+    Copilot,
 }
 
 impl SourceTool {
@@ -402,7 +404,14 @@ impl SourceTool {
             SourceTool::Cursor => "[Cu]",
             SourceTool::Codex => "[Cx]",
             SourceTool::OpenCode => "[Oc]",
+            SourceTool::Gemini => "[G]",
+            SourceTool::Copilot => "[Co]",
         }
+    }
+
+    /// Returns `true` for Claude Code sessions (hides the badge)
+    pub fn is_claude_code(&self) -> bool {
+        matches!(self, SourceTool::ClaudeCode)
     }
 }
 

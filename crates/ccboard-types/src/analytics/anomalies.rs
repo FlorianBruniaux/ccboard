@@ -227,6 +227,7 @@ mod tests {
     fn create_test_session(id: &str, tokens: u64) -> Arc<SessionMetadata> {
         Arc::new(SessionMetadata {
             id: id.to_string(),
+            source_tool: None,
             file_path: PathBuf::from(format!("/tmp/{}.jsonl", id)),
             project_path: "test".to_string(),
             first_timestamp: Some(Utc::now()),

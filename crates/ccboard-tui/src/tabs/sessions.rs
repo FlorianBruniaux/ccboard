@@ -862,12 +862,22 @@ impl SessionsTab {
             // Cache for handle_key access (cloned snapshot)
             self.waiting_sessions_cache = waiting.iter().map(|s| (*s).clone()).collect();
 
-            let live_split = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
-                .split(main_chunks[1]);
-            self.render_live_sessions(frame, live_split[0], live_sessions, self.focus == 0, &p);
-            Self::render_waiting_answers(frame, live_split[1], &waiting, &p);
+            if !waiting.is_empty() {
+                let live_split = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+                    .split(main_chunks[1]);
+                self.render_live_sessions(frame, live_split[0], live_sessions, self.focus == 0, &p);
+                Self::render_waiting_answers(frame, live_split[1], &waiting, &p);
+            } else {
+                self.render_live_sessions(
+                    frame,
+                    main_chunks[1],
+                    live_sessions,
+                    self.focus == 0,
+                    &p,
+                );
+            }
             2
         } else {
             1
