@@ -16,7 +16,6 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
 
             Arc::new(SessionMetadata {
                 id: format!("session-{}", i).into(),
-                source_tool: None,
                 file_path: std::path::PathBuf::from(format!("/test/session-{}.jsonl", i)),
                 project_path: "/test".into(),
                 first_timestamp: Some(ts),
@@ -28,13 +27,18 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
                 cache_creation_tokens: 50 + (i as u64 * 5),
                 cache_read_tokens: 50 + (i as u64 * 5),
                 models_used: vec!["sonnet".to_string()],
+                model_segments: Vec::new(),
                 file_size_bytes: 1024 * (i as u64 + 1),
                 first_user_message: None,
                 has_subagents: false,
+                parent_session_id: None,
                 duration_seconds: Some(1800),
                 branch: None,
                 tool_usage: std::collections::HashMap::new(),
                 tool_token_usage: std::collections::HashMap::new(),
+                source_tool: Default::default(),
+                lines_added: 0,
+                lines_removed: 0,
             })
         })
         .collect()
@@ -207,7 +211,6 @@ fn test_patterns_multi_model_session_no_double_count() {
     let now = Utc::now();
     let sessions = vec![Arc::new(SessionMetadata {
         id: "multi-model".into(),
-        source_tool: None,
         file_path: std::path::PathBuf::from("/test/multi.jsonl"),
         project_path: "/test".into(),
         first_timestamp: Some(now),
@@ -219,13 +222,18 @@ fn test_patterns_multi_model_session_no_double_count() {
         cache_creation_tokens: 0,
         cache_read_tokens: 0,
         models_used: vec!["sonnet".to_string(), "haiku".to_string()], // 2 models
+        model_segments: Vec::new(),
         file_size_bytes: 1024,
         first_user_message: None,
         has_subagents: false,
+        parent_session_id: None,
         duration_seconds: Some(1800),
         branch: None,
         tool_usage: std::collections::HashMap::new(),
         tool_token_usage: std::collections::HashMap::new(),
+        source_tool: Default::default(),
+        lines_added: 0,
+        lines_removed: 0,
     })];
 
     let patterns = detect_patterns(&sessions, 7);

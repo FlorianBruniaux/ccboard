@@ -23,6 +23,7 @@ Complete feature reference for ccboard — the TUI and Web dashboard for Claude 
   - [0 — Tools](#0--tools)
   - [p — Plugins](#p--plugins)
   - [/ — Search](#---search)
+  - [13 — Brain](#13--brain)
 - [Conversation viewer](#conversation-viewer)
 - [Live session monitoring](#live-session-monitoring)
 - [CLI reference](#cli-reference)
@@ -117,6 +118,7 @@ ccboard --claude-home /path/to/.claude
 | `0` | Tools |
 | `p` | Plugins |
 | `/` | Search |
+| `b` | Brain |
 | `Tab` / `Shift+Tab` | Next / previous tab |
 
 ### Universal keys
@@ -162,6 +164,7 @@ Press `:` to open the command palette. Type to fuzzy-search available commands:
 :config       Jump to Config tab
 :mcp          Jump to MCP tab
 :search       Jump to Search tab
+:brain        Jump to Brain tab
 :quit         Exit application
 ```
 
@@ -172,6 +175,8 @@ Press `:` to open the command palette. Type to fuzzy-search available commands:
 ### 1 — Dashboard
 
 **Key**: `1`
+
+![Dashboard](../assets/screenshots/tui/tui-01-dashboard.png)
 
 Overview of your Claude Code usage at a glance.
 
@@ -200,6 +205,10 @@ Overview of your Claude Code usage at a glance.
 
 **Key**: `2`
 
+![Sessions — list view](../assets/screenshots/tui/tui-02-sessions-list.png)
+
+![Sessions — detail pane](../assets/screenshots/tui/tui-02-sessions-detail.png)
+
 Three-pane layout: project tree on the left, session list in the middle, detail panel on the right.
 
 **Navigation:**
@@ -210,6 +219,9 @@ Three-pane layout: project tree on the left, session list in the middle, detail 
 | `j` / `k` | Move up/down in the focused pane |
 | `Enter` | Open conversation viewer for selected session |
 | `/` | Filter sessions by text |
+| `b` | Toggle bookmark on the selected session |
+| `B` | Toggle "bookmarked only" filter (show `★` sessions only) |
+| `s` | Cycle sort mode (newest / oldest / tokens / duration / messages) |
 
 **Session status indicators:**
 
@@ -218,18 +230,52 @@ Three-pane layout: project tree on the left, session list in the middle, detail 
 | `●` | Running (active Claude process) |
 | `◐` | Waiting for input / permission |
 | `✓` | Completed |
+| `★` | Bookmarked |
 
 Live status requires `ccboard setup` (see [Live session monitoring](#live-session-monitoring)).
 
 **Detail panel** shows:
 - Session ID, timestamps, duration
 - Token counts (input / output / cache read / cache write)
-- Model used
-- Message count
+- Model switching timeline: `Opus 4.5 (8) → Sonnet 4.6 (15)` (computed at scan time)
+- Message count, file size
+- Subagent tree: `⤵ Subagents (N): X tokens total` with per-child breakdown; or `⤴ Subagent of: <parent_id>` for child sessions
+- Bookmark tag and note (if bookmarked)
+- AI Summary section (if cached via `ccboard summarize <id>`)
+- First user message preview
 - CPU / RAM usage for live sessions
 - Session type: CLI, IDE, or Agent
 
+**Bookmarks** persist to `~/.ccboard/bookmarks.json`. Each bookmark stores a tag (label), an optional note, and the creation date. Bookmarks survive restarts and are independent of Claude Code's own data.
+
+**AI Summaries** are generated on demand:
+
+```bash
+ccboard summarize <session-id>           # Generate and cache
+ccboard summarize <session-id> --force   # Regenerate
+ccboard summarize <session-id> --model claude-haiku-4-5  # Faster/cheaper model
+```
+
+Once cached to `~/.ccboard/summaries/<id>.md`, the summary appears automatically in the detail panel.
+
 **Conversation viewer** opens when you press `Enter` on a session. See [Conversation viewer](#conversation-viewer) for full details.
+
+#### Code metrics
+
+Sessions now show a `+N / -N` badge in the list and detail panel representing lines added and removed across all Edit and Write tool calls in that session. This metric is computed during session indexing and cached in SQLite.
+
+#### Third-party AI tool sessions
+
+ccboard automatically detects and imports sessions from other AI coding tools installed on your system. These sessions appear in the Sessions tab alongside Claude Code sessions, with a colored badge in the source column:
+
+| Tool | Badge | Data source |
+|------|-------|-------------|
+| Claude Code | (none) | `~/.claude/projects/**/*.jsonl` |
+| Cursor | `[Cu]` | `~/Library/Application Support/Cursor/User/workspaceStorage/*/state.vscdb` |
+| Codex CLI | `[Cx]` | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` |
+| OpenCode | `[Oc]` | `~/Library/Application Support/OpenCode/opencode.db` (macOS) or `~/.local/share/opencode/opencode.db` (Linux) |
+
+All parsers are opt-in and silent — if the tool is not installed, its parser is skipped without error. Session content from third-party tools is read-only.
 
 ---
 
@@ -237,18 +283,33 @@ Live status requires `ccboard setup` (see [Live session monitoring](#live-sessio
 
 **Key**: `3`
 
-Six sub-views, switch with `Tab` / `←` / `→`:
+![Analytics — Overview](../assets/screenshots/tui/tui-09-analytics-overview.png)
+
+![Analytics — Trends](../assets/screenshots/tui/tui-09-analytics-trends.png)
+
+![Analytics — Patterns](../assets/screenshots/tui/tui-09-analytics-patterns.png)
+
+![Analytics — Summary](../assets/screenshots/tui/tui-09-analytics-summary.png)
+
+![Analytics — Anomalies](../assets/screenshots/tui/tui-09-analytics-anomalies.png)
+
+![Analytics — Costs](../assets/screenshots/tui/tui-09-analytics-costs.png)
+
+![Analytics — Discover](../assets/screenshots/tui/tui-09-analytics-discover.png)
+
+Seven sub-views, switch with `Tab` / `←` / `→`:
 
 | Sub-view | What it shows |
 |----------|---------------|
-| **Overview** | Budget status, MTD cost, monthly projection |
-| **Trends** | 30-day token and cost trend chart |
-| **Patterns** | Hourly heatmap of activity (fills terminal width), day-of-week distribution |
-| **Insights** | Actionable suggestions based on usage patterns |
+| **Overview** | Budget status, MTD cost, monthly projection, project breakdown |
+| **Trends** | 30-day token activity chart with 30-day forecast and confidence bands |
+| **Patterns** | Activity heatmap (fills terminal width), most-used tools, model distribution, session duration stats |
+| **Summary** | Actionable insights and suggestions based on usage patterns |
 | **Anomalies** | Detected spikes and unusual activity with timestamps |
-| **Forecast** | Token usage forecast with confidence bands |
+| **Costs** | Per-tool token cost bar chart with high-cost tool alerts |
+| **Discover** | AI-generated pattern suggestions from session history |
 
-The hourly heatmap is responsive: it uses your full terminal width and adjusts cell size accordingly.
+The activity heatmap is responsive: it uses your full terminal width and adjusts cell size accordingly.
 
 **Budget tracking** configuration (in `~/.claude/settings.json` or `.claude/settings.json`):
 
@@ -266,6 +327,18 @@ The hourly heatmap is responsive: it uses your full terminal width and adjusts c
 ### 4 — Costs
 
 **Key**: `4`
+
+![Costs — Overview](../assets/screenshots/tui/tui-06-costs-overview.png)
+
+![Costs — By Model](../assets/screenshots/tui/tui-06-costs-by-model.png)
+
+![Costs — Daily](../assets/screenshots/tui/tui-06-costs-daily.png)
+
+![Costs — Usage Periods](../assets/screenshots/tui/tui-06-costs-billing-blocks.png)
+
+![Costs — Top Sessions](../assets/screenshots/tui/tui-06-costs-top-sessions.png)
+
+![Costs — Per Project](../assets/screenshots/tui/tui-06-costs-per-project.png)
 
 Six sub-views, switch with `Tab` / `←` / `→`:
 
@@ -290,6 +363,8 @@ Six sub-views, switch with `Tab` / `←` / `→`:
 
 **Key**: `5`
 
+![History](../assets/screenshots/tui/tui-07-history.png)
+
 Chronological timeline of all sessions with search and export.
 
 **Keys:**
@@ -308,6 +383,8 @@ Chronological timeline of all sessions with search and export.
 ### 6 — Audit Log
 
 **Key**: `6`
+
+![Audit Log](../assets/screenshots/tui/tui-10-audit-log.png)
 
 Security-focused view of session activity. Scans tool call history for risky patterns.
 
@@ -334,6 +411,8 @@ Each violation includes a remediation hint explaining what to check or change.
 
 **Key**: `7`
 
+![MCP](../assets/screenshots/tui/tui-08-mcp.png)
+
 MCP server configuration and status.
 
 **What you see:**
@@ -356,6 +435,8 @@ MCP server configuration and status.
 ### 8 — Config
 
 **Key**: `8`
+
+![Config](../assets/screenshots/tui/tui-03-config.png)
 
 Visualizes how Claude Code settings merge across four levels.
 
@@ -385,6 +466,8 @@ The active (merged) value is highlighted. Overrides are visible at a glance.
 
 **Key**: `9`
 
+![Hooks](../assets/screenshots/tui/tui-04-hooks.png)
+
 Bash hooks configured in your Claude Code settings, organized by event type.
 
 **Event types**: `PreToolUse`, `PostToolUse`, `Notification`, `Stop`, `SubagentStop`
@@ -409,6 +492,12 @@ Bash hooks configured in your Claude Code settings, organized by event type.
 
 **Key**: `0`
 
+![Tools — Agents](../assets/screenshots/tui/tui-05-agents.png)
+
+![Tools — Commands](../assets/screenshots/tui/tui-05-commands.png)
+
+![Tools — Skills](../assets/screenshots/tui/tui-05-skills.png)
+
 Browse agents, commands, and skills from your `.claude/` directories.
 
 **Three sub-views** (switch with `Tab`):
@@ -426,6 +515,8 @@ Frontmatter is parsed and displayed separately from the Markdown body.
 ### p — Plugins
 
 **Key**: `p`
+
+![Plugins](../assets/screenshots/tui/tui-11-plugins.png)
 
 Usage analytics for your skills, MCP servers, and agents.
 
@@ -447,6 +538,8 @@ Usage analytics for your skills, MCP servers, and agents.
 
 **Key**: `/` (or reach via `Tab`)
 
+![Search](../assets/screenshots/tui/tui-12-search.png)
+
 Full-text search across all sessions using SQLite FTS5.
 
 **How it works:**
@@ -464,6 +557,54 @@ Full-text search across all sessions using SQLite FTS5.
 | `Enter` | Open selected session in conversation viewer |
 | `j` / `k` | Navigate results |
 | `Esc` | Clear search |
+
+---
+
+### 13 — Brain
+
+**Key**: `b`
+
+![Brain](../assets/screenshots/tui/tui-13-brain.png)
+
+Cross-session knowledge base that captures learning from every session via hooks.
+
+**How it works**
+
+A `session-stop` hook runs when Claude Code finishes a session. It reads the session JSONL, evaluates its significance (sessions under 3KB are skipped as trivial), extracts key information via structured prompting, and stores insights in `~/.ccboard/insights.db` (WAL SQLite).
+
+A `session-start` hook reads the most recent progress, blockers, and knowledge entries from insights.db and injects them into Claude's context at the start of each session, so Claude remembers where you left off without any manual context setting.
+
+**Insight types**
+
+| Type | Icon | Description |
+|------|------|-------------|
+| `progress` | 📍 | What was accomplished in the session |
+| `decision` | 🏛️ | Architectural or design decisions made |
+| `blocked` | 🚧 | Blockers encountered, unresolved issues |
+| `pattern` | 🔁 | Recurring patterns worth remembering |
+| `fix` | 🔧 | Bug fixes with root cause and solution |
+| `context` | 📌 | General context and background knowledge |
+
+**Key bindings (Brain tab)**
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Navigate insight list |
+| `←` / `→` (or `h` / `l`) | Switch filter (All → Progress → Decision → Blocked → Pattern → Fix → Context) |
+| `Enter` | Expand/collapse detail pane |
+| `d` | Archive selected insight |
+| `r` | Refresh from database |
+
+**Manual entries**
+
+Use the `/ccboard-remember` skill to store knowledge manually from any session:
+
+```
+/ccboard-remember fixed the auth bug by setting SESSION_SECRET in .env
+/ccboard-remember decided to use Axum over Actix for the web backend
+```
+
+**Database location**: `~/.ccboard/insights.db`
 
 ---
 

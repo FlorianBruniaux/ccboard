@@ -1,7 +1,7 @@
 # ccboard Architecture
 
-**Version**: 0.14.0
-**Last Updated**: 2026-03-19
+**Version**: 0.18.0
+**Last Updated**: 2026-03-27
 
 This document describes the technical architecture of ccboard, a unified TUI/Web dashboard for Claude Code monitoring.
 
@@ -38,7 +38,7 @@ ccboard is a Rust workspace with 4 crates providing dual TUI + Web interfaces fo
         ┌───────▼──────┐  ┌───▼─────────────┐
         │ ccboard-tui  │  │ ccboard-web     │
         │ (Ratatui)    │  │ (Leptos+Axum)   │
-        │ 11 tabs      │  │ API backend     │
+        │ 12 tabs      │  │ API backend     │
         └───────┬──────┘  └───┬─────────────┘
                 │              │
                 └──────┬───────┘
@@ -56,6 +56,8 @@ ccboard is a Rust workspace with 4 crates providing dual TUI + Web interfaces fo
               │ • Export        │
               │ • hook_state    │
               │ • hook_event    │
+              │ • bookmarks     │
+              │ • summaries     │
               └─────────────────┘
 ```
 
@@ -184,6 +186,7 @@ pub struct DataStore {
     invocation_stats: RwLock<InvocationStats>,
     billing_blocks: RwLock<BillingBlockManager>,
     analytics_cache: RwLock<Option<AnalyticsData>>,
+    live_hook_sessions: RwLock<LiveSessionFile>,
 
     // High contention (many entries, concurrent access)
     sessions: DashMap<String, Arc<SessionMetadata>>,
@@ -201,6 +204,12 @@ pub struct DataStore {
     // Populated on-demand by analyze_session(); persisted to SQLite via MetadataCache
     activity_results: DashMap<String, ActivitySummary>,
 
+    // Bookmarks persisted to ~/.ccboard/bookmarks.json
+    bookmark_store: RwLock<BookmarkStore>,
+
+    // LLM summary cache reader (~/.ccboard/summaries/)
+    summary_store: SummaryStore,
+
     // Degraded state tracking
     degraded_state: RwLock<DegradedState>,
 }
@@ -210,11 +219,15 @@ pub struct DataStore {
 
 | Method | Purpose | Concurrency |
 |--------|---------|-------------|
-| `initial_load()` | Scan `~/.claude`, populate store | Spawns 8 concurrent tasks per project |
+| `initial_load()` | Scan `~/.claude`, populate store, backfill `has_subagents` | Spawns 8 concurrent tasks per project |
 | `stats()` | Read-only stats access | RwLock read (non-blocking) |
 | `sessions_by_project()` | Filter sessions | DashMap iteration (lock-free) |
 | `update_session(path)` | Hot reload on file change | DashMap per-key lock |
 | `invalidate_analytics()` | Clear forecast cache | RwLock write |
+| `subagent_children(id)` | Return child sessions of a parent | DashMap iteration |
+| `compute_has_subagents()` | Backfill parent flags after full scan | DashMap iter_mut |
+| `is_bookmarked(id)` / `toggle_bookmark(id)` | Bookmark management | RwLock write + atomic file write |
+| `has_summary(id)` / `load_summary(id)` | LLM summary cache reads | Filesystem read (no lock) |
 
 ### Graceful Degradation State
 
@@ -333,6 +346,8 @@ pub trait Parser {
 | **filters** | Message text | Pattern matching | `bool` (is_meaningful) |
 | **LiveSessionFile** | `~/.ccboard/live-sessions.json` | fd-lock + atomic write | `Vec<LiveSession>` |
 | **ClaudeGlobalStats** | `~/.claude.json` | serde_json | `GlobalStats` (per-project costs) |
+| **BookmarkStore** | `~/.ccboard/bookmarks.json` | serde_json + atomic write (tmp→rename) | `HashMap<id, BookmarkEntry>` |
+| **SummaryStore** | `~/.ccboard/summaries/<id>.md` + `.json` | Filesystem reads, atomic writes | Summary text + `SummaryMeta` |
 
 ### Settings Merge Logic
 
@@ -1104,6 +1119,36 @@ cargo test --all-features           # Integration tests (requires ~/.claude)
 
 ---
 
-**Document Version**: 1.5
-**Last Updated**: 2026-03-19
+---
+
+## Session Intelligence (v0.18.0)
+
+Three lightweight features that enrich the Sessions detail pane without adding parser overhead.
+
+### Bookmarks (`BookmarkStore`)
+
+Persisted to `~/.ccboard/bookmarks.json` via atomic write (tmp → rename). The `BookmarkStore` holds a `HashMap<session_id, BookmarkEntry>` with tag + optional note + created_at. All mutating methods persist immediately. `DataStore` exposes `is_bookmarked`, `toggle_bookmark`, `upsert_bookmark`, `remove_bookmark` as thin wrappers.
+
+**TUI**: `b` toggles bookmark on selected session, `B` filters list to starred only, `★` icon appears in list.
+
+### Subagent Graph (`parent_session_id` + cross-reference)
+
+`SessionLine.parent_session_id` (JSONL field `parentSessionId`) is captured during the existing metadata scan — zero extra I/O. After `initial_load()` completes, `compute_has_subagents()` iterates all sessions once and backfills `has_subagents = true` on any session referenced as a parent.
+
+`DataStore::subagent_children(parent_id)` queries the DashMap in O(n) (acceptable — called only on detail view, not on every frame).
+
+**TUI**: Parent sessions show `⤵ Subagents (N): X tok` tree; child sessions show `⤴ Subagent of: <id>`.
+
+### LLM Summaries (`SummaryStore` + `ccboard summarize`)
+
+`ccboard summarize <id>` loads full JSONL content, builds a plain-text user/assistant transcript, calls `claude --print` with a structured prompt (≤20K chars), caches result to `~/.ccboard/summaries/<id>.md` + metadata JSON.
+
+`SummaryStore` is a simple directory wrapper — no locking needed (one writer at a time, reads are safe since files are atomically renamed into place). `DataStore::load_summary(id)` does a direct filesystem read on demand.
+
+**TUI**: Sessions detail pane shows "AI Summary:" section if cached, otherwise shows hint to run `ccboard summarize`.
+
+---
+
+**Document Version**: 1.6
+**Last Updated**: 2026-03-27
 **Maintainer**: Florian Bruniaux

@@ -1116,7 +1116,6 @@ mod tests {
         let timestamp = Utc.with_ymd_and_hms(2026, 2, 3, 14, 30, 0).unwrap();
         SessionMetadata {
             id: id.into(),
-            source_tool: None,
             file_path: PathBuf::from(format!("/test/{}.jsonl", id)),
             project_path: project.into(),
             first_timestamp: Some(timestamp),
@@ -1128,13 +1127,18 @@ mod tests {
             cache_creation_tokens: tokens / 10,
             cache_read_tokens: tokens - (tokens / 2 + tokens / 3 + tokens / 10),
             models_used: vec!["sonnet".to_string(), "opus".to_string()],
+            model_segments: Vec::new(),
             file_size_bytes: 1024,
             first_user_message: Some("Test message".to_string()),
             has_subagents: false,
-            duration_seconds: Some(2700), // 45 minutes
+            parent_session_id: None,
+            duration_seconds: Some(2700),
             branch: None,
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
+            source_tool: Default::default(),
+            lines_added: 0,
+            lines_removed: 0,
         }
     }
 

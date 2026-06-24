@@ -81,8 +81,11 @@ pub fn run_hook(event_name: String) -> Result<()> {
         event_name.clone(),
     );
 
-    // 9. Prune stopped sessions older than 30 minutes
+    // 9. Prune stale sessions:
+    //    - Stopped older than 30 min
+    //    - Running/WaitingInput not updated in 10 min (crash/kill -9 recovery)
     session_file.prune_stopped(Duration::from_secs(30 * 60));
+    session_file.prune_stale_running(Duration::from_secs(10 * 60));
     session_file.updated_at = Some(chrono::Utc::now());
 
     // 10. Atomic save (write to .tmp then rename)

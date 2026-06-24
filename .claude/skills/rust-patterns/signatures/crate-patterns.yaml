@@ -1,0 +1,233 @@
+# Crate-Specific Patterns and Idioms
+
+# tokio Ecosystem
+tokio:
+  name: "tokio Async Runtime"
+  indicators:
+    - 'use tokio::'
+    - '#\[tokio::main\]'
+    - '#\[tokio::test\]'
+
+  patterns:
+    async_sleep:
+      signature: 'tokio::time::sleep'
+      category: "idiom"
+      description: "Non-blocking sleep in async context"
+      example: |
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+    spawn_blocking:
+      signature: 'tokio::task::spawn_blocking'
+      category: "idiom"
+      description: "Run blocking code in async context"
+      example: |
+        let result = tokio::task::spawn_blocking(|| {
+            std::fs::read("file.txt")
+        }).await??;
+
+    async_fs:
+      signature: 'tokio::fs::'
+      category: "idiom"
+      description: "Async filesystem operations"
+      example: |
+        let data = tokio::fs::read("file.txt").await?;
+
+    timeout:
+      signature: 'tokio::time::timeout'
+      category: "idiom"
+      description: "Timeout wrapper for async operations"
+      example: |
+        let result = tokio::time::timeout(
+            Duration::from_secs(5),
+            async_operation()
+        ).await??;
+
+  anti_patterns:
+    - std_sleep_in_async
+    - std_fs_in_async
+    - missing_timeout
+
+# serde Ecosystem
+serde:
+  name: "serde Serialization"
+  indicators:
+    - 'use serde::'
+    - '#\[derive\(Serialize, Deserialize\)\]'
+
+  patterns:
+    rename:
+      signature: '#\[serde\(rename = "'
+      category: "idiom"
+      description: "Rename fields for serialization"
+      example: |
+        #[derive(Serialize, Deserialize)]
+        struct User {
+            #[serde(rename = "user_id")]
+            id: u64,
+        }
+
+    skip:
+      signature: '#\[serde\(skip\)\]'
+      category: "idiom"
+      description: "Skip field in serialization"
+      example: |
+        #[derive(Serialize)]
+        struct Config {
+            #[serde(skip)]
+            password: String,
+        }
+
+    flatten:
+      signature: '#\[serde\(flatten\)\]'
+      category: "idiom"
+      description: "Flatten nested structures"
+      example: |
+        #[derive(Serialize)]
+        struct Response {
+            #[serde(flatten)]
+            metadata: Metadata,
+        }
+
+# anyhow Error Handling
+anyhow:
+  name: "anyhow Error Handling"
+  indicators:
+    - 'use anyhow::'
+    - 'anyhow::Result'
+
+  patterns:
+    context:
+      signature: '\.context\('
+      category: "idiom"
+      description: "Add context to errors"
+      example: |
+        fs::read("file.txt")
+            .context("Failed to read config")?
+
+    with_context:
+      signature: '\.with_context\('
+      category: "idiom"
+      description: "Lazy context computation"
+      example: |
+        operation()
+            .with_context(|| format!("Failed at step {}", step))?
+
+    bail:
+      signature: 'bail!'
+      category: "idiom"
+      description: "Early return with error"
+      example: |
+        if !valid {
+            bail!("Validation failed");
+        }
+
+# thiserror Error Types
+thiserror:
+  name: "thiserror Error Types"
+  indicators:
+    - 'use thiserror::Error'
+    - '#\[derive\(Error'
+
+  patterns:
+    custom_error:
+      signature: '#\[derive\(Error, Debug\)\]'
+      category: "idiom"
+      description: "Custom error type with Display"
+      example: |
+        #[derive(Error, Debug)]
+        pub enum ConfigError {
+            #[error("Config file not found at {path}")]
+            NotFound { path: String },
+
+            #[error("Parse error: {0}")]
+            ParseError(#[from] serde_json::Error),
+        }
+
+# parking_lot Synchronization
+parking_lot:
+  name: "parking_lot Locks"
+  indicators:
+    - 'use parking_lot::'
+
+  patterns:
+    rwlock:
+      signature: 'parking_lot::RwLock'
+      category: "idiom"
+      description: "Better RwLock implementation"
+      example: |
+        use parking_lot::RwLock;
+        let lock = RwLock::new(data);
+        let guard = lock.read();  // No .unwrap() needed
+
+    mutex:
+      signature: 'parking_lot::Mutex'
+      category: "idiom"
+      description: "Better Mutex implementation"
+      example: |
+        use parking_lot::Mutex;
+        let lock = Mutex::new(data);
+        let mut guard = lock.lock();  // No .unwrap() needed
+
+# axum Web Framework
+axum:
+  name: "axum Web Framework"
+  indicators:
+    - 'use axum::'
+    - 'axum::Router'
+
+  patterns:
+    handler:
+      signature: 'async fn.*\(.*Extension<'
+      category: "idiom"
+      description: "Axum handler with state extraction"
+      example: |
+        async fn handler(
+            Extension(state): Extension<Arc<AppState>>,
+            Json(payload): Json<Request>,
+        ) -> Result<Json<Response>, ApiError> { }
+
+    state:
+      signature: '\.with_state\('
+      category: "idiom"
+      description: "Shared state with Arc"
+      example: |
+        let app = Router::new()
+            .route("/", get(handler))
+            .with_state(Arc::new(state));
+
+# sqlx Database
+sqlx:
+  name: "sqlx Database"
+  indicators:
+    - 'use sqlx::'
+
+  patterns:
+    query_as:
+      signature: 'sqlx::query_as!'
+      category: "idiom"
+      description: "Compile-time verified queries"
+      example: |
+        let users = sqlx::query_as!(
+            User,
+            "SELECT id, name FROM users WHERE id = $1",
+            user_id
+        ).fetch_all(&pool).await?;
+
+common_combinations:
+  - crates: ["tokio", "anyhow"]
+    patterns:
+      - "tokio_async"
+      - "context"
+    description: "Async application with error handling"
+
+  - crates: ["axum", "serde"]
+    patterns:
+      - "handler"
+      - "serde serialization"
+    description: "Web API with JSON"
+
+  - crates: ["tokio", "parking_lot"]
+    patterns:
+      - "rwlock"
+      - "arc_usage"
+    description: "Async with shared state"

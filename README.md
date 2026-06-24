@@ -3,12 +3,13 @@
 **A free, open-source TUI/Web dashboard for Claude Code session monitoring, cost tracking & config management**
 <p align="center">
   <a href="https://github.com/FlorianBruniaux/ccboard/stargazers"><img src="https://img.shields.io/github/stars/FlorianBruniaux/ccboard?style=for-the-badge" alt="GitHub stars"/></a>
+  <a href="https://starmapper.bruniaux.com/FlorianBruniaux/ccboard"><img src="https://starmapper.bruniaux.com/api/badge/FlorianBruniaux/ccboard" alt="StarMapper"/></a>
   <a href="https://crates.io/crates/ccboard"><img src="https://img.shields.io/crates/v/ccboard?style=for-the-badge&logo=rust" alt="crates.io"/></a>
   <a href="https://crates.io/crates/ccboard"><img src="https://img.shields.io/crates/d/ccboard?style=for-the-badge" alt="Downloads"/></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-419_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-492_passing-success?style=for-the-badge&logo=github-actions" alt="Tests"/>
   <img src="https://img.shields.io/badge/Clippy-0_warnings-success?style=for-the-badge&logo=rust" alt="Clippy"/>
   <img src="https://img.shields.io/badge/Binary-5.8MB-blue?style=for-the-badge" alt="Binary Size"/>
   <img src="https://img.shields.io/badge/Cache_Speedup-89x-orange?style=for-the-badge&logo=sqlite" alt="Speedup"/>
@@ -25,28 +26,29 @@
   <img src="assets/demo.gif" alt="ccboard demo" width="800"/>
 </p>
 
-> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 383 tests, 0 clippy warnings.
+> **The only actively-maintained, free and open-source Rust TUI** combining Claude Code monitoring, Claude Code config management, hooks, agents, and MCP servers in a single 5.8MB binary. 89x faster startup with SQLite cache, 492 tests, 0 clippy warnings.
 
 ---
 
 ## Features
 
-### 12 Interactive Tabs (TUI + Web)
+### 13 Interactive Tabs (TUI + Web)
 
 | Tab | Key | Description | Highlights |
 |-----|-----|-------------|------------|
 | **Dashboard** | `1` | Overview stats, model usage, 7-day activity | API usage estimation, plan-based budgets, MCP server count |
-| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), CPU/RAM/Tokens, conversation viewer with regex search |
-| **Analytics** | `3` | Advanced analytics (6 sub-views) | Budget tracking, 30-day forecast, hourly heatmap, anomaly detection, usage patterns |
+| **Sessions** | `2` | Browse all sessions with 3-pane layout | Live status icons (●/◐/✓), session type (CLI/IDE/Agent), bookmarks (`b`/`B`), subagent tree, model timeline, AI summaries (`ccboard summarize`), conversation viewer with regex search, code metrics (+N/-N lines), third-party sessions (Cursor `[Cu]`, Codex `[Cx]`, OpenCode `[Oc]`) |
+| **Analytics** | `3` | Advanced analytics (8 sub-views) | Budget tracking, 30-day forecast, hourly heatmap, anomaly detection (configurable thresholds), usage patterns, per-tool cost breakdown, pattern discovery (`r`) |
 | **Costs** | `4` | Token analytics (6 sub-views) | Overview, By Model, Daily, Usage Periods, Top Sessions, Per Project — 4-level budget alerts |
 | **History** | `5` | Chronological session timeline | CSV/JSON/Markdown export (`x`), full-text search |
 | **Audit Log** | `6` | Security audit & violations feed | Credential detection, destructive command alerts, cross-session violations with remediation hints |
-| **MCP** | `7` | MCP server management | Status detection (running/stopped), copy command to clipboard (`y`), env vars masking |
+| **MCP** | `7` | MCP server management | Status detection (running/stopped), copy command to clipboard (`y`), env vars masking, usage stats by server (`s`) |
 | **Config** | `8` | Cascading configuration editor | 4-column diff (default/global/project/local), edit with `e`, reveal in file manager (`o`) |
 | **Hooks** | `9` | Event-based hook management | Bash syntax highlighting, badge indicators |
-| **Tools** | `0` | Agents, commands, and skills browser | Frontmatter YAML parsing, invocation stats |
+| **Tools** | `0` | Agents, commands, and skills browser | Frontmatter YAML parsing, real invocation counts (includes session-discovered agents) |
 | **Plugins** | `p` | Plugin & capability usage analytics | Dead code detection, sort by usage/cost/name |
 | **Search** | `/` | Full-text search across all sessions | FTS5-powered, search-as-you-type (≥2 chars), ranked snippets, opens conversation viewer |
+| **Brain** | `b` | Cross-session knowledge base | Insights captured by session-stop hook (progress/decision/blocked/pattern/fix/context), filter by type, archive, detail pane, `/ccboard-remember` skill for manual entries |
 
 ### Platform Capabilities
 
@@ -57,13 +59,30 @@
 | **UX** | Command palette (`:`), contextual help (`?`), vim keybindings (hjkl), breadcrumbs, scrollbar indicators, Light/Dark mode (`Ctrl+T`, persistent) |
 | **File Operations** | Edit with `$EDITOR` (`e`), reveal in file manager (`o`), cross-platform |
 | **Zero Config** | Works out of the box with `~/.claude`, single 5.8MB binary, macOS/Linux/Windows |
-| **Hook Integration** | `ccboard setup` injects Claude Code hooks, live session status (Running/WaitingInput/Stopped), macOS notification on stop |
+| **Multi-tool** | Auto-imports sessions from Cursor, Codex CLI, and OpenCode alongside Claude Code — all parsers opt-in and silent if tool not installed |
+| **Hook Integration** | `ccboard setup` injects Claude Code hooks, live session status (Running/WaitingInput/Stopped), macOS notification on stop, 10-min TTL pruning for stale sessions |
+| **Session Intelligence** | Bookmarks with tags/notes, subagent parent/child tree, model switching timeline, LLM summaries via `ccboard summarize` |
+| **Brain / Knowledge Base** | Session-stop hook captures progress, decisions, blockers, patterns, fixes after each meaningful session into `~/.ccboard/insights.db`. Context-injection hook injects relevant past knowledge at session start. Manual entries via `/ccboard-remember` skill. |
 
 > Missing a feature? [Request it here](https://github.com/FlorianBruniaux/ccboard/issues/new?template=feature_request.yml) | Found a bug? [Report it](https://github.com/FlorianBruniaux/ccboard/issues/new?template=bug_report.yml)
 
 ### Hook-Based Live Monitoring
 
 Run `ccboard setup` once to inject hooks into `~/.claude/settings.json`. After that, ccboard tracks every Claude session in real time — which session is running, which is waiting for your permission, which just finished — visible in the Sessions tab with ●/◐/✓ indicators and macOS notifications.
+
+---
+
+## StarMapper
+
+<p align="center">
+  <a href="https://starmapper.bruniaux.com/FlorianBruniaux/ccboard">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://starmapper.bruniaux.com/api/map-image/FlorianBruniaux/ccboard?theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://starmapper.bruniaux.com/api/map-image/FlorianBruniaux/ccboard?theme=light" />
+      <img alt="StarMapper — see who stars this repo on a world map" src="https://starmapper.bruniaux.com/api/map-image/FlorianBruniaux/ccboard" />
+    </picture>
+  </a>
+</p>
 
 ---
 
@@ -193,6 +212,8 @@ Navigate tabs with `1-9`, `0`, `p`. Press `?` for contextual help, `:` to open t
 ![Costs Daily](assets/screenshots/tui/tui-06-costs-daily.png)
 ![Costs Billing Blocks](assets/screenshots/tui/tui-06-costs-billing-blocks.png)
 ![Costs Leaderboard](assets/screenshots/tui/tui-06-costs-leaderboard.png)
+![Costs Top Sessions](assets/screenshots/tui/tui-06-costs-top-sessions.png)
+![Costs Per Project](assets/screenshots/tui/tui-06-costs-per-project.png)
 
 #### History Search
 ![History](assets/screenshots/tui/tui-07-history.png)
@@ -206,6 +227,21 @@ Navigate tabs with `1-9`, `0`, `p`. Press `?` for contextual help, `:` to open t
 ![Analytics Patterns](assets/screenshots/tui/tui-09-analytics-patterns.png)
 ![Analytics Insights](assets/screenshots/tui/tui-09-analytics-insights.png)
 ![Analytics Anomalies](assets/screenshots/tui/tui-09-analytics-anomalies.png)
+![Analytics Summary](assets/screenshots/tui/tui-09-analytics-summary.png)
+![Analytics Costs](assets/screenshots/tui/tui-09-analytics-costs.png)
+![Analytics Discover](assets/screenshots/tui/tui-09-analytics-discover.png)
+
+#### Audit Log
+![Audit Log](assets/screenshots/tui/tui-10-audit-log.png)
+
+#### Plugins
+![Plugins](assets/screenshots/tui/tui-11-plugins.png)
+
+#### Search
+![Search](assets/screenshots/tui/tui-12-search.png)
+
+#### Brain — Cross-session Knowledge Base
+![Brain](assets/screenshots/tui/tui-13-brain.png)
 
 </details>
 
@@ -540,6 +576,23 @@ ccboard both --port 3333
 - `/activity` - Security audit & violations feed
 - `/search` - Full-text session search
 
+### Session Summaries
+
+Generate and cache an AI summary of any session using `claude --print`:
+
+```bash
+# Generate summary (cached to ~/.ccboard/summaries/<id>.md)
+ccboard summarize <session-id>
+
+# Regenerate even if cached
+ccboard summarize <session-id> --force
+
+# Use a specific model
+ccboard summarize <session-id> --model claude-haiku-4-5
+```
+
+Once cached, the summary appears automatically in the Sessions detail pane under **AI Summary**. Summaries are plain-text, under 200 words, and cover what was accomplished and key decisions.
+
 ### Discover — Config Optimization
 
 Analyze your session history to surface recurring patterns and suggest what to extract as **CLAUDE.md rules**, **skills**, or **commands**.
@@ -691,6 +744,9 @@ ccboard export conversation <session-id> --output conv.html --format html
 **Sessions**
 - `/` - Search sessions
 - `Enter` - Show session detail
+- `b` - Toggle bookmark on selected session
+- `B` - Toggle "bookmarked only" filter
+- `s` - Cycle sort mode (date/tokens/duration/messages)
 
 **Config**
 - `m` - Show MCP detail modal

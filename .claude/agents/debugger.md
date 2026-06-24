@@ -4,6 +4,7 @@ description: Use this agent when encountering errors, test failures, unexpected 
 model: sonnet
 color: red
 permissionMode: dontAsk
+allowed-tools: Read, Bash, Grep, Glob
 disallowedTools:
   - Write
   - Edit

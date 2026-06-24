@@ -6,6 +6,7 @@
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
+use crate::models::config::AnomalyThresholds;
 use crate::models::session::SessionMetadata;
 
 pub mod anomalies;
@@ -88,6 +89,20 @@ impl Period {
     }
 }
 
+/// Per-tool token and cost attribution for a period
+#[derive(Debug, Clone)]
+pub struct ToolTokenStat {
+    pub tool_name: String,
+    pub call_count: usize,
+    pub tokens: u64,
+    /// Fraction of total tool tokens (0.0..1.0)
+    pub pct_of_total: f64,
+    /// Estimated cost proportional to period total cost
+    pub est_cost_usd: f64,
+    /// est_cost_usd / call_count (0 if call_count == 0)
+    pub cost_per_call: f64,
+}
+
 /// Complete analytics data for a period
 #[derive(Debug, Clone)]
 pub struct AnalyticsData {
@@ -107,12 +122,16 @@ pub struct AnalyticsData {
     pub anomalies: Vec<anomalies::Anomaly>,
     /// Daily cost spikes
     pub daily_spikes: Vec<anomalies::DailyCostAnomaly>,
+    /// Per-tool token and cost breakdown for the period
+    pub tool_token_stats: Vec<ToolTokenStat>,
     /// Number of sessions in the analyzed period
     pub sessions_in_period: usize,
     /// Timestamp of computation
     pub computed_at: DateTime<Utc>,
     /// Period analyzed
     pub period: Period,
+    /// Effective anomaly thresholds used for this computation
+    pub anomaly_thresholds: AnomalyThresholds,
 }
 
 impl AnalyticsData {
@@ -124,6 +143,23 @@ impl AnalyticsData {
     /// # Performance
     /// Target: <100ms for 1000 sessions over 30 days
     pub fn compute(sessions: &[Arc<SessionMetadata>], period: Period) -> Self {
+        Self::compute_inner(sessions, period, &AnomalyThresholds::default())
+    }
+
+    /// Compute analytics using custom anomaly thresholds from settings.json.
+    pub fn compute_with_thresholds(
+        sessions: &[Arc<SessionMetadata>],
+        period: Period,
+        thresholds: &AnomalyThresholds,
+    ) -> Self {
+        Self::compute_inner(sessions, period, thresholds)
+    }
+
+    fn compute_inner(
+        sessions: &[Arc<SessionMetadata>],
+        period: Period,
+        thresholds: &AnomalyThresholds,
+    ) -> Self {
         use chrono::Local;
 
         let trends = compute_trends(sessions, period.days());
@@ -131,7 +167,6 @@ impl AnalyticsData {
         let patterns = detect_patterns(sessions, period.days());
         let insights = generate_insights(&trends, &patterns, &forecast);
 
-        // Filter sessions to the period for anomaly detection
         let cutoff = Local::now() - chrono::Duration::days(period.days() as i64);
         let period_sessions: Vec<Arc<SessionMetadata>> = sessions
             .iter()
@@ -144,9 +179,13 @@ impl AnalyticsData {
             .collect();
 
         let sessions_in_period = period_sessions.len();
-        let anomalies_detected = anomalies::detect_anomalies(&period_sessions);
-        let daily_spikes_detected =
-            anomalies::detect_daily_cost_spikes(&period_sessions, period.days());
+        let anomalies_detected =
+            anomalies::detect_anomalies_with_thresholds(&period_sessions, thresholds);
+        let daily_spikes_detected = anomalies::detect_daily_cost_spikes_with_thresholds(
+            &period_sessions,
+            period.days(),
+            thresholds,
+        );
 
         // Aggregate per-tool token usage across all sessions
         let mut aggregated_tool_tokens: std::collections::HashMap<String, u64> =
@@ -157,8 +196,51 @@ impl AnalyticsData {
             }
         }
 
+        // Aggregate per-tool call counts and token usage for the period only
+        let mut period_tool_calls: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let mut period_tool_tokens: std::collections::HashMap<String, u64> =
+            std::collections::HashMap::new();
+        for session in &period_sessions {
+            for (tool, &calls) in &session.tool_usage {
+                *period_tool_calls.entry(tool.clone()).or_default() += calls;
+            }
+            for (tool, &tokens) in &session.tool_token_usage {
+                *period_tool_tokens.entry(tool.clone()).or_default() += tokens;
+            }
+        }
+
         // Estimate period cost from trend data
         let total_cost_estimate: f64 = trends.daily_cost.iter().sum();
+
+        // Build per-tool stats sorted by token usage descending
+        let total_tool_tokens: u64 = period_tool_tokens.values().sum();
+        let mut tool_token_stats: Vec<ToolTokenStat> = period_tool_tokens
+            .iter()
+            .map(|(name, &tokens)| {
+                let pct = if total_tool_tokens > 0 {
+                    tokens as f64 / total_tool_tokens as f64
+                } else {
+                    0.0
+                };
+                let est_cost = total_cost_estimate * pct;
+                let calls = *period_tool_calls.get(name).unwrap_or(&0);
+                let cost_per_call = if calls > 0 {
+                    est_cost / calls as f64
+                } else {
+                    0.0
+                };
+                ToolTokenStat {
+                    tool_name: name.clone(),
+                    call_count: calls,
+                    tokens,
+                    pct_of_total: pct,
+                    est_cost_usd: est_cost,
+                    cost_per_call,
+                }
+            })
+            .collect();
+        tool_token_stats.sort_by(|a, b| b.tokens.cmp(&a.tokens));
 
         // Generate cost suggestions (plugin_analytics populated with empty data here;
         // full plugin analytics with dead-code detection requires skill/command lists
@@ -189,9 +271,11 @@ impl AnalyticsData {
             cost_suggestions,
             anomalies: anomalies_detected,
             daily_spikes: daily_spikes_detected,
+            tool_token_stats,
             sessions_in_period,
             computed_at: Utc::now(),
             period,
+            anomaly_thresholds: thresholds.clone(),
         }
     }
 
@@ -211,9 +295,11 @@ impl AnalyticsData {
             cost_suggestions: Vec::new(),
             anomalies: Vec::new(),
             daily_spikes: Vec::new(),
+            tool_token_stats: Vec::new(),
             sessions_in_period: sessions.len(),
             computed_at: Utc::now(),
             period,
+            anomaly_thresholds: AnomalyThresholds::default(),
         }
     }
 }

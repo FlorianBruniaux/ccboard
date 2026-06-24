@@ -5,6 +5,98 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-04-21
+
+### Added
+
+- **Live context window monitoring**: Sessions tab now shows an inline context pressure bar (`[████░░░░░░] 42% ⚡`) for active Claude sessions. The detail panel displays a 20-character color-coded bar (green < 65%, orange < 85%, red above), compaction count, turn count, and current active tool. Compaction events (triggered by `/compact`) are detected automatically and marked with `⚡`.
+- **Incremental JSONL transcript parsing** (`LiveMonitorState`): Live session monitoring now reads only new bytes since the last poll (O(delta) vs O(file_size)). On long sessions with 50MB+ JSONL files, this eliminates multi-second per-tick re-parsing. The `LiveMonitorState` struct persists across 2-second TUI refresh cycles via `parking_lot::Mutex` in `DataStore`. File rotation is detected via inode + mtime identity tuple.
+- **Live sessions panel (Web Dashboard)**: The web Dashboard page now shows active Claude sessions in a live panel, polling `/api/sessions/live` every 5 seconds. Displays project name, elapsed time, token count, CPU%, and memory per session. Animated green dot when sessions are running.
+- **claude-mem integration (Brain tab/page)**: Brain tab and web Brain page now optionally surface `claude-mem` observations alongside session insights. `feat(brain): add optional claude-mem integration` — toggle with `m` in the TUI. Web Brain page shows a dedicated observations section.
+- **ccboard-ffi crate**: New `crates/ccboard-ffi` workspace member — UniFFI bindings exposing `ccboard-core` to Swift/iOS via a `staticlib`/`cdylib`. Provides `ccboard_init()`, `FfiProject`, `FfiSession`, `FfiStats`, and SSE-like event streaming for native mobile dashboards.
+- **uniffi-bindgen crate**: New `crates/uniffi-bindgen` workspace member — `uniffi-bindgen` binary for generating Swift/Kotlin bindings from the FFI crate.
+
+### Changed
+
+- `LiveSession` struct gains 11 new fields: `context_percent`, `context_window`, `compaction_count`, `context_history` (ring buffer 200 pts), `token_history` (ring buffer 200 pts), `total_input_tokens`, `total_output_tokens`, `total_cache_read_tokens`, `total_cache_create_tokens`, `turn_count`, `current_task`.
+- Brain tab section switching uses `←`/`→` (consistent with Config, Agents, and other multi-section tabs) instead of `h`/`l`.
+
+### Fixed
+
+- Brain tab section navigation keys unified with the rest of the TUI (`←`/`→`).
+
+---
+
+## [0.21.0] - 2026-03-28
+
+### Added
+
+- **Third-party session parsers**: ccboard now imports sessions from Cursor, Codex CLI, and OpenCode alongside Claude Code sessions. New `SourceTool` enum (`ClaudeCode`, `Cursor`, `Codex`, `OpenCode`) added to `SessionMetadata`. Sessions from non-Claude tools display a yellow badge (`[Cu]`, `[Cx]`, `[Oc]`) in the Sessions tab. All parsers are opt-in and silently skipped if the tool is not installed.
+  - `cursor.rs`: scans `workspaceStorage/*/state.vscdb`, parses `ItemTable` JSON chat bubble arrays
+  - `codex.rs`: walks `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`, infers timestamps from path
+  - `opencode.rs`: queries `opencode.db` via rusqlite (joins Session + Message tables)
+- **Code Metrics**: `SessionMetadata` gains `lines_added` and `lines_removed` fields computed from Edit/Write tool inputs during session indexing (CACHE_VERSION v8). Sessions tab shows a `+N/-N` badge in the list and detail panel. Web session table shows a Lines column with green/red badges.
+- **Brain tab** (tab 12, key `b`): Cross-session knowledge base powered by two hooks:
+  - `session-stop.sh`: runs after each session, evaluates significance (skips sessions < 3KB), extracts structured insights (progress, decision, blocked, pattern, fix, context) and stores them in `~/.ccboard/insights.db` (WAL SQLite via `InsightsDb`).
+  - `session-start.sh`: injects the most recent progress, blockers, and knowledge entries from `insights.db` into Claude's context at session start (guarded by a per-session marker to inject only once).
+  - TUI Brain tab: filterable list by insight type (`←`/`→`), expandable detail pane (`Enter`), archive (`d`), refresh (`r`).
+  - Web Brain page (Leptos): filter tabs, list + detail split panel, type icons and colors.
+  - `/ccboard-remember` skill: stores fix/pattern/context/decision insights directly from any Claude session.
+  - `GET /api/insights` Axum route with project/type/limit filters.
+
+### Changed
+
+- `SessionMetadata` struct gains `source_tool: SourceTool` and `lines_added`/`lines_removed` fields (SQLite cache bumped to v8 — automatic rescan on first launch).
+- Sessions tab list and detail panel updated to show source tool badge and code metrics.
+
+---
+
+## [0.20.0] - 2026-03-28
+
+### Added
+
+- **Analytics — Per-Tool Cost Breakdown** (MF1): New `Costs` sub-tab in Analytics (replaces the previous `Plugins` proxy view). Shows a scrollable table — Tool | Calls | Tokens | % Total | Est. Cost | $/Call — aggregated from period sessions. Rows colored red (≥20% of token budget) and yellow (≥10%) for fast hotspot identification. `j/k` to scroll. `ToolTokenStat` struct added to `AnalyticsData`.
+- **Analytics — Pattern Discovery** (Discover sub-tab): New `Discover` view in Analytics. Press `r` to scan recent session JSONL files, extract recurring user message patterns via n-gram analysis and Jaccard clustering, and surface suggestions categorized as 📋 CLAUDE.md rule, 🧩 Skill, or ⚡ Command with session count and relevance score. Results cached in `DataStore.discover_cache`. Uses existing `discover_patterns()` engine — no API key required.
+- **MCP — Server Usage Stats**: Press `s` in the MCP tab to toggle a usage stats table — Server | Calls | Sessions | Last Seen — aggregated from all analyzed sessions via `DataStore.mcp_call_stats()`. Row coloring: green = used today, default = this week, muted = older or never. `s` or `Esc` to return to the server list. `McpCallStat` struct exported from `ccboard-core`.
+- **TUI Smoke Tests** (MF9): 12 smoke tests added under `ccboard-tui::tests` using `ratatui::backend::TestBackend` (120×40). One test per tab — constructs with `new()`, renders with `None`/empty data, asserts non-empty buffer. Catches render panics on empty state. Total: 492 tests (was 472).
+
+### Changed
+
+- Analytics `Plugins` sub-tab renamed to `Costs` — content replaced with real per-tool cost breakdown table instead of bigram proxy chart.
+- `AnalyticsData` gains `tool_token_stats: Vec<ToolTokenStat>` field (period-scoped aggregation).
+- `DataStore` gains `discover_cache`, `compute_discover()`, and `mcp_call_stats()`.
+
+---
+
+## [0.19.0] - 2026-03-27
+
+### Added
+
+- **Agents — Real Invocation Counts** (QW1): Agents and tools used in sessions but without local frontmatter files are now discovered automatically and shown in the Agents/Capabilities tab with a real invocation count. Previously all entries showed `0`. Discovered entries display `"Discovered from sessions"` as description. Unlocks dead plugin detection — any agent with count 0 is truly unused.
+- **Sessions — Replay Complexity Warning** (QW6): Opening a session with ≥2000 total tool calls now shows a "High Complexity Session" modal before loading the replay viewer. Prevents accidental freezes on very large sessions. `[Enter]` or `y` to confirm loading, any other key cancels. Threshold is based on the `tool_usage` count sum already stored in `SessionMetadata`.
+- **Analytics — Configurable Anomaly Thresholds** (QW7): Anomaly detection thresholds are now configurable via `anomalyThresholds` in `settings.json`. Supported keys: `warningZScore` (default 2.0), `criticalZScore` (default 3.0), `spike2x` (default 2.0), `spike3x` (default 3.0), `minSessions` (default 10). Active thresholds are shown in the Analytics → Anomalies sub-tab with a `[custom]` badge when non-default values are active.
+
+---
+
+## [0.18.0] - 2026-03-27
+
+### Added
+
+- **Sessions — Bookmarks** (`b` to toggle, `B` to filter): Tag any session with a short label (e.g. "important", "bug-fix"). Bookmarks persist to `~/.ccboard/bookmarks.json` via atomic write. Bookmarked sessions show a `★` icon in the list; `[B]` toggles a "starred only" filter. Detail pane shows the tag and optional note. `BookmarkStore` API: upsert, remove, toggle, is\_bookmarked, all persistent across restarts.
+- **Sessions — Subagent Session Graph** (MF6): Sessions that spawned subagents now show a tree in the detail pane — `⤵ Subagents (N): X tokens total` with per-child breakdown (msg count, tokens, model). Child sessions show `⤴ Subagent of: <parent_id>`. `parent_session_id` captured from JSONL `parentSessionId` field during metadata scan; `has_subagents` backfilled at load time via cross-reference. `DataStore::subagent_children(id)` API for tree queries.
+- **Sessions — LLM Summaries** (`ccboard summarize <id>`): Generate an AI summary of any session via `claude --print`. Cached to `~/.ccboard/summaries/<id>.md` + metadata JSON (atomic write). Sessions detail pane shows the cached summary under "AI Summary:" header, or a hint to run `ccboard summarize <id>` if not yet generated. `--force` flag regenerates; `--model` flag selects model. `SummaryStore` module with load/save/delete/has\_summary API and 3 unit tests.
+- **Sessions — Model Switching Timeline**: Detail pane now shows ordered model segments instead of a flat model list — `Opus 4.5 (8) → Sonnet 4.6 (15)` — computed inline during JSONL metadata scan with zero extra I/O. Falls back to `models_used` for sessions parsed before this version.
+- **Dashboard — Context Saturation Trend**: Context window card subtitle is now dynamic. Linear regression over last N sessions' saturation percentages predicts `↑ ~N sessions` until 85% breach, or `↓ declining` when trend is negative. Flat trend shows `avg 30d`. `ContextWindowStats` gains `trend_slope: f64` and `sessions_until_high: Option<usize>`.
+- **Hook State TTL**: Stale `Running` / `WaitingInput` sessions (no update in >10 min) are now pruned from live session state. Prevents ghost sessions persisting indefinitely after crashes. `prune_stale_running(max_age)` method on `LiveSessionFile`.
+- **Settings Hot-Reload Toast**: Changing `settings.json` while ccboard is running now shows a brief "Settings reloaded" info toast in the TUI. Fixed double `ConfigChanged` publish that was emitting two events per file change.
+
+### Changed
+
+- Sessions detail pane layout reorganized: subagent tree and LLM summary sections added between tool usage and first message.
+- `SessionMetadata` gains two new fields (`model_segments: Vec<(String, usize)>`, `parent_session_id: Option<String>`), both `#[serde(default)]` for backward compatibility with cached metadata.
+
+---
+
 ## [0.17.0] - 2026-03-24
 
 ### Added

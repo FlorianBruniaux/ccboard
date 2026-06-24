@@ -102,6 +102,12 @@ pub fn App() -> impl IntoView {
                                         view! { <crate::pages::SearchPage /> }
                                     }
                                 />
+                                <Route
+                                    path=path!("/brain")
+                                    view=|| {
+                                        view! { <crate::pages::Brain /> }
+                                    }
+                                />
                             </Routes>
                         </main>
                     </div>

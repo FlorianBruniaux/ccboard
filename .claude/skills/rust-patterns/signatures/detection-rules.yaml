@@ -1,0 +1,313 @@
+# Pattern Detection Rules for rust-patterns skill
+# Grep-compatible regex patterns for identifying Rust patterns
+
+patterns:
+  # Core Idioms
+  newtype:
+    name: "Newtype Pattern"
+    category: "idiom"
+    primary_signals:
+      - 'struct \w+\([^,)]+\);'  # struct UserId(u64);
+    secondary_signals:
+      - 'impl From<\w+> for \w+'
+      - 'impl AsRef<\w+> for \w+'
+      - 'impl Display for \w+\(\w+\)'
+    confidence: 0.90
+    description: "Zero-cost type safety wrapper"
+
+  builder:
+    name: "Builder Pattern"
+    category: "creational"
+    primary_signals:
+      - 'struct \w+Builder'
+      - 'fn new\(\) -> \w+Builder'
+      - '\.build\(\) -> Result<'
+    secondary_signals:
+      - 'PhantomData<'  # Type-state builder
+      - 'fn \w+\(mut self, \w+: \w+\) -> Self'
+    confidence: 0.88
+    description: "Fluent API for complex construction"
+
+  raii:
+    name: "RAII Pattern"
+    category: "rust-specific"
+    primary_signals:
+      - 'impl Drop for \w+'
+      - 'fn drop\(&mut self\)'
+    secondary_signals:
+      - 'struct \w+Guard'
+      - 'cleanup\(\)'
+      - 'close\(\)'
+    confidence: 0.95
+    description: "Automatic resource cleanup with Drop"
+
+  arc_usage:
+    name: "Arc Usage"
+    category: "idiom"
+    primary_signals:
+      - 'Arc<\w+>'
+      - 'use std::sync::Arc'
+    confidence: 0.95
+    description: "Shared ownership across threads"
+
+  rwlock_usage:
+    name: "RwLock Usage"
+    category: "idiom"
+    primary_signals:
+      - 'RwLock<\w+>'
+      - 'use parking_lot::RwLock'
+      - '\.read\(\)'
+      - '\.write\(\)'
+    confidence: 0.92
+    description: "Read-write lock for concurrent access"
+
+  mutex_usage:
+    name: "Mutex Usage"
+    category: "idiom"
+    primary_signals:
+      - 'Mutex<\w+>'
+      - '\.lock\(\)'
+    confidence: 0.92
+    description: "Mutual exclusion lock"
+
+  # Structural Patterns
+  trait_object:
+    name: "Trait Object"
+    category: "structural"
+    primary_signals:
+      - 'Box<dyn \w+>'
+      - '&dyn \w+'
+      - 'Vec<Box<dyn \w+>>'
+    confidence: 0.88
+    description: "Dynamic dispatch with trait objects"
+
+  extension_trait:
+    name: "Extension Trait"
+    category: "structural"
+    primary_signals:
+      - 'trait \w+Ext'
+      - 'impl \w+Ext for \w+'
+    confidence: 0.85
+    description: "Add methods to external types"
+
+  # Type-State Pattern
+  type_state:
+    name: "Type-State Pattern"
+    category: "rust-specific"
+    primary_signals:
+      - 'PhantomData<\w+>'
+      - 'struct \w+<State>'
+    secondary_signals:
+      - 'struct Initialized'
+      - 'struct Uninitialized'
+      - 'struct Locked'
+      - 'struct Unlocked'
+    confidence: 0.82
+    description: "Compile-time state tracking"
+
+  sealed_trait:
+    name: "Sealed Trait"
+    category: "rust-specific"
+    primary_signals:
+      - 'mod sealed'
+      - 'pub trait Sealed'
+      - 'trait \w+: sealed::Sealed'
+    confidence: 0.90
+    description: "Prevent external trait implementations"
+
+  # Behavioral Patterns
+  strategy_enum:
+    name: "Strategy Pattern (Enum)"
+    category: "behavioral"
+    primary_signals:
+      - 'enum \w+Strategy'
+      - 'fn execute\(&self'
+    confidence: 0.75
+    description: "Interchangeable algorithms using enums"
+
+  command_enum:
+    name: "Command Pattern (Enum)"
+    category: "behavioral"
+    primary_signals:
+      - 'enum Command'
+      - 'fn execute\(&self\)'
+      - 'fn undo\(&self\)'
+    confidence: 0.78
+    description: "Encapsulated requests as enum variants"
+
+  # Error Handling
+  anyhow_usage:
+    name: "anyhow Error Handling"
+    category: "idiom"
+    primary_signals:
+      - 'use anyhow::'
+      - 'anyhow::Result<'
+      - '\.context\('
+    confidence: 0.92
+    description: "Application error handling with anyhow"
+
+  thiserror_usage:
+    name: "thiserror Error Handling"
+    category: "idiom"
+    primary_signals:
+      - 'use thiserror::Error'
+      - '#\[derive\(Error'
+      - '#\[error\('
+    confidence: 0.95
+    description: "Library error types with thiserror"
+
+  # Iterator Patterns
+  iterator_chain:
+    name: "Iterator Chain"
+    category: "idiom"
+    primary_signals:
+      - '\.iter\(\)'
+      - '\.filter\('
+      - '\.map\('
+      - '\.collect\(\)'
+    confidence: 0.70
+    description: "Functional iterator composition"
+
+  # Async Patterns
+  tokio_async:
+    name: "tokio Async Pattern"
+    category: "idiom"
+    primary_signals:
+      - 'tokio::time::sleep'
+      - 'tokio::fs::'
+      - 'tokio::task::spawn_blocking'
+    confidence: 0.88
+    description: "Proper tokio async usage"
+
+anti_patterns:
+  # Critical Anti-Patterns
+  excessive_clone:
+    name: "Excessive Clone"
+    category: "anti-pattern"
+    severity: "high"
+    primary_signals:
+      - '\.clone\(\).*\.clone\(\)'  # Multiple clones in chain
+      - 'for .* in .*\.clone\(\)'    # Cloning in loops
+    confidence: 0.85
+    description: "Unnecessary cloning kills performance"
+    suggestion: "Use references (&T) instead of cloning"
+
+  unwrap_production:
+    name: "Unwrap in Production"
+    category: "anti-pattern"
+    severity: "critical"
+    primary_signals:
+      - '\.unwrap\(\)'
+      - '\.expect\('
+    exclude_patterns:
+      - '#\[cfg\(test\)\]'  # OK in tests
+      - '#\[test\]'
+    confidence: 0.90
+    description: "Panics on errors instead of propagating"
+    suggestion: "Use ? operator with .context() instead"
+
+  blocking_in_async:
+    name: "Blocking in Async"
+    category: "anti-pattern"
+    severity: "high"
+    primary_signals:
+      - 'std::thread::sleep'
+      - 'std::fs::'
+    context_required:
+      - 'async fn'
+      - '\.await'
+    confidence: 0.82
+    description: "Blocks async executor"
+    suggestion: "Use tokio::time::sleep or spawn_blocking"
+
+  arc_mutex_overuse:
+    name: "Arc<Mutex> Instead of RwLock"
+    category: "anti-pattern"
+    severity: "medium"
+    primary_signals:
+      - 'Arc<Mutex<'
+    confidence: 0.70
+    description: "Mutex for read-heavy data"
+    suggestion: "Consider Arc<RwLock> for read-heavy workloads"
+
+  missing_context:
+    name: "Error Without Context"
+    category: "anti-pattern"
+    severity: "medium"
+    primary_signals:
+      - '\?\s*$'  # ? at end of line without .context()
+    exclude_patterns:
+      - '\.context\('
+      - '\.with_context\('
+    confidence: 0.65
+    description: "Error propagation without descriptive context"
+    suggestion: "Add .context() to all ? operators"
+
+  string_over_str:
+    name: "String Parameter Instead of &str"
+    category: "anti-pattern"
+    severity: "low"
+    primary_signals:
+      - 'fn \w+\(.*: String[,\)]'
+    confidence: 0.75
+    description: "Forces String allocation"
+    suggestion: "Use &str for function parameters"
+
+  vec_over_slice:
+    name: "Vec Parameter Instead of &[T]"
+    category: "anti-pattern"
+    severity: "low"
+    primary_signals:
+      - 'fn \w+\(.*: Vec<\w+>[,\)]'
+    confidence: 0.72
+    description: "Forces Vec allocation"
+    suggestion: "Use &[T] for read-only slices"
+
+# Pattern Relationships
+relationships:
+  - pattern: "builder"
+    often_with:
+      - "newtype"  # Builder returns newtype
+      - "type_state"  # Type-state builder
+    confidence: 0.75
+
+  - pattern: "arc_usage"
+    often_with:
+      - "rwlock_usage"  # Arc<RwLock<T>>
+      - "mutex_usage"   # Arc<Mutex<T>>
+    confidence: 0.85
+
+  - pattern: "anyhow_usage"
+    conflicts_with:
+      - "thiserror_usage"  # Don't mix in same module
+    confidence: 0.70
+
+# Crate-Specific Patterns
+crate_patterns:
+  tokio:
+    name: "tokio Ecosystem"
+    indicators:
+      - 'use tokio::'
+      - '#\[tokio::main\]'
+    patterns:
+      - "tokio_async"
+    anti_patterns:
+      - "blocking_in_async"
+
+  serde:
+    name: "serde Ecosystem"
+    indicators:
+      - 'use serde::'
+      - '#\[derive\(Serialize, Deserialize\)\]'
+    patterns:
+      - "newtype"  # Often used with serde
+    confidence: 0.80
+
+  parking_lot:
+    name: "parking_lot Locks"
+    indicators:
+      - 'use parking_lot::'
+    patterns:
+      - "rwlock_usage"
+      - "mutex_usage"
+    confidence: 0.90

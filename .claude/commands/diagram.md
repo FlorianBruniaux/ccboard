@@ -1,6 +1,8 @@
 ---
+name: diagram
 model: sonnet
-description: Genere des diagrammes ASCII expliquant l'architecture/decisions de la session courante
+description: Generate ASCII diagrams explaining architecture or decisions from the current session
+argument-hint: "[aspect to diagram, e.g. 'permission flow', 'session states']"
 ---
 
 # /diagram

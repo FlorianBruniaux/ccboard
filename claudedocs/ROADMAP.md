@@ -1,7 +1,7 @@
 # ccboard Roadmap
 
-**Last Updated**: 2026-03-24
-**Current Version**: v0.17.0
+**Last Updated**: 2026-04-21
+**Current Version**: v0.22.0
 **Target**: v1.0.0 (Phases L + N complete)
 
 ---
@@ -18,16 +18,57 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 
 ---
 
-## 📍 Current Status (v0.17.0)
+## 📍 Current Status (v0.22.0)
 
 ### ✅ Production Features
 
-**TUI + Web UI** (12 tabs, 100% parity):
-- Dashboard, Sessions (live monitoring with hook-based status), Config, Hooks, Agents
+**TUI + Web UI** (13 tabs, 100% parity):
+- Dashboard, Sessions (live monitoring + context pressure bar), Config, Hooks, Agents
 - Costs (5 views + quota + per-project last session cost), History (search + export), MCP, Analytics
 - **Activity** — security audit, violations feed, on-demand session analysis, batch scan (4 concurrent)
 - **Search** — FTS5 full-text search with date, message count, detail pane, search-as-you-type
+- **Brain** — cross-session knowledge base, hook auto-extract, claude-mem integration
 - **Visual redesign (v0.16.0)**: palette system, rounded borders, responsive heatmap, sub-tabs
+
+**Live Context Window Monitoring (v0.22.0)** ✅:
+- **Context pressure bar** — `[████░░░░░░] 42% ⚡` inline in Sessions list for active processes
+- **Incremental JSONL parsing** (`LiveMonitorState`) — O(delta) parsing per tick; offset-based, inode+mtime file rotation detection; eliminates full re-parse on 50MB+ files
+- **Compaction detection** — context drop >30% between turns → `compaction_count++`, `⚡` indicator
+- **Context detail panel** — 20-char color-coded bar (green/orange/red), turn count, current tool
+- **ccboard-ffi crate** — UniFFI bindings exposing `ccboard-core` to Swift/iOS via staticlib/cdylib
+- **uniffi-bindgen crate** — binding generator binary for Swift/Kotlin targets
+- 492 tests passing, 0 clippy warnings
+
+**Brain Tab (v0.21.0)** ✅:
+- Cross-session knowledge base via `session-stop.sh` + `session-start.sh` hooks, stored in `~/.ccboard/insights.db`
+- Filterable by type (`←`/`→`), expandable detail pane, archive (`d`), refresh (`r`)
+- Optional claude-mem integration (toggle `m`) — surfaces observations from claude-mem alongside insights
+- `/ccboard-remember` skill for manual insight capture from any Claude session
+- Web Brain page (Leptos): filter tabs, list + detail split panel, type icons and colors
+- `GET /api/insights` Axum route with project/type/limit filters
+
+**Third-party Session Imports (v0.21.0)** ✅:
+- Cursor (`workspaceStorage/*/state.vscdb`), Codex CLI (`rollout-*.jsonl`), OpenCode (`opencode.db`)
+- `SourceTool` enum; yellow badge (`[Cu]`, `[Cx]`, `[Oc]`) in Sessions tab; opt-in, silently skipped if not installed
+
+**Code Metrics (v0.21.0)** ✅:
+- `lines_added` / `lines_removed` computed from Edit/Write tool inputs during session indexing
+- `+N/-N` badge in Sessions list, detail panel, and web session table
+
+**Analytics Enhancements (v0.20.0)** ✅:
+- Per-tool cost breakdown (`Costs` sub-tab): Tool | Calls | Tokens | % Total | Est. Cost | $/Call with red/yellow hotspot coloring
+- Pattern Discovery (`Discover` sub-tab): n-gram analysis, Jaccard clustering, CLAUDE.md/Skill/Command suggestions
+- MCP server usage stats: Server | Calls | Sessions | Last Seen
+- TUI smoke tests: 12 tests, one per tab — 492 total
+
+**Session Intelligence (v0.18.0–v0.19.0)** ✅:
+- **Bookmarks** — `b` toggles, `B` filters to starred only, persisted to `~/.ccboard/bookmarks.json`
+- **Subagent graph** — parent/child tree in Sessions detail pane with token/msg breakdown
+- **LLM summaries** — `ccboard summarize <id>` via `claude --print`, cached to `~/.ccboard/summaries/`
+- **Model switching timeline** — `Opus 4.5 (8) → Sonnet 4.6 (15)` computed inline during JSONL scan
+- **Context saturation trend** — linear regression predicts sessions until 85% breach
+- **Hook state TTL** — stale Running/WaitingInput sessions pruned after 10 min
+- **Live sessions panel (Web Dashboard)** — polls `/api/sessions/live` every 5s, animated green dot
 
 **Live Session Monitoring** (v0.14.0):
 - `ccboard hook <EventName>` ingests Claude Code hook JSON, updates `~/.ccboard/live-sessions.json` with file locking + atomic save
@@ -51,9 +92,8 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 **Waiting Answers Panel + Max 20x tip (v0.17.0)**:
 - Sessions tab: "Waiting Answers" panel showing sessions pending user input (WaitingInput status)
 - Dashboard: Max 20x plan cost tip surfaced automatically
-- 458 tests passing, 0 clippy warnings
 
-**Bug Fixes & Polish (v0.16.0 → v0.16.4)**:
+**Bug Fixes & Polish (v0.16.0 → v0.16.5)**:
 - TUI keybindings `?` / `:` fixed on macOS (KeyModifiers::NONE vs SHIFT)
 - Web Activity + Analytics Tools pages fully styled (440+ CSS lines added)
 - Web session tooltip positioning fixed (invalid HTML in `<tr>` → `<td>`)
@@ -65,7 +105,8 @@ Transform ccboard from a monitoring dashboard into a **complete Claude Code mana
 **Performance**:
 - 89x faster startup (SQLite cache: 20s → 33ms)
 - 50x memory reduction (Arc migration: 1.4GB → 28MB)
-- 458 tests passing, 0 clippy warnings
+- O(delta) live session parsing (vs O(file_size) per tick previously)
+- 492 tests passing, 0 clippy warnings
 
 **`ccboard discover`** (v0.12.0):
 - Analyzes session history to suggest CLAUDE.md rules, skills, or commands
@@ -176,6 +217,62 @@ Delivered:
 - Streak detection, daily cost spikes, model downgrade recommendations
 - AnalyticsData owns anomalies/daily_spikes (computed once, cached)
 - 11 nouveaux tests — 433 total
+
+---
+
+### ✅ Live Context Window Monitoring + ccboard-ffi (v0.22.0) - **DONE**
+
+**Priority**: 🔴 HIGH
+**Status**: ✅ Released 2026-04-21
+
+**Delivered**:
+- `LiveMonitorState` — stateful incremental JSONL parsing, `HashMap<session_id, TranscriptCache>`, persisted across 2s TUI ticks via `parking_lot::Mutex` in `DataStore`
+- Context pressure bar `[████░░░░░░] 42% ⚡` inline in Sessions list; 20-char color-coded detail panel (green/orange/red)
+- Compaction detection (context drop >30% → `compaction_count++`, `⚡` marker)
+- `context_window_for_model()` heuristic (200K default, 1M for `claude-*-1m` or `max_context_tokens > 200_000`)
+- File rotation detection via `(inode, mtime_nanos)` identity tuple
+- `ccboard-ffi` crate — UniFFI `staticlib`/`cdylib` for Swift/iOS native dashboards
+- `uniffi-bindgen` crate — binding generator binary
+
+---
+
+### ✅ Brain Tab + Third-party Sessions + Code Metrics (v0.21.0) - **DONE**
+
+**Priority**: 🔴 HIGH
+**Status**: ✅ Released 2026-03-28
+
+**Delivered**:
+- Brain tab (key `b`): `session-stop.sh` auto-extracts insights into `~/.ccboard/insights.db`; `session-start.sh` injects context at session start; filterable by type, expandable detail, archive
+- Optional claude-mem integration (`m` toggle in Brain tab)
+- Third-party session imports: Cursor, Codex CLI, OpenCode — `SourceTool` enum, yellow badge
+- Code Metrics: `lines_added`/`lines_removed` from Edit/Write tool inputs; `+N/-N` badge
+- `/ccboard-remember` skill for manual insight capture
+
+---
+
+### ✅ Analytics Costs + Pattern Discovery + MCP Stats (v0.20.0) - **DONE**
+
+**Priority**: 🟡 MEDIUM
+**Status**: ✅ Released 2026-03-28
+
+**Delivered**:
+- Analytics `Costs` sub-tab: per-tool token tracking with red/yellow hotspot coloring
+- `Discover` sub-tab: n-gram analysis + Jaccard clustering → CLAUDE.md/Skill/Command suggestions
+- MCP server usage stats: Server | Calls | Sessions | Last Seen
+- 12 TUI smoke tests (one per tab) — 492 total
+
+---
+
+### ✅ Session Intelligence + Web Live Panel (v0.18.0–v0.19.0) - **DONE**
+
+**Priority**: 🟡 MEDIUM
+**Status**: ✅ Released 2026-03-24 → 2026-03-27
+
+**Delivered**:
+- Bookmarks, subagent graph, LLM summaries, model switching timeline, context saturation trend
+- Waiting Answers panel, Max 20x tip surfacing
+- Web Dashboard live sessions panel (polls `/api/sessions/live` every 5s, animated dot)
+- Brain tab initial claude-mem integration
 
 ---
 
@@ -310,8 +407,12 @@ Delivered:
 | **M** | 🟡 MEDIUM | 8-10h | v0.15.5 | Conversation enhancements | #3, #7, #8 | ✅ Done 2026-03-20 |
 | **v0.16.x fixes** | — | — | v0.16.0–0.16.4 | Visual redesign, keybindings, web CSS, pricing, plan detection | — | ✅ Done 2026-03-23 |
 | **v0.17.0** | — | — | v0.17.0 | Waiting Answers panel + Max 20x tip | — | ✅ Done 2026-03-24 |
-| **L** | 🟢 LOW | 12-15h | v0.18.0 | Plugin system | — | 📋 Backlog |
-| **N** | 🟢 LOW | 10-14h | v0.18.5 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
+| **v0.18.0–v0.19.0** | 🟡 MEDIUM | — | v0.18.0–v0.19.0 | Session intelligence + Web live panel | — | ✅ Done 2026-03-27 |
+| **v0.20.0** | 🟡 MEDIUM | — | v0.20.0 | Analytics costs + Pattern Discovery + MCP stats | — | ✅ Done 2026-03-28 |
+| **v0.21.0** | 🔴 HIGH | — | v0.21.0 | Brain tab + Third-party sessions + Code metrics | — | ✅ Done 2026-03-28 |
+| **v0.22.0** | 🔴 HIGH | — | v0.22.0 | Live context window monitoring + ccboard-ffi | — | ✅ Done 2026-04-21 |
+| **L** | 🟢 LOW | 12-15h | v0.23.0 | Plugin system | — | 📋 Backlog |
+| **N** | 🟢 LOW | 10-14h | v0.24.0 | Plan-aware completion | #4, #10-13 | 📋 Backlog |
 
 **Total Estimated**: 46-59h for v1.0.0 completion
 
@@ -325,7 +426,7 @@ Delivered:
 | **Memory Usage** | 28MB | <50MB |
 | **Session Render** | <500ms (1000 msgs) | <500ms |
 | **Export Speed** | N/A | <2s for 1000 sessions |
-| **Test Coverage** | 344 tests | 500+ tests |
+| **Test Coverage** | 492 tests | 500+ tests |
 | **Bug Reports** | 0 critical | <5% error rate |
 
 ---
@@ -362,6 +463,6 @@ Interested in implementing a roadmap phase? See:
 
 ---
 
-**Last Updated**: 2026-03-23
+**Last Updated**: 2026-04-21
 **Maintainer**: @FlorianBruniaux
 **Repository**: https://github.com/FlorianBruniaux/ccboard

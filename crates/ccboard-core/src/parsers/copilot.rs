@@ -15,7 +15,7 @@
 //! - Only the single active log file is parsed (copilot-api rotates daily)
 
 use crate::error::LoadReport;
-use crate::models::{ProjectId, SessionId, SessionMetadata};
+use crate::models::{session::SourceTool, ProjectId, SessionId, SessionMetadata};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -121,7 +121,7 @@ impl CopilotParser {
 
                 SessionMetadata {
                     id: SessionId::new(id.clone()),
-                    source_tool: Some(COPILOT_SOURCE.to_string()),
+                    source_tool: SourceTool::Copilot,
                     file_path: log_file_path
                         .clone()
                         .unwrap_or_else(|| PathBuf::from("copilot.log")),
@@ -135,13 +135,17 @@ impl CopilotParser {
                     cache_creation_tokens: 0,
                     cache_read_tokens: accum.cache_read_tokens,
                     models_used,
+                    model_segments: Vec::new(),
                     file_size_bytes: 0,
                     first_user_message: None,
                     has_subagents: false,
+                    parent_session_id: None,
                     duration_seconds,
                     branch: None,
                     tool_usage: HashMap::new(),
                     tool_token_usage: HashMap::new(),
+                    lines_added: 0,
+                    lines_removed: 0,
                 }
             })
             .collect();
@@ -381,7 +385,7 @@ mod tests {
         assert_eq!(s2.output_tokens, 582 + 2125);
         assert_eq!(s2.cache_read_tokens, 51968);
         assert_eq!(s2.models_used, vec!["gpt-5.3-codex"]);
-        assert_eq!(s2.source_tool, Some("copilot".to_string()));
+        assert_eq!(s2.source_tool, SourceTool::Copilot);
 
         // Session 77ff1551: 1 message_delta event
         let s1 = sessions

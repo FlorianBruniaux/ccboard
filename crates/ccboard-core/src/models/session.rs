@@ -323,6 +323,11 @@ pub struct SessionMessage {
     /// Token usage (for assistant messages)
     #[serde(default)]
     pub usage: Option<TokenUsage>,
+
+    /// Model used — present in assistant messages in Claude Code v2.1.92+
+    /// (moved from top-level SessionLine.model to message.model)
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 /// Token usage for a message
@@ -378,6 +383,38 @@ pub struct SessionSummary {
     pub models_used: Option<Vec<String>>,
 }
 
+/// Origin tool that produced this session
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SourceTool {
+    #[default]
+    ClaudeCode,
+    Cursor,
+    Codex,
+    OpenCode,
+    Gemini,
+    Copilot,
+}
+
+impl SourceTool {
+    /// Short badge label shown in TUI (e.g. "[Cu]")
+    pub fn badge(&self) -> &'static str {
+        match self {
+            SourceTool::ClaudeCode => "",
+            SourceTool::Cursor => "[Cu]",
+            SourceTool::Codex => "[Cx]",
+            SourceTool::OpenCode => "[Oc]",
+            SourceTool::Gemini => "[G]",
+            SourceTool::Copilot => "[Co]",
+        }
+    }
+
+    /// Returns `true` for Claude Code sessions (hides the badge)
+    pub fn is_claude_code(&self) -> bool {
+        matches!(self, SourceTool::ClaudeCode)
+    }
+}
+
 /// Metadata extracted from a session without full parse
 ///
 /// Created by streaming the JSONL until session_end event.
@@ -385,11 +422,6 @@ pub struct SessionSummary {
 pub struct SessionMetadata {
     /// Session ID (from filename or content)
     pub id: SessionId,
-
-    /// Source tool that generated this session.
-    /// None = Claude Code (default). Some("gemini"), Some("copilot"), etc.
-    #[serde(default)]
-    pub source_tool: Option<String>,
 
     /// Full path to the JSONL file
     pub file_path: PathBuf,
@@ -418,14 +450,24 @@ pub struct SessionMetadata {
     /// Models used in this session
     pub models_used: Vec<String>,
 
+    /// Ordered model segments: (model_id, assistant_message_count).
+    /// Captures mid-session model switches, e.g. Opus → Sonnet → Haiku.
+    /// Empty for sessions parsed before this field was added.
+    #[serde(default)]
+    pub model_segments: Vec<(String, usize)>,
+
     /// File size in bytes
     pub file_size_bytes: u64,
 
     /// Preview of first user message (truncated to 200 chars)
     pub first_user_message: Option<String>,
 
-    /// Whether this session spawned subagents
+    /// Whether this session spawned subagents (detected when another session references this one)
     pub has_subagents: bool,
+
+    /// Parent session ID if this session is a subagent (derived from JSONL parentSessionId field)
+    #[serde(default)]
+    pub parent_session_id: Option<String>,
 
     /// Duration in seconds (from summary)
     pub duration_seconds: Option<u64>,
@@ -441,6 +483,18 @@ pub struct SessionMetadata {
     /// Proportionally distributed from message-level token counts
     #[serde(default)]
     pub tool_token_usage: std::collections::HashMap<String, u64>,
+
+    /// Which AI coding tool produced this session
+    #[serde(default)]
+    pub source_tool: SourceTool,
+
+    /// Lines added in this session (from Edit/Write tool inputs)
+    #[serde(default)]
+    pub lines_added: u64,
+
+    /// Lines removed in this session (from Edit old_string)
+    #[serde(default)]
+    pub lines_removed: u64,
 }
 
 impl SessionMetadata {
@@ -457,7 +511,6 @@ impl SessionMetadata {
 
         Self {
             id,
-            source_tool: None,
             file_path: path,
             project_path,
             first_timestamp: None,
@@ -469,13 +522,18 @@ impl SessionMetadata {
             cache_creation_tokens: 0,
             cache_read_tokens: 0,
             models_used: Vec::new(),
+            model_segments: Vec::new(),
             file_size_bytes,
             first_user_message: None,
             has_subagents: false,
+            parent_session_id: None,
             duration_seconds: None,
             branch: None,
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
+            source_tool: SourceTool::ClaudeCode,
+            lines_added: 0,
+            lines_removed: 0,
         }
     }
 

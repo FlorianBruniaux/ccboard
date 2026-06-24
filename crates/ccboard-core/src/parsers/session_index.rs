@@ -274,6 +274,9 @@ impl SessionIndexParser {
         let mut lines = reader.lines();
         let mut line_number = 0;
         let mut models_seen: HashSet<String> = HashSet::new();
+        let mut model_segments: Vec<(String, usize)> = Vec::new();
+        let mut current_segment_model: Option<String> = None;
+        let mut current_segment_count: usize = 0;
         let mut first_timestamp = None;
         let mut last_timestamp = None;
         let mut message_count = 0u64;
@@ -287,6 +290,8 @@ impl SessionIndexParser {
             std::collections::HashMap::new();
         let mut tool_token_usage: std::collections::HashMap<String, u64> =
             std::collections::HashMap::new();
+        let mut lines_added: u64 = 0;
+        let mut lines_removed: u64 = 0;
 
         while let Some(line_result) = lines.next_line().await.map_err(|e| CoreError::FileRead {
             path: path.to_path_buf(),
@@ -349,14 +354,32 @@ impl SessionIndexParser {
                 }
             }
 
-            // Track models
-            if let Some(ref model) = session_line.model {
+            // Track models and compute switching segments.
+            // Claude Code v2.1.92+ moved model from top-level to message.model;
+            // fall back to the nested field when the top-level field is absent.
+            let effective_model = session_line
+                .model
+                .as_ref()
+                .or_else(|| session_line.message.as_ref().and_then(|m| m.model.as_ref()));
+            if let Some(model) = effective_model {
                 models_seen.insert(model.clone());
+                // Segment tracking: detect transitions between models
+                if current_segment_model.as_deref() == Some(model.as_str()) {
+                    current_segment_count += 1;
+                } else {
+                    if let Some(prev) = current_segment_model.take() {
+                        model_segments.push((prev, current_segment_count));
+                    }
+                    current_segment_model = Some(model.clone());
+                    current_segment_count = 1;
+                }
             }
 
-            // Track subagents
-            if session_line.parent_session_id.is_some() {
-                metadata.has_subagents = true;
+            // Capture parent session ID (first non-null occurrence wins)
+            if metadata.parent_session_id.is_none() {
+                if let Some(ref pid) = session_line.parent_session_id {
+                    metadata.parent_session_id = Some(pid.clone());
+                }
             }
 
             // Extract git branch (first occurrence wins)
@@ -469,6 +492,33 @@ impl SessionIndexParser {
                                             block.get("name").and_then(|n| n.as_str())
                                         {
                                             *tool_usage.entry(name.to_string()).or_default() += 1;
+
+                                            // Extract code metrics from Edit/Write tool inputs
+                                            if let Some(input) = block.get("input") {
+                                                match name {
+                                                    "Edit" => {
+                                                        let old = input
+                                                            .get("old_string")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("");
+                                                        let new = input
+                                                            .get("new_string")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("");
+                                                        lines_removed += old.lines().count() as u64;
+                                                        lines_added += new.lines().count() as u64;
+                                                    }
+                                                    "Write" => {
+                                                        let content = input
+                                                            .get("content")
+                                                            .and_then(|v| v.as_str())
+                                                            .unwrap_or("");
+                                                        lines_added +=
+                                                            content.lines().count() as u64;
+                                                    }
+                                                    _ => {}
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -488,10 +538,16 @@ impl SessionIndexParser {
             }
         }
 
+        // Flush the last model segment
+        if let Some(model) = current_segment_model {
+            model_segments.push((model, current_segment_count));
+        }
+
         // Apply collected data
         metadata.first_timestamp = first_timestamp;
         metadata.last_timestamp = last_timestamp;
         metadata.models_used = models_seen.into_iter().collect();
+        metadata.model_segments = model_segments;
 
         // Only use counted values if summary didn't provide them
         if metadata.message_count == 0 {
@@ -515,6 +571,10 @@ impl SessionIndexParser {
 
         // Apply per-tool token usage
         metadata.tool_token_usage = tool_token_usage;
+
+        // Apply code metrics
+        metadata.lines_added = lines_added;
+        metadata.lines_removed = lines_removed;
 
         Ok(metadata)
     }
@@ -1034,5 +1094,61 @@ mod tests {
             !preview.contains("[Request interrupted"),
             "Should not contain noise patterns"
         );
+    }
+
+    #[tokio::test]
+    async fn test_scan_session_model_segments_single() {
+        let mut file = NamedTempFile::new().unwrap();
+        // 3 assistant messages with the same model
+        for _ in 0..3 {
+            writeln!(
+                file,
+                r#"{{"type": "assistant", "model": "claude-sonnet-4-6", "sessionId": "seg-test", "usage": {{"input_tokens": 10, "output_tokens": 5}}}}"#
+            ).unwrap();
+        }
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(file.path()).await.unwrap();
+
+        assert_eq!(
+            meta.model_segments,
+            vec![("claude-sonnet-4-6".to_string(), 3)]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_scan_session_model_segments_switch() {
+        let mut file = NamedTempFile::new().unwrap();
+        // Opus × 2, then Sonnet × 3, then Haiku × 1
+        for _ in 0..2 {
+            writeln!(
+                file,
+                r#"{{"type": "assistant", "model": "claude-opus-4-5", "sessionId": "seg-switch", "usage": {{"input_tokens": 10, "output_tokens": 5}}}}"#
+            ).unwrap();
+        }
+        for _ in 0..3 {
+            writeln!(
+                file,
+                r#"{{"type": "assistant", "model": "claude-sonnet-4-5", "sessionId": "seg-switch", "usage": {{"input_tokens": 10, "output_tokens": 5}}}}"#
+            ).unwrap();
+        }
+        writeln!(
+            file,
+            r#"{{"type": "assistant", "model": "claude-haiku-4-5", "sessionId": "seg-switch", "usage": {{"input_tokens": 5, "output_tokens": 2}}}}"#
+        ).unwrap();
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(file.path()).await.unwrap();
+
+        assert_eq!(
+            meta.model_segments,
+            vec![
+                ("claude-opus-4-5".to_string(), 2),
+                ("claude-sonnet-4-5".to_string(), 3),
+                ("claude-haiku-4-5".to_string(), 1),
+            ]
+        );
+        // models_used still has all three (unordered)
+        assert_eq!(meta.models_used.len(), 3);
     }
 }

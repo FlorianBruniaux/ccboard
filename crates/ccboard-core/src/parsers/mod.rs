@@ -2,12 +2,15 @@
 
 pub mod activity;
 pub mod claude_global;
+pub mod codex;
 pub mod copilot;
+pub mod cursor;
 pub mod filters;
 pub mod gemini;
 pub mod hooks;
 pub mod invocations;
 pub mod mcp_config;
+pub mod opencode;
 pub mod plan_parser;
 pub mod rules;
 pub mod session_content;
@@ -21,12 +24,15 @@ pub use activity::{
     classify_tool_calls, is_destructive_command, is_sensitive_file, parse_tool_calls,
 };
 pub use claude_global::{parse_claude_global, ClaudeGlobalStats, ProjectLastUsage};
+pub use codex::CodexParser;
 pub use copilot::{CopilotParser, COPILOT_SOURCE};
+pub use cursor::CursorParser;
 pub use filters::is_meaningful_user_message;
 pub use gemini::{GeminiParser, GEMINI_SOURCE};
 pub use hooks::{Hook, HookType, HooksParser};
 pub use invocations::InvocationParser;
 pub use mcp_config::McpConfig;
+pub use opencode::OpenCodeParser;
 pub use plan_parser::PlanParser;
 pub use rules::Rules;
 pub use session_content::SessionContentParser;

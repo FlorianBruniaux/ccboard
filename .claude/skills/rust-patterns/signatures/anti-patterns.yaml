@@ -1,0 +1,275 @@
+# Anti-Pattern Detection and Suggestions
+# Maps code smells to recommended Rust patterns
+
+code_smells:
+  # Ownership & Borrowing Issues
+  excessive_cloning:
+    name: "Excessive Cloning"
+    severity: "high"
+    detection:
+      - '\.clone\(\).*\.clone\(\)'
+      - 'for .* in .*\.clone\(\)'
+    suggested_patterns:
+      - pattern: "borrow_instead"
+        priority: "high"
+        example: |
+          // ❌ Wrong
+          for item in items.clone() { }
+
+          // ✅ Right
+          for item in &items { }
+
+  string_parameters:
+    name: "String Instead of &str"
+    severity: "medium"
+    detection:
+      - 'fn \w+\(.*: String'
+    suggested_patterns:
+      - pattern: "prefer_str_slice"
+        priority: "medium"
+        example: |
+          // ❌ Wrong
+          fn process(text: String) { }
+
+          // ✅ Right
+          fn process(text: &str) { }
+
+  vec_parameters:
+    name: "Vec Instead of &[T]"
+    severity: "medium"
+    detection:
+      - 'fn \w+\(.*: Vec<'
+    suggested_patterns:
+      - pattern: "prefer_slice"
+        priority: "medium"
+        example: |
+          // ❌ Wrong
+          fn sum(items: Vec<i32>) { }
+
+          // ✅ Right
+          fn sum(items: &[i32]) { }
+
+  # Error Handling Issues
+  unwrap_usage:
+    name: "Unwrap/Expect in Production"
+    severity: "critical"
+    detection:
+      - '\.unwrap\(\)'
+      - '\.expect\('
+    exclude:
+      - '#\[cfg\(test\)\]'
+      - '#\[test\]'
+    suggested_patterns:
+      - pattern: "error_propagation"
+        priority: "critical"
+        example: |
+          // ❌ Wrong
+          let value = operation().unwrap();
+
+          // ✅ Right
+          let value = operation()
+              .context("Failed to perform operation")?;
+
+  missing_context:
+    name: "Error Without Context"
+    severity: "medium"
+    detection:
+      - '\?\s*$'
+    suggested_patterns:
+      - pattern: "add_context"
+        priority: "medium"
+        example: |
+          // ❌ Wrong
+          let data = fs::read("file.txt")?;
+
+          // ✅ Right
+          let data = fs::read("file.txt")
+              .context("Failed to read file.txt")?;
+
+  # Async Issues
+  blocking_in_async:
+    name: "Blocking in Async Context"
+    severity: "high"
+    detection:
+      - 'std::thread::sleep'
+      - 'std::fs::'
+    context:
+      - 'async fn'
+    suggested_patterns:
+      - pattern: "tokio_async"
+        priority: "high"
+        example: |
+          // ❌ Wrong
+          async fn process() {
+              std::thread::sleep(Duration::from_secs(1));
+              let data = std::fs::read("file.txt")?;
+          }
+
+          // ✅ Right
+          async fn process() {
+              tokio::time::sleep(Duration::from_secs(1)).await;
+              let data = tokio::fs::read("file.txt").await?;
+          }
+
+  # Concurrency Issues
+  arc_mutex_for_reads:
+    name: "Arc<Mutex> for Read-Heavy Data"
+    severity: "medium"
+    detection:
+      - 'Arc<Mutex<'
+    suggested_patterns:
+      - pattern: "rwlock_instead"
+        priority: "medium"
+        example: |
+          // ❌ Suboptimal for read-heavy workloads
+          let data = Arc::new(Mutex::new(vec![1, 2, 3]));
+
+          // ✅ Better for read-heavy
+          let data = Arc::new(RwLock::new(vec![1, 2, 3]));
+
+  std_rwlock:
+    name: "std::sync::RwLock Instead of parking_lot"
+    severity: "low"
+    detection:
+      - 'use std::sync::RwLock'
+    suggested_patterns:
+      - pattern: "parking_lot_rwlock"
+        priority: "low"
+        example: |
+          // ❌ Slower, can deadlock
+          use std::sync::RwLock;
+
+          // ✅ Faster, better fairness
+          use parking_lot::RwLock;
+
+  # Type Safety Issues
+  primitive_ids:
+    name: "Primitive Types for IDs"
+    severity: "medium"
+    detection:
+      - 'fn \w+\(id: u64\)'
+      - 'fn \w+\(id: String\)'
+    suggested_patterns:
+      - pattern: "newtype"
+        priority: "medium"
+        example: |
+          // ❌ Wrong: Easy to mix up IDs
+          fn get_user(id: u64) -> User { }
+          fn get_session(id: u64) -> Session { }
+
+          // ✅ Right: Type safety
+          struct UserId(u64);
+          struct SessionId(u64);
+
+          fn get_user(id: UserId) -> User { }
+          fn get_session(id: SessionId) -> Session { }
+
+  # Construction Issues
+  many_constructor_params:
+    name: "Constructor with Many Parameters"
+    severity: "medium"
+    detection:
+      - 'fn new\([^)]{100,}\)'  # >100 chars of params
+    suggested_patterns:
+      - pattern: "builder"
+        priority: "medium"
+        example: |
+          // ❌ Wrong: Hard to read, hard to maintain
+          Config::new(host, port, timeout, retries, ssl, verbose, log_level, buffer_size)
+
+          // ✅ Right: Builder pattern
+          Config::builder()
+              .host("localhost")
+              .port(8080)
+              .timeout(30)
+              .build()?
+
+  # Pattern Matching Issues
+  catch_all_match:
+    name: "Catch-All in Match (Hiding Variants)"
+    severity: "low"
+    detection:
+      - 'match .* \{.*_ => '
+    suggested_patterns:
+      - pattern: "exhaustive_match"
+        priority: "low"
+        example: |
+          // ❌ Hides new enum variants
+          match status {
+              Status::Active => "Running",
+              _ => "Other",
+          }
+
+          // ✅ Exhaustive, compiler catches new variants
+          match status {
+              Status::Active => "Running",
+              Status::Pending => "Waiting",
+              Status::Inactive => "Stopped",
+          }
+
+pattern_suggestions:
+  borrow_instead:
+    title: "Use References Instead of Cloning"
+    impact: "high"
+    effort: "low"
+    pattern: "idiom"
+
+  prefer_str_slice:
+    title: "Use &str for String Parameters"
+    impact: "medium"
+    effort: "low"
+    pattern: "idiom"
+
+  prefer_slice:
+    title: "Use &[T] for Vec Parameters"
+    impact: "medium"
+    effort: "low"
+    pattern: "idiom"
+
+  error_propagation:
+    title: "Use ? with .context() for Errors"
+    impact: "critical"
+    effort: "low"
+    pattern: "idiom"
+
+  add_context:
+    title: "Add Context to Error Propagation"
+    impact: "medium"
+    effort: "low"
+    pattern: "idiom"
+
+  tokio_async:
+    title: "Use tokio Async Primitives"
+    impact: "high"
+    effort: "medium"
+    pattern: "crate-specific"
+
+  rwlock_instead:
+    title: "Use RwLock for Read-Heavy Workloads"
+    impact: "medium"
+    effort: "low"
+    pattern: "idiom"
+
+  parking_lot_rwlock:
+    title: "Use parking_lot::RwLock for Better Performance"
+    impact: "low"
+    effort: "low"
+    pattern: "crate-specific"
+
+  newtype:
+    title: "Newtype Pattern for Type Safety"
+    impact: "medium"
+    effort: "low"
+    pattern: "structural"
+
+  builder:
+    title: "Builder Pattern for Complex Construction"
+    impact: "medium"
+    effort: "medium"
+    pattern: "creational"
+
+  exhaustive_match:
+    title: "Exhaustive Match for Safety"
+    impact: "low"
+    effort: "low"
+    pattern: "idiom"

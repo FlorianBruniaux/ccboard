@@ -1,111 +1,53 @@
-# ccboard Claude Code Setup
+# ccboard — Claude Code Configuration
 
-Configuration optimisée pour le développement Rust avec Claude Code.
+## Agents (10)
 
-## Structure
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| `rust-ccboard` | sonnet | Rust/Leptos implementation — primary coding agent |
+| `leptos-designer` | sonnet | Leptos UI components, Ratatui TUI widgets |
+| `ui-designer` | sonnet | UI/UX design, accessibility, design systems |
+| `backend-architect` | sonnet | Axum backend design, API reliability |
+| `system-architect` | opus | System-level architecture, long-term decisions |
+| `product-designer` | sonnet | Product design, user flows |
+| `code-reviewer` | sonnet | Code quality, security review |
+| `architect-review` | sonnet | Architecture review, scalability |
+| `debugger` | sonnet | Root cause analysis, error resolution |
+| `technical-writer` | sonnet | Documentation, API references |
 
-```
-.claude/
-├─ settings.local.json      # Permissions Rust étendues (git-ignored)
-├─ agents/
-│  └─ rust-ccboard.md       # Agent expert Rust pour ccboard (workspace, parsers, concurrency)
-├─ skills/
-│  └─ tdd-rust/
-│     └─ SKILL.md          # Workflow TDD Rust (Red-Green-Refactor)
-└─ hooks/
-   └─ bash/
-      └─ pre-commit-format.sh  # Auto-format + clippy avant commits
-```
+## Skills (11)
 
-## Usage
+| Skill | Trigger |
+|-------|---------|
+| `backend-architect` | Backend design requests |
+| `ccboard-remember` | Persist key decisions across sessions |
+| `code-simplifier` | Code cleanup, DRY/KISS improvements |
+| `cybersec` | Security audit, Rust/Axum/WASM |
+| `design-patterns` | Architecture patterns |
+| `issue-triage` | GitHub issue triage and classification |
+| `performance` | Web performance, Core Web Vitals |
+| `pr-triage` | PR review and classification |
+| `security-guardian` | Security-first code review |
+| `ship` | Release and deployment workflows |
+| `tdd-rust` | TDD cycle for Rust (red-green-refactor) |
 
-### Agents
+## Commands (2)
 
-**Invoke Rust expert agent:**
-```
-@rust-ccboard implement extract_metadata function with JSONL streaming
-```
+| Command | Description |
+|---------|-------------|
+| `/diagnose` | Diagnose Rust/Cargo build environment |
+| `/diagram` | Generate architecture diagrams |
 
-L'agent active automatiquement :
-- Patterns spécifiques ccboard (DashMap, parking_lot, graceful degradation)
-- Error handling (anyhow/thiserror)
-- Performance patterns (lazy loading, parallel scanning)
-- Pre-commit checklist automatique
+## Hooks
 
-### Skills
+| Event | Script | Purpose |
+|-------|--------|---------|
+| `SessionStart` | `session-start.sh` | Load Brain context (once per session) |
+| `Stop` | `session-stop.sh` | Save session insights to Brain SQLite DB |
+| `PreToolUse/Bash` | `pre-commit-format.sh` | Run `cargo fmt` before git commit |
+| `Notification` | `notification.sh` | macOS desktop notifications (budget alerts) |
 
-**TDD workflow:**
-```
-/tdd add session metadata extraction
-```
+## Rules
 
-Force le cycle Red-Green-Refactor :
-1. Écrit le test qui échoue
-2. Implémente le code minimal
-3. Refactor
-4. Pre-commit checks
-
-**Équivalent à utiliser le skill global:**
-```
-/rust-expert refactor parser with error handling
-```
-
-### Hooks
-
-Le hook `pre-commit-format.sh` s'exécute automatiquement avant les commits si configuré dans `settings.json` (non-local).
-
-**Pour activer (settings.json globale ou projet) :**
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash.*git commit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/bash/pre-commit-format.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-## Permissions
-
-`settings.local.json` autorise automatiquement :
-- Commandes Cargo (build, test, clippy, fmt, watch)
-- Exécutables ccboard (debug + release)
-- Outils de recherche (rtk, rg, fd)
-- Commandes lecture (ls, cat, head, tail, wc)
-
-## Commandes recommandées
-
-```bash
-# Development avec agent
-claude
-> @rust-ccboard fix parser error handling
-
-# TDD workflow
-claude
-> /tdd implement session metadata
-
-# Quick test
-cargo test -p ccboard-core
-
-# Pre-commit manual
-cargo fmt --all && cargo clippy --all-targets && cargo test --all
-```
-
-## Best Practices
-
-✅ Toujours utiliser `@rust-ccboard` pour le code core (parsers, models, store)
-✅ Utiliser `/tdd` pour nouvelles features avec tests
-✅ Lancer `cargo fmt && cargo clippy` avant chaque commit
-✅ Tests dans `#[cfg(test)] mod tests` (embedded) ou `tests/` (integration)
-
-❌ Éviter `.unwrap()` en production (sauf tests avec `.expect()`)
-❌ Ne pas parser JSONL entier au startup (lazy metadata)
-❌ Ne pas oublier `.context()` avec `?` operator
+- `rust-patterns.md` — idiomatic Rust patterns for this codebase
+- `search-strategy.md` — grep/ripgrep strategies for Rust code navigation

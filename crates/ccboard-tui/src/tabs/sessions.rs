@@ -119,6 +119,8 @@ pub struct SessionsTab {
     session_state: ListState,
     /// Live sessions list state (for scrolling)
     live_sessions_state: ListState,
+    /// Snapshot of waiting sessions (updated during render, used by handle_key)
+    waiting_sessions_cache: Vec<ccboard_core::MergedLiveSession>,
     /// Current focus: Live Sessions (0), Projects (1), or Sessions (2)
     focus: usize,
     /// Cached project list (sorted)
@@ -165,6 +167,13 @@ pub struct SessionsTab {
     prev_session_count: usize,
     /// Vim-style: waiting for second 'g' press
     pending_gg: bool,
+
+    /// When true, only bookmarked sessions are shown
+    show_bookmarks_only: bool,
+    /// Pending high-complexity session: (file_path, total_tool_calls).
+    /// Set when user tries to open a session above the complexity threshold.
+    /// Awaits [Enter] to confirm load or [Esc]/[n] to cancel.
+    complexity_warning: Option<(std::path::PathBuf, usize)>,
 }
 
 impl Default for SessionsTab {
@@ -188,6 +197,7 @@ impl SessionsTab {
             project_state,
             session_state,
             live_sessions_state,
+            waiting_sessions_cache: Vec::new(),
             focus: 1, // Start with Projects focused (1), not Live Sessions (0)
             projects: Vec::new(),
             search_filter: String::new(),
@@ -211,12 +221,57 @@ impl SessionsTab {
             notification_time: None,
             prev_session_count: 0,
             pending_gg: false,
+            show_bookmarks_only: false,
+            complexity_warning: None,
         }
+    }
+
+    /// Set a short notification message (auto-clears after 2s)
+    pub fn set_notification(&mut self, msg: &str) {
+        self.refresh_message = Some(msg.to_string());
+        self.notification_time = Some(Instant::now());
     }
 
     /// Check if replay viewer is currently open
     pub fn is_replay_open(&self) -> bool {
         self.show_replay
+    }
+
+    /// Try to open the replay viewer for a session file.
+    ///
+    /// If the session has more than COMPLEXITY_THRESHOLD tool calls, sets
+    /// `complexity_warning` instead of loading immediately, so the user can
+    /// confirm before the TUI potentially freezes.
+    fn try_open_replay(&mut self, path: std::path::PathBuf, tool_calls: usize) {
+        const COMPLEXITY_THRESHOLD: usize = 2_000;
+        if tool_calls >= COMPLEXITY_THRESHOLD {
+            self.complexity_warning = Some((path, tool_calls));
+            return;
+        }
+        self.do_open_replay(path);
+    }
+
+    /// Unconditionally load and open the replay viewer for a session file.
+    fn do_open_replay(&mut self, path: std::path::PathBuf) {
+        match tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(SessionContentParser::parse_session_lines(&path))
+        }) {
+            Ok(mut messages) => {
+                messages = SessionContentParser::filter_messages(messages);
+                let last = messages.len().saturating_sub(1);
+                self.replay_messages = messages;
+                self.replay_scroll.select(Some(last));
+                self.replay_expanded.clear();
+                self.replay_search_query.clear();
+                self.replay_search_hits.clear();
+                self.replay_search_hit_idx = 0;
+                self.show_replay = true;
+            }
+            Err(e) => {
+                self.error_message = Some(format!("Failed to load session: {}", e));
+            }
+        }
     }
 
     /// Handle key input for this tab
@@ -226,6 +281,22 @@ impl SessionsTab {
         _sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
     ) {
         use crossterm::event::KeyCode;
+
+        // Complexity warning popup has top priority — intercept all keys
+        if self.complexity_warning.is_some() {
+            match key {
+                KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    if let Some((path, _)) = self.complexity_warning.take() {
+                        self.do_open_replay(path);
+                    }
+                }
+                _ => {
+                    // Any other key (Esc, n, q, …) cancels the warning
+                    self.complexity_warning = None;
+                }
+            }
+            return;
+        }
 
         // Replay search mode has priority when replay is open
         if self.replay_search_active {
@@ -333,6 +404,28 @@ impl SessionsTab {
                     self.show_detail = !self.show_detail;
                 }
             }
+            KeyCode::Char('w') => {
+                // Open replay for the first waiting session (shortcut from anywhere)
+                if !self.show_replay {
+                    if let Some(session) = self.waiting_sessions_cache.first() {
+                        let found = session.session_id.as_ref().and_then(|sid| {
+                            _sessions_by_project
+                                .values()
+                                .flat_map(|v| v.iter())
+                                .find(|s| s.id == *sid)
+                                .map(|s| {
+                                    (s.file_path.clone(), s.tool_usage.values().sum::<usize>())
+                                })
+                        });
+                        if let Some((path, tool_calls)) = found {
+                            self.try_open_replay(path, tool_calls);
+                        } else {
+                            self.error_message =
+                                Some("Session file not found in history".to_string());
+                        }
+                    }
+                }
+            }
             KeyCode::Char('e') => {
                 // Open selected session file in editor
                 if self.focus == 2 {
@@ -371,24 +464,9 @@ impl SessionsTab {
                 // Toggle replay viewer for selected session (works from Sessions pane)
                 if self.focus == 2 && !self.show_replay {
                     if let Some(session) = self.get_selected_session(_sessions_by_project) {
-                        // Use block_in_place to safely block within existing runtime
                         let path = session.file_path.clone();
-                        match tokio::task::block_in_place(|| {
-                            tokio::runtime::Handle::current()
-                                .block_on(SessionContentParser::parse_session_lines(&path))
-                        }) {
-                            Ok(mut messages) => {
-                                // Filter to only user/assistant/tool messages
-                                messages = SessionContentParser::filter_messages(messages);
-                                self.replay_messages = messages;
-                                self.replay_scroll.select(Some(0));
-                                self.replay_expanded.clear();
-                                self.show_replay = true;
-                            }
-                            Err(e) => {
-                                self.error_message = Some(format!("Failed to load session: {}", e));
-                            }
-                        }
+                        let tool_calls: usize = session.tool_usage.values().sum();
+                        self.try_open_replay(path, tool_calls);
                     }
                 }
             }
@@ -414,6 +492,18 @@ impl SessionsTab {
                         }
                     }
                 }
+            }
+            KeyCode::Char('B') => {
+                // Toggle bookmarks-only filter
+                self.show_bookmarks_only = !self.show_bookmarks_only;
+                let msg = if self.show_bookmarks_only {
+                    "★ Showing bookmarks only"
+                } else {
+                    "Showing all sessions"
+                };
+                self.refresh_message = Some(msg.to_string());
+                self.notification_time = Some(Instant::now());
+                self.session_state.select(Some(0));
             }
             KeyCode::Char('d') => {
                 // Cycle date filter (works from any pane)
@@ -684,6 +774,7 @@ impl SessionsTab {
         sessions_by_project: &HashMap<String, Vec<Arc<SessionMetadata>>>,
         live_sessions: &[ccboard_core::MergedLiveSession],
         _scheme: ccboard_core::models::config::ColorScheme,
+        store: &ccboard_core::store::DataStore,
     ) {
         let p = Palette::new(_scheme);
 
@@ -750,14 +841,26 @@ impl SessionsTab {
 
         frame.render_widget(search_input, main_chunks[0]);
 
-        // Render live sessions if any — split horizontally when WaitingInput sessions exist
+        // Render live sessions if any — always split horizontally: Live | Waiting Answers
         let content_chunk_idx = if live_height > 0 {
+            let now_local = chrono::Local::now();
             let waiting: Vec<&ccboard_core::MergedLiveSession> = live_sessions
                 .iter()
                 .filter(|s| {
-                    s.effective_status() == ccboard_core::LiveSessionDisplayStatus::WaitingInput
+                    if s.effective_status() != ccboard_core::LiveSessionDisplayStatus::WaitingInput
+                    {
+                        return false;
+                    }
+                    // Ignore stale WaitingInput sessions (hook file not cleaned up on exit)
+                    // Only show sessions with activity in the last 30 minutes
+                    s.last_event_at
+                        .map(|t| now_local.signed_duration_since(t).num_minutes().abs() < 30)
+                        .unwrap_or(false)
                 })
                 .collect();
+
+            // Cache for handle_key access (cloned snapshot)
+            self.waiting_sessions_cache = waiting.iter().map(|s| (*s).clone()).collect();
 
             if !waiting.is_empty() {
                 let live_split = Layout::default()
@@ -858,10 +961,15 @@ impl SessionsTab {
             &all_sessions_vec
         };
 
-        // Filter sessions based on search and date filter (Arc clone is cheap: 8 bytes)
+        // Filter sessions based on search, date filter, and bookmark filter
         let mut sessions: Vec<Arc<SessionMetadata>> = all_sessions
             .iter()
             .filter(|s| {
+                // Apply bookmark filter
+                if self.show_bookmarks_only && !store.is_bookmarked(&s.id) {
+                    return false;
+                }
+
                 // Apply date filter
                 if !self.date_filter.matches(s) {
                     return false;
@@ -927,16 +1035,21 @@ impl SessionsTab {
         }
 
         // Render session list
-        self.render_sessions(frame, chunks[1], &sessions, &p);
+        self.render_sessions(frame, chunks[1], &sessions, &p, store);
 
         // Render detail popup if open
         if self.show_detail && chunks.len() > 2 {
             let selected_session = self.session_state.selected().and_then(|i| sessions.get(i));
-            self.render_detail(frame, chunks[2], selected_session, &p);
+            self.render_detail(frame, chunks[2], selected_session, &p, store);
         }
 
         // Render keyboard hints at bottom
         self.render_keyboard_hints(frame, area, &p);
+
+        // Render complexity warning popup if present
+        if self.complexity_warning.is_some() {
+            self.render_complexity_warning_popup(frame, area, &p);
+        }
 
         // Render error popup if present
         if self.error_message.is_some() {
@@ -1070,9 +1183,30 @@ impl SessionsTab {
                             .as_deref()
                             .map(|m| format!("{}  ", m))
                             .unwrap_or_default();
+                        // Context % bar (only when data is available)
+                        let ctx_str = if proc.context_percent > 0.0 {
+                            let bar_len = 10usize;
+                            let filled =
+                                ((proc.context_percent / 100.0) * bar_len as f64).round() as usize;
+                            let filled = filled.min(bar_len);
+                            let bar: String = "█".repeat(filled) + &"░".repeat(bar_len - filled);
+                            let compact_mark = if proc.compaction_count > 0 {
+                                "⚡"
+                            } else {
+                                " "
+                            };
+                            format!(" Ctx:[{}]{:.0}%{}", bar, proc.context_percent, compact_mark)
+                        } else {
+                            String::new()
+                        };
                         parts.push(format!(
-                            "{}{}CPU:{:.1}% RAM:{}MB Tok:{}",
-                            type_str, model_str, proc.cpu_percent, proc.memory_mb, tokens_str
+                            "{}{}CPU:{:.1}% RAM:{}MB Tok:{}{}",
+                            type_str,
+                            model_str,
+                            proc.cpu_percent,
+                            proc.memory_mb,
+                            tokens_str,
+                            ctx_str
                         ));
                     }
                     parts
@@ -1116,6 +1250,7 @@ impl SessionsTab {
         use chrono::Local;
         use ratatui::style::Color;
 
+        let hint = if waiting.is_empty() { "" } else { " w: view " };
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -1126,7 +1261,8 @@ impl SessionsTab {
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
-            ));
+            ))
+            .title_bottom(Span::styled(hint, Style::default().fg(p.muted)));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -1247,7 +1383,9 @@ impl SessionsTab {
         area: Rect,
         sessions: &[Arc<SessionMetadata>],
         p: &Palette,
+        store: &ccboard_core::store::DataStore,
     ) {
+        use ratatui::style::Color;
         let is_focused = self.focus == 2; // Sessions focus
         let border_color = if is_focused { p.focus } else { p.border };
 
@@ -1272,6 +1410,11 @@ impl SessionsTab {
         // Add sort mode if not default
         if self.sort_mode != SessionSortMode::DateDesc {
             title_parts.push(format!("[{}]", self.sort_mode.display()));
+        }
+
+        // Add bookmark filter indicator
+        if self.show_bookmarks_only {
+            title_parts.push("★".to_string());
         }
 
         let title_prefix = title_parts.join(" ");
@@ -1404,11 +1547,27 @@ impl SessionsTab {
                 let tokens_str = Self::format_tokens(session.total_tokens);
                 let msgs_str = format!("{}msg", session.message_count);
 
+                // Bookmark indicator (star before selection arrow)
+                let is_bookmarked = store.is_bookmarked(&session.id);
+                let bookmark_span = if is_bookmarked {
+                    Span::styled("★ ", Style::default().fg(Color::Yellow))
+                } else {
+                    Span::raw("  ")
+                };
+
                 // Build preview spans with optional highlighting
-                let mut preview_spans = vec![Span::styled(
-                    format!(" {} ", if is_selected { "▶" } else { " " }),
-                    style,
-                )];
+                let badge = session.source_tool.badge();
+                let badge_span = if !badge.is_empty() {
+                    Span::styled(format!("{} ", badge), Style::default().fg(Color::Yellow))
+                } else {
+                    Span::raw("")
+                };
+
+                let mut preview_spans = vec![
+                    bookmark_span,
+                    badge_span,
+                    Span::styled(format!("{} ", if is_selected { "▶" } else { " " }), style),
+                ];
 
                 // Add project prefix if global search is active
                 if self.search_global && self.search_active {
@@ -1425,6 +1584,18 @@ impl SessionsTab {
                     Span::styled(format!("{:>5} ", msgs_str), Style::default().fg(p.success)),
                 ]);
 
+                // Code metrics: show +N-N only when data is available (sessions parsed with v8+ cache)
+                if session.lines_added > 0 || session.lines_removed > 0 {
+                    preview_spans.push(Span::styled(
+                        format!(
+                            "+{}-{} ",
+                            Self::format_short(session.lines_added),
+                            Self::format_short(session.lines_removed)
+                        ),
+                        Style::default().fg(Color::Green),
+                    ));
+                }
+
                 // Add branch if available
                 if let Some(ref branch) = session.branch {
                     let branch_display = if branch.len() > 12 {
@@ -1435,21 +1606,6 @@ impl SessionsTab {
                     preview_spans.push(Span::styled(
                         branch_display,
                         Style::default().fg(p.important),
-                    ));
-                }
-
-                // Add source tool badge for non-Claude sessions
-                if let Some(ref tool) = session.source_tool {
-                    let badge = match tool.as_str() {
-                        "gemini" => "[G] ".to_string(),
-                        "copilot" => "[C] ".to_string(),
-                        other => format!("[{}] ", other.chars().next().unwrap_or('?')),
-                    };
-                    preview_spans.push(Span::styled(
-                        badge,
-                        Style::default()
-                            .fg(ratatui::style::Color::Blue)
-                            .add_modifier(Modifier::BOLD),
                     ));
                 }
 
@@ -1493,6 +1649,7 @@ impl SessionsTab {
         area: Rect,
         session: Option<&Arc<SessionMetadata>>,
         p: &Palette,
+        store: &ccboard_core::store::DataStore,
     ) {
         let block = Block::default()
             .borders(Borders::ALL)
@@ -1582,6 +1739,28 @@ impl SessionsTab {
             ]),
         ]);
 
+        // Code metrics (if available — sessions parsed with cache v8+)
+        if session.lines_added > 0 || session.lines_removed > 0 {
+            let net = session.lines_added as i64 - session.lines_removed as i64;
+            let net_color = if net >= 0 { p.success } else { p.error };
+            lines.push(Line::from(vec![
+                Span::styled("Lines: ", Style::default().fg(p.muted)),
+                Span::styled(
+                    format!("+{}", Self::format_short(session.lines_added)),
+                    Style::default().fg(p.success),
+                ),
+                Span::styled(" / ", Style::default().fg(p.muted)),
+                Span::styled(
+                    format!("-{}", Self::format_short(session.lines_removed)),
+                    Style::default().fg(p.error),
+                ),
+                Span::styled(
+                    format!("  net {}{}", if net >= 0 { "+" } else { "" }, net),
+                    Style::default().fg(net_color),
+                ),
+            ]));
+        }
+
         // Token breakdown (if available)
         if session.input_tokens > 0 || session.output_tokens > 0 {
             lines.push(Line::from(vec![
@@ -1618,35 +1797,102 @@ impl SessionsTab {
             }
         }
 
-        lines.extend(vec![
-            Line::from(vec![
-                Span::styled("File Size: ", Style::default().fg(p.muted)),
-                Span::styled(session.size_display(), Style::default().fg(p.fg)),
-            ]),
-            Line::from(vec![
-                Span::styled("Subagents: ", Style::default().fg(p.muted)),
+        lines.extend(vec![Line::from(vec![
+            Span::styled("File Size: ", Style::default().fg(p.muted)),
+            Span::styled(session.size_display(), Style::default().fg(p.fg)),
+        ])]);
+
+        // Subagent tree: show parent link or children list
+        let children = store.subagent_children(&session.id);
+        if let Some(ref parent_id) = session.parent_session_id {
+            let short_parent = parent_id[..parent_id.len().min(16)].to_string();
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("⤴ Subagent of: ", Style::default().fg(p.muted)),
+                Span::styled(short_parent, Style::default().fg(p.warning)),
+            ]));
+        } else if !children.is_empty() {
+            let child_total_tokens: u64 = children.iter().map(|c| c.total_tokens).sum();
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
                 Span::styled(
-                    if session.has_subagents { "Yes" } else { "No" },
-                    if session.has_subagents {
-                        Style::default().fg(p.success)
-                    } else {
-                        Style::default().fg(p.muted)
-                    },
+                    format!("⤵ Subagents ({}):", children.len()),
+                    Style::default().fg(p.success).bold(),
                 ),
-            ]),
-            Line::from(""),
-            Line::from(vec![
+                Span::styled(
+                    format!("  {} tokens total", Self::format_tokens(child_total_tokens)),
+                    Style::default().fg(p.muted),
+                ),
+            ]));
+            let mut sorted_children = children;
+            sorted_children.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
+            let child_count = sorted_children.len();
+            for (i, child) in sorted_children.iter().take(5).enumerate() {
+                let connector = if i + 1 == child_count.min(5) {
+                    "  └─ "
+                } else {
+                    "  ├─ "
+                };
+                let short_id = child.id[..child.id.len().min(16)].to_string();
+                let msg_count = format!(" {} msgs", child.message_count);
+                let token_str = format!(" {}", Self::format_tokens(child.total_tokens));
+                let model_hint = child
+                    .models_used
+                    .first()
+                    .map(|m| format!(" [{}]", Self::shorten_model_name(m)))
+                    .unwrap_or_default();
+                lines.push(Line::from(vec![
+                    Span::styled(connector, Style::default().fg(p.muted)),
+                    Span::styled(short_id, Style::default().fg(p.focus)),
+                    Span::styled(msg_count, Style::default().fg(p.muted)),
+                    Span::styled(token_str, Style::default().fg(p.warning)),
+                    Span::styled(model_hint, Style::default().fg(p.important)),
+                ]));
+            }
+            if child_count > 5 {
+                lines.push(Line::from(vec![Span::styled(
+                    format!("  … and {} more", child_count - 5),
+                    Style::default().fg(p.muted),
+                )]));
+            }
+        }
+
+        lines.push(Line::from(""));
+
+        // Model switching timeline
+        if !session.model_segments.is_empty() {
+            // Build timeline: "Opus 4.5 (8) → Sonnet 4.5 (15) → Haiku 4.5 (3)"
+            let mut timeline_spans: Vec<Span> =
+                vec![Span::styled("Models: ", Style::default().fg(p.muted))];
+            for (i, (model, count)) in session.model_segments.iter().enumerate() {
+                if i > 0 {
+                    timeline_spans.push(Span::styled(" → ", Style::default().fg(p.muted)));
+                }
+                timeline_spans.push(Span::styled(
+                    Self::shorten_model_name(model),
+                    Style::default().fg(p.important),
+                ));
+                timeline_spans.push(Span::styled(
+                    format!(" ({})", count),
+                    Style::default().fg(p.muted),
+                ));
+            }
+            lines.push(Line::from(timeline_spans));
+        } else if !session.models_used.is_empty() {
+            // Fallback for sessions parsed before model_segments was added
+            lines.push(Line::from(vec![
                 Span::styled("Models: ", Style::default().fg(p.muted)),
                 Span::styled(
-                    if session.models_used.is_empty() {
-                        "unknown".to_string()
-                    } else {
-                        session.models_used.join(", ")
-                    },
+                    session
+                        .models_used
+                        .iter()
+                        .map(|m| Self::shorten_model_name(m))
+                        .collect::<Vec<_>>()
+                        .join(", "),
                     Style::default().fg(p.important),
                 ),
-            ]),
-        ]);
+            ]));
+        }
 
         // Tool usage (top 5 if available)
         if !session.tool_usage.is_empty() {
@@ -1666,6 +1912,46 @@ impl SessionsTab {
                     Span::styled(format!(" ({})", count), Style::default().fg(p.warning)),
                 ]));
             }
+        }
+
+        // Bookmark section — clone to avoid lifetime issues with lines Vec
+        if let Some(entry) = store.bookmark_entry(&session.id) {
+            use ratatui::style::Color;
+            let tag = entry.tag.clone();
+            let note = entry.note.clone();
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("★ Bookmarked: ", Style::default().fg(Color::Yellow).bold()),
+                Span::styled(tag, Style::default().fg(Color::Yellow)),
+            ]));
+            if let Some(note) = note {
+                lines.push(Line::from(vec![
+                    Span::styled("  Note: ", Style::default().fg(p.muted)),
+                    Span::styled(note, Style::default().fg(p.fg)),
+                ]));
+            }
+        }
+
+        // LLM summary (if cached via `ccboard summarize <id>`)
+        if let Some(summary) = store.load_summary(&session.id) {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "AI Summary:",
+                Style::default().fg(p.focus).bold(),
+            )));
+            // Wrap long summary lines at ~60 chars
+            for raw_line in summary.lines().take(12) {
+                lines.push(Line::from(Span::styled(
+                    raw_line.to_string(),
+                    Style::default().fg(p.fg),
+                )));
+            }
+        } else {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "No summary — run: ccboard summarize <id>",
+                Style::default().fg(p.muted),
+            )));
         }
 
         lines.extend(vec![
@@ -1691,6 +1977,38 @@ impl SessionsTab {
             path.to_string()
         } else {
             format!(".../{}", parts[parts.len() - 2..].join("/"))
+        }
+    }
+
+    /// Shorten a full model ID to a compact display name.
+    /// e.g. "claude-opus-4-5-20251101" → "Opus 4.5"
+    fn shorten_model_name(model: &str) -> String {
+        let m = model.to_lowercase();
+        let family = if m.contains("opus") {
+            "Opus"
+        } else if m.contains("sonnet") {
+            "Sonnet"
+        } else if m.contains("haiku") {
+            "Haiku"
+        } else {
+            return model.to_string();
+        };
+        // Extract version number: look for digits like "4-5", "4.5", "4-6"
+        let version = m
+            .split('-')
+            .skip_while(|s| {
+                !s.chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+            })
+            .take(2)
+            .collect::<Vec<_>>()
+            .join(".");
+        if version.is_empty() {
+            family.to_string()
+        } else {
+            format!("{} {}", family, version)
         }
     }
 
@@ -1851,6 +2169,59 @@ impl SessionsTab {
                     Span::styled("Tokens: ", Style::default().fg(p.muted)),
                     Span::styled(Self::format_tokens(tokens), Style::default().fg(p.focus)),
                 ]));
+            }
+
+            // Context window section (shown when transcript data is available)
+            if proc.context_window > 0 {
+                let ctx_color = if proc.context_percent >= 85.0 {
+                    p.error
+                } else if proc.context_percent >= 65.0 {
+                    p.warning
+                } else {
+                    p.success
+                };
+                let bar_len = 20usize;
+                let filled = ((proc.context_percent / 100.0) * bar_len as f64).round() as usize;
+                let filled = filled.min(bar_len);
+                let bar: String = "█".repeat(filled) + &"░".repeat(bar_len - filled);
+                lines.push(Line::from(vec![
+                    Span::styled("Context: ", Style::default().fg(p.muted)),
+                    Span::styled(
+                        format!(
+                            "[{}] {:.1}% of {}K",
+                            bar,
+                            proc.context_percent,
+                            proc.context_window / 1000
+                        ),
+                        Style::default().fg(ctx_color).bold(),
+                    ),
+                ]));
+                if proc.compaction_count > 0 {
+                    lines.push(Line::from(vec![
+                        Span::styled("Compactions: ", Style::default().fg(p.muted)),
+                        Span::styled(
+                            format!(
+                                "⚡ {} (context was reset {} time{})",
+                                proc.compaction_count,
+                                proc.compaction_count,
+                                if proc.compaction_count == 1 { "" } else { "s" }
+                            ),
+                            Style::default().fg(p.warning),
+                        ),
+                    ]));
+                }
+                if proc.turn_count > 0 {
+                    lines.push(Line::from(vec![
+                        Span::styled("Turns: ", Style::default().fg(p.muted)),
+                        Span::styled(proc.turn_count.to_string(), Style::default().fg(p.fg)),
+                    ]));
+                }
+                if let Some(ref task) = proc.current_task {
+                    lines.push(Line::from(vec![
+                        Span::styled("Current: ", Style::default().fg(p.muted)),
+                        Span::styled(task, Style::default().fg(p.focus)),
+                    ]));
+                }
             }
             lines.push(Line::from(""));
         }
@@ -2344,6 +2715,56 @@ impl SessionsTab {
         String::new()
     }
 
+    fn render_complexity_warning_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
+        let Some((_, tool_calls)) = &self.complexity_warning else {
+            return;
+        };
+
+        let popup_width = (area.width as f32 * 0.5).max(50.0) as u16;
+        let popup_height = 9_u16;
+        let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+        let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+        let popup_area = Rect {
+            x: area.x + popup_x,
+            y: area.y + popup_y,
+            width: popup_width,
+            height: popup_height,
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(p.warning))
+            .title(Span::styled(
+                " High Complexity Session ",
+                Style::default().fg(p.warning).bold(),
+            ));
+
+        let inner = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+
+        let lines = vec![
+            Line::from(Span::styled(
+                format!("This session has {} tool calls.", tool_calls),
+                Style::default().fg(p.fg),
+            )),
+            Line::from(Span::styled(
+                "Loading may take a few seconds.",
+                Style::default().fg(p.muted),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("[Enter/y]", Style::default().fg(p.success).bold()),
+                Span::styled(" Load anyway  ", Style::default().fg(p.fg)),
+                Span::styled("[Esc/n]", Style::default().fg(p.error).bold()),
+                Span::styled(" Cancel", Style::default().fg(p.fg)),
+            ]),
+        ];
+
+        let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
+        frame.render_widget(paragraph, inner);
+    }
+
     fn render_error_popup(&self, frame: &mut Frame, area: Rect, p: &Palette) {
         // Center popup (40% width, 30% height)
         let popup_width = (area.width as f32 * 0.4).max(40.0) as u16;
@@ -2432,6 +2853,7 @@ impl SessionsTab {
 
     /// Render refresh notification overlay (bottom banner)
     fn render_keyboard_hints(&self, frame: &mut Frame, area: Rect, p: &Palette) {
+        use ratatui::style::Color;
         // Calculate position at bottom of area
         let hint_area = Rect {
             x: area.x,
@@ -2445,9 +2867,9 @@ impl SessionsTab {
                 // Live Sessions
                 vec![
                     Span::raw(" ["),
-                    Span::styled("Tab", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
-                    Span::styled("cycle focus", Style::default().fg(p.fg)),
+                    Span::styled("switch pane", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
@@ -2458,15 +2880,20 @@ impl SessionsTab {
                     Span::styled("Enter", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("detail", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
+                    Span::raw("["),
+                    Span::styled("w", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
+                    Span::raw("] "),
+                    Span::styled("view waiting", Style::default().fg(p.fg)),
                 ]
             }
             1 => {
                 // Projects
                 vec![
                     Span::raw(" ["),
-                    Span::styled("Tab", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
-                    Span::styled("cycle focus", Style::default().fg(p.fg)),
+                    Span::styled("switch pane", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
@@ -2474,18 +2901,18 @@ impl SessionsTab {
                     Span::styled("navigate", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::styled("w", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
                     Span::raw("] "),
-                    Span::styled("switch pane", Style::default().fg(p.fg)),
+                    Span::styled("view waiting", Style::default().fg(p.fg)),
                 ]
             }
             2 => {
                 // Sessions
                 vec![
                     Span::raw(" ["),
-                    Span::styled("Tab", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::styled("h/l", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
-                    Span::styled("cycle focus", Style::default().fg(p.fg)),
+                    Span::styled("switch pane", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled("↑↓ j/k", Style::default().fg(p.bg).bg(p.focus).bold()),
@@ -2503,9 +2930,9 @@ impl SessionsTab {
                     Span::styled("replay", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
-                    Span::styled("e", Style::default().fg(p.bg).bg(p.focus).bold()),
+                    Span::styled("w", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
                     Span::raw("] "),
-                    Span::styled("edit", Style::default().fg(p.fg)),
+                    Span::styled("view waiting", Style::default().fg(p.fg)),
                     Span::styled(" │ ", Style::default().fg(p.muted)),
                     Span::raw("["),
                     Span::styled("r", Style::default().fg(p.bg).bg(p.focus).bold()),
@@ -2516,6 +2943,16 @@ impl SessionsTab {
                     Span::styled("d", Style::default().fg(p.bg).bg(p.focus).bold()),
                     Span::raw("] "),
                     Span::styled("date filter", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
+                    Span::raw("["),
+                    Span::styled("b", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
+                    Span::raw("] "),
+                    Span::styled("bookmark", Style::default().fg(p.fg)),
+                    Span::styled(" │ ", Style::default().fg(p.muted)),
+                    Span::raw("["),
+                    Span::styled("B", Style::default().fg(p.bg).bg(Color::Yellow).bold()),
+                    Span::raw("] "),
+                    Span::styled("★ only", Style::default().fg(p.fg)),
                 ]
             }
             _ => vec![],
@@ -2737,5 +3174,23 @@ mod tests {
         assert_eq!(text, "Let me read this.");
         assert!(!text.contains("tool_use"));
         assert!(!text.contains("tool_result"));
+    }
+
+    #[test]
+    fn test_shorten_model_name() {
+        assert_eq!(
+            SessionsTab::shorten_model_name("claude-opus-4-5-20251101"),
+            "Opus 4.5"
+        );
+        assert_eq!(
+            SessionsTab::shorten_model_name("claude-sonnet-4-6"),
+            "Sonnet 4.6"
+        );
+        assert_eq!(
+            SessionsTab::shorten_model_name("claude-haiku-4-5-20251001"),
+            "Haiku 4.5"
+        );
+        // Unknown model passes through unchanged
+        assert_eq!(SessionsTab::shorten_model_name("gpt-4o"), "gpt-4o");
     }
 }

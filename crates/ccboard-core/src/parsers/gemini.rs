@@ -18,7 +18,7 @@
 //! Limitations: no token counts, no cost data (not stored locally by Gemini CLI).
 
 use crate::error::LoadReport;
-use crate::models::{ProjectId, SessionId, SessionMetadata};
+use crate::models::{session::SourceTool, ProjectId, SessionId, SessionMetadata};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -152,7 +152,7 @@ impl GeminiParser {
 
         Ok(SessionMetadata {
             id: SessionId::new(session.session_id.clone()),
-            source_tool: Some(GEMINI_SOURCE.to_string()),
+            source_tool: SourceTool::Gemini,
             file_path: path.to_path_buf(),
             project_path,
             first_timestamp: session.start_time,
@@ -164,13 +164,17 @@ impl GeminiParser {
             cache_creation_tokens: 0,
             cache_read_tokens: 0,
             models_used: vec!["gemini".to_string()],
+            model_segments: Vec::new(),
             file_size_bytes,
             first_user_message,
             has_subagents: false,
+            parent_session_id: None,
             duration_seconds: compute_duration(session.start_time, session.last_updated),
             branch: None,
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
+            lines_added: 0,
+            lines_removed: 0,
         })
     }
 
@@ -259,7 +263,7 @@ mod tests {
         let meta = GeminiParser::parse_session_file(&path).unwrap();
 
         assert_eq!(meta.id, "test-session-id");
-        assert_eq!(meta.source_tool, Some("gemini".to_string()));
+        assert_eq!(meta.source_tool, SourceTool::Gemini);
         assert_eq!(meta.message_count, 2); // user + gemini, not info
         assert_eq!(meta.models_used, vec!["gemini"]);
         assert_eq!(meta.project_path.as_ref(), "gemini:abcdef12");

@@ -4,17 +4,19 @@
 //! for stats/settings (better fairness than std::sync::RwLock).
 
 use crate::analytics::{AnalyticsData, Period};
-use crate::cache::{MetadataCache, StoredAlert};
+use crate::bookmarks::BookmarkStore;
+use crate::cache::{ClaudeMemDb, MetadataCache, StoredAlert};
 use crate::error::{CoreError, DegradedState, LoadReport};
-use crate::event::{ConfigScope, DataEvent, EventBus};
+use crate::event::{DataEvent, EventBus};
 use crate::models::activity::ActivitySummary;
 use crate::models::{
-    BillingBlockManager, InvocationStats, MergedConfig, SessionId, SessionMetadata, StatsCache,
+    BillingBlockManager, CcboardConfig, ClaudeMemSummary, InvocationStats, MergedConfig, SessionId,
+    SessionMetadata, StatsCache,
 };
 use crate::parsers::{
-    classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats, CopilotParser,
-    GeminiParser, InvocationParser, McpConfig, Rules, SessionContentParser, SessionIndexParser,
-    SettingsParser, StatsParser,
+    classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats, CodexParser,
+    CopilotParser, CursorParser, GeminiParser, InvocationParser, McpConfig, OpenCodeParser, Rules,
+    SessionContentParser, SessionIndexParser, SettingsParser, StatsParser,
 };
 use dashmap::DashMap;
 use moka::future::Cache;
@@ -55,6 +57,15 @@ impl Default for DataStoreConfig {
     }
 }
 
+/// Per-server MCP usage statistics aggregated from analyzed sessions
+#[derive(Debug, Clone)]
+pub struct McpCallStat {
+    pub server_name: String,
+    pub call_count: usize,
+    pub session_count: usize,
+    pub last_seen: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 /// Central data store for ccboard
 ///
 /// Thread-safe access to all Claude Code data.
@@ -90,6 +101,9 @@ pub struct DataStore {
     /// Analytics data cache (invalidated on stats/sessions update)
     analytics_cache: RwLock<Option<AnalyticsData>>,
 
+    /// Discover pattern analysis cache
+    discover_cache: RwLock<Option<Vec<crate::analytics::DiscoverSuggestion>>>,
+
     /// Session metadata (high contention with many entries)
     /// Arc<SessionMetadata> for cheap cloning (8 bytes vs ~400 bytes)
     ///
@@ -119,6 +133,24 @@ pub struct DataStore {
 
     /// Per-project last session stats from ~/.claude.json
     claude_global_stats: RwLock<Option<ClaudeGlobalStats>>,
+
+    /// Session bookmarks persisted to ~/.ccboard/bookmarks.json
+    bookmark_store: RwLock<BookmarkStore>,
+
+    /// Summary store — reads cached summaries from ~/.ccboard/summaries/
+    summary_store: crate::summaries::SummaryStore,
+
+    /// Path to ~/.ccboard directory
+    ccboard_dir: PathBuf,
+
+    /// ccboard-specific configuration (from ~/.ccboard/config.toml)
+    ccboard_config: RwLock<CcboardConfig>,
+
+    /// Observations loaded from claude-mem (when integration is enabled)
+    claude_mem_summaries: RwLock<Vec<ClaudeMemSummary>>,
+
+    /// Stateful live session monitor with incremental transcript parsing
+    live_monitor_state: parking_lot::Mutex<crate::live_monitor::LiveMonitorState>,
 }
 
 /// Project leaderboard entry with aggregated metrics
@@ -142,6 +174,27 @@ impl DataStore {
             .max_capacity((config.max_session_content_cache_mb * 1024 * 1024 / 1000) as u64) // Rough estimate
             .time_to_idle(Duration::from_secs(300)) // 5 min idle expiry
             .build();
+
+        // Resolve ~/.ccboard dir (sibling of claude_home which is ~/.claude)
+        let ccboard_dir = claude_home
+            .parent()
+            .unwrap_or(&claude_home)
+            .join(".ccboard");
+
+        // Load bookmark store from ~/.ccboard/bookmarks.json
+        let bookmark_store = {
+            let bookmarks_path = ccboard_dir.join("bookmarks.json");
+            match BookmarkStore::load(&bookmarks_path) {
+                Ok(store) => store,
+                Err(e) => {
+                    warn!(error = %e, "Failed to load bookmark store, starting empty");
+                    BookmarkStore::default()
+                }
+            }
+        };
+
+        // Load ccboard config from ~/.ccboard/config.toml
+        let ccboard_config = CcboardConfig::load(&ccboard_dir);
 
         // Create metadata cache in ~/.claude/cache/
         let metadata_cache = {
@@ -169,6 +222,10 @@ impl DataStore {
             invocation_stats: RwLock::new(InvocationStats::new()),
             billing_blocks: RwLock::new(BillingBlockManager::new()),
             analytics_cache: RwLock::new(None),
+            discover_cache: RwLock::new(None),
+            ccboard_dir: ccboard_dir.clone(),
+            ccboard_config: RwLock::new(ccboard_config),
+            claude_mem_summaries: RwLock::new(Vec::new()),
             sessions: DashMap::new(),
             session_content_cache,
             event_bus: EventBus::default_capacity(),
@@ -177,6 +234,11 @@ impl DataStore {
             activity_results: DashMap::new(),
             live_hook_sessions: RwLock::new(crate::hook_state::LiveSessionFile::default()),
             claude_global_stats: RwLock::new(None),
+            bookmark_store: RwLock::new(bookmark_store),
+            summary_store: crate::summaries::SummaryStore::new(&ccboard_dir),
+            live_monitor_state: parking_lot::Mutex::new(
+                crate::live_monitor::LiveMonitorState::new(),
+            ),
         }
     }
 
@@ -224,8 +286,14 @@ impl DataStore {
         // Scan sessions
         self.scan_sessions(&mut report).await;
 
+        // Scan third-party AI tool sessions (Codex, OpenCode, Cursor)
+        self.scan_third_party_sessions(&mut report).await;
+
         // Determine degraded state
         self.update_degraded_state(&report);
+
+        // Load claude-mem session summaries if integration is enabled
+        self.reload_claude_mem_summaries();
 
         // Notify subscribers
         self.event_bus.publish(DataEvent::LoadCompleted);
@@ -238,6 +306,9 @@ impl DataStore {
             errors = report.errors.len(),
             "Initial load complete"
         );
+
+        // Backfill has_subagents after all sessions are indexed
+        self.compute_has_subagents();
 
         report
     }
@@ -390,6 +461,48 @@ impl DataStore {
         debug!(count = self.sessions.len(), "Sessions indexed");
     }
 
+    /// Scan third-party AI tool sessions (Codex, OpenCode, Cursor).
+    ///
+    /// Each parser is skipped silently when its data directory does not exist,
+    /// which is the common case for users who only use Claude Code.
+    async fn scan_third_party_sessions(&self, _report: &mut LoadReport) {
+        // Codex
+        if let Some(codex_dir) = CodexParser::default_path() {
+            if codex_dir.exists() {
+                let sessions = CodexParser::scan(&codex_dir).await;
+                let count = sessions.len();
+                for s in sessions {
+                    self.sessions.insert(s.id.clone(), Arc::new(s));
+                }
+                debug!(count, "Codex sessions indexed");
+            }
+        }
+
+        // OpenCode
+        if let Some(db_path) = OpenCodeParser::default_path() {
+            if db_path.exists() {
+                let sessions = OpenCodeParser::scan(&db_path);
+                let count = sessions.len();
+                for s in sessions {
+                    self.sessions.insert(s.id.clone(), Arc::new(s));
+                }
+                debug!(count, "OpenCode sessions indexed");
+            }
+        }
+
+        // Cursor
+        if let Some(cursor_dir) = CursorParser::default_dir() {
+            if cursor_dir.exists() {
+                let sessions = CursorParser::scan(&cursor_dir);
+                let count = sessions.len();
+                for s in sessions {
+                    self.sessions.insert(s.id.clone(), Arc::new(s));
+                }
+                debug!(count, "Cursor sessions indexed");
+            }
+        }
+    }
+
     /// Update degraded state based on load report
     fn update_degraded_state(&self, report: &LoadReport) {
         let mut state = self.degraded_state.write();
@@ -476,20 +589,20 @@ impl DataStore {
         Some(crate::quota::calculate_quota_status(&stats, budget))
     }
 
-    /// Get live Claude Code sessions (running processes, ps-based)
+    /// Get live Claude Code sessions enriched with incremental transcript data.
     ///
-    /// Detects active Claude processes on the system and returns metadata.
-    /// Returns empty vector if detection fails or no processes are running.
+    /// Uses `LiveMonitorState` to parse only new JSONL bytes since last call —
+    /// O(delta) instead of O(file_size). Returns empty vec if no processes found.
     pub fn live_sessions(&self) -> Vec<crate::live_monitor::LiveSession> {
-        crate::live_monitor::detect_live_sessions().unwrap_or_default()
+        self.live_monitor_state.lock().detect_sessions()
     }
 
-    /// Get merged live sessions: hook data + ps-based fallback
+    /// Get merged live sessions: hook data + ps-based fallback with transcript enrichment.
     ///
     /// Hook sessions are prioritized; unmatched ps sessions appear as ProcessOnly.
     pub fn merged_live_sessions(&self) -> Vec<crate::live_monitor::MergedLiveSession> {
         let hook_file = self.live_hook_sessions.read().clone();
-        let ps_sessions = crate::live_monitor::detect_live_sessions().unwrap_or_default();
+        let ps_sessions = self.live_monitor_state.lock().detect_sessions();
         crate::live_monitor::merge_live_sessions(&hook_file, &ps_sessions)
     }
 
@@ -509,6 +622,68 @@ impl DataStore {
     /// Get per-project last session stats from ~/.claude.json
     pub fn claude_global_stats(&self) -> Option<ClaudeGlobalStats> {
         self.claude_global_stats.read().clone()
+    }
+
+    // ===================
+    // claude-mem integration
+    // ===================
+
+    /// Whether the claude-mem integration is currently enabled
+    pub fn is_claude_mem_enabled(&self) -> bool {
+        self.ccboard_config.read().claude_mem_enabled
+    }
+
+    /// Get a snapshot of claude-mem session summaries (empty if integration is disabled)
+    pub fn claude_mem_summaries(&self) -> Vec<ClaudeMemSummary> {
+        self.claude_mem_summaries.read().clone()
+    }
+
+    /// Get the ccboard configuration (for reading db_path, limit, etc.)
+    pub fn ccboard_config(&self) -> CcboardConfig {
+        self.ccboard_config.read().clone()
+    }
+
+    /// Toggle claude-mem integration on/off, persist to config.toml, and reload/clear observations.
+    ///
+    /// Write lock is held only briefly; disk I/O happens outside the lock.
+    pub fn toggle_claude_mem(&self, enabled: bool) {
+        // 1. Update in memory (brief write lock)
+        {
+            let mut cfg = self.ccboard_config.write();
+            cfg.claude_mem_enabled = enabled;
+        }
+        // 2. Persist to disk (lock released)
+        let cfg = self.ccboard_config.read().clone();
+        if let Err(e) = cfg.save(&self.ccboard_dir) {
+            warn!(error = %e, "Failed to save ccboard config.toml");
+        }
+        // 3. Reload or clear
+        if enabled {
+            self.reload_claude_mem_summaries();
+        } else {
+            self.claude_mem_summaries.write().clear();
+        }
+        info!(enabled, "claude-mem integration toggled");
+    }
+
+    /// Reload claude-mem session summaries from disk (no-op if disabled or DB absent)
+    pub fn reload_claude_mem_summaries(&self) {
+        let cfg = self.ccboard_config.read().clone();
+        if !cfg.claude_mem_enabled {
+            return;
+        }
+        let db = ClaudeMemDb::new(cfg.db_path());
+        if !db.is_available() {
+            debug!(
+                path = %cfg.db_path().display(),
+                "claude-mem DB not found, skipping load"
+            );
+            return;
+        }
+        let summaries = db.load_recent_summaries(cfg.claude_mem_limit);
+        let count = summaries.len();
+        *self.claude_mem_summaries.write() = summaries;
+        debug!(count, "claude-mem summaries loaded");
     }
 
     /// Get session count
@@ -605,9 +780,19 @@ impl DataStore {
             "compute_analytics() ENTRY"
         );
 
+        // Pick up custom anomaly thresholds from merged settings (if configured)
+        let thresholds = self
+            .settings()
+            .global
+            .as_ref()
+            .and_then(|s| s.anomaly_thresholds.clone())
+            .unwrap_or_default();
+
         // Offload to blocking task for CPU-intensive computation
-        let analytics =
-            tokio::task::spawn_blocking(move || AnalyticsData::compute(&sessions, period)).await;
+        let analytics = tokio::task::spawn_blocking(move || {
+            AnalyticsData::compute_with_thresholds(&sessions, period, &thresholds)
+        })
+        .await;
 
         match analytics {
             Ok(data) => {
@@ -622,6 +807,104 @@ impl DataStore {
             }
             Err(e) => {
                 warn!(error = %e, "Failed to compute analytics (task panicked)");
+            }
+        }
+    }
+
+    /// Get cached discover suggestions (None if not yet computed)
+    pub fn discover(&self) -> Option<Vec<crate::analytics::DiscoverSuggestion>> {
+        self.discover_cache.read().clone()
+    }
+
+    /// Extract user messages from recent sessions and run pattern discovery.
+    ///
+    /// Loads JSONL content for up to `max_sessions` most recent sessions,
+    /// extracts user message text, and stores results in `discover_cache`.
+    /// Publishes `DataEvent::AnalyticsUpdated` on completion so the TUI re-renders.
+    pub async fn compute_discover(&self, max_sessions: usize, min_count: usize, top: usize) {
+        let sessions = self.recent_sessions(max_sessions);
+
+        info!(session_count = sessions.len(), "compute_discover() ENTRY");
+
+        let session_data = tokio::task::spawn_blocking(move || {
+            use std::io::BufRead;
+
+            let mut result: Vec<crate::analytics::DiscoverSessionData> = Vec::new();
+            for session in &sessions {
+                let path = session.file_path.clone();
+                let session_id = session.id.as_str().to_string();
+                let project = session.project_path.as_str().to_string();
+
+                let messages: Option<Vec<String>> = (|| {
+                    let file = std::fs::File::open(&path).ok()?;
+                    let reader = std::io::BufReader::new(file);
+                    let mut msgs: Vec<String> = Vec::new();
+                    for line in reader.lines().map_while(|l| l.ok()) {
+                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
+                            if v.get("type").and_then(|t| t.as_str()) == Some("user") {
+                                if let Some(content) =
+                                    v.get("message").and_then(|m| m.get("content"))
+                                {
+                                    let text = match content {
+                                        serde_json::Value::String(s) => s.clone(),
+                                        serde_json::Value::Array(arr) => arr
+                                            .iter()
+                                            .filter_map(|item| {
+                                                if item.get("type").and_then(|t| t.as_str())
+                                                    == Some("text")
+                                                {
+                                                    item.get("text")
+                                                        .and_then(|t| t.as_str())
+                                                        .map(|s| s.to_string())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                            .collect::<Vec<_>>()
+                                            .join(" "),
+                                        _ => continue,
+                                    };
+                                    if !text.trim().is_empty() && text.len() > 10 {
+                                        msgs.push(text);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if msgs.is_empty() {
+                        None
+                    } else {
+                        Some(msgs)
+                    }
+                })();
+
+                if let Some(messages) = messages {
+                    result.push(crate::analytics::DiscoverSessionData {
+                        session_id,
+                        project,
+                        messages,
+                    });
+                }
+            }
+            result
+        })
+        .await;
+
+        match session_data {
+            Ok(data) => {
+                let sessions_analyzed = data.len();
+                let suggestions = crate::analytics::discover_patterns(&data, min_count, top);
+                info!(
+                    sessions_analyzed,
+                    suggestions_count = suggestions.len(),
+                    "compute_discover() completed"
+                );
+                let mut guard = self.discover_cache.write();
+                *guard = Some(suggestions);
+                self.event_bus.publish(DataEvent::AnalyticsUpdated);
+            }
+            Err(e) => {
+                warn!(error = %e, "compute_discover() task panicked");
             }
         }
     }
@@ -777,6 +1060,54 @@ impl DataStore {
         } else {
             vec![]
         }
+    }
+
+    /// Aggregate MCP call stats from all analyzed sessions.
+    ///
+    /// Returns one entry per server that has been called, sorted by
+    /// call_count descending. Servers with 0 calls are omitted.
+    pub fn mcp_call_stats(&self) -> Vec<McpCallStat> {
+        use crate::models::activity::NetworkTool;
+        use std::collections::{HashMap, HashSet};
+
+        let mut stats: HashMap<String, McpCallStat> = HashMap::new();
+
+        for entry in self.activity_results.iter() {
+            let summary = entry.value();
+            let mut servers_in_session: HashSet<String> = HashSet::new();
+
+            for call in &summary.network_calls {
+                if let NetworkTool::McpCall { server } = &call.tool {
+                    let stat = stats.entry(server.clone()).or_insert_with(|| McpCallStat {
+                        server_name: server.clone(),
+                        call_count: 0,
+                        session_count: 0,
+                        last_seen: None,
+                    });
+                    stat.call_count += 1;
+                    match stat.last_seen {
+                        Some(existing) if call.timestamp > existing => {
+                            stat.last_seen = Some(call.timestamp);
+                        }
+                        None => {
+                            stat.last_seen = Some(call.timestamp);
+                        }
+                        _ => {}
+                    }
+                    servers_in_session.insert(server.clone());
+                }
+            }
+
+            for server in servers_in_session {
+                if let Some(stat) = stats.get_mut(&server) {
+                    stat.session_count += 1;
+                }
+            }
+        }
+
+        let mut result: Vec<McpCallStat> = stats.into_values().collect();
+        result.sort_by(|a, b| b.call_count.cmp(&a.call_count));
+        result
     }
 
     /// Consolidated violations feed: merges in-memory DashMap results (freshest) with
@@ -1023,8 +1354,7 @@ impl DataStore {
             *guard = merged;
         }
 
-        self.event_bus
-            .publish(DataEvent::ConfigChanged(ConfigScope::Global));
+        // Note: caller (watcher handle_event) publishes ConfigChanged after this returns.
         debug!("Settings reloaded");
     }
 
@@ -1212,6 +1542,100 @@ impl DataStore {
         let cache_dir = self.claude_home.join("cache");
         prefs.save(&cache_dir)
     }
+
+    // ── Bookmark accessors ───────────────────────────────────────────────────
+
+    /// Returns true if the session is bookmarked
+    pub fn is_bookmarked(&self, session_id: &str) -> bool {
+        self.bookmark_store.read().is_bookmarked(session_id)
+    }
+
+    /// Returns the bookmark entry for a session, if any.
+    /// Cloned to avoid holding the lock across an await point.
+    pub fn bookmark_entry(&self, session_id: &str) -> Option<crate::bookmarks::BookmarkEntry> {
+        self.bookmark_store.read().get(session_id).cloned()
+    }
+
+    /// Toggle bookmark (add with default tag "bookmarked", or remove).
+    /// Returns `true` if the session is now bookmarked.
+    pub fn toggle_bookmark(&self, session_id: &str) -> anyhow::Result<bool> {
+        self.bookmark_store.write().toggle(session_id, "bookmarked")
+    }
+
+    /// Add or update a bookmark with a custom tag and optional note.
+    pub fn upsert_bookmark(
+        &self,
+        session_id: &str,
+        tag: impl Into<String>,
+        note: Option<String>,
+    ) -> anyhow::Result<()> {
+        self.bookmark_store.write().upsert(session_id, tag, note)
+    }
+
+    /// Remove a bookmark explicitly.
+    pub fn remove_bookmark(&self, session_id: &str) -> anyhow::Result<bool> {
+        self.bookmark_store.write().remove(session_id)
+    }
+
+    /// Number of bookmarked sessions
+    pub fn bookmark_count(&self) -> usize {
+        self.bookmark_store.read().len()
+    }
+
+    /// True if a cached LLM summary exists for this session
+    pub fn has_summary(&self, session_id: &str) -> bool {
+        self.summary_store.has_summary(session_id)
+    }
+
+    /// Load cached summary text, or None if not yet generated
+    pub fn load_summary(&self, session_id: &str) -> Option<String> {
+        self.summary_store.load(session_id)
+    }
+
+    /// Returns all direct subagent sessions of the given parent session ID.
+    /// A session is a subagent if its `parent_session_id` == `parent_id`.
+    pub fn subagent_children(&self, parent_id: &str) -> Vec<Arc<SessionMetadata>> {
+        self.sessions
+            .iter()
+            .filter(|entry| {
+                entry
+                    .value()
+                    .parent_session_id
+                    .as_deref()
+                    .map(|pid| pid == parent_id)
+                    .unwrap_or(false)
+            })
+            .map(|entry| Arc::clone(entry.value()))
+            .collect()
+    }
+
+    /// Backfills `has_subagents` on all sessions based on cross-references.
+    /// A session has subagents if any other session has `parent_session_id == this_id`.
+    /// Called once after initial_load() completes.
+    pub fn compute_has_subagents(&self) {
+        // Collect all parent IDs referenced by child sessions
+        let parent_ids: std::collections::HashSet<String> = self
+            .sessions
+            .iter()
+            .filter_map(|entry| entry.value().parent_session_id.clone())
+            .collect();
+
+        if parent_ids.is_empty() {
+            return;
+        }
+
+        // For each session that is referenced as a parent, set has_subagents = true
+        for mut entry in self.sessions.iter_mut() {
+            if parent_ids.contains(entry.value().id.as_str()) {
+                let current: &SessionMetadata = entry.value();
+                let updated = SessionMetadata {
+                    has_subagents: true,
+                    ..current.clone()
+                };
+                *entry.value_mut() = Arc::new(updated);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1293,7 +1717,6 @@ mod tests {
             let total_tokens = 1000 * (i as u64 + 1);
             let session = SessionMetadata {
                 id: format!("test-{}", i).into(),
-                source_tool: None,
                 file_path: std::path::PathBuf::from(format!("/test-{}.jsonl", i)),
                 project_path: "/test".into(),
                 first_timestamp: Some(now - chrono::Duration::days(i)),
@@ -1306,13 +1729,18 @@ mod tests {
                 cache_read_tokens: total_tokens
                     - (total_tokens / 2 + total_tokens / 3 + total_tokens / 10),
                 models_used: vec!["sonnet".to_string()],
+                model_segments: Vec::new(),
                 file_size_bytes: 1024,
                 first_user_message: None,
                 has_subagents: false,
+                parent_session_id: None,
                 duration_seconds: Some(1800),
                 branch: None,
                 tool_usage: std::collections::HashMap::new(),
                 tool_token_usage: std::collections::HashMap::new(),
+                source_tool: Default::default(),
+                lines_added: 0,
+                lines_removed: 0,
             };
             store.sessions.insert(session.id.clone(), Arc::new(session));
         }
@@ -1360,7 +1788,6 @@ mod tests {
         for (id, tokens, model, days_ago) in test_data {
             let session = SessionMetadata {
                 id: id.into(),
-                source_tool: None,
                 file_path: std::path::PathBuf::from(format!("/{}.jsonl", id)),
                 project_path: "/test".into(),
                 first_timestamp: Some(now - chrono::Duration::days(days_ago)),
@@ -1372,13 +1799,18 @@ mod tests {
                 cache_creation_tokens: 0,
                 cache_read_tokens: 0,
                 models_used: vec![model.to_string()],
+                model_segments: Vec::new(),
                 file_size_bytes: 1024,
                 first_user_message: None,
                 has_subagents: false,
+                parent_session_id: None,
                 duration_seconds: Some(1800),
                 branch: None,
                 tool_usage: std::collections::HashMap::new(),
                 tool_token_usage: std::collections::HashMap::new(),
+                source_tool: Default::default(),
+                lines_added: 0,
+                lines_removed: 0,
             };
             store.sessions.insert(session.id.clone(), Arc::new(session));
         }

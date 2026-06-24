@@ -3,6 +3,7 @@
 //! Provides parsers, models, store, and file watcher for Claude Code data.
 
 pub mod analytics;
+pub mod bookmarks;
 pub mod cache;
 pub mod error;
 pub mod event;
@@ -17,6 +18,7 @@ pub mod preferences;
 pub mod pricing;
 pub mod quota;
 pub mod store;
+pub mod summaries;
 pub mod usage_estimator;
 pub mod watcher;
 
@@ -26,7 +28,7 @@ pub use analytics::{
     DiscoverConfig, DiscoverSessionData, DiscoverSuggestion, ForecastData, LlmSuggestion, Period,
     SuggestionCategory, TrendDirection, TrendsData, UsagePatterns,
 };
-pub use cache::{AggregateStats, SearchResult, StoredAlert};
+pub use cache::{AggregateStats, InsightsDb, SearchResult, StoredAlert};
 pub use error::{CoreError, DegradedState, LoadReport};
 pub use event::{DataEvent, EventBus};
 pub use export::{
@@ -39,14 +41,14 @@ pub use hook_state::{
     make_session_key, HookSession, HookSessionStatus, LiveSessionFile, SessionKey,
 };
 pub use live_monitor::{
-    detect_live_sessions, merge_live_sessions, LiveSession, LiveSessionDisplayStatus,
-    MergedLiveSession, SessionType,
+    detect_live_sessions, merge_live_sessions, LiveMonitorState, LiveSession,
+    LiveSessionDisplayStatus, MergedLiveSession, SessionType,
 };
 pub use models::activity::{
     ActivitySummary, Alert, AlertCategory, AlertSeverity, BashCommand, FileAccess, FileOperation,
     NetworkCall, NetworkTool, ToolCall as ActivityToolCall,
 };
 pub use quota::{calculate_quota_status, AlertLevel, QuotaStatus};
-pub use store::{DataStore, ProjectLeaderboardEntry};
+pub use store::{DataStore, McpCallStat, ProjectLeaderboardEntry};
 pub use usage_estimator::{calculate_usage_estimate, SubscriptionPlan, UsageEstimate};
 pub use watcher::FileWatcher;

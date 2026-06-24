@@ -27,7 +27,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["ssr"]
-ssr = ["leptos/ssr", "leptos_axum", "dep:axum", "dep:tower-http", "dep:tokio", "dep:tokio-stream", "dep:tracing", "dep:ccboard-core", "dep:futures", "dep:anyhow", "dep:serde_yaml", "dep:rust-embed", "dep:mime_guess"]
+ssr = ["leptos/ssr", "leptos_axum", "dep:axum", "dep:tower-http", "dep:tokio", "dep:tokio-stream", "dep:tracing", "dep:ccboard-core", "dep:futures", "dep:anyhow", "dep:serde_yaml", "dep:rust-embed", "dep:mime_guess", "dep:dirs"]
 hydrate = ["leptos/hydrate"]
 csr = ["leptos/csr"]
 
@@ -54,6 +54,7 @@ anyhow = { workspace = true, optional = true }
 serde_yaml = { version = "0.9", optional = true }
 rust-embed = { version = "8", optional = true }
 mime_guess = { version = "2", optional = true }
+dirs = { workspace = true, optional = true }
 
 # Client-side only (WASM/Hydrate)
 console_error_panic_hook = "0.1"

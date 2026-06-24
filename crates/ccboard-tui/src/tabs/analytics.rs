@@ -25,8 +25,10 @@ pub enum AnalyticsView {
     Patterns,
     Insights,
     Anomalies,
-    /// Per-tool token usage and cost optimization suggestions (Phase K)
-    Plugins,
+    /// Per-tool token usage and cost optimization suggestions
+    Costs,
+    /// Pattern discovery from session history
+    Discover,
 }
 
 impl AnalyticsView {
@@ -37,20 +39,22 @@ impl AnalyticsView {
             Self::Trends => Self::Patterns,
             Self::Patterns => Self::Insights,
             Self::Insights => Self::Anomalies,
-            Self::Anomalies => Self::Plugins,
-            Self::Plugins => Self::Overview,
+            Self::Anomalies => Self::Costs,
+            Self::Costs => Self::Discover,
+            Self::Discover => Self::Overview,
         }
     }
 
     /// Cycle to previous view
     pub fn prev(self) -> Self {
         match self {
-            Self::Overview => Self::Plugins,
+            Self::Overview => Self::Discover,
             Self::Trends => Self::Overview,
             Self::Patterns => Self::Trends,
             Self::Insights => Self::Patterns,
             Self::Anomalies => Self::Insights,
-            Self::Plugins => Self::Anomalies,
+            Self::Costs => Self::Anomalies,
+            Self::Discover => Self::Costs,
         }
     }
 
@@ -62,7 +66,26 @@ impl AnalyticsView {
             Self::Patterns => "Patterns",
             Self::Insights => "Summary",
             Self::Anomalies => "Anomalies",
-            Self::Plugins => "Plugins",
+            Self::Costs => "Costs",
+            Self::Discover => "Discover",
+        }
+    }
+}
+
+/// State for the Discover sub-view
+#[derive(Debug, Clone)]
+struct DiscoverState {
+    scroll: usize,
+    /// Shared flag: true while async discover task is running.
+    /// Arc<AtomicBool> so the spawned task can clear it without needing &mut self.
+    loading: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Default for DiscoverState {
+    fn default() -> Self {
+        Self {
+            scroll: 0,
+            loading: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 }
@@ -113,6 +136,10 @@ pub struct AnalyticsTab {
     leaderboard_sort: LeaderboardSortColumn,
     /// Leaderboard sort descending
     leaderboard_sort_desc: bool,
+    /// Scroll offset for tool cost breakdown table (Costs view)
+    tool_cost_scroll: usize,
+    /// Discover sub-view state
+    discover: DiscoverState,
 }
 
 impl Default for AnalyticsTab {
@@ -129,6 +156,8 @@ impl AnalyticsTab {
             scroll_offset: 0,
             leaderboard_sort: LeaderboardSortColumn::TotalCost,
             leaderboard_sort_desc: true,
+            tool_cost_scroll: 0,
+            discover: DiscoverState::default(),
         }
     }
 
@@ -146,24 +175,38 @@ impl AnalyticsTab {
     pub fn next_view(&mut self) {
         self.current_view = self.current_view.next();
         self.scroll_offset = 0;
+        self.tool_cost_scroll = 0;
     }
 
     /// Cycle to previous view (Shift+Tab key)
     pub fn prev_view(&mut self) {
         self.current_view = self.current_view.prev();
         self.scroll_offset = 0;
+        self.tool_cost_scroll = 0;
     }
 
     /// Scroll down (j key)
     pub fn scroll_down(&mut self, max_items: usize) {
-        if self.scroll_offset + 10 < max_items {
+        if self.current_view == AnalyticsView::Costs {
+            if self.tool_cost_scroll + 1 < max_items {
+                self.tool_cost_scroll += 1;
+            }
+        } else if self.current_view == AnalyticsView::Discover {
+            self.discover.scroll = self.discover.scroll.saturating_add(1);
+        } else if self.scroll_offset + 10 < max_items {
             self.scroll_offset += 1;
         }
     }
 
     /// Scroll up (k key)
     pub fn scroll_up(&mut self) {
-        if self.scroll_offset > 0 {
+        if self.current_view == AnalyticsView::Costs {
+            if self.tool_cost_scroll > 0 {
+                self.tool_cost_scroll -= 1;
+            }
+        } else if self.current_view == AnalyticsView::Discover {
+            self.discover.scroll = self.discover.scroll.saturating_sub(1);
+        } else if self.scroll_offset > 0 {
             self.scroll_offset -= 1;
         }
     }
@@ -176,6 +219,22 @@ impl AnalyticsTab {
     /// Toggle sort order (r key)
     pub fn toggle_sort_order(&mut self) {
         self.leaderboard_sort_desc = !self.leaderboard_sort_desc;
+    }
+
+    /// Get current view
+    pub fn current_view(&self) -> AnalyticsView {
+        self.current_view
+    }
+
+    /// Mark discover as loading and return a cloned Arc to the loading flag.
+    ///
+    /// The spawned async task uses the returned Arc to clear the flag on completion
+    /// without requiring `&mut self`.
+    pub fn begin_discover_loading(&mut self) -> std::sync::Arc<std::sync::atomic::AtomicBool> {
+        self.discover
+            .loading
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        std::sync::Arc::clone(&self.discover.loading)
     }
 
     /// Render the analytics tab
@@ -207,6 +266,12 @@ impl AnalyticsTab {
 
         self.render_header(frame, chunks[0], analytics, store, &p);
 
+        // Discover view renders independently of analytics data
+        if self.current_view == AnalyticsView::Discover {
+            self.render_discover(frame, chunks[1], store, &p);
+            return;
+        }
+
         match analytics {
             Some(data) => {
                 debug!(
@@ -221,7 +286,8 @@ impl AnalyticsTab {
                     AnalyticsView::Patterns => self.render_patterns(frame, chunks[1], data, &p),
                     AnalyticsView::Insights => self.render_insights(frame, chunks[1], data, &p),
                     AnalyticsView::Anomalies => self.render_anomalies(frame, chunks[1], data, &p),
-                    AnalyticsView::Plugins => self.render_plugins(frame, chunks[1], data, &p),
+                    AnalyticsView::Costs => self.render_costs(frame, chunks[1], data, &p),
+                    AnalyticsView::Discover => unreachable!("handled above"),
                 }
             }
             None => {
@@ -287,7 +353,8 @@ impl AnalyticsTab {
             AnalyticsView::Patterns,
             AnalyticsView::Insights,
             AnalyticsView::Anomalies,
-            AnalyticsView::Plugins,
+            AnalyticsView::Costs,
+            AnalyticsView::Discover,
         ];
         let mut tab_spans: Vec<Span> = Vec::new();
         for (i, view) in views.iter().enumerate() {
@@ -1530,12 +1597,43 @@ impl AnalyticsTab {
         let anomalies = &data.anomalies;
         let daily_spikes = &data.daily_spikes;
         let session_count = data.sessions_in_period;
+        let thresholds = &data.anomaly_thresholds;
 
-        // Split area: daily cost spikes panel (top) + session anomaly table (bottom)
+        // Split area: thresholds hint (1 line) + daily cost spikes (6 lines) + anomaly table (rest)
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(6), Constraint::Min(0)])
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(6),
+                Constraint::Min(0),
+            ])
             .split(area);
+
+        // Render active thresholds hint
+        let is_custom = thresholds.warning_z_score != 2.0
+            || thresholds.critical_z_score != 3.0
+            || thresholds.spike_2x != 2.0
+            || thresholds.spike_3x != 3.0;
+        let hint_style = if is_custom {
+            Style::default().fg(p.important)
+        } else {
+            Style::default().fg(p.muted)
+        };
+        let hint = format!(
+            " Thresholds: warn >{:.1}σ  crit >{:.1}σ  spike ≥{:.1}x/≥{:.1}x  min {} sessions{}",
+            thresholds.warning_z_score,
+            thresholds.critical_z_score,
+            thresholds.spike_2x,
+            thresholds.spike_3x,
+            thresholds.min_sessions,
+            if is_custom { "  [custom]" } else { "" },
+        );
+        frame.render_widget(
+            ratatui::widgets::Paragraph::new(Line::from(Span::styled(hint, hint_style))),
+            chunks[0],
+        );
+
+        let chunks = &chunks[1..];
 
         // Render daily cost spikes panel
         {
@@ -1770,7 +1868,7 @@ impl AnalyticsTab {
     }
 
     /// Render Plugins sub-view: per-tool token usage + cost optimization suggestions
-    fn render_plugins(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
+    fn render_costs(&self, frame: &mut Frame, area: Rect, data: &AnalyticsData, p: &Palette) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -1948,5 +2046,108 @@ impl AnalyticsTab {
 
         let list = List::new(items).block(block);
         frame.render_widget(list, area);
+    }
+
+    /// Render Discover sub-view — pattern discovery from session history
+    fn render_discover(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        store: Option<&Arc<DataStore>>,
+        p: &Palette,
+    ) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(0)])
+            .split(area);
+
+        let suggestions = store.and_then(|s| s.discover());
+        let suggestion_count = suggestions.as_ref().map(|v| v.len()).unwrap_or(0);
+        let is_loading = self
+            .discover
+            .loading
+            .load(std::sync::atomic::Ordering::Relaxed);
+
+        let status_text = if is_loading {
+            " Analyzing session history for patterns... ".to_string()
+        } else if suggestion_count > 0 {
+            format!(
+                " {} suggestions found  [r] re-run  [j/k] scroll ",
+                suggestion_count
+            )
+        } else {
+            " Press [r] to discover recurring patterns in your session history ".to_string()
+        };
+
+        let status_style = if is_loading {
+            Style::default().fg(p.warning)
+        } else {
+            Style::default().fg(p.muted)
+        };
+
+        let status = Paragraph::new(status_text).style(status_style).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title(" Pattern Discovery ")
+                .style(Style::default().fg(p.border).bg(p.surface)),
+        );
+        frame.render_widget(status, chunks[0]);
+
+        let has_results = suggestion_count > 0;
+        if !has_results {
+            let msg = if is_loading {
+                "Scanning session history for recurring patterns..."
+            } else {
+                "No patterns discovered yet. Press [r] to analyze your session history."
+            };
+            let para = Paragraph::new(msg)
+                .style(Style::default().fg(p.muted))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .style(Style::default().fg(p.border).bg(p.surface)),
+                );
+            frame.render_widget(para, chunks[1]);
+        } else if let Some(ref suggestions) = suggestions {
+            let items: Vec<ListItem> = suggestions
+                .iter()
+                .skip(self.discover.scroll)
+                .map(|s| {
+                    let icon = s.category.icon();
+                    let cat = s.category.as_str();
+                    let score_pct = (s.score * 100.0) as u32;
+                    let line = Line::from(vec![
+                        Span::styled(format!("{} ", icon), Style::default().fg(p.focus)),
+                        Span::styled(format!("{:<14} ", cat), Style::default().fg(p.muted)),
+                        Span::styled(
+                            s.pattern.clone(),
+                            Style::default().fg(p.fg).add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(
+                            format!("  ({} sessions, score {}%)", s.session_count, score_pct),
+                            Style::default().fg(p.muted),
+                        ),
+                    ]);
+                    ListItem::new(line)
+                })
+                .collect();
+
+            let list = List::new(items)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Rounded)
+                        .title(format!(
+                            " Suggestions ({}) — [r] re-run  [j/k] scroll ",
+                            suggestion_count
+                        ))
+                        .style(Style::default().fg(p.border).bg(p.surface)),
+                )
+                .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+            frame.render_widget(list, chunks[1]);
+        }
     }
 }

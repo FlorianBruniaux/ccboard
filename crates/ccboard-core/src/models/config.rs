@@ -62,9 +62,53 @@ pub struct Settings {
     #[serde(default)]
     pub keybindings: Option<HashMap<String, String>>,
 
+    /// Anomaly detection thresholds (optional overrides)
+    #[serde(default)]
+    pub anomaly_thresholds: Option<AnomalyThresholds>,
+
+    /// Auto mode permission rules (v2.1.136+)
+    #[serde(default)]
+    pub auto_mode: Option<AutoModeConfig>,
+
+    /// Worktree behaviour (v2.1.133+)
+    #[serde(default)]
+    pub worktree: Option<WorktreeConfig>,
+
+    /// Enterprise: trust all claude.ai MCP servers (v2.1.149)
+    #[serde(rename = "allowAllClaudeAiMcps", default)]
+    pub allow_all_claude_ai_mcps: Option<bool>,
+
     /// Additional untyped fields
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
+}
+
+/// Auto mode permission configuration (v2.1.136+)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoModeConfig {
+    /// Patterns always allowed without user confirmation
+    #[serde(default)]
+    pub allow: Vec<serde_json::Value>,
+    /// Patterns that trigger a soft warning before proceeding
+    #[serde(default)]
+    pub soft_deny: Vec<serde_json::Value>,
+    /// Patterns unconditionally blocked (v2.1.136)
+    #[serde(default)]
+    pub hard_deny: Vec<serde_json::Value>,
+    /// Trusted environment indicators
+    #[serde(default)]
+    pub environment: Vec<serde_json::Value>,
+}
+
+/// Worktree behaviour configuration (v2.1.133+)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeConfig {
+    /// Branch base for new worktrees: "fresh" (default since v2.1.133) or "head"
+    pub base_ref: Option<String>,
+    /// Background isolation mode: "none" or default (v2.1.143)
+    pub bg_isolation: Option<String>,
 }
 
 /// Budget configuration for cost tracking and alerts
@@ -89,6 +133,68 @@ fn default_warning_threshold() -> f64 {
 
 fn default_critical_threshold() -> f64 {
     90.0
+}
+
+/// Configurable thresholds for anomaly detection.
+///
+/// Add an `"anomalyThresholds"` object to `settings.json` to override defaults:
+/// ```json
+/// {
+///   "anomalyThresholds": {
+///     "warningZScore": 2.0,
+///     "criticalZScore": 3.0,
+///     "spike2x": 2.0,
+///     "spike3x": 3.0,
+///     "minSessions": 10
+///   }
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnomalyThresholds {
+    /// Z-score for warning severity (default: 2.0)
+    #[serde(default = "default_anomaly_warning_z")]
+    pub warning_z_score: f64,
+    /// Z-score for critical severity (default: 3.0)
+    #[serde(default = "default_anomaly_critical_z")]
+    pub critical_z_score: f64,
+    /// Daily cost spike ratio for warning (default: 2.0 = 2x average)
+    #[serde(default = "default_spike_2x")]
+    pub spike_2x: f64,
+    /// Daily cost spike ratio for critical (default: 3.0 = 3x average)
+    #[serde(default = "default_spike_3x")]
+    pub spike_3x: f64,
+    /// Minimum sessions required before anomaly detection kicks in (default: 10)
+    #[serde(default = "default_min_sessions")]
+    pub min_sessions: usize,
+}
+
+impl Default for AnomalyThresholds {
+    fn default() -> Self {
+        Self {
+            warning_z_score: default_anomaly_warning_z(),
+            critical_z_score: default_anomaly_critical_z(),
+            spike_2x: default_spike_2x(),
+            spike_3x: default_spike_3x(),
+            min_sessions: default_min_sessions(),
+        }
+    }
+}
+
+fn default_anomaly_warning_z() -> f64 {
+    2.0
+}
+fn default_anomaly_critical_z() -> f64 {
+    3.0
+}
+fn default_spike_2x() -> f64 {
+    2.0
+}
+fn default_spike_3x() -> f64 {
+    3.0
+}
+fn default_min_sessions() -> usize {
+    10
 }
 
 impl Settings {
@@ -175,6 +281,14 @@ pub struct HookDefinition {
     /// Environment variables
     #[serde(default)]
     pub env: Option<HashMap<String, String>>,
+
+    /// Terminal output sequence emitted after hook runs (v2.1.141)
+    #[serde(default)]
+    pub terminal_sequence: Option<String>,
+
+    /// PostToolUse only: continue even if hook exits non-zero (v2.1.120)
+    #[serde(default)]
+    pub continue_on_block: bool,
 
     /// Source file path (not from JSON, populated during scanning)
     #[serde(skip)]

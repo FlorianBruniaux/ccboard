@@ -6,6 +6,77 @@ use crate::sse_hook::{use_sse, SseEvent};
 use crate::utils::export_as_json;
 use leptos::prelude::*;
 use leptos_router::hooks::use_navigate;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct LiveSession {
+    pid: Option<u32>,
+    #[serde(rename = "startTime")]
+    start_time: Option<String>,
+    #[serde(rename = "workingDirectory")]
+    working_directory: Option<String>,
+    #[serde(rename = "cpuPercent")]
+    cpu_percent: Option<f64>,
+    #[serde(rename = "memoryMb")]
+    memory_mb: Option<f64>,
+    tokens: Option<u64>,
+    #[serde(rename = "sessionId")]
+    session_id: Option<String>,
+    #[serde(rename = "sessionName")]
+    session_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct LiveSessionsResponse {
+    sessions: Vec<LiveSession>,
+    total: u64,
+    #[serde(default)]
+    truncated: bool,
+}
+
+async fn fetch_live_sessions() -> Result<LiveSessionsResponse, String> {
+    let response = gloo_net::http::Request::get("/api/sessions/live")
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?;
+
+    if !response.ok() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+
+    response
+        .json::<LiveSessionsResponse>()
+        .await
+        .map_err(|e| format!("Parse error: {e}"))
+}
+
+fn project_name(working_dir: &Option<String>) -> String {
+    working_dir
+        .as_deref()
+        .and_then(|p| p.rsplit('/').next())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+fn elapsed(start_time: &Option<String>) -> String {
+    let Some(ts) = start_time else {
+        return String::new();
+    };
+    let Ok(start) = chrono::DateTime::parse_from_rfc3339(ts) else {
+        return String::new();
+    };
+    let now = chrono::Utc::now();
+    let secs = (now - start.with_timezone(&chrono::Utc))
+        .num_seconds()
+        .max(0) as u64;
+    if secs < 60 {
+        format!("{secs}s")
+    } else if secs < 3600 {
+        format!("{}m{}s", secs / 60, secs % 60)
+    } else {
+        format!("{}h{}m", secs / 3600, (secs % 3600) / 60)
+    }
+}
 
 /// Dashboard page - main overview with live stats
 #[component]
@@ -22,6 +93,29 @@ pub fn Dashboard() -> impl IntoView {
         let _ = stats_version.get(); // Track this to trigger refetch
         async move { fetch_recent_sessions(5).await }
     });
+
+    // Live sessions — auto-refresh every 5s
+    let (live_version, set_live_version) = signal(0u32);
+    let live_sessions = LocalResource::new(move || {
+        let _ = live_version.get();
+        async move { fetch_live_sessions().await }
+    });
+
+    // setInterval every 5s to refresh live sessions
+    {
+        use wasm_bindgen::JsCast;
+        let cb = wasm_bindgen::closure::Closure::wrap(Box::new(move || {
+            set_live_version.update(|v| *v += 1);
+        }) as Box<dyn Fn()>);
+        web_sys::window()
+            .unwrap()
+            .set_interval_with_callback_and_timeout_and_arguments_0(
+                cb.as_ref().unchecked_ref(),
+                5_000,
+            )
+            .unwrap();
+        cb.forget();
+    }
 
     // Toast notifications
     let toast = use_toast();
@@ -189,6 +283,63 @@ pub fn Dashboard() -> impl IntoView {
                                             height=100
                                             label="Token Usage - Last 30 Days".to_string()
                                         />
+                                    </div>
+
+                                    // Live sessions panel
+                                    <div class="live-sessions-section">
+                                        <div class="live-sessions-header">
+                                            <h3>
+                                                {move || {
+                                                    let count = live_sessions.get()
+                                                        .and_then(|r| r.as_ref().ok().map(|d| d.total))
+                                                        .unwrap_or(0);
+                                                    if count > 0 {
+                                                        view! {
+                                                            <span>
+                                                                <span class="live-dot live-dot--active"></span>
+                                                                {format!("Live Sessions ({})", count)}
+                                                            </span>
+                                                        }.into_any()
+                                                    } else {
+                                                        view! {
+                                                            <span>
+                                                                <span class="live-dot"></span>
+                                                                "Live Sessions"
+                                                            </span>
+                                                        }.into_any()
+                                                    }
+                                                }}
+                                            </h3>
+                                        </div>
+                                        {move || live_sessions.get().map(|result| match &*result {
+                                            Ok(data) if data.sessions.is_empty() => view! {
+                                                <p class="live-sessions-empty">{"No active Claude sessions detected."}</p>
+                                            }.into_any(),
+                                            Ok(data) => {
+                                                let sessions = data.sessions.clone();
+                                                view! {
+                                                    <div class="live-sessions-list">
+                                                        {sessions.into_iter().map(|s| {
+                                                            let project = project_name(&s.working_directory);
+                                                            let time_elapsed = elapsed(&s.start_time);
+                                                            let tokens = s.tokens.unwrap_or(0);
+                                                            let cpu = s.cpu_percent.unwrap_or(0.0);
+                                                            let mem = s.memory_mb.unwrap_or(0.0);
+                                                            view! {
+                                                                <div class="live-session-row">
+                                                                    <span class="live-session-project">{project}</span>
+                                                                    <span class="live-session-elapsed">{time_elapsed}</span>
+                                                                    <span class="live-session-tokens">{format_number(tokens)} " tok"</span>
+                                                                    <span class="live-session-cpu">{format!("{cpu:.0}%")} " CPU"</span>
+                                                                    <span class="live-session-mem">{format!("{mem:.0} MB")}</span>
+                                                                </div>
+                                                            }
+                                                        }).collect_view()}
+                                                    </div>
+                                                }.into_any()
+                                            },
+                                            Err(_) => view! { <p class="live-sessions-empty">{"—"}</p> }.into_any(),
+                                        })}
                                     </div>
 
                                     <div class="recent-sessions-section">

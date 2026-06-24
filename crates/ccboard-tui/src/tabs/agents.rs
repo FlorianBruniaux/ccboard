@@ -21,8 +21,21 @@ pub struct AgentEntry {
     pub file_path: String,
     pub description: Option<String>,
     pub entry_type: AgentType,
-    /// Number of times this agent/command/skill has been invoked (TODO: implement counting)
+    /// Number of times this agent/command/skill has been invoked across all sessions
     pub invocation_count: usize,
+    // Frontmatter fields parsed from YAML header
+    /// Tools this entry is allowed to use
+    pub allowed_tools: Vec<String>,
+    /// Tools explicitly blocked (v2.1.152)
+    pub disallowed_tools: Vec<String>,
+    /// Execution context: "fork" runs skill in isolated subagent (v2.1.150)
+    pub context_mode: Option<String>,
+    /// Effort hint: low/medium/high/xhigh (v2.1.146)
+    pub effort: Option<String>,
+    /// Skills inherited by subagents spawned from this agent (v2.1.142)
+    pub skills: Vec<String>,
+    /// Whether the skill content uses ${CLAUDE_EFFORT} variable (v2.1.120)
+    pub uses_effort_var: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,6 +69,184 @@ impl AgentType {
             AgentType::Skill => Color::Rgb(220, 175, 60), // p.warning
         }
     }
+}
+
+/// Result type from a blocking directory scan: (agents, commands, skills).
+pub type ScanResult = (Vec<AgentEntry>, Vec<AgentEntry>, Vec<AgentEntry>);
+
+/// Scan all agent/command/skill directories using blocking std::fs I/O.
+///
+/// Must be called from `tokio::task::spawn_blocking` — never on the async executor thread.
+/// With 45+ symlinked skill directories the blocking syscalls are enough to stall the
+/// tokio runtime and fill the broadcast channel (capacity 256), causing a deadlock.
+pub fn scan_all_blocking(claude_home: &Path, project_path: Option<&Path>) -> ScanResult {
+    let mut agents = Vec::new();
+    let mut commands = Vec::new();
+    let mut skills = Vec::new();
+
+    for base in [Some(claude_home), project_path].into_iter().flatten() {
+        collect_subdir(base, "agents", AgentType::Agent, &mut agents);
+        collect_subdir(base, "commands", AgentType::Command, &mut commands);
+        collect_subdir(base, "skills", AgentType::Skill, &mut skills);
+    }
+
+    agents.sort_by(|a, b| a.name.cmp(&b.name));
+    commands.sort_by(|a, b| a.name.cmp(&b.name));
+    skills.sort_by(|a, b| a.name.cmp(&b.name));
+
+    (agents, commands, skills)
+}
+
+fn collect_subdir(base: &Path, subdir: &str, entry_type: AgentType, out: &mut Vec<AgentEntry>) {
+    let dir = base.join(subdir);
+    if dir.exists() {
+        collect_recursive(&dir, entry_type, out);
+    }
+}
+
+fn collect_recursive(dir: &Path, entry_type: AgentType, out: &mut Vec<AgentEntry>) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if path.is_file() && path.extension().is_some_and(|e| e == "md") {
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("README") || n.starts_with("_README"))
+            {
+                continue;
+            }
+            let name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let fm = parse_frontmatter(&path);
+            out.push(AgentEntry {
+                name,
+                file_path: path.display().to_string(),
+                description: fm.description,
+                entry_type,
+                invocation_count: 0,
+                allowed_tools: fm.allowed_tools,
+                disallowed_tools: fm.disallowed_tools,
+                context_mode: fm.context_mode,
+                effort: fm.effort,
+                skills: fm.skills,
+                uses_effort_var: fm.uses_effort_var,
+            });
+        } else if path.is_dir() {
+            let skill_md = path.join("SKILL.md");
+            if skill_md.exists() {
+                let name = path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let fm = parse_frontmatter(&skill_md);
+                out.push(AgentEntry {
+                    name,
+                    file_path: skill_md.display().to_string(),
+                    description: fm.description,
+                    entry_type,
+                    invocation_count: 0,
+                    allowed_tools: fm.allowed_tools,
+                    disallowed_tools: fm.disallowed_tools,
+                    context_mode: fm.context_mode,
+                    effort: fm.effort,
+                    skills: fm.skills,
+                    uses_effort_var: fm.uses_effort_var,
+                });
+            } else {
+                collect_recursive(&path, entry_type, out);
+            }
+        }
+    }
+}
+
+/// Parsed frontmatter fields from a skill/agent/command .md file
+struct Frontmatter {
+    description: Option<String>,
+    allowed_tools: Vec<String>,
+    disallowed_tools: Vec<String>,
+    context_mode: Option<String>,
+    effort: Option<String>,
+    skills: Vec<String>,
+    uses_effort_var: bool,
+}
+
+fn parse_frontmatter(path: &Path) -> Frontmatter {
+    let mut fm = Frontmatter {
+        description: None,
+        allowed_tools: Vec::new(),
+        disallowed_tools: Vec::new(),
+        context_mode: None,
+        effort: None,
+        skills: Vec::new(),
+        uses_effort_var: false,
+    };
+
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return fm,
+    };
+
+    if !content.starts_with("---") {
+        return fm;
+    }
+    let parts: Vec<&str> = content.splitn(3, "---").collect();
+    if parts.len() < 3 {
+        return fm;
+    }
+
+    let yaml_block = parts[1];
+
+    // Check if body uses ${CLAUDE_EFFORT}
+    fm.uses_effort_var = parts
+        .get(2)
+        .map_or(false, |body| body.contains("${CLAUDE_EFFORT}"));
+
+    for line in yaml_block.lines() {
+        let line = line.trim();
+
+        if let Some(v) = scalar_value(line, "description:") {
+            fm.description = Some(v);
+        } else if let Some(v) = scalar_value(line, "context:") {
+            fm.context_mode = Some(v);
+        } else if let Some(v) = scalar_value(line, "effort:") {
+            fm.effort = Some(v);
+        } else if let Some(v) = scalar_value(line, "allowed-tools:") {
+            fm.allowed_tools = split_tools(&v);
+        } else if let Some(v) = scalar_value(line, "disallowed-tools:") {
+            fm.disallowed_tools = split_tools(&v);
+        } else if let Some(v) = scalar_value(line, "skills:") {
+            fm.skills = split_tools(&v);
+        }
+        // List items for allowed-tools / disallowed-tools / skills
+        else if line.starts_with("- ") {
+            // We can't know which field we're under without tracking state,
+            // so skip bare list items — scalar parsing covers the common inline format.
+        }
+    }
+
+    fm
+}
+
+fn scalar_value<'a>(line: &'a str, key: &str) -> Option<String> {
+    let val = line.strip_prefix(key)?.trim();
+    Some(val.trim_matches('"').trim_matches('\'').to_string())
+}
+
+fn split_tools(raw: &str) -> Vec<String> {
+    raw.split([',', ' '])
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
 }
 
 /// Agents tab state
@@ -113,47 +304,102 @@ impl AgentsTab {
         }
     }
 
-    /// Scan directories for agents/commands/skills
-    pub fn scan_directories(&mut self, claude_home: &Path, project_path: Option<&Path>) {
-        self.agents.clear();
-        self.commands.clear();
-        self.skills.clear();
-
-        // Scan global and project directories
-        let dirs_to_scan: Vec<&Path> = [Some(claude_home), project_path]
-            .into_iter()
-            .flatten()
-            .collect();
-
-        for base_dir in dirs_to_scan {
-            self.scan_directory(base_dir, "agents", AgentType::Agent);
-            self.scan_directory(base_dir, "commands", AgentType::Command);
-            self.scan_directory(base_dir, "skills", AgentType::Skill);
-        }
-
-        // Sort all lists by name initially (will be re-sorted by usage later if stats available)
-        self.agents.sort_by(|a, b| a.name.cmp(&b.name));
-        self.commands.sort_by(|a, b| a.name.cmp(&b.name));
-        self.skills.sort_by(|a, b| a.name.cmp(&b.name));
+    /// Apply pre-scanned directory results (produced by `scan_all_blocking`).
+    pub fn apply_scanned(
+        &mut self,
+        agents: Vec<AgentEntry>,
+        commands: Vec<AgentEntry>,
+        skills: Vec<AgentEntry>,
+    ) {
+        self.agents = agents;
+        self.commands = commands;
+        self.skills = skills;
     }
 
     /// Update invocation counts from stats and sort by usage
     pub fn update_invocation_counts(&mut self, stats: &ccboard_core::models::InvocationStats) {
-        // Update agent counts
+        // Update counts for entries that have local frontmatter files
         for agent in &mut self.agents {
             agent.invocation_count = stats.agents.get(&agent.name).copied().unwrap_or(0);
         }
-
-        // Update command counts (need to add / prefix for matching)
         for command in &mut self.commands {
             let key = format!("/{}", command.name);
             command.invocation_count = stats.commands.get(&key).copied().unwrap_or(0);
         }
-
-        // Update skill counts
         for skill in &mut self.skills {
             skill.invocation_count = stats.skills.get(&skill.name).copied().unwrap_or(0);
         }
+
+        // Add entries discovered from sessions that have no local frontmatter file.
+        // Collect new entries first (borrow checker: can't borrow self.* mutably while iterating it).
+        let known_agents: std::collections::HashSet<String> =
+            self.agents.iter().map(|a| a.name.clone()).collect();
+        let new_agents: Vec<AgentEntry> = stats
+            .agents
+            .iter()
+            .filter(|(name, &count)| !known_agents.contains(*name) && count > 0)
+            .map(|(name, &count)| AgentEntry {
+                name: name.clone(),
+                file_path: String::new(),
+                description: Some("Discovered from sessions".to_string()),
+                entry_type: AgentType::Agent,
+                invocation_count: count,
+                allowed_tools: Vec::new(),
+                disallowed_tools: Vec::new(),
+                context_mode: None,
+                effort: None,
+                skills: Vec::new(),
+                uses_effort_var: false,
+            })
+            .collect();
+        self.agents.extend(new_agents);
+
+        let known_commands: std::collections::HashSet<String> = self
+            .commands
+            .iter()
+            .map(|c| format!("/{}", c.name))
+            .collect();
+        let new_commands: Vec<AgentEntry> = stats
+            .commands
+            .iter()
+            .filter(|(key, &count)| !known_commands.contains(*key) && count > 0)
+            .map(|(key, &count)| AgentEntry {
+                name: key.strip_prefix('/').unwrap_or(key).to_string(),
+                file_path: String::new(),
+                description: Some("Discovered from sessions".to_string()),
+                entry_type: AgentType::Command,
+                invocation_count: count,
+                allowed_tools: Vec::new(),
+                disallowed_tools: Vec::new(),
+                context_mode: None,
+                effort: None,
+                skills: Vec::new(),
+                uses_effort_var: false,
+            })
+            .collect();
+        self.commands.extend(new_commands);
+
+        let known_skills: std::collections::HashSet<String> =
+            self.skills.iter().map(|s| s.name.clone()).collect();
+        let new_skills: Vec<AgentEntry> = stats
+            .skills
+            .iter()
+            .filter(|(name, &count)| !known_skills.contains(*name) && count > 0)
+            .map(|(name, &count)| AgentEntry {
+                name: name.clone(),
+                file_path: String::new(),
+                description: Some("Discovered from sessions".to_string()),
+                entry_type: AgentType::Skill,
+                invocation_count: count,
+                allowed_tools: Vec::new(),
+                disallowed_tools: Vec::new(),
+                context_mode: None,
+                effort: None,
+                skills: Vec::new(),
+                uses_effort_var: false,
+            })
+            .collect();
+        self.skills.extend(new_skills);
 
         // Sort by usage (descending), then by name (ascending) as tie-breaker
         self.agents.sort_by(|a, b| {
@@ -171,117 +417,6 @@ impl AgentsTab {
                 .cmp(&a.invocation_count)
                 .then(a.name.cmp(&b.name))
         });
-    }
-
-    fn scan_directory(&mut self, base: &Path, subdir: &str, entry_type: AgentType) {
-        let dir = base.join(subdir);
-        if !dir.exists() {
-            return;
-        }
-
-        self.scan_recursive(&dir, entry_type);
-    }
-
-    fn scan_recursive(&mut self, dir: &Path, entry_type: AgentType) {
-        let entries = match std::fs::read_dir(dir) {
-            Ok(e) => e,
-            Err(_) => return,
-        };
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-
-            // Case 1: Direct .md file
-            if path.is_file() && path.extension().is_some_and(|e| e == "md") {
-                // Skip README files
-                if path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("README") || n.starts_with("_README"))
-                {
-                    continue;
-                }
-
-                let name = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-
-                let description = Self::extract_description(&path);
-
-                let target_list = match entry_type {
-                    AgentType::Agent => &mut self.agents,
-                    AgentType::Command => &mut self.commands,
-                    AgentType::Skill => &mut self.skills,
-                };
-
-                target_list.push(AgentEntry {
-                    name,
-                    file_path: path.display().to_string(),
-                    description,
-                    entry_type,
-                    invocation_count: 0, // TODO: implement counting from sessions
-                });
-            }
-            // Case 2: Directory containing SKILL.md (standard skill format)
-            else if path.is_dir() {
-                let skill_md = path.join("SKILL.md");
-                if skill_md.exists() {
-                    let name = path
-                        .file_name()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("unknown")
-                        .to_string();
-
-                    let description = Self::extract_description(&skill_md);
-
-                    let target_list = match entry_type {
-                        AgentType::Agent => &mut self.agents,
-                        AgentType::Command => &mut self.commands,
-                        AgentType::Skill => &mut self.skills,
-                    };
-
-                    target_list.push(AgentEntry {
-                        name,
-                        file_path: skill_md.display().to_string(),
-                        description,
-                        entry_type,
-                        invocation_count: 0, // TODO: implement counting from sessions
-                    });
-                } else {
-                    // Case 3: Directory without SKILL.md → scan recursively for .md files
-                    self.scan_recursive(&path, entry_type);
-                }
-            }
-        }
-    }
-
-    fn extract_description(path: &Path) -> Option<String> {
-        let content = std::fs::read_to_string(path).ok()?;
-
-        // Simple frontmatter extraction: look for description field
-        if !content.starts_with("---") {
-            return None;
-        }
-
-        let parts: Vec<&str> = content.splitn(3, "---").collect();
-        if parts.len() < 3 {
-            return None;
-        }
-
-        let frontmatter = parts[1];
-        for line in frontmatter.lines() {
-            let line = line.trim();
-            if line.starts_with("description:") {
-                let desc = line.strip_prefix("description:")?.trim();
-                // Remove quotes if present
-                let desc = desc.trim_matches('"').trim_matches('\'');
-                return Some(desc.to_string());
-            }
-        }
-
-        None
     }
 
     /// Handle key input
@@ -614,7 +749,7 @@ impl AgentsTab {
             })
             .unwrap_or_else(|_| "Unable to read file".to_string());
 
-        let lines = vec![
+        let mut lines = vec![
             Line::from(vec![
                 Span::styled("Name: ", Style::default().fg(p.muted)),
                 Span::styled(
@@ -637,19 +772,80 @@ impl AgentsTab {
                 Style::default().fg(p.fg),
             )),
             Line::from(""),
-            Line::from(Span::styled(
-                "Content preview:",
-                Style::default().fg(p.muted),
-            )),
-            Line::from(Span::styled(
-                if content_preview.len() >= 500 {
-                    format!("{}...", content_preview)
-                } else {
-                    content_preview
-                },
-                Style::default().fg(p.muted),
-            )),
         ];
+
+        // Frontmatter metadata rows — only shown when the entry has parsed data
+        if !entry.allowed_tools.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Tools: ", Style::default().fg(p.muted)),
+                Span::styled(entry.allowed_tools.join(", "), Style::default().fg(p.fg)),
+            ]));
+        }
+
+        if !entry.disallowed_tools.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Blocked: ", Style::default().fg(p.muted)),
+                Span::styled(
+                    entry.disallowed_tools.join(", "),
+                    Style::default().fg(p.error),
+                ),
+            ]));
+        }
+
+        if let Some(ref mode) = entry.context_mode {
+            let mut mode_spans = vec![Span::styled("Context: ", Style::default().fg(p.muted))];
+            if mode == "fork" {
+                mode_spans.push(Span::styled("fork", Style::default().fg(p.focus).bold()));
+            } else {
+                mode_spans.push(Span::styled(mode.as_str(), Style::default().fg(p.fg)));
+            }
+            lines.push(Line::from(mode_spans));
+        }
+
+        if let Some(ref effort) = entry.effort {
+            lines.push(Line::from(vec![
+                Span::styled("Effort: ", Style::default().fg(p.muted)),
+                Span::styled(effort.as_str(), Style::default().fg(p.fg)),
+            ]));
+        }
+
+        if !entry.skills.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Skills: ", Style::default().fg(p.muted)),
+                Span::styled(entry.skills.join(", "), Style::default().fg(p.fg)),
+            ]));
+        }
+
+        if entry.uses_effort_var {
+            lines.push(Line::from(Span::styled(
+                "uses $EFFORT",
+                Style::default().fg(p.muted).italic(),
+            )));
+        }
+
+        // Separate metadata from content preview only if we added any metadata rows
+        let has_metadata = !entry.allowed_tools.is_empty()
+            || !entry.disallowed_tools.is_empty()
+            || entry.context_mode.is_some()
+            || entry.effort.is_some()
+            || !entry.skills.is_empty()
+            || entry.uses_effort_var;
+        if has_metadata {
+            lines.push(Line::from(""));
+        }
+
+        lines.push(Line::from(Span::styled(
+            "Content preview:",
+            Style::default().fg(p.muted),
+        )));
+        lines.push(Line::from(Span::styled(
+            if content_preview.len() >= 500 {
+                format!("{}...", content_preview)
+            } else {
+                content_preview
+            },
+            Style::default().fg(p.muted),
+        )));
 
         let detail = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(detail, inner);

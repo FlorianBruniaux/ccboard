@@ -36,13 +36,18 @@ fn generate_test_sessions(count: usize, days: usize) -> Vec<Arc<SessionMetadata>
                 cache_creation_tokens: 0,
                 cache_read_tokens: 0,
                 models_used: vec!["sonnet".to_string()],
+                model_segments: Vec::new(),
                 file_size_bytes: 1024 * (i as u64 + 1),
                 first_user_message: None,
                 has_subagents: false,
+                parent_session_id: None,
                 tool_usage: std::collections::HashMap::new(),
                 tool_token_usage: std::collections::HashMap::new(),
                 duration_seconds: Some(1800),
                 branch: None,
+                source_tool: Default::default(),
+                lines_added: 0,
+                lines_removed: 0,
             })
         })
         .collect()

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **ccboard** is a unified dashboard for Claude Code management, providing both TUI and web interfaces from a single binary to visualize sessions, stats, configuration, hooks, agents, costs, and history from `~/.claude` directories.
 
-**Stack**: Rust workspace with 4 crates, Ratatui (11-tab TUI), Axum (Web API backend), Leptos (WASM frontend), Arc + parking_lot for concurrency.
+**Stack**: Rust workspace with 4 crates, Ratatui (13-tab TUI), Axum (Web API backend), Leptos (WASM frontend), Arc + parking_lot for concurrency.
 
 ## Workspace Architecture
 
@@ -15,7 +15,7 @@ This is a Cargo workspace with a layered architecture:
 ```
 ccboard/                     # Root binary - CLI entry point
 ├─ ccboard-core/             # Shared data layer (parsers, models, store, watcher)
-├─ ccboard-tui/              # Ratatui frontend (11 tabs)
+├─ ccboard-tui/              # Ratatui frontend (13 tabs)
 └─ ccboard-web/              # Axum API backend + Leptos WASM frontend
 ```
 
@@ -186,6 +186,7 @@ ccboard reads from `~/.claude` and optional project `.claude/`:
 | Tasks | `~/.claude/tasks/<list-id>/<task-id>.json` | `TaskParser` | JSON |
 | Agents/Commands/Skills | `.claude/{agents,commands,skills}/*.md` | Frontmatter | YAML + Markdown |
 | Hooks | `.claude/hooks/bash/*.sh` | `HooksParser` | Shell scripts |
+| Insights | `~/.ccboard/insights.db` | `InsightsDb` | SQLite WAL (written by hooks, read by Rust) |
 
 **Settings merge priority**: local > project > global > defaults
 
@@ -193,12 +194,12 @@ ccboard reads from `~/.claude` and optional project `.claude/`:
 
 Located in `ccboard-tui/src/`:
 
-- **11 tabs**: Dashboard, Sessions, Config, Hooks, Agents/Capabilities, Costs, History, MCP, Analytics, Activity, Search
+- **13 tabs**: Dashboard, Sessions, Config, Hooks, Agents/Capabilities, Costs, History, MCP, Analytics, Activity, Search, Plugins, Brain
 - **Key bindings**: `Tab`/`Shift+Tab` (nav tabs), `j/k` (nav lists), `Enter` (detail), `/` (search), `r` (refresh), `q` (quit), `1-9` (jump tabs)
 - **Event loop**: Crossterm events + DataStore EventBus subscriptions
 - **Widgets**: Sparkline, BarChart, Tree, List, Popup, Table (Ratatui components)
 
-**Current implementation status**: All 11 tabs fully functional.
+**Current implementation status**: All 13 tabs fully functional.
 
 ## Web Structure (Axum API + Leptos Frontend)
 
@@ -267,6 +268,74 @@ Follow Rust-specific error handling rules from RULES.md:
 - **Performance target**: Initial load <2s for 1000+ sessions
 - **Graceful degradation**: Display partial UI if some data unavailable
 - **Shared state**: `Arc<DataStore>` passed to both TUI and web frontends
+
+## Known Gotchas
+
+### JSONL files locked during Claude Code writes
+
+`~/.claude/projects/**/*.jsonl` files are actively written by Claude Code during sessions. Reading them can yield partial JSON lines at the end. The `SessionIndexParser` handles this with `skip malformed` logic — never remove that guard.
+
+### SQLite cache vs JSONL source
+
+The SQLite metadata cache can go stale if you manually delete or move JSONL files. If sessions show wrong counts or missing entries, run `cargo run -- clear-cache` to force a full rescan.
+
+### Leptos WASM: `trunk` is NOT `cargo run`
+
+`cargo run -- web` starts the Axum API backend (port 8080). `trunk serve` starts the Leptos WASM frontend (port 3333). They're two separate processes. Running only one gives a blank page or 404 on `/api/*`. Full stack = both terminals.
+
+### `parking_lot::RwLock` — write locks block readers
+
+`parking_lot` uses a fair queuing policy. A long write operation (e.g. full rescan) blocks all read accessors until complete. If the TUI feels frozen during reload, this is why. Keep write locks short — swap data atomically.
+
+### Stats-cache.json partial writes
+
+Claude Code writes `stats-cache.json` incrementally. The `StatsParser` has retry logic with a short sleep for exactly this reason. Do not remove the retry — parsing on first read can fail during a Claude Code session.
+
+---
+
+## Architecture Decision Records
+
+Key decisions that shaped the codebase. Read before proposing architectural changes.
+
+### ADR-001: Arc<DataStore> over DashMap (v0.4.0)
+
+**Decision**: Replace `DashMap<SessionId, Session>` with `Arc<DataStore>` holding `parking_lot::RwLock`.
+
+**Rationale**: DashMap holds one lock per shard — with 1000+ sessions, that's 1000+ heap allocations and 64 locks. Arc<DataStore> is a single allocation with one shared reader/writer lock. Result: ~50x memory reduction.
+
+**Consequence**: Write locks (reload) block all readers. Keep write operations short. Never hold a write lock across awaits.
+
+### ADR-002: SQLite metadata cache over full JSONL parse (v0.3.0)
+
+**Decision**: Cache session metadata (timestamps, message count, models) in SQLite. Load full JSONL content only on demand.
+
+**Rationale**: 1000+ sessions = 2.5GB of JSONL. Full parse at startup was 2.9s. SQLite metadata cache reduces startup to 33ms (89x faster).
+
+**Consequence**: The cache can go stale if JSONL files are moved/deleted externally. `cargo run -- clear-cache` forces a full rescan. Never bypass the cache by reading JSONL directly at startup.
+
+### ADR-003: parking_lot::RwLock over std::sync::RwLock
+
+**Decision**: Use `parking_lot::RwLock` everywhere in `ccboard-core`.
+
+**Rationale**: `parking_lot` has fairer queuing — a write lock does not starve indefinitely under heavy reads. `std::sync::RwLock` can deadlock under repeated write pressure.
+
+**Consequence**: `parking_lot::RwLock` is not in `std`. All lock usage must import from `parking_lot`. Do not mix with `std::sync::RwLock`.
+
+### ADR-004: axum over actix-web
+
+**Decision**: HTTP layer uses `axum` (Tokio-native).
+
+**Rationale**: `axum` is maintained by the Tokio team, composes with `tower` middleware, and has better `async_graphql` integration. `actix-web` has a separate runtime that complicates shared `Arc<DataStore>` ownership.
+
+**Consequence**: Middleware must be `tower::Layer`. No `actix`-specific extractors.
+
+### ADR-005: Incremental stats-cache.json writes
+
+**Decision**: `stats-cache.json` is written incrementally during Claude Code sessions, not atomically.
+
+**Rationale**: Claude Code writes stats incrementally as the session progresses. Atomic writes would require a separate file watcher with merge logic.
+
+**Consequence**: `StatsParser` has retry logic with a short sleep. Do not remove the retry — first-read failures during active sessions are expected.
 
 ## Common Pitfalls
 

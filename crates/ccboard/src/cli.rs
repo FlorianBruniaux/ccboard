@@ -487,7 +487,6 @@ mod tests {
     fn create_test_session(id: &str) -> Arc<SessionMetadata> {
         Arc::new(SessionMetadata {
             id: id.into(),
-            source_tool: None,
             file_path: std::path::PathBuf::from(format!("/{}.jsonl", id)),
             project_path: "/test".into(),
             first_timestamp: Some(Utc::now()),
@@ -499,13 +498,18 @@ mod tests {
             cache_creation_tokens: 0,
             cache_read_tokens: 0,
             models_used: vec!["sonnet".to_string()],
+            model_segments: Vec::new(),
             file_size_bytes: 1024,
             first_user_message: Some("Test message".to_string()),
             has_subagents: false,
+            parent_session_id: None,
             duration_seconds: Some(1800),
             branch: Some("main".to_string()),
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
+            source_tool: Default::default(),
+            lines_added: 0,
+            lines_removed: 0,
         })
     }
 

@@ -298,7 +298,6 @@ mod tests {
         }
         Arc::new(SessionMetadata {
             id: id.into(),
-            source_tool: None,
             file_path: std::path::PathBuf::from(format!("/tmp/{}.jsonl", id)),
             project_path: "test".into(),
             first_timestamp: Some(chrono::Utc::now()),
@@ -310,13 +309,18 @@ mod tests {
             cache_creation_tokens: 0,
             cache_read_tokens: 0,
             models_used: vec![model.to_string()],
+            model_segments: Vec::new(),
             file_size_bytes: 1024,
             first_user_message: None,
             has_subagents: false,
+            parent_session_id: None,
             duration_seconds: Some(60),
             branch: None,
             tool_usage,
             tool_token_usage: HashMap::new(),
+            source_tool: Default::default(),
+            lines_added: 0,
+            lines_removed: 0,
         })
     }
 

@@ -5,7 +5,7 @@ use axum::{
     extract::Query,
     http::{header, StatusCode, Uri},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use ccboard_core::AlertSeverity;
@@ -162,6 +162,12 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
             get(analytics_suggestions_handler),
         )
         .route("/api/task-graph", get(task_graph_handler))
+        .route("/api/insights", get(insights_handler))
+        .route(
+            "/api/claude-mem/summaries",
+            get(claude_mem_summaries_handler),
+        )
+        .route("/api/claude-mem/toggle", post(claude_mem_toggle_handler))
         .route("/api/health", get(health_handler))
         // Activity routes — literal path before parameterised path
         .route("/api/activity/violations", get(activity_violations_handler))
@@ -1290,4 +1296,137 @@ fn extract_dependencies(description: &str) -> Vec<String> {
     }
 
     deps
+}
+
+/// Query parameters for /api/insights
+#[derive(Debug, Deserialize)]
+struct InsightsQuery {
+    #[serde(default)]
+    project: Option<String>,
+    #[serde(default)]
+    r#type: Option<String>,
+    #[serde(default = "default_insights_limit")]
+    limit: usize,
+    #[serde(default)]
+    archived: Option<u8>,
+}
+
+fn default_insights_limit() -> usize {
+    100
+}
+
+/// GET /api/insights — returns Brain insights from ~/.ccboard/insights.db
+async fn insights_handler(
+    Query(params): Query<InsightsQuery>,
+    axum::extract::State(_store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    use ccboard_core::models::insight::InsightType;
+    use ccboard_core::InsightsDb;
+    use std::str::FromStr;
+
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => {
+            return axum::Json(serde_json::json!({
+                "insights": [],
+                "error": "Cannot determine home directory"
+            }))
+        }
+    };
+    let db_dir = home.join(".ccboard");
+
+    let db = match InsightsDb::new(&db_dir) {
+        Ok(db) => db,
+        Err(_) => {
+            return axum::Json(serde_json::json!({
+                "insights": [],
+                "total": 0
+            }))
+        }
+    };
+
+    let limit = params.limit.min(500);
+    let show_archived = params.archived.unwrap_or(0) != 0;
+
+    let insights = if let Some(type_str) = &params.r#type {
+        if let Ok(t) = InsightType::from_str(type_str) {
+            if let Some(project) = &params.project {
+                db.list_by_type(project, t).unwrap_or_default()
+            } else {
+                db.list_by_type_all(t, limit).unwrap_or_default()
+            }
+        } else {
+            db.list_all(limit).unwrap_or_default()
+        }
+    } else if let Some(project) = &params.project {
+        db.list_for_project(project).unwrap_or_default()
+    } else {
+        db.list_all(limit).unwrap_or_default()
+    };
+
+    let insights: Vec<_> = insights
+        .into_iter()
+        .filter(|i| show_archived || !i.archived)
+        .take(limit)
+        .map(|i| {
+            serde_json::json!({
+                "id": i.id,
+                "session_id": i.session_id,
+                "project": i.project,
+                "type": i.insight_type.as_str(),
+                "content": i.content,
+                "reasoning": i.reasoning,
+                "archived": i.archived,
+                "created_at": i.created_at.to_rfc3339(),
+            })
+        })
+        .collect();
+
+    let total = insights.len();
+    axum::Json(serde_json::json!({
+        "insights": insights,
+        "total": total as u64
+    }))
+}
+
+/// GET /api/claude-mem/summaries — returns recent session summaries + enabled state
+async fn claude_mem_summaries_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    let enabled = store.is_claude_mem_enabled();
+    let summaries: Vec<_> = store
+        .claude_mem_summaries()
+        .into_iter()
+        .map(|s| {
+            serde_json::json!({
+                "id": s.id,
+                "memory_session_id": s.memory_session_id,
+                "project": s.project,
+                "request": s.request,
+                "completed": s.completed,
+                "next_steps": s.next_steps,
+                "files_edited": s.files_edited,
+                "created_at": s.created_at,
+            })
+        })
+        .collect();
+
+    axum::Json(serde_json::json!({
+        "enabled": enabled,
+        "summaries": summaries,
+        "total": summaries.len() as u64
+    }))
+}
+
+/// POST /api/claude-mem/toggle — enable or disable claude-mem integration
+async fn claude_mem_toggle_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+    axum::Json(body): axum::Json<serde_json::Value>,
+) -> axum::Json<serde_json::Value> {
+    let enabled = body
+        .get("enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    store.toggle_claude_mem(enabled);
+    axum::Json(serde_json::json!({ "enabled": enabled }))
 }

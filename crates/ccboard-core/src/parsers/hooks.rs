@@ -39,6 +39,15 @@ pub enum HookType {
     PrePush,
     UserPromptSubmit,
     ToolResultReturn,
+    // Modern CC hook events (v2.1.118+)
+    PreToolUse,
+    PostToolUse,
+    Stop,
+    SubagentStop,
+    MessageDisplay,
+    PreCompact,
+    PostCompact,
+    Notification,
     Custom(String),
 }
 
@@ -51,7 +60,35 @@ impl HookType {
             "pre-push" => HookType::PrePush,
             "user-prompt-submit" => HookType::UserPromptSubmit,
             "tool-result-return" => HookType::ToolResultReturn,
+            "pre-tool-use" => HookType::PreToolUse,
+            "post-tool-use" => HookType::PostToolUse,
+            "stop" => HookType::Stop,
+            "subagent-stop" => HookType::SubagentStop,
+            "message-display" => HookType::MessageDisplay,
+            "pre-compact" => HookType::PreCompact,
+            "post-compact" => HookType::PostCompact,
+            "notification" => HookType::Notification,
             custom => HookType::Custom(custom.to_string()),
+        }
+    }
+
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            HookType::PreCommit => "PreCommit",
+            HookType::PostCommit => "PostCommit",
+            HookType::PrePush => "PrePush",
+            HookType::UserPromptSubmit => "UserPromptSubmit",
+            HookType::ToolResultReturn => "ToolResultReturn",
+            HookType::PreToolUse => "PreToolUse",
+            HookType::PostToolUse => "PostToolUse",
+            HookType::Stop => "Stop",
+            HookType::SubagentStop => "SubagentStop",
+            HookType::MessageDisplay => "MessageDisplay",
+            HookType::PreCompact => "PreCompact",
+            HookType::PostCompact => "PostCompact",
+            HookType::Notification => "Notification",
+            HookType::Custom(name) => name.as_str(),
         }
     }
 }
@@ -64,6 +101,10 @@ pub struct Hook {
     pub path: PathBuf,
     pub is_executable: bool,
     pub has_valid_shebang: bool,
+    /// v2.1.141: terminal output sequence emitted after hook runs
+    pub terminal_sequence: Option<String>,
+    /// v2.1.120: PostToolUse only — continue even if hook blocks
+    pub continue_on_block: bool,
 }
 
 /// Hook parsing and validation errors
@@ -156,6 +197,8 @@ impl HooksParser {
             path: path.to_path_buf(),
             is_executable,
             has_valid_shebang,
+            terminal_sequence: None,
+            continue_on_block: false,
         })
     }
 

@@ -317,7 +317,6 @@ mod tests {
         let ts = chrono::Utc::now() - chrono::Duration::days(days_ago);
         Arc::new(SessionMetadata {
             id: format!("s{}", days_ago).into(),
-            source_tool: None,
             file_path: std::path::PathBuf::from(format!("/tmp/s{}.jsonl", days_ago)),
             project_path: "test".into(),
             first_timestamp: Some(ts),
@@ -329,13 +328,18 @@ mod tests {
             cache_creation_tokens: 0,
             cache_read_tokens: 0,
             models_used: vec![],
+            model_segments: Vec::new(),
             file_size_bytes: 256,
             first_user_message: None,
             has_subagents: false,
+            parent_session_id: None,
             duration_seconds: Some(10),
             branch: None,
             tool_usage: std::collections::HashMap::new(),
             tool_token_usage: std::collections::HashMap::new(),
+            source_tool: Default::default(),
+            lines_added: 0,
+            lines_removed: 0,
         })
     }
 

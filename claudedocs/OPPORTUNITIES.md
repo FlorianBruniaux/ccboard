@@ -1,8 +1,8 @@
 # ccboard — Feature Opportunities Catalog
 
-**Last Updated**: 2026-03-24
+**Last Updated**: 2026-03-27
 **Analysis Date**: 2026-03-24
-**Version at Analysis**: v0.17.0
+**Version at Analysis**: v0.17.0 → updated to v0.18.0
 **Method**: 3-agent parallel exploration (UX/Product, Technical, Ecosystem angles)
 
 ---
@@ -25,7 +25,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Solution**: Aggregate counts from existing `InvocationStats` → display in Tools tab.
 **Files**: `ccboard-core/src/analytics/invocations.rs`, `ccboard-tui/src/tabs/agents.rs`
 **Impact**: Unlocks dead plugin detection + `ccboard export recommendations` cleanup.
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.19.0 (session stats cross-indexed; agents/tools without local files appear as "Discovered from sessions" entries with real invocation counts)
 
 ---
 
@@ -33,7 +33,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: Changing `settings.json` (budget limit, thresholds) requires restarting the TUI.
 **Solution**: File watcher already detects changes → add `DataEvent::SettingsUpdated` + subscribe in TUI app loop.
 **Files**: `ccboard-core/src/watcher.rs`, `ccboard-core/src/store.rs`, `ccboard-tui/src/app.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.17.0 (toast "Settings reloaded" on settings.json change)
 
 ---
 
@@ -41,7 +41,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: Mid-session model switches (Opus → Sonnet → Haiku) are invisible. No cost impact shown.
 **Solution**: Scan `ConversationMessage.model` (already parsed), detect transitions, display in detail pane.
 **Files**: `ccboard-core/src/models/session.rs`, `ccboard-tui/src/tabs/sessions.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.18.0 (`Opus 4.5 (8) → Sonnet 4.6 (15)` in detail pane, computed inline during JSONL scan)
 
 ---
 
@@ -49,7 +49,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: Context saturation calculated per-session, no 7-day trend or predictive alert.
 **Solution**: Linear regression over last 30 sessions → widget "⚠️ Likely to exceed 85% in 3 sessions".
 **Files**: `ccboard-core/src/analytics/mod.rs`, `ccboard-tui/src/tabs/dashboard.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.18.0 (linear regression → `↑ ~N sessions` / `↓ declining`, `ContextWindowStats.trend_slope`)
 
 ---
 
@@ -57,7 +57,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: Live sessions remain "Running" after crash or kill -9. No TTL on live-sessions.json entries.
 **Solution**: Explicit TTL (10min) on session entries + cleanup on startup + heartbeat validation.
 **Files**: `ccboard-core/src/hook_state.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.18.0 (`prune_stale_running(max_age)` on `LiveSessionFile`, 10-min TTL)
 
 ---
 
@@ -65,15 +65,15 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: Opening a session with 5000+ tool calls can freeze the viewer. No pre-flight warning.
 **Solution**: Complexity score (tool call count) in SessionMetadata → warning modal before loading.
 **Files**: `ccboard-tui/src/tabs/sessions.rs`, `ccboard-core/src/models/session.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.19.0 (≥2000 tool calls shows "High Complexity Session" modal; `[Enter/y]` to confirm, any other key cancels; uses existing `tool_usage` map sum)
 
 ---
 
 ### QW7 · Configurable Anomaly Thresholds
 **Problem**: Anomaly detection hardcoded (2x spike, 3-sigma outlier). Doesn't fit all usage patterns.
-**Solution**: `anomaly_config` section in `settings.json` + TUI modal for live adjustment.
+**Solution**: `anomalyThresholds` section in `settings.json` → read at compute time, shown in Analytics Anomalies sub-tab.
 **Files**: `ccboard-core/src/analytics/anomalies.rs`, `ccboard-core/src/models/config.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.19.0 (`AnomalyThresholds` in `settings.json`; active thresholds shown in Analytics with `[custom]` badge when non-default)
 
 ---
 
@@ -83,7 +83,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: Costs aggregated per session. Impossible to know if `WebFetch` costs 10x more than `Read`.
 **Solution**: Extend `ToolCall` with estimated token count, cross-reference pricing table. New sub-tab "Tool Cost Breakdown" in Analytics.
 **Files**: `ccboard-core/src/parsers/activity.rs`, `ccboard-core/src/analytics/`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.20.0 (`Costs` sub-tab in Analytics: Tool | Calls | Tokens | % Total | Est. Cost | $/Call; `ToolTokenStat` in `AnalyticsData`; red/yellow hotspot coloring)
 
 ---
 
@@ -91,7 +91,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: No way to organize important sessions (breakthroughs, bugs, useful patterns).
 **Solution**: Lightweight bookmark system in `~/.ccboard/bookmarks.json` + arbitrary tags + filter in Sessions tab.
 **Files**: New `ccboard-core/src/bookmarks.rs`, `ccboard-tui/src/tabs/sessions.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.18.0 (`b` toggle, `B` filter starred, `★` icon, `BookmarkStore` persisted to `~/.ccboard/bookmarks.json`)
 
 ---
 
@@ -99,7 +99,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: MCP servers listed but no latency/failure tracking. Impossible to identify which one slows sessions.
 **Solution**: Track MCP calls via hook events, aggregate avg latency + failure rate per server. New sub-tab in MCP tab.
 **Files**: `ccboard-core/src/hook_event.rs`, `ccboard-tui/src/tabs/mcp.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.20.0 (`[s]` toggles Stats view in MCP tab: Server | Calls | Sessions | Last Seen; `McpCallStat` + `mcp_call_stats()` on DataStore; recency-colored rows)
 
 ---
 
@@ -123,7 +123,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: Subagent sessions listed flat. No hierarchy visualization for TeamCreate workflows.
 **Solution**: Detect `parent_session_id` in JSONL, render tree view in Sessions tab, aggregate per-agent token costs.
 **Files**: `ccboard-core/src/models/session.rs`, `ccboard-tui/src/tabs/sessions.rs`
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.18.0 (`⤵ Subagents (N)` tree in detail pane, `has_subagents` backfilled at load, `subagent_children()` DataStore API)
 
 ---
 
@@ -135,11 +135,11 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 
 ---
 
-### MF8 · Session Retry Pattern Analysis
-**Problem**: Retry loops (Read → Read → Read → fail) not detected. No reliability analytics.
-**Solution**: Analyze `ToolCall.name` sequences, flag repetitive patterns → alert in Activity tab.
-**Files**: `ccboard-core/src/parsers/activity.rs`
-**Status**: 📋 Backlog
+### MF8 · Analytics Discover Sub-Tab
+**Problem**: `discover.rs` pattern engine existed but was only accessible via CLI. No TUI exposure.
+**Solution**: New `Discover` sub-view in Analytics — press `r` to scan recent sessions, surface recurring patterns as CLAUDE.md rules / Skills / Commands with score and session count.
+**Files**: `ccboard-core/src/store.rs`, `ccboard-tui/src/tabs/analytics.rs`
+**Status**: ✅ Done — v0.20.0 (`Discover` sub-tab with `r` to run, `discover_cache` on DataStore, `compute_discover(max_sessions)` async; no API key needed)
 
 ---
 
@@ -147,7 +147,7 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 **Problem**: 0 unit tests in `ccboard-tui`. Regression risk on UI refactors.
 **Solution**: Snapshot tests for key tabs, keybinding tests for modals, pagination state tests.
 **Files**: `crates/ccboard-tui/tests/` (new)
-**Status**: 📋 Backlog
+**Status**: ✅ Done — v0.20.0 (12 smoke tests with `TestBackend` 120×40; one per tab; 492 total tests)
 
 ---
 
@@ -180,10 +180,9 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 
 ### SF4 · LLM Session Summaries (opt-in)
 **Problem**: Impossible to understand a session's purpose without reading the full conversation.
-**Solution**: `ccboard summarize <session-id>` → calls `claude --print`, caches in SQLite `session_summaries` table, displays in detail pane.
-**Config**: `enable_summaries: true` in `settings.json`.
-**Files**: New `src/commands/summarize.rs`, `ccboard-core/src/cache/metadata_cache.rs`
-**Status**: 📋 Backlog
+**Solution**: `ccboard summarize <session-id>` → calls `claude --print`, caches in `~/.ccboard/summaries/`, displays in detail pane.
+**Files**: `crates/ccboard/src/main.rs`, new `ccboard-core/src/summaries.rs`
+**Status**: ✅ Done — v0.18.0 (`ccboard summarize <id>`, `SummaryStore` with atomic write, detail pane shows cached summary or hint)
 
 ---
 
@@ -191,35 +190,47 @@ Deliberately excluded: Phase L (Plugin System), Phase N (Plan-Aware) — already
 
 These don't add features but improve reliability and maintainability across the board.
 
-| Item | Problem | Files | Complexity |
-|---|---|---|---|
-| **EventBus overflow detection** | 256-cap broadcast → silent event drops under high load | `ccboard-core/src/event.rs` | S |
-| **Session content cache eviction** | Moka cache no TTL → unbounded RAM on long sessions | `ccboard-core/src/store.rs` | S |
-| **Activity alerts archival (90d TTL)** | Alerts lost after cache eviction, no historical trends | `ccboard-core/src/cache/metadata_cache.rs` | M |
-| **Web API test coverage** | 26 endpoints, 0 tests — API contracts unvalidated | `crates/ccboard-web/tests/` | M |
-| **Billing health endpoint** | Silent pricing fallback, no audit log | `ccboard-core/src/models/billing_block.rs` | S |
-| **Invocation deduplication** | Retry patterns may overcount identical tool calls | `ccboard-core/src/analytics/invocations.rs` | S |
+| Item | Problem | Files | Complexity | Status |
+|---|---|---|---|---|
+| **EventBus overflow detection** | 256-cap broadcast → silent event drops under high load | `ccboard-core/src/event.rs` | S | 📋 Backlog |
+| **Session content cache eviction** | Moka cache no TTL → unbounded RAM on long sessions | `ccboard-core/src/store.rs` | S | 📋 Backlog |
+| **Activity alerts archival (90d TTL)** | Alerts lost after cache eviction, no historical trends | `ccboard-core/src/cache/metadata_cache.rs` | M | 📋 Backlog |
+| **Web API test coverage** | 26 endpoints, 0 tests — API contracts unvalidated | `crates/ccboard-web/tests/` | M | 📋 Backlog |
+| **Billing health endpoint** | Silent pricing fallback, no audit log | `ccboard-core/src/models/billing_block.rs` | S | 📋 Backlog |
+| **Invocation deduplication** | Retry patterns may overcount identical tool calls | `ccboard-core/src/analytics/invocations.rs` | S | 📋 Backlog |
 
 ---
 
 ## Prioritization Guide
 
 ```
-Sprint 1 (Quick Wins batch) — pick 3-4 from:
-  QW1  Invocation counts         ← unblocks dead plugin detection
-  QW2  Settings hot-reload       ← UX win, low risk
-  QW3  Model switching timeline  ← data already there
-  QW4  Context saturation trend  ← adds predictive value to Dashboard
-  QW5  Hook state cleanup        ← reliability fix
+✅ Sprint 1 (v0.17.0) — DONE:
+  QW2  Settings hot-reload       ✅
+  QW5  Hook state cleanup        ✅
 
-Sprint 2 (first Medium Feature) — choose based on user demand:
-  MF1  Per-tool cost attribution  ← highest analytics impact
-  MF2  Session bookmarks          ← most-requested UX
-  MF3  MCP health dashboard       ← differentiator vs competitors
+✅ Sprint 2 (v0.18.0) — DONE:
+  QW3  Model switching timeline  ✅
+  QW4  Context saturation trend  ✅
+  MF2  Session bookmarks         ✅
+  MF6  Subagent graph            ✅
+  SF4  LLM summaries             ✅
 
-Strategic decision:
+✅ Sprint 3 (v0.19.0) — DONE:
+  QW1  Invocation counts         ✅
+  QW6  Session replay warning    ✅
+  QW7  Configurable thresholds   ✅
+
+✅ Sprint 4 (v0.20.0) — DONE:
+  MF1  Per-tool cost attribution  ✅
+  MF3  MCP usage stats            ✅
+  MF8  Analytics Discover tab     ✅
+  MF9  TUI test coverage          ✅
+
+Sprint 5 (v0.21.x) — candidates:
+  MF5  Session comparison view    ← UX differentiator
+  SF3  Export CLI (json/csv)      ← high demand
   SF1  Git integration            ← decide timing relative to Phase N
-  SF4  LLM summaries             ← opt-in, low risk, high wow factor
+  SF2  Activity timeline Web UI   ← Leptos parity
 ```
 
 ---
@@ -238,4 +249,4 @@ Strategic decision:
 ---
 
 **Related**: [ROADMAP.md](ROADMAP.md) · [PLAN.md](PLAN.md) · [NEXT_STEPS.md](NEXT_STEPS.md)
-**Last Updated**: 2026-03-24
+**Last Updated**: 2026-03-27

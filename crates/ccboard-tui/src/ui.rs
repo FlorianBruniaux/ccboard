@@ -7,6 +7,7 @@ use crate::tabs::{
     ActivityTab, AgentsTab, AnalyticsTab, ConfigTab, ConversationTab, CostsTab, DashboardTab,
     HistoryTab, HooksTab, McpTab, PluginsTab, SessionsTab,
 };
+// BrainTab state lives in App; we just call render/handle_key via app.brain_tab
 use crate::theme::Palette;
 use ccboard_core::DegradedState;
 use ratatui::{
@@ -67,14 +68,19 @@ impl Ui {
         self.sessions.is_replay_open()
     }
 
-    /// Initialize tabs that need data scan
+    /// Initialize tabs with pre-scanned directory data.
+    ///
+    /// The scan result must be produced by `scan_all_blocking` running inside
+    /// `tokio::task::spawn_blocking` — never on the async executor thread.
     pub fn init(
         &mut self,
+        scan: crate::tabs::agents::ScanResult,
         claude_home: &std::path::Path,
         project_path: Option<&std::path::Path>,
         invocation_stats: &ccboard_core::models::InvocationStats,
     ) {
-        self.agents.scan_directories(claude_home, project_path);
+        let (agents, commands, skills) = scan;
+        self.agents.apply_scanned(agents, commands, skills);
         self.agents.update_invocation_counts(invocation_stats);
         self.config.init(claude_home, project_path);
     }
@@ -109,6 +115,22 @@ impl Ui {
                         self.sessions.selected_session_id(&sessions_by_project)
                     {
                         self.conversation.load_session(session_id, &app.store);
+                        return;
+                    }
+                }
+
+                // 'b' — toggle bookmark on selected session
+                if let KeyCode::Char('b') = key {
+                    if let Some(session_id) =
+                        self.sessions.selected_session_id(&sessions_by_project)
+                    {
+                        match app.store.toggle_bookmark(&session_id) {
+                            Ok(true) => self.sessions.set_notification("Bookmarked ★"),
+                            Ok(false) => self.sessions.set_notification("Bookmark removed"),
+                            Err(e) => self
+                                .sessions
+                                .set_notification(&format!("Bookmark error: {}", e)),
+                        }
                         return;
                     }
                 }
@@ -178,8 +200,18 @@ impl Ui {
                     KeyCode::Right | KeyCode::Char('l') => self.analytics.next_view(),
                     KeyCode::Left | KeyCode::Char('h') => self.analytics.prev_view(),
                     KeyCode::Char('j') | KeyCode::Down => {
-                        let max_items =
-                            app.store.analytics().map(|a| a.insights.len()).unwrap_or(0);
+                        use crate::tabs::analytics::AnalyticsView;
+                        let max_items = app
+                            .store
+                            .analytics()
+                            .map(|a| {
+                                if self.analytics.current_view() == AnalyticsView::Costs {
+                                    a.tool_token_stats.len()
+                                } else {
+                                    a.insights.len()
+                                }
+                            })
+                            .unwrap_or(0);
                         self.analytics.scroll_down(max_items);
                     }
                     KeyCode::Char('k') | KeyCode::Up => self.analytics.scroll_up(),
@@ -192,12 +224,24 @@ impl Ui {
                         self.analytics.toggle_sort_order();
                     }
                     KeyCode::Char('r') => {
-                        // Recompute analytics with current period (async operation)
-                        let store = app.store.clone();
-                        let period = self.analytics.period();
-                        tokio::spawn(async move {
-                            store.compute_analytics(period).await;
-                        });
+                        use crate::tabs::analytics::AnalyticsView;
+                        if self.analytics.current_view() == AnalyticsView::Discover {
+                            // Run pattern discovery (async, stores results in DataStore).
+                            // The loading flag is an Arc<AtomicBool> shared with the task.
+                            let loading_flag = self.analytics.begin_discover_loading();
+                            let store = app.store.clone();
+                            tokio::spawn(async move {
+                                store.compute_discover(50, 2, 20).await;
+                                loading_flag.store(false, std::sync::atomic::Ordering::Relaxed);
+                            });
+                        } else {
+                            // Recompute analytics with current period (async operation)
+                            let store = app.store.clone();
+                            let period = self.analytics.period();
+                            tokio::spawn(async move {
+                                store.compute_analytics(period).await;
+                            });
+                        }
                     }
                     _ => {}
                 }
@@ -208,6 +252,9 @@ impl Ui {
             Tab::Activity => {
                 let sessions = app.store.recent_sessions(50);
                 self.activity.handle_key(key, &sessions, &app.store);
+            }
+            Tab::Brain => {
+                app.brain_tab.handle_key(key, Some(&app.store));
             }
             Tab::Search => {
                 use crossterm::event::KeyCode;
@@ -534,7 +581,7 @@ impl Ui {
         }
     }
 
-    fn render_tab_content(&mut self, frame: &mut Frame, area: Rect, app: &App) {
+    fn render_tab_content(&mut self, frame: &mut Frame, area: Rect, app: &mut App) {
         let scheme = app.color_scheme;
 
         // If conversation is open, render it as overlay
@@ -562,8 +609,14 @@ impl Ui {
                                                          // Count total sessions for refresh tracking
                 let session_count: usize = sessions_by_project.values().map(|v| v.len()).sum();
                 self.sessions.mark_refreshed(session_count);
-                self.sessions
-                    .render(frame, area, &sessions_by_project, live_sessions, scheme);
+                self.sessions.render(
+                    frame,
+                    area,
+                    &sessions_by_project,
+                    live_sessions,
+                    scheme,
+                    &app.store,
+                );
             }
             Tab::Config => {
                 let config = app.store.settings();
@@ -599,7 +652,9 @@ impl Ui {
             }
             Tab::Mcp => {
                 let mcp_config = app.store.mcp_config();
-                self.mcp.render(frame, area, mcp_config.as_ref(), scheme);
+                let mcp_stats = app.store.mcp_call_stats();
+                self.mcp
+                    .render(frame, area, mcp_config.as_ref(), &mcp_stats, scheme);
             }
             Tab::Analytics => {
                 use tracing::debug;
@@ -621,6 +676,9 @@ impl Ui {
             }
             Tab::Search => {
                 render_search_tab(&app.search_tab, frame, area, scheme);
+            }
+            Tab::Brain => {
+                app.brain_tab.render(frame, area, scheme, Some(&app.store));
             }
         }
     }
@@ -646,13 +704,14 @@ impl Ui {
                 Tab::Agents => "Tab switch │ Enter detail",
                 Tab::Costs => "Tab/←→/h/l switch views",
                 Tab::History => "/ search │ gg/G/Home/End jump │ c clear │ x export",
-                Tab::Mcp => "←→ focus │ ↑↓ select │ e edit │ o reveal │ r refresh",
+                Tab::Mcp => "←→ focus │ ↑↓ select │ s stats │ e edit │ o reveal │ r refresh",
                 Tab::Analytics => {
                     "F1-F4 period │ ←→/h/l switch views │ j/k scroll │ s sort │ o order │ r refresh"
                 }
                 Tab::Plugins => "Tab cycle columns │ j/k navigate │ s sort │ r refresh",
                 Tab::Activity => "j/k navigate │ a analyze session │ Tab/Shift+Tab switch tabs",
                 Tab::Search => "i type query │ Enter search/open │ j/k navigate │ ESC exit input",
+                Tab::Brain => "j/k navigate │ ←/→ filter │ Enter expand │ d archive │ r reload",
             };
 
             Line::from(vec![
