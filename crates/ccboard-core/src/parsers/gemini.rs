@@ -85,7 +85,11 @@ impl GeminiParser {
             let chat_files = match std::fs::read_dir(&chats_dir) {
                 Ok(d) => d,
                 Err(e) => {
-                    warn!("Failed to read Gemini chats dir {}: {}", chats_dir.display(), e);
+                    warn!(
+                        "Failed to read Gemini chats dir {}: {}",
+                        chats_dir.display(),
+                        e
+                    );
                     continue;
                 }
             };
@@ -99,7 +103,11 @@ impl GeminiParser {
                 match Self::parse_session_file(&file_path) {
                     Ok(meta) => sessions.push(meta),
                     Err(e) => {
-                        warn!("Failed to parse Gemini session {}: {}", file_path.display(), e);
+                        warn!(
+                            "Failed to parse Gemini session {}: {}",
+                            file_path.display(),
+                            e
+                        );
                         report.sessions_failed += 1;
                     }
                 }
@@ -178,7 +186,11 @@ fn extract_text_preview(val: &serde_json::Value, max_len: usize) -> Option<Strin
         serde_json::Value::String(s) => s.clone(),
         serde_json::Value::Array(arr) => arr
             .iter()
-            .filter_map(|item| item.get("text").and_then(|t| t.as_str()).map(|s| s.to_string()))
+            .filter_map(|item| {
+                item.get("text")
+                    .and_then(|t| t.as_str())
+                    .map(|s| s.to_string())
+            })
             .collect::<Vec<_>>()
             .join(" "),
         _ => return None,
@@ -199,10 +211,7 @@ fn extract_text_preview(val: &serde_json::Value, max_len: usize) -> Option<Strin
     }
 }
 
-fn compute_duration(
-    start: Option<DateTime<Utc>>,
-    end: Option<DateTime<Utc>>,
-) -> Option<u64> {
+fn compute_duration(start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>) -> Option<u64> {
     let s = start?;
     let e = end?;
     let diff = e.signed_duration_since(s);
@@ -241,7 +250,11 @@ mod tests {
     #[test]
     fn test_parse_session_file() {
         let dir = tempdir().unwrap();
-        let path = write_session(dir.path(), "session-2026-01-01T10-00-test.json", SAMPLE_SESSION);
+        let path = write_session(
+            dir.path(),
+            "session-2026-01-01T10-00-test.json",
+            SAMPLE_SESSION,
+        );
 
         let meta = GeminiParser::parse_session_file(&path).unwrap();
 
@@ -263,7 +276,11 @@ mod tests {
         let hash = "aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa7777bbbb8888";
         let chats_dir = dir.path().join("tmp").join(hash).join("chats");
         fs::create_dir_all(&chats_dir).unwrap();
-        write_session(&chats_dir, "session-2026-01-01T10-00-abc.json", SAMPLE_SESSION);
+        write_session(
+            &chats_dir,
+            "session-2026-01-01T10-00-abc.json",
+            SAMPLE_SESSION,
+        );
 
         let mut report = LoadReport::default();
         let sessions = GeminiParser::scan_all(dir.path(), &mut report);

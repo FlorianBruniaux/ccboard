@@ -764,13 +764,7 @@ impl SessionsTab {
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
                     .split(main_chunks[1]);
-                self.render_live_sessions(
-                    frame,
-                    live_split[0],
-                    live_sessions,
-                    self.focus == 0,
-                    &p,
-                );
+                self.render_live_sessions(frame, live_split[0], live_sessions, self.focus == 0, &p);
                 Self::render_waiting_answers(frame, live_split[1], &waiting, &p);
             } else {
                 self.render_live_sessions(
@@ -1158,7 +1152,10 @@ impl SessionsTab {
 
                 let line = Line::from(vec![
                     Span::styled("◐ ", Style::default().fg(Color::Yellow)),
-                    Span::styled(project, Style::default().fg(p.fg).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        project,
+                        Style::default().fg(p.fg).add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(
                         format!("  • idle {}", idle_str),
                         Style::default().fg(p.muted),

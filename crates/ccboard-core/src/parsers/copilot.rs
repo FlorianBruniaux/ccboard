@@ -78,7 +78,11 @@ impl CopilotParser {
         let log_files = match Self::find_log_files(copilot_log_dir) {
             Ok(f) => f,
             Err(e) => {
-                warn!("Failed to read Copilot log dir {}: {}", copilot_log_dir.display(), e);
+                warn!(
+                    "Failed to read Copilot log dir {}: {}",
+                    copilot_log_dir.display(),
+                    e
+                );
                 return Vec::new();
             }
         };
@@ -98,11 +102,16 @@ impl CopilotParser {
             .into_iter()
             .filter(|(_, accum)| accum.message_count > 0)
             .map(|(id, accum)| {
-                let total_tokens = accum.input_tokens + accum.output_tokens + accum.cache_read_tokens;
+                let total_tokens =
+                    accum.input_tokens + accum.output_tokens + accum.cache_read_tokens;
                 let duration_seconds = match (accum.first_timestamp, accum.last_timestamp) {
                     (Some(s), Some(e)) => {
                         let diff = e.signed_duration_since(s).num_seconds();
-                        if diff > 0 { Some(diff as u64) } else { None }
+                        if diff > 0 {
+                            Some(diff as u64)
+                        } else {
+                            None
+                        }
                     }
                     _ => None,
                 };
@@ -188,7 +197,10 @@ impl CopilotParser {
             if let Some(session_id) = extract_session_id(&line) {
                 current_session_id = Some(session_id.to_string());
                 if let Some(ts) = ts {
-                    sessions.entry(session_id.to_string()).or_default().update_timestamp(ts);
+                    sessions
+                        .entry(session_id.to_string())
+                        .or_default()
+                        .update_timestamp(ts);
                 }
                 continue;
             }
@@ -341,7 +353,10 @@ mod tests {
     fn test_parse_timestamp() {
         let line = "[2026-03-14 17:32:05] [debug] something";
         let ts = parse_line_timestamp(line).unwrap();
-        assert_eq!(ts.format("%Y-%m-%d %H:%M:%S").to_string(), "2026-03-14 17:32:05");
+        assert_eq!(
+            ts.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "2026-03-14 17:32:05"
+        );
     }
 
     #[test]
@@ -357,7 +372,10 @@ mod tests {
         assert_eq!(report.sessions_scanned, 2);
 
         // Session 47e7be02: 2 message_delta events
-        let s2 = sessions.iter().find(|s| s.id.starts_with("47e7be02")).unwrap();
+        let s2 = sessions
+            .iter()
+            .find(|s| s.id.starts_with("47e7be02"))
+            .unwrap();
         assert_eq!(s2.message_count, 2);
         assert_eq!(s2.input_tokens, 52067 + 404);
         assert_eq!(s2.output_tokens, 582 + 2125);
@@ -366,7 +384,10 @@ mod tests {
         assert_eq!(s2.source_tool, Some("copilot".to_string()));
 
         // Session 77ff1551: 1 message_delta event
-        let s1 = sessions.iter().find(|s| s.id.starts_with("77ff1551")).unwrap();
+        let s1 = sessions
+            .iter()
+            .find(|s| s.id.starts_with("77ff1551"))
+            .unwrap();
         assert_eq!(s1.message_count, 1);
         assert_eq!(s1.input_tokens, 52055);
         assert_eq!(s1.output_tokens, 455);
