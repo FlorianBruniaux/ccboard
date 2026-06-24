@@ -5,6 +5,26 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-06-24
+
+### Added
+
+- **Gemini CLI session import**: ccboard now reads sessions from `~/.gemini/tmp/{projectHash}/chats/session-*.json`. Gemini sessions display a `[G]` badge in the Sessions tab. Parser handles the stable Gemini CLI v0.28+ format (sessionId, projectHash, startTime, messages). Token counts are not available (not stored locally by Gemini CLI).
+- **GitHub Copilot CLI session import**: ccboard parses `~/.local/share/copilot-api/logs/messages-handler-*.log` to extract Copilot sessions. Copilot sessions display a `[Co]` badge. Input/output token usage is parsed from `Translated Anthropic event` log lines. Cost data is not available (subscription-based pricing).
+- **SourceTool enum extended**: `Gemini` and `Copilot` variants added alongside the existing `ClaudeCode`, `Cursor`, `Codex`, `OpenCode`. The `badge()` method returns `[G]` and `[Co]` respectively.
+- **Cost Analysis time window**: The web Cost Analysis page header now shows the full date range covered (`All-time · 2025-01-01 -> 2026-06-24`), derived from `first_session_date` and `last_computed_date` in `stats-cache.json`.
+
+### Fixed
+
+- **TUI panic hook**: The TUI now installs a panic hook before entering raw mode, so any unexpected panic properly restores the terminal instead of leaving it broken. Previously, a panic mid-session would lock the terminal in raw mode and require `reset` to recover.
+- **Model tracking for Claude Code v2.1.92+**: Claude Code moved the `model` field from the top-level `SessionLine` to `message.model` in v2.1.92. The session parser now falls back to `message.model` when the top-level field is absent, restoring correct model detection in the Sessions tab and History tab.
+
+### Changed
+
+- SQLite metadata cache bumped to v9 (`lines_added`/`lines_removed` fields added in v0.21.0 were at v8; v9 separates the two schema versions cleanly).
+
+---
+
 ## [0.22.0] - 2026-04-21
 
 ### Added
