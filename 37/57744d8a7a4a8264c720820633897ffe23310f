@@ -1,0 +1,63 @@
+crates/ccboard-core/src/models/session.rs
+  s_0585cfd11ae693::t_8bf731a77ae900 561-571,574-576,580-589
+  s_0585cfd11ae693::t_7534c4efd74e3e 577-579
+  s_0585cfd11ae693::t_229fb1cb745c11 572-573
+crates/ccboard-ffi/src/lib.rs
+  s_0585cfd11ae693::t_4aa2b0a5c326d0 458
+crates/ccboard-core/src/pricing/embedded.rs
+  s_0585cfd11ae693::t_67f616d71dcb17 93-98
+  s_0585cfd11ae693::t_94ca7d13ac4d45 90-92
+crates/ccboard-tui/src/tabs/analytics.rs
+  s_0585cfd11ae693::t_bbd60c786e3646 476-479,488
+  s_0585cfd11ae693::t_0abcdace0055d9 1466-1467
+crates/ccboard-tui/src/tabs/agents.rs
+  s_0585cfd11ae693::t_4aa2b0a5c326d0 212,240
+crates/ccboard-core/src/usage_estimator.rs
+  s_0585cfd11ae693::t_0ddef0f4e5bfb7 77-80,83-87,89,91-92,95,97-98,101,104,108-119,150-158,164-166
+  s_0585cfd11ae693::t_f24a191d4d9260 196-199,206-207,210-211,216-224,226-237,256-287
+  s_0585cfd11ae693::t_dc593b78122b88 215,238-239,248-249,288-289
+  s_52fae4ac1e2d05::t_1b1db2903351f6 225,290-291
+crates/ccboard-core/src/analytics/trends.rs
+  s_0585cfd11ae693::t_dbb814d629484b 97,99-105
+crates/ccboard-tui/src/tabs/dashboard.rs
+  s_0585cfd11ae693::t_fb08e41186494a 147-150
+  s_0585cfd11ae693::t_e54ddcadbd8ff1 151-159
+  s_0585cfd11ae693::t_d5c64ce83227d2 525-538,547-548,550-551,563-566,569-573,575-576,582,584-585,591-592,594,605
+  s_0585cfd11ae693::t_7a9f459c989702 273
+  s_0585cfd11ae693::t_c0cb5be782442f 280-284,287-291
+crates/ccboard-core/src/store.rs
+  s_0585cfd11ae693::t_2d91a9e83af9f6 1248
+  s_0585cfd11ae693::t_6a01d2c1cadabb 1241,1243-1244,1246,1253-1254,1256-1258,1261-1263
+  s_0585cfd11ae693::t_0f9ce1e7cbce4d 1462-1463
+  s_0585cfd11ae693::t_f04330f0bac658 1255
+.gitignore
+  s_0585cfd11ae693::t_bbc60a9e2a0b77 22
+crates/ccboard/src/main.rs
+  s_0585cfd11ae693::t_4aa2b0a5c326d0 1749
+crates/ccboard-tui/src/tabs/sessions.rs
+  s_0585cfd11ae693::t_4aa2b0a5c326d0 1002,1008
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "3757744d8a7a4a8264c720820633897ffe23310f",
+  "prompts": {},
+  "sessions": {
+    "s_0585cfd11ae693": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70beddb1-ee35-4d40-b4f8-ab61cc1fe014",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    },
+    "s_52fae4ac1e2d05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7924c587-9028-4927-8b24-a0ba65031ace",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
