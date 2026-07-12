@@ -1238,24 +1238,29 @@ impl DataStore {
         results
     }
 
-    /// Get project leaderboard with aggregated metrics
+    /// Get project leaderboard with aggregated metrics, filtered to `period`
     ///
-    /// Returns all projects with session count, total tokens, total cost, and average session cost.
+    /// Returns projects with session count, total tokens, total cost, and average session cost,
+    /// counting only sessions whose `first_timestamp` falls within `period`.
     /// Cost is calculated using accurate model-based pricing from the pricing module.
-    pub fn projects_leaderboard(&self) -> Vec<ProjectLeaderboardEntry> {
+    pub fn projects_leaderboard(&self, period: Period) -> Vec<ProjectLeaderboardEntry> {
         let mut project_metrics = std::collections::HashMap::new();
+        let cutoff = chrono::Local::now() - chrono::Duration::days(period.days() as i64);
 
         // Aggregate metrics per project
         for session in self.sessions.iter() {
             let metadata = session.value();
+
+            match metadata.first_timestamp {
+                Some(ts) if ts.with_timezone(&chrono::Local) >= cutoff => {}
+                _ => continue,
+            }
+
             let project_path = &metadata.project_path;
 
-            // Get model for this session (use first model, or "unknown")
-            let model = metadata
-                .models_used
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("unknown");
+            // Attribute the session to its majority model (deterministic, handles
+            // mid-session model switches better than an arbitrary first() pick)
+            let model = metadata.primary_model();
 
             // Calculate cost using accurate pricing
             let cost = crate::pricing::calculate_cost(
@@ -1454,12 +1459,8 @@ impl DataStore {
 
             sessions_with_timestamps += 1;
 
-            // Get model for this session (use first model, or "unknown")
-            let model = metadata
-                .models_used
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("unknown");
+            // Attribute the session to its majority model (see primary_model() docs)
+            let model = metadata.primary_model();
 
             // Calculate real cost using pricing table
             let cost = crate::pricing::calculate_cost(

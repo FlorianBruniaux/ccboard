@@ -87,6 +87,15 @@ static PRICING_TABLE: Lazy<HashMap<&'static str, ModelPricing>> = Lazy::new(|| {
     m.insert("claude-opus-4-6-20250212", opus_45_pricing.clone());
     m.insert("claude-opus-4-6", opus_45_pricing.clone());
     m.insert("claude-opus-4.6", opus_45_pricing.clone()); // dot-style alias
+                                                          // Opus 4.7/4.8: Anthropic has not published a separate rate for these releases,
+                                                          // so they're billed at the same $5/$25 Opus tier as 4.5/4.6 rather than falling
+                                                          // through to ModelPricing::default_average() (which underestimates Opus by ~36%).
+    m.insert("claude-opus-4-7", opus_45_pricing.clone());
+    m.insert("claude-opus-4.7", opus_45_pricing.clone()); // dot-style alias
+    m.insert("opus-4-7", opus_45_pricing.clone());
+    m.insert("claude-opus-4-8", opus_45_pricing.clone());
+    m.insert("claude-opus-4.8", opus_45_pricing.clone()); // dot-style alias
+    m.insert("opus-4-8", opus_45_pricing.clone());
     m.insert("opus-4", opus_45_pricing.clone());
     m.insert("claude-opus-4", opus_45_pricing);
 

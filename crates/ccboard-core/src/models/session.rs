@@ -558,6 +558,35 @@ impl SessionMetadata {
             format!("{} B", bytes)
         }
     }
+
+    /// Model that produced the most assistant messages in this session.
+    ///
+    /// Used to attribute session-level cost to a single model. `models_used` is built
+    /// from a `HashSet` at parse time and has no deterministic order, so picking
+    /// `models_used.first()` silently attributes mixed-model sessions (e.g. a Sonnet →
+    /// Opus switch) to an arbitrary model. `model_segments` records chronological
+    /// (model, message_count) runs, so summing counts per model gives a stable
+    /// majority pick instead.
+    pub fn primary_model(&self) -> &str {
+        if !self.model_segments.is_empty() {
+            let mut counts: std::collections::BTreeMap<&str, usize> =
+                std::collections::BTreeMap::new();
+            for (model, count) in &self.model_segments {
+                *counts.entry(model.as_str()).or_insert(0) += count;
+            }
+            // BTreeMap iterates by model name and max_by_key keeps the last maximum,
+            // so a count tie resolves to a fixed model name instead of depending on
+            // hash iteration order.
+            if let Some((model, _)) = counts.into_iter().max_by_key(|(_, count)| *count) {
+                return model;
+            }
+        }
+
+        self.models_used
+            .first()
+            .map(|s| s.as_str())
+            .unwrap_or("unknown")
+    }
 }
 
 /// A single conversation message extracted from session JSONL

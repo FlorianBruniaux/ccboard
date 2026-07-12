@@ -94,12 +94,15 @@ struct DailyAggregate {
     cost: f64,
 }
 
-/// Estimate cost from session
-///
-/// TODO: Integrate with StatsCache.model_pricing when available
-/// Currently uses placeholder: $0.01 per 1K tokens
+/// Estimate cost from session using real per-model pricing
 fn estimate_cost(session: &SessionMetadata) -> f64 {
-    (session.total_tokens as f64 / 1000.0) * 0.01
+    crate::pricing::calculate_cost(
+        session.primary_model(),
+        session.input_tokens,
+        session.output_tokens,
+        session.cache_creation_tokens,
+        session.cache_read_tokens,
+    )
 }
 
 /// Compute trends from sessions

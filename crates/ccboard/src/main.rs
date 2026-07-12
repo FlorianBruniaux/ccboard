@@ -1746,7 +1746,7 @@ async fn run_report(
             );
 
             md.push_str("## Summary\n\n");
-            md.push_str(&format!("| Metric | Value |\n|--------|-------|\n"));
+            md.push_str("| Metric | Value |\n|--------|-------|\n");
             md.push_str(&format!(
                 "| Total Tokens | {} |\n",
                 format_number(total_tokens)

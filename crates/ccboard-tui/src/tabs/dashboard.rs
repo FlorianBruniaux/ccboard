@@ -144,7 +144,19 @@ impl DashboardTab {
             })
             .unwrap_or_else(|| ("—".into(), p.muted, "avg 30d".into()));
 
-        self.render_stat_card(frame, chunks[0], "◆ Tokens", &tokens, p.focus, "total", p);
+        // Subtitle says "all-time" (not just "total") to distinguish this all-time,
+        // input+output-only figure (StatsCache::total_tokens(), sourced from
+        // stats-cache.json) from the Analytics tab's windowed, cache-inclusive
+        // "Tokens" card -- same label, different definition otherwise.
+        self.render_stat_card(
+            frame,
+            chunks[0],
+            "◆ Tokens",
+            &tokens,
+            p.focus,
+            "all-time",
+            p,
+        );
         self.render_stat_card(
             frame,
             chunks[1],
@@ -258,18 +270,25 @@ impl DashboardTab {
             .border_style(Style::default().fg(p.border))
             .style(Style::default().bg(p.surface))
             .title(Span::styled(
-                " ≡ 7-Day Activity ",
+                " ≡ 7-Day Token Activity ",
                 Style::default().fg(p.fg).bold(),
             ));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        // Get activity data
+        // Get activity data: daily token totals (not message counts), matching the
+        // unit of the "Tokens" card above this widget. Uses daily_model_tokens
+        // (same source consulted by the Costs tab's daily chart) rather than
+        // daily_activity's message_count, which used to make this sparkline read
+        // as "16K, 12K, 3K..." next to a 204M token total above it.
         let (data, labels): (Vec<u64>, Vec<String>) = stats
             .map(|s| {
-                let recent = s.recent_daily(7);
-                let data: Vec<u64> = recent.iter().map(|d| d.message_count).collect();
+                let recent: Vec<_> = s.daily_model_tokens.iter().rev().take(7).rev().collect();
+                let data: Vec<u64> = recent
+                    .iter()
+                    .map(|d| d.tokens_by_model.values().sum())
+                    .collect();
                 let labels: Vec<String> = recent
                     .iter()
                     .map(|d| {
@@ -503,7 +522,20 @@ impl DashboardTab {
     ) {
         let estimate = store.map(|s| s.usage_estimate());
 
-        let (plan_name, plan, cost_today, cost_week, cost_month, budget, pct_month) = estimate
+        #[allow(clippy::type_complexity)]
+        let (
+            plan_name,
+            plan,
+            cost_today,
+            cost_week,
+            cost_month,
+            daily_budget,
+            weekly_budget,
+            monthly_budget,
+            pct_today,
+            pct_week,
+            pct_month,
+        ) = estimate
             .as_ref()
             .map(|est| {
                 (
@@ -512,7 +544,11 @@ impl DashboardTab {
                     est.cost_today,
                     est.cost_week,
                     est.cost_month,
+                    est.daily_budget_usd,
+                    est.weekly_budget_usd,
                     est.budget_usd,
+                    est.percent_today(),
+                    est.percent_week(),
                     est.percent_month(),
                 )
             })
@@ -524,35 +560,38 @@ impl DashboardTab {
                 0.0,
                 None,
                 None,
+                None,
+                None,
+                None,
+                None,
             ));
 
-        // Create 3 lines: Today, Week, Month
-        let today_line = if let Some(budget) = budget {
+        // Create 3 lines: Today, Week, Month. Each is checked against its own
+        // prorated slice of the monthly budget, not the full monthly figure --
+        // otherwise a single day's spend would always read as "0-something% of
+        // $200" and a normal week would already show 100%.
+        let today_line = if let (Some(budget), Some(pct)) = (daily_budget, pct_today) {
             format!(
-                "Today:      ${:>6.2} / ${:<6.0}  ({:>5.1}%)",
-                cost_today,
-                budget,
-                (cost_today / budget * 100.0).min(100.0)
+                "Today:      ${:>6.2} / ${:<6.2}  ({:>5.1}%)",
+                cost_today, budget, pct
             )
         } else {
             format!("Today:      ${:>6.2}", cost_today)
         };
 
-        let week_line = if let Some(budget) = budget {
+        let week_line = if let (Some(budget), Some(pct)) = (weekly_budget, pct_week) {
             format!(
-                "This week:  ${:>6.2} / ${:<6.0}  ({:>5.1}%)",
-                cost_week,
-                budget,
-                (cost_week / budget * 100.0).min(100.0)
+                "This week:  ${:>6.2} / ${:<6.2}  ({:>5.1}%)",
+                cost_week, budget, pct
             )
         } else {
             format!("This week:  ${:>6.2}", cost_week)
         };
 
-        let month_line = if let Some(budget) = budget {
-            let color = if pct_month.unwrap_or(0.0) > 80.0 {
+        let month_line = if let (Some(budget), Some(pct)) = (monthly_budget, pct_month) {
+            let color = if pct > 80.0 {
                 p.error
-            } else if pct_month.unwrap_or(0.0) > 60.0 {
+            } else if pct > 60.0 {
                 p.warning
             } else {
                 p.success
@@ -563,11 +602,7 @@ impl DashboardTab {
                     format!("${:>6.2}", cost_month),
                     Style::default().fg(color).add_modifier(Modifier::BOLD),
                 ),
-                Span::raw(format!(
-                    " / ${:<6.0}  ({:>5.1}%)",
-                    budget,
-                    pct_month.unwrap_or(0.0)
-                )),
+                Span::raw(format!(" / ${:<6.0}  ({:>5.1}%)", budget, pct)),
             ]
         } else {
             vec![Span::raw(format!("This month: ${:>6.2}", cost_month))]

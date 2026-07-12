@@ -473,7 +473,10 @@ impl AnalyticsTab {
             ])
             .split(area);
 
-        // Total tokens
+        // Total tokens for the selected period. Includes cache_read/cache_write
+        // tokens (SessionMetadata::total_tokens, session.rs), unlike the Dashboard
+        // tab's all-time "Tokens" card which is input+output only. Subtitle flags
+        // that explicitly so the two cards aren't read as the same metric.
         let total_tokens: u64 = data.trends.daily_tokens.iter().sum();
         let tokens_display = Self::format_number(total_tokens);
         self.render_stat_card(
@@ -482,7 +485,7 @@ impl AnalyticsTab {
             "◆ Tokens",
             &tokens_display,
             p.focus,
-            "total",
+            "incl. cache",
             p,
         );
 
@@ -1460,8 +1463,8 @@ impl AnalyticsTab {
         store: &Arc<DataStore>,
         p: &Palette,
     ) {
-        // Get leaderboard data
-        let mut entries = store.projects_leaderboard();
+        // Get leaderboard data, filtered to the currently selected F1/F2/F3/F4 period
+        let mut entries = store.projects_leaderboard(self.current_period);
 
         // Sort based on current selection
         match self.leaderboard_sort {

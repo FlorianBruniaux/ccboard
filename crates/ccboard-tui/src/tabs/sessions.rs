@@ -999,13 +999,13 @@ impl SessionsTab {
                 sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
             }
             SessionSortMode::DateAsc => {
-                sessions.sort_by(|a, b| a.last_timestamp.cmp(&b.last_timestamp));
+                sessions.sort_by_key(|a| a.last_timestamp);
             }
             SessionSortMode::TokensDesc => {
                 sessions.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
             }
             SessionSortMode::TokensAsc => {
-                sessions.sort_by(|a, b| a.total_tokens.cmp(&b.total_tokens));
+                sessions.sort_by_key(|a| a.total_tokens);
             }
             SessionSortMode::DurationDesc => {
                 sessions.sort_by(|a, b| {

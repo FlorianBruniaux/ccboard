@@ -455,7 +455,7 @@ fn project_display_name(project_id: &str) -> String {
     // or the raw path "/Users/florianbruniaux/Sites/perso/ccboard"
     let clean = project_id.trim_start_matches('-').trim_start_matches('/');
     clean
-        .rsplit(|c| c == '/' || c == '-')
+        .rsplit(['/', '-'])
         .find(|s| !s.is_empty())
         .unwrap_or(project_id)
         .to_string()

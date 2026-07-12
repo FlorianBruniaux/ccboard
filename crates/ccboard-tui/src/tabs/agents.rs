@@ -209,7 +209,7 @@ fn parse_frontmatter(path: &Path) -> Frontmatter {
     // Check if body uses ${CLAUDE_EFFORT}
     fm.uses_effort_var = parts
         .get(2)
-        .map_or(false, |body| body.contains("${CLAUDE_EFFORT}"));
+        .is_some_and(|body| body.contains("${CLAUDE_EFFORT}"));
 
     for line in yaml_block.lines() {
         let line = line.trim();
@@ -237,7 +237,7 @@ fn parse_frontmatter(path: &Path) -> Frontmatter {
     fm
 }
 
-fn scalar_value<'a>(line: &'a str, key: &str) -> Option<String> {
+fn scalar_value(line: &str, key: &str) -> Option<String> {
     let val = line.strip_prefix(key)?.trim();
     Some(val.trim_matches('"').trim_matches('\'').to_string())
 }

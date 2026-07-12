@@ -19,6 +19,7 @@ Thumbs.db
 .claude/settings.local.json
 .claude/cache/
 .claude/.task-*
+.claude/worktrees/
 claudedocs/
 
 # Temporary files
