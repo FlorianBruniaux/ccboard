@@ -1,0 +1,127 @@
+crates/ccboard-web/src/router.rs
+  s_0585cfd11ae693::t_d2edaad19348ff 541
+  s_0585cfd11ae693::t_55e42875d84384 595
+  s_0585cfd11ae693::t_9e3fa265ce5177 493,500
+  s_0585cfd11ae693::t_a7a2110bbccfa9 696,702,704-710
+  s_0585cfd11ae693::t_1db97842aecbe7 221
+  s_0585cfd11ae693::t_57e1e057980bf6 376,1056
+  s_0585cfd11ae693::t_2676f894ec19fa 643
+  s_0585cfd11ae693::t_62b8fb312bcee1 305
+  s_0585cfd11ae693::t_f00f8064bd33aa 632
+crates/ccboard-core/src/analytics/mod.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 234
+  s_0585cfd11ae693::t_42bf373de11a13 241,247
+crates/ccboard-core/src/quota.rs
+  s_0585cfd11ae693::t_b2a0f324e46b30 88,90-93,95,97,99-112,117-118,121,124,128
+  s_0585cfd11ae693::t_cdf1bf3f448005 47-50
+  s_0585cfd11ae693::t_04c2386af89af4 147-158,160-166,171-172,174,178,186-187,189,193,202-220,223,229
+  s_0585cfd11ae693::t_5a3d3506c513f2 3-5
+  s_0585cfd11ae693::t_cb65b837fcd5d5 42,44-46,51-52,64-65
+  s_0585cfd11ae693::t_d497c605a2431e 7-8,10
+crates/ccboard-web/src/components/session_table.rs
+  s_0585cfd11ae693::t_747364e42737c6 312-313
+  s_0585cfd11ae693::t_8380e2c149696b 260-263,265-266
+  s_0585cfd11ae693::t_06a045ec208b43 289-295,297-311
+crates/ccboard-core/src/analytics/patterns.rs
+  s_0585cfd11ae693::t_48b063a6c3c77b 66,68-74
+crates/ccboard-web/src/components/session_detail_modal.rs
+  s_0585cfd11ae693::t_70169acf024cb3 210-211
+  s_0585cfd11ae693::t_5d9cdb805f7567 203
+  s_0585cfd11ae693::t_8ad1820821e4eb 180-181,183,185,187-192,196-202,204-209
+crates/ccboard-core/src/export.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 250,372
+crates/ccboard-types/src/models/stats.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 194,239
+crates/ccboard-web/src/pages/analytics.rs
+  s_0585cfd11ae693::t_041f1297d36a80 179,181-187
+  s_0585cfd11ae693::t_a0d29e4ed314b0 371-372
+  s_0585cfd11ae693::t_06cb13f37af33c 376-398
+  s_0585cfd11ae693::t_10b001875051a4 455,459-461
+  s_0585cfd11ae693::t_edac1f5fe022a4 424
+  s_0585cfd11ae693::t_37597f5acfe341 231-232,256-257
+  s_0585cfd11ae693::t_3b6d0aa87b78fd 180
+  s_0585cfd11ae693::t_0acf2398b3316f 556-559
+  s_0585cfd11ae693::t_12e8c3d1126046 420-421
+  s_0585cfd11ae693::t_07f8b1e365e7ce 220-230,233-244,250-255,258-262
+  s_0585cfd11ae693::t_57c7b6f757664b 373-375
+crates/ccboard-core/src/models/stats.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 210,277
+  s_0585cfd11ae693::t_ad0949c13d62c1 291-295
+  s_0585cfd11ae693::t_0b62506892c0a3 235,238-258
+  s_0585cfd11ae693::t_59b2c5d687aa4a 259
+crates/ccboard-web/src/api.rs
+  s_0585cfd11ae693::t_b953c9bef3e424 51-52
+crates/ccboard/src/main.rs
+  s_0585cfd11ae693::t_2c45212b31e6d1 1554-1563,1565,1567,1577
+crates/ccboard-core/src/analytics/anomalies.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 339
+  s_0585cfd11ae693::t_eb1af47412f0f1 237
+  s_0585cfd11ae693::t_6f8d2fe4b0d39c 290-296
+  s_0585cfd11ae693::t_45539b0f3cda79 192-196
+crates/ccboard-core/src/analytics/discover_llm.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 99
+crates/ccboard-core/src/analytics/forecasting.rs
+  s_0585cfd11ae693::t_2fa5067ad86a15 98-106,108,111-118
+  s_0585cfd11ae693::t_5bacaa2c73e6d7 63-64,68-70,72-73,83-84
+  s_0585cfd11ae693::t_27b7811ddf1217 131-158,161-162,165-167
+  s_0585cfd11ae693::t_bd56d6393af0fa 159-160,163-164
+  s_0585cfd11ae693::t_2cd5740e15d070 32
+crates/ccboard-core/src/store.rs
+  s_0585cfd11ae693::t_17e5338fc347c3 589,593,597-603
+  s_0585cfd11ae693::t_bcc23e1f7cf994 548,550,555-560,565-566
+  s_0585cfd11ae693::t_3da69ea82ff4d7 1488-1513
+  s_0585cfd11ae693::t_b39d2934dfb419 1529-1567
+  s_0585cfd11ae693::t_57e1e057980bf6 419,965,984,1123,1211,1230,1250
+crates/ccboard-ffi/src/lib.rs
+  s_0585cfd11ae693::t_1c321dcf90b000 344-348,350,354
+  s_0585cfd11ae693::t_48ac88e5846880 495-506
+crates/ccboard-tui/src/tabs/analytics.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 1269,1952
+crates/ccboard-core/src/analytics/plugin_usage.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 354
+  s_0585cfd11ae693::t_70169acf024cb3 451
+  s_0585cfd11ae693::t_f3247abfc448c5 335-344
+  s_0585cfd11ae693::t_4ebe70ae62df2d 427,429,445-450,452,455,458-459,467,469
+  s_0585cfd11ae693::t_f5144ad6379cc0 18,226-228,236,243,273-281,283
+crates/ccboard-core/src/usage_estimator.rs
+  s_0585cfd11ae693::t_70169acf024cb3 109
+crates/ccboard-core/src/cache/metadata_cache.rs
+  s_0585cfd11ae693::t_f925085a563f9d 699
+  s_0585cfd11ae693::t_d402eb8c3d8bc5 260,263,273
+  s_0585cfd11ae693::t_3d4135d716dfee 296,299
+  s_0585cfd11ae693::t_ddb46b8a2455ad 628,631,641
+  s_0585cfd11ae693::t_ec1c950535dc23 322
+  s_0585cfd11ae693::t_11ee3697ebae99 672,675
+  s_0585cfd11ae693::t_12d80605557e47 347,359
+crates/ccboard-core/src/analytics/optimization.rs
+  s_0585cfd11ae693::t_44bd21762ef946 181-188,194,196-197
+crates/ccboard-tui/src/tabs/costs.rs
+  s_0585cfd11ae693::t_5c56342d3f7574 238-244
+  s_0585cfd11ae693::t_67150e74ef263a 500-506
+  s_0585cfd11ae693::t_1faf751cca39aa 579-585
+  s_0585cfd11ae693::t_d74d9e8c344c8a 576,578
+crates/ccboard-core/src/analytics/tool_chains.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 99,110
+crates/ccboard-tui/src/tabs/plugins.rs
+  s_0585cfd11ae693::t_6171abe0e95197 182-185,188-193
+crates/ccboard-tui/src/tabs/history.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 306
+crates/ccboard-tui/src/tabs/sessions.rs
+  s_0585cfd11ae693::t_57e1e057980bf6 999,1005,1026,1828
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "fde5fb2254b7537376161f121f85660ba1cd1fa4",
+  "prompts": {},
+  "sessions": {
+    "s_0585cfd11ae693": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70beddb1-ee35-4d40-b4f8-ab61cc1fe014",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
