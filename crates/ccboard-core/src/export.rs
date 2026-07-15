@@ -247,7 +247,7 @@ pub fn export_stats_to_csv(stats: &StatsCache, path: &Path) -> Result<()> {
         .iter()
         .filter(|(_, u)| u.total_tokens() > 0)
         .collect();
-    models.sort_by(|a, b| b.1.total_tokens().cmp(&a.1.total_tokens()));
+    models.sort_by_key(|b| std::cmp::Reverse(b.1.total_tokens()));
 
     for (name, usage) in &models {
         writeln!(
@@ -369,7 +369,7 @@ pub fn export_stats_to_markdown(stats: &StatsCache, path: &Path) -> Result<()> {
             .iter()
             .filter(|(_, u)| u.total_tokens() > 0)
             .collect();
-        models.sort_by(|a, b| b.1.total_tokens().cmp(&a.1.total_tokens()));
+        models.sort_by_key(|b| std::cmp::Reverse(b.1.total_tokens()));
 
         for (name, usage) in &models {
             writeln!(

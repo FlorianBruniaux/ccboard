@@ -341,12 +341,17 @@ impl CcboardHandle {
             0.0
         };
 
+        let quota = ccboard_core::quota::calculate_quota_status(
+            &self.store.all_sessions(),
+            &ccboard_core::models::config::BudgetConfig::default(),
+        );
+
         Some(FfiStats {
-            total_sessions: stats.total_sessions,
+            total_sessions: self.store.session_count() as u64,
             total_messages: stats.total_messages,
             daily_activity,
             model_usage,
-            this_month_cost: 0.0, // Claudoscope computes cost via its pricing tables
+            this_month_cost: quota.current_cost,
             cache_hit_ratio,
         })
     }
@@ -487,14 +492,18 @@ fn session_to_ffi(s: &ccboard_core::models::session::SessionMetadata) -> FfiSess
         parent_session_id: s.parent_session_id.clone(),
         duration_seconds: s.duration_seconds,
         branch: s.branch.clone(),
-        tool_usage: s
-            .tool_usage
-            .iter()
-            .map(|(name, count)| FfiToolCount {
-                name: name.clone(),
-                count: *count as u64,
-            })
-            .collect(),
+        tool_usage: {
+            let mut tool_usage: Vec<FfiToolCount> = s
+                .tool_usage
+                .iter()
+                .map(|(name, count)| FfiToolCount {
+                    name: name.clone(),
+                    count: *count as u64,
+                })
+                .collect();
+            tool_usage.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
+            tool_usage
+        },
         source_tool: format!("{:?}", s.source_tool).to_lowercase(),
         lines_added: s.lines_added,
         lines_removed: s.lines_removed,

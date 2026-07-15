@@ -176,6 +176,15 @@ fn AnalyticsOverview(data: crate::api::StatsData) -> impl IntoView {
         .unwrap_or_else(|| "N/A".to_string());
     let forecast_cost = data.forecast_cost_30d;
 
+    let total_tokens = data.total_tokens();
+    let lifetime_cost = data.total_cost();
+    let daily_tokens_30d = data.daily_tokens_30d.clone();
+    let daily_tokens_30d_fallback = daily_tokens_30d.clone();
+    let forecast_tokens_30d = data.forecast_tokens_30d.clone();
+    let forecast_tokens_30d_fallback = forecast_tokens_30d.clone();
+    let forecast_confidence = data.forecast_confidence;
+    let quota_resource = LocalResource::new(move || async move { crate::api::fetch_quota().await });
+
     view! {
         <div class="analytics-content">
             // Key metrics summary (top section)
@@ -208,21 +217,49 @@ fn AnalyticsOverview(data: crate::api::StatsData) -> impl IntoView {
 
             // Forecast chart section
             <div class="forecast-section">
-                <ForecastChart
-                    historical={data.daily_tokens_30d.clone()}
-                    forecast={data.forecast_tokens_30d.clone()}
-                    budget={None::<u64>}
-                    confidence={data.forecast_confidence}
-                />
+                <Suspense fallback=move || view! {
+                    <ForecastChart
+                        historical={daily_tokens_30d_fallback.clone()}
+                        forecast={forecast_tokens_30d_fallback.clone()}
+                        budget={None::<u64>}
+                        confidence={forecast_confidence}
+                    />
+                }>
+                    {move || {
+                        quota_resource.get().map(|result| {
+                            let budget = result.as_ref().ok().and_then(|q| q.budget_limit).and_then(|dollars| {
+                                (total_tokens > 0 && lifetime_cost > 0.0)
+                                    .then(|| (dollars / (lifetime_cost / total_tokens as f64)) as u64)
+                            });
+                            view! {
+                                <ForecastChart
+                                    historical={daily_tokens_30d.clone()}
+                                    forecast={forecast_tokens_30d.clone()}
+                                    budget={budget}
+                                    confidence={forecast_confidence}
+                                />
+                            }
+                        })
+                    }}
+                </Suspense>
             </div>
 
             // Breakdown section (side by side on desktop, stacked on mobile)
             <div class="breakdown-section">
                 <div class="breakdown-left">
-                    <BudgetStatus
-                        used={data.total_tokens()}
-                        budget={None::<u64>}
-                    />
+                    <Suspense fallback=move || view! {
+                        <BudgetStatus used={total_tokens} budget={None::<u64>} />
+                    }>
+                        {move || {
+                            quota_resource.get().map(|result| {
+                                let budget = result.as_ref().ok().and_then(|q| q.budget_limit).and_then(|dollars| {
+                                    (total_tokens > 0 && lifetime_cost > 0.0)
+                                        .then(|| (dollars / (lifetime_cost / total_tokens as f64)) as u64)
+                                });
+                                view! { <BudgetStatus used={total_tokens} budget={budget} /> }
+                            })
+                        }}
+                    </Suspense>
                 </div>
                 <div class="breakdown-right">
                     <ProjectsBreakdown
@@ -331,11 +368,34 @@ fn AnalyticsPatterns(data: crate::api::StatsData) -> impl IntoView {
     };
 
     // Calculate average tokens per session
-    let avg_tokens_per_session = if data.total_sessions > 0 {
-        data.total_tokens() / data.total_sessions
-    } else {
-        0
-    };
+    let avg_tokens_per_session = data
+        .total_tokens()
+        .checked_div(data.total_sessions)
+        .unwrap_or(0);
+
+    let (peak_period, peak_range) = data
+        .hour_counts
+        .iter()
+        .filter_map(|(hour, count)| hour.parse::<u32>().ok().map(|h| (h, *count)))
+        .max_by_key(|(_, count)| *count)
+        .map(|(hour, _)| {
+            let period = match hour {
+                0..=5 => "Night",
+                6..=11 => "Morning",
+                12..=17 => "Afternoon",
+                _ => "Evening",
+            };
+            let format_hour = |h: u32| {
+                let h12 = if h % 12 == 0 { 12 } else { h % 12 };
+                let suffix = if h < 12 { "AM" } else { "PM" };
+                format!("{}{}", h12, suffix)
+            };
+            (
+                period.to_string(),
+                format!("{}-{}", format_hour(hour), format_hour((hour + 1) % 24)),
+            )
+        })
+        .unwrap_or_else(|| ("N/A".to_string(), "No data".to_string()));
 
     view! {
         <div class="analytics-patterns">
@@ -357,11 +417,11 @@ fn AnalyticsPatterns(data: crate::api::StatsData) -> impl IntoView {
                 <div class="pattern-card">
                     <h4>"⏰ Peak Usage"</h4>
                     <div class="pattern-metric">
-                        <span class="pattern-value">"Morning"</span>
-                        <span class="pattern-label">"9AM-12PM"</span>
+                        <span class="pattern-value">{peak_period}</span>
+                        <span class="pattern-label">{peak_range}</span>
                     </div>
                     <p class="pattern-note">
-                        "Most active time window (typical pattern)"
+                        "Most active hour based on your session history"
                     </p>
                 </div>
 
@@ -392,12 +452,13 @@ fn AnalyticsPatterns(data: crate::api::StatsData) -> impl IntoView {
                 <h4>"📈 Weekly Distribution"</h4>
                 <p>"Last 7 days activity breakdown:"</p>
                 <div class="weekly-bars">
-                    {data.daily_activity.iter().rev().take(7).rev().enumerate().map(|(i, activity)| {
+                    {data.daily_activity.iter().rev().take(7).rev().map(|activity| {
                         let activity_sessions = activity.session_count;
                         let max_activity = data.daily_activity.iter().map(|a| a.session_count).max().unwrap_or(1);
                         let height_pct = (activity_sessions as f64 / max_activity as f64 * 100.0).min(100.0);
-                        let day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-                        let day_name = day_names[i % 7];
+                        let day_name = chrono::NaiveDate::parse_from_str(&activity.date, "%Y-%m-%d")
+                            .map(|d| d.format("%a").to_string())
+                            .unwrap_or_else(|_| "?".to_string());
                         view! {
                             <div class="weekly-bar">
                                 <div class="weekly-bar__fill" style=format!("height: {}%", height_pct)>
@@ -492,11 +553,10 @@ fn AnalyticsInsights(data: crate::api::StatsData) -> impl IntoView {
     }
 
     // Session patterns insight
-    let avg_tokens_per_session = if data.total_sessions > 0 {
-        data.total_tokens() / data.total_sessions
-    } else {
-        0
-    };
+    let avg_tokens_per_session = data
+        .total_tokens()
+        .checked_div(data.total_sessions)
+        .unwrap_or(0);
     if avg_tokens_per_session > 100_000 {
         insights.push((
             "⚡",

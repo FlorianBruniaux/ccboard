@@ -996,13 +996,13 @@ impl SessionsTab {
         // Apply sort mode
         match self.sort_mode {
             SessionSortMode::DateDesc => {
-                sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+                sessions.sort_by_key(|b| std::cmp::Reverse(b.last_timestamp));
             }
             SessionSortMode::DateAsc => {
                 sessions.sort_by_key(|a| a.last_timestamp);
             }
             SessionSortMode::TokensDesc => {
-                sessions.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
+                sessions.sort_by_key(|b| std::cmp::Reverse(b.total_tokens));
             }
             SessionSortMode::TokensAsc => {
                 sessions.sort_by_key(|a| a.total_tokens);
@@ -1023,7 +1023,7 @@ impl SessionsTab {
                 });
             }
             SessionSortMode::MessagesDesc => {
-                sessions.sort_by(|a, b| b.message_count.cmp(&a.message_count));
+                sessions.sort_by_key(|b| std::cmp::Reverse(b.message_count));
             }
         }
 
@@ -1825,7 +1825,7 @@ impl SessionsTab {
                 ),
             ]));
             let mut sorted_children = children;
-            sorted_children.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
+            sorted_children.sort_by_key(|b| std::cmp::Reverse(b.total_tokens));
             let child_count = sorted_children.len();
             for (i, child) in sorted_children.iter().take(5).enumerate() {
                 let connector = if i + 1 == child_count.min(5) {

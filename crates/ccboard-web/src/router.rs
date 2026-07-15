@@ -218,7 +218,7 @@ async fn stats_handler(
                 session.output_tokens,
                 session.cache_creation_tokens,
                 session.cache_read_tokens,
-                &session.models_used,
+                session.primary_model(),
             );
             *project_costs
                 .entry(session.project_path.as_str().to_string())
@@ -302,7 +302,7 @@ async fn stats_handler(
                             s.output_tokens,
                             s.cache_creation_tokens,
                             s.cache_read_tokens,
-                            &s.models_used,
+                            s.primary_model(),
                         )
                     })
                     .sum();
@@ -373,7 +373,7 @@ async fn recent_sessions_handler(
     let mut all_sessions = store.all_sessions();
 
     // Sort by date desc
-    all_sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+    all_sessions.sort_by_key(|b| std::cmp::Reverse(b.last_timestamp));
 
     let sessions: Vec<_> = all_sessions
         .iter()
@@ -490,14 +490,14 @@ async fn sessions_handler(
                 a.output_tokens,
                 a.cache_creation_tokens,
                 a.cache_read_tokens,
-                &a.models_used,
+                a.primary_model(),
             );
             let cost_b = calculate_session_cost(
                 b.input_tokens,
                 b.output_tokens,
                 b.cache_creation_tokens,
                 b.cache_read_tokens,
-                &b.models_used,
+                b.primary_model(),
             );
             if params.order == "asc" {
                 cost_a
@@ -538,7 +538,7 @@ fn session_to_json(s: &ccboard_core::models::SessionMetadata) -> serde_json::Val
         s.output_tokens,
         s.cache_creation_tokens,
         s.cache_read_tokens,
-        &s.models_used,
+        s.primary_model(),
     );
 
     serde_json::json!({
@@ -592,7 +592,7 @@ async fn plugins_handler(
     let commands: Vec<String> = invocation_stats.commands.keys().cloned().collect();
 
     // Compute plugin analytics
-    let analytics = aggregate_plugin_usage(&sessions, &skills, &commands);
+    let analytics = aggregate_plugin_usage(&sessions, &skills, &commands, &invocation_stats);
 
     // Return JSON response
     axum::Json(serde_json::json!({
@@ -629,7 +629,7 @@ async fn analytics_suggestions_handler(
     let invocation_stats = store.invocation_stats();
     let skills: Vec<String> = invocation_stats.skills.keys().cloned().collect();
     let commands: Vec<String> = invocation_stats.commands.keys().cloned().collect();
-    let plugin_analytics = aggregate_plugin_usage(&sessions, &skills, &commands);
+    let plugin_analytics = aggregate_plugin_usage(&sessions, &skills, &commands, &invocation_stats);
 
     // Estimate monthly cost from all sessions
     let total_cost: f64 = sessions
@@ -640,7 +640,7 @@ async fn analytics_suggestions_handler(
                 s.output_tokens,
                 s.cache_creation_tokens,
                 s.cache_read_tokens,
-                &s.models_used,
+                s.primary_model(),
             )
         })
         .sum();
@@ -693,33 +693,21 @@ async fn tool_stats_handler(
     }))
 }
 
-/// Calculate rough cost estimate for a session
+/// Calculate cost estimate for a session
 fn calculate_session_cost(
     input_tokens: u64,
     output_tokens: u64,
     cache_creation_tokens: u64,
     cache_read_tokens: u64,
-    models: &[String],
+    model: &str,
 ) -> f64 {
-    // Default to Sonnet 4.5 pricing if unknown model
-    // Input: $3/MTok, Output: $15/MTok, Cache write: $3.75/MTok, Cache read: $0.30/MTok
-    let is_opus = models.iter().any(|m| m.contains("opus"));
-    let is_haiku = models.iter().any(|m| m.contains("haiku"));
-
-    let (input_price, output_price, cache_write_price, cache_read_price) = if is_opus {
-        (15.0, 75.0, 18.75, 1.5) // Opus 4 pricing
-    } else if is_haiku {
-        (0.8, 4.0, 1.0, 0.08) // Haiku 4 pricing
-    } else {
-        (3.0, 15.0, 3.75, 0.3) // Sonnet 4.5 pricing (default)
-    };
-
-    let input_cost = (input_tokens as f64 / 1_000_000.0) * input_price;
-    let output_cost = (output_tokens as f64 / 1_000_000.0) * output_price;
-    let cache_write_cost = (cache_creation_tokens as f64 / 1_000_000.0) * cache_write_price;
-    let cache_read_cost = (cache_read_tokens as f64 / 1_000_000.0) * cache_read_price;
-
-    input_cost + output_cost + cache_write_cost + cache_read_cost
+    ccboard_core::pricing::calculate_cost(
+        model,
+        input_tokens,
+        output_tokens,
+        cache_creation_tokens,
+        cache_read_tokens,
+    )
 }
 
 /// Config handler - returns merged settings (global + project + local)
@@ -1065,7 +1053,7 @@ async fn task_graph_handler(
         let mut all_events = Vec::new();
         let sessions = store.all_sessions();
         let mut sorted = sessions;
-        sorted.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.last_timestamp));
         for session in sorted.into_iter().take(50) {
             if let Ok(events) = TodoWriteParser::parse_session(&session.file_path) {
                 all_events.extend(events);

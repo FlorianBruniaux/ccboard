@@ -96,7 +96,7 @@ pub fn analyze_tool_chains(sessions: &[Arc<SessionMetadata>]) -> ToolChainAnalys
             sessions_count: sess.len(),
         })
         .collect();
-    top_bigrams.sort_by(|a, b| b.frequency.cmp(&a.frequency));
+    top_bigrams.sort_by_key(|b| std::cmp::Reverse(b.frequency));
     top_bigrams.truncate(10);
 
     let mut top_trigrams: Vec<ToolChain> = trigrams
@@ -107,7 +107,7 @@ pub fn analyze_tool_chains(sessions: &[Arc<SessionMetadata>]) -> ToolChainAnalys
             sessions_count: sess.len(),
         })
         .collect();
-    top_trigrams.sort_by(|a, b| b.frequency.cmp(&a.frequency));
+    top_trigrams.sort_by_key(|b| std::cmp::Reverse(b.frequency));
     top_trigrams.truncate(10);
 
     // Most expensive chains: rank bigrams by combined token usage

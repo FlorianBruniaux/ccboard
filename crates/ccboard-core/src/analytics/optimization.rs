@@ -178,16 +178,23 @@ pub fn generate_model_recommendations(
     let avg_tool_calls = total_tool_calls_opus as f64 / opus_sessions as f64;
 
     if opus_pct > OPUS_THRESHOLD && avg_tool_calls < LOW_TOOL_CALLS as f64 {
-        // Opus is ~5x more expensive than Sonnet; estimate 70% savings on Opus sessions
-        let savings = total_monthly_cost * opus_pct * 0.70;
+        let opus_cost = crate::pricing::calculate_cost("opus-4", 1_000_000, 1_000_000, 0, 0);
+        let sonnet_cost = crate::pricing::calculate_cost("sonnet-4", 1_000_000, 1_000_000, 0, 0);
+        let cost_ratio = if sonnet_cost > 0.0 {
+            opus_cost / sonnet_cost
+        } else {
+            1.0
+        };
+        let savings = total_monthly_cost * opus_pct * (1.0 - 1.0 / cost_ratio);
         vec![CostSuggestion {
             category: OptimizationCategory::ModelDowngrade,
             title: format!("Switch {:.0}% of Opus sessions to Sonnet", opus_pct * 100.0),
             description: format!(
                 "{:.0}% of sessions use Opus with only ~{:.0} avg tool calls — \
-                 Sonnet handles most coding tasks at ~5× lower cost.",
+                 Sonnet handles most coding tasks at ~{:.1}× lower cost.",
                 opus_pct * 100.0,
-                avg_tool_calls
+                avg_tool_calls,
+                cost_ratio
             ),
             potential_savings: savings,
             action: "Use claude-sonnet-4-6 for routine tasks, reserve Opus 4.6 for complex \

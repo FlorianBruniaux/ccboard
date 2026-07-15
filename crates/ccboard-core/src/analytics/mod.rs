@@ -187,15 +187,6 @@ impl AnalyticsData {
             thresholds,
         );
 
-        // Aggregate per-tool token usage across all sessions
-        let mut aggregated_tool_tokens: std::collections::HashMap<String, u64> =
-            std::collections::HashMap::new();
-        for session in sessions {
-            for (tool, &tokens) in &session.tool_token_usage {
-                *aggregated_tool_tokens.entry(tool.clone()).or_default() += tokens;
-            }
-        }
-
         // Aggregate per-tool call counts and token usage for the period only
         let mut period_tool_calls: std::collections::HashMap<String, usize> =
             std::collections::HashMap::new();
@@ -240,20 +231,20 @@ impl AnalyticsData {
                 }
             })
             .collect();
-        tool_token_stats.sort_by(|a, b| b.tokens.cmp(&a.tokens));
+        tool_token_stats.sort_by_key(|b| std::cmp::Reverse(b.tokens));
 
         // Generate cost suggestions (plugin_analytics populated with empty data here;
         // full plugin analytics with dead-code detection requires skill/command lists
         // which are provided by DataStore when calling the analytics tab)
         let mut cost_suggestions = optimization::generate_cost_suggestions(
             &plugin_usage::PluginAnalytics::empty(),
-            &aggregated_tool_tokens,
+            &period_tool_tokens,
             total_cost_estimate,
         );
 
         // Append model downgrade recommendations
         let model_recs =
-            optimization::generate_model_recommendations(sessions, total_cost_estimate);
+            optimization::generate_model_recommendations(&period_sessions, total_cost_estimate);
         cost_suggestions.extend(model_recs);
         // Re-sort by potential savings descending after merge
         cost_suggestions.sort_by(|a, b| {

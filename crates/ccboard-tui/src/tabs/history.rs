@@ -303,7 +303,7 @@ impl HistoryTab {
 
         // Sort by date (newest first)
         self.filtered_sessions
-            .sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+            .sort_by_key(|b| std::cmp::Reverse(b.last_timestamp));
 
         // Reset selection
         if !self.filtered_sessions.is_empty() {

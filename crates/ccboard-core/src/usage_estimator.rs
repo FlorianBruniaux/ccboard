@@ -106,7 +106,7 @@ impl UsageEstimate {
 }
 
 /// Number of days in the month containing `date`
-fn days_in_month(date: NaiveDate) -> i64 {
+pub(crate) fn days_in_month(date: NaiveDate) -> i64 {
     let (next_year, next_month) = if date.month() == 12 {
         (date.year() + 1, 1)
     } else {

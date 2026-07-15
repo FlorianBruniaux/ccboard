@@ -179,13 +179,18 @@ impl PluginsTab {
         // Get all sessions (limit to recent 10000 for performance)
         let sessions = store.recent_sessions(10000);
 
-        // Extract skill and command names from store
-        // TODO: Implement proper skill/command extraction from .claude/skills and .claude/commands
-        let skills = vec![]; // Placeholder
-        let commands = vec![]; // Placeholder
+        // Extract skill and command names from invocation stats
+        let invocation_stats = store.invocation_stats();
+        let skills: Vec<String> = invocation_stats.skills.keys().cloned().collect();
+        let commands: Vec<String> = invocation_stats.commands.keys().cloned().collect();
 
         // Compute analytics
-        self.analytics = Some(aggregate_plugin_usage(&sessions, &skills, &commands));
+        self.analytics = Some(aggregate_plugin_usage(
+            &sessions,
+            &skills,
+            &commands,
+            &invocation_stats,
+        ));
 
         // Reset selection to first item
         self.top_usage_state.select(Some(0));

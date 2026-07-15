@@ -257,9 +257,13 @@ pub fn SessionTable(
                 </span>
                 <button
                     class="btn btn-secondary"
-                    disabled=move || current_page.get() >= total_pages.get() - 1
+                    disabled=move || {
+                        let pages = total_pages.get();
+                        pages == 0 || current_page.get() >= pages.saturating_sub(1)
+                    }
                     on:click=move |_| {
-                        if current_page.get() < total_pages.get() - 1 {
+                        let pages = total_pages.get();
+                        if pages > 0 && current_page.get() < pages - 1 {
                             set_current_page.update(|p| *p += 1)
                         }
                     }
@@ -282,14 +286,31 @@ fn format_date(date: &Option<String>) -> String {
 }
 
 fn format_model(model: &str) -> String {
-    if model.contains("sonnet") {
-        "Sonnet 4.5".to_string()
-    } else if model.contains("opus") {
-        "Opus 4".to_string()
-    } else if model.contains("haiku") {
-        "Haiku 4".to_string()
+    let lower = model.to_lowercase();
+    let family = if lower.contains("opus") {
+        "Opus"
+    } else if lower.contains("sonnet") {
+        "Sonnet"
+    } else if lower.contains("haiku") {
+        "Haiku"
     } else {
-        model.to_string()
+        return model.to_string();
+    };
+
+    let mut parts: Vec<&str> = model.split('-').collect();
+    if let Some(last) = parts.last() {
+        if last.len() == 8 && last.chars().all(|c| c.is_ascii_digit()) {
+            parts.pop();
+        }
+    }
+
+    let family_lower = family.to_lowercase();
+    match parts.iter().position(|p| p.to_lowercase() == family_lower) {
+        Some(pos) if pos + 1 < parts.len() => {
+            format!("{} {}", family, parts[pos + 1..].join("."))
+        }
+        Some(_) => family.to_string(),
+        None => model.to_string(),
     }
 }
 

@@ -1551,10 +1551,20 @@ async fn run_report(
     spinner.set_message("Computing analytics...");
     let analytics = AnalyticsData::compute(&sessions, period);
 
+    let cutoff = chrono::Local::now() - chrono::Duration::days(days as i64);
+    let period_sessions: Vec<_> = sessions
+        .iter()
+        .filter(|s| {
+            s.first_timestamp
+                .map(|ts| ts.with_timezone(&chrono::Local) >= cutoff)
+                .unwrap_or(false)
+        })
+        .collect();
+
     // Derive error stats: sessions with non-zero tool errors as proxy
-    let total_sessions = sessions.len();
+    let total_sessions = period_sessions.len();
     // Proxy: sessions with 0 messages (failed init) or containing "error" in tool_usage
-    let errored_sessions = sessions
+    let errored_sessions = period_sessions
         .iter()
         .filter(|s| s.message_count == 0 || s.tool_usage.contains_key("error"))
         .count();
@@ -1564,7 +1574,7 @@ async fn run_report(
         0.0
     };
 
-    let total_tokens: u64 = sessions.iter().map(|s| s.total_tokens).sum();
+    let total_tokens: u64 = period_sessions.iter().map(|s| s.total_tokens).sum();
     let total_cost: f64 = analytics.trends.daily_cost.iter().sum();
 
     spinner.finish_and_clear();

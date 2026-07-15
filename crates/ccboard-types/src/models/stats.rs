@@ -191,7 +191,7 @@ impl StatsCache {
             .filter(|(_, usage)| usage.total_tokens() > 0)
             .map(|(k, v)| (k.as_str(), v))
             .collect();
-        models.sort_by(|a, b| b.1.total_tokens().cmp(&a.1.total_tokens()));
+        models.sort_by_key(|b| std::cmp::Reverse(b.1.total_tokens()));
         models.truncate(n);
         models
     }
@@ -236,7 +236,7 @@ impl StatsCache {
             .iter()
             .filter(|s| s.last_timestamp.is_some() && s.total_tokens > 0)
             .collect();
-        sorted.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.last_timestamp));
 
         // Take last N sessions
         let recent: Vec<_> = sorted.into_iter().take(last_n).collect();

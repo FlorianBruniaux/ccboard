@@ -48,6 +48,8 @@ pub struct StatsData {
     pub cache_hit_ratio: f64,
     #[serde(default)]
     pub mcp_servers_count: usize,
+    #[serde(default)]
+    pub hour_counts: HashMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -29,7 +29,7 @@ pub enum TrendDirection {
     Up(f64),
     /// Decreasing trend (percentage)
     Down(f64),
-    /// Stable trend (<10% change)
+    /// Stable trend (<30% change over 30 days)
     Stable,
 }
 
@@ -60,16 +60,17 @@ impl ForecastData {
 /// - `ForecastData::unavailable()` if <7 days of data
 /// - `ForecastData` with R² confidence otherwise
 pub fn forecast_usage(trends: &TrendsData) -> ForecastData {
-    if trends.dates.len() < 7 {
+    let days_in_period = calendar_span_days(&trends.dates);
+    if days_in_period < 7 {
         return ForecastData::unavailable("Insufficient data (<7 days)");
     }
 
-    // Prepare data points (x = day index, y = tokens)
-    let points: Vec<_> = trends
-        .daily_tokens
+    // Prepare data points (x = calendar day offset from first date, y = tokens)
+    let offsets = calendar_offsets(&trends.dates);
+    let points: Vec<_> = offsets
         .iter()
-        .enumerate()
-        .map(|(i, &tokens)| (i as f64, tokens as f64))
+        .zip(trends.daily_tokens.iter())
+        .map(|(&x, &tokens)| (x, tokens as f64))
         .collect();
 
     // Linear regression: y = slope * x + intercept
@@ -79,8 +80,8 @@ pub fn forecast_usage(trends: &TrendsData) -> ForecastData {
     // 1.0 = perfect fit, 0.0 = no correlation
     let confidence = r_squared.clamp(0.0, 1.0);
 
-    // Extrapolate 30 days ahead
-    let last_x = points.len() as f64;
+    // Extrapolate 30 days ahead from the most recent calendar day covered
+    let last_x = offsets.last().copied().unwrap_or(0.0);
     let next_30_x = last_x + 30.0;
     let next_30_days_tokens = (slope * next_30_x + intercept).max(0.0) as u64;
 
@@ -94,19 +95,27 @@ pub fn forecast_usage(trends: &TrendsData) -> ForecastData {
     };
     let next_30_days_cost = next_30_days_tokens as f64 * cost_per_token;
 
-    // Monthly estimate (extrapolate to 30 days from current average)
-    let days_in_period = trends.dates.len() as f64;
-    let monthly_cost_estimate = (total_cost / days_in_period) * 30.0;
+    // Monthly estimate (extrapolate to 30 days from the calendar window average)
+    let monthly_cost_estimate = (total_cost / days_in_period as f64) * 30.0;
 
-    // Trend direction (slope-based)
-    let trend_direction = if slope.abs() < 0.01 * intercept.abs() {
+    // Trend direction: compare the 30-day projected change against a stable
+    // baseline (average of the first half of the window) instead of the
+    // regression intercept, which can sit near zero and blow up the ratio.
+    let half = (points.len() / 2).max(1);
+    let baseline: f64 = points.iter().take(half).map(|p| p.1).sum::<f64>() / half as f64;
+    let projected_change = slope * 30.0;
+
+    let trend_direction = if baseline.abs() < 1e-6 || projected_change.abs() < 1e-9 {
         TrendDirection::Stable
-    } else if slope > 0.0 {
-        let increase_pct = (slope * 30.0 / intercept.abs() * 100.0).abs();
-        TrendDirection::Up(increase_pct)
     } else {
-        let decrease_pct = (slope * 30.0 / intercept.abs() * 100.0).abs();
-        TrendDirection::Down(decrease_pct)
+        let change_pct = (projected_change / baseline * 100.0).abs();
+        if change_pct < 30.0 {
+            TrendDirection::Stable
+        } else if slope > 0.0 {
+            TrendDirection::Up(change_pct)
+        } else {
+            TrendDirection::Down(change_pct)
+        }
     };
 
     ForecastData {
@@ -117,6 +126,43 @@ pub fn forecast_usage(trends: &TrendsData) -> ForecastData {
         trend_direction,
         unavailable_reason: None,
     }
+}
+
+/// Calendar span in days covered by a sorted list of "YYYY-MM-DD" dates
+///
+/// Falls back to the entry count if dates fail to parse, so callers still
+/// degrade gracefully instead of panicking on malformed data.
+fn calendar_span_days(dates: &[String]) -> i64 {
+    let (Some(first), Some(last)) = (dates.first(), dates.last()) else {
+        return 0;
+    };
+    match (
+        chrono::NaiveDate::parse_from_str(first, "%Y-%m-%d"),
+        chrono::NaiveDate::parse_from_str(last, "%Y-%m-%d"),
+    ) {
+        (Ok(first), Ok(last)) => (last - first).num_days() + 1,
+        _ => dates.len() as i64,
+    }
+}
+
+/// Calendar day offset of each date relative to the first date
+///
+/// Falls back to the sequential index for entries that fail to parse.
+fn calendar_offsets(dates: &[String]) -> Vec<f64> {
+    let base = dates
+        .first()
+        .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok());
+
+    dates
+        .iter()
+        .enumerate()
+        .map(
+            |(i, d)| match (base, chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok()) {
+                (Some(base), Some(current)) => (current - base).num_days() as f64,
+                _ => i as f64,
+            },
+        )
+        .collect()
 }
 
 /// Simple linear regression with R² calculation

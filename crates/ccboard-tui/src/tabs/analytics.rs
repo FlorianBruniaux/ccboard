@@ -1266,7 +1266,7 @@ impl AnalyticsTab {
             .map(|(model, pct)| (model.as_str(), (*pct * 1000.0) as u64)) // Scale for bar height
             .collect();
 
-        model_data.sort_by(|a, b| b.1.cmp(&a.1)); // Sort by percentage desc
+        model_data.sort_by_key(|b| std::cmp::Reverse(b.1)); // Sort by percentage desc
         model_data.truncate(5); // Top 5 models
 
         let barchart = BarChart::default()
@@ -1949,7 +1949,7 @@ impl AnalyticsTab {
             }
 
             let mut sorted_tools: Vec<(&str, u64)> = seen_tools.into_iter().collect();
-            sorted_tools.sort_by(|a, b| b.1.cmp(&a.1));
+            sorted_tools.sort_by_key(|b| std::cmp::Reverse(b.1));
             sorted_tools.truncate(10);
 
             if sorted_tools.is_empty() {

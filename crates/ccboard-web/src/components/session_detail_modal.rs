@@ -177,15 +177,36 @@ fn format_date(date: &Option<String>) -> String {
 }
 
 fn format_model(model: &str) -> String {
-    if model.contains("sonnet") {
-        "Claude Sonnet 4.5".to_string()
+    let family = if model.contains("sonnet") {
+        "Sonnet"
     } else if model.contains("opus") {
-        "Claude Opus 4".to_string()
+        "Opus"
     } else if model.contains("haiku") {
-        "Claude Haiku 4".to_string()
+        "Haiku"
     } else {
-        model.to_string()
+        return model.to_string();
+    };
+
+    match model_version(model) {
+        Some(version) => format!("Claude {family} {version}"),
+        None => format!("Claude {family}"),
     }
+}
+
+fn model_version(model: &str) -> Option<String> {
+    let parts: Vec<&str> = model.split(['-', '.']).collect();
+    let family_idx = parts
+        .iter()
+        .position(|p| matches!(*p, "sonnet" | "opus" | "haiku"))?;
+    let major = parts.get(family_idx + 1).filter(|p| is_numeric(p))?;
+    match parts.get(family_idx + 2) {
+        Some(minor) if is_numeric(minor) && minor.len() <= 2 => Some(format!("{major}.{minor}")),
+        _ => Some(major.to_string()),
+    }
+}
+
+fn is_numeric(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())
 }
 
 fn format_duration(duration_seconds: Option<u64>) -> String {

@@ -15,6 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::models::session::SessionMetadata;
+use crate::models::InvocationStats;
 use crate::pricing::calculate_cost;
 
 /// Plugin classification by origin
@@ -222,6 +223,9 @@ fn classify_plugin(name: &str, skills: &[String], commands: &[String]) -> Plugin
 /// - `sessions`: All sessions to analyze
 /// - `available_skills`: Skill names from .claude/skills/*.md
 /// - `available_commands`: Command names from .claude/commands/*.md
+/// - `invocation_stats`: Aggregated agent/command/skill invocation counts, used as the
+///   source of truth for dead-code detection (session.tool_usage only records the
+///   generic "Skill"/"Task" tool names, not the specific skill/command invoked)
 ///
 /// # Returns
 /// Complete plugin analytics with rankings and dead code detection
@@ -229,18 +233,14 @@ pub fn aggregate_plugin_usage(
     sessions: &[Arc<SessionMetadata>],
     available_skills: &[String],
     available_commands: &[String],
+    invocation_stats: &InvocationStats,
 ) -> PluginAnalytics {
     let mut usage_map: HashMap<String, PluginUsage> = HashMap::new();
 
     // Aggregate tool usage from all sessions
     for session in sessions {
         // Calculate session cost (proportional attribution)
-        // Use first model from models_used, or default to sonnet-4.5
-        let model = session
-            .models_used
-            .first()
-            .map(|s| s.as_str())
-            .unwrap_or("sonnet-4.5");
+        let model = session.primary_model();
         let session_cost = calculate_cost(
             model,
             session.input_tokens,
@@ -248,8 +248,6 @@ pub fn aggregate_plugin_usage(
             session.cache_creation_tokens,
             session.cache_read_tokens,
         );
-        let session_tokens = session.total_tokens;
-
         // Skip sessions with no tool usage
         if session.tool_usage.is_empty() {
             continue;
@@ -272,9 +270,17 @@ pub fn aggregate_plugin_usage(
             // Proportional cost attribution
             let tool_cost = session_cost * (*call_count as f64 / total_calls as f64);
 
-            // Average tokens per call (rough approximation)
+            // Average tokens per call, from the per-tool proportional token
+            // attribution (each token counted once, distributed across the
+            // tools that consumed it), not the session total (which would be
+            // double/triple-counted once per distinct tool in the session)
+            let tool_tokens = session
+                .tool_token_usage
+                .get(tool_name)
+                .copied()
+                .unwrap_or(0);
             let avg_tokens = if *call_count > 0 {
-                session_tokens / *call_count as u64
+                tool_tokens / *call_count as u64
             } else {
                 0
             };
@@ -326,8 +332,16 @@ pub fn aggregate_plugin_usage(
         }
     }
 
-    // Identify dead code (defined but never used)
-    let used_names: HashSet<_> = usage_map.keys().map(|s| s.to_lowercase()).collect();
+    // Identify dead code (defined but never used). session.tool_usage only records
+    // the generic "Skill"/"Task" tool names, not which skill/command was actually
+    // invoked, so usage_map keys can't be used here; invocation_stats tracks the
+    // real skill/command names and is the correct source of truth.
+    let used_names: HashSet<_> = invocation_stats
+        .skills
+        .keys()
+        .chain(invocation_stats.commands.keys())
+        .map(|s| s.to_lowercase())
+        .collect();
     let dead_plugins: Vec<String> = available_skills
         .iter()
         .chain(available_commands.iter())
@@ -337,7 +351,7 @@ pub fn aggregate_plugin_usage(
 
     // Convert to sorted vector
     let mut plugins: Vec<_> = usage_map.into_values().collect();
-    plugins.sort_by(|a, b| b.total_invocations.cmp(&a.total_invocations));
+    plugins.sort_by_key(|b| std::cmp::Reverse(b.total_invocations));
 
     // Top 10 by usage
     let top_by_usage = plugins.iter().take(10).cloned().collect();
@@ -410,8 +424,9 @@ mod tests {
         let sessions = vec![Arc::new(session1)];
         let skills = vec!["rust-expert".to_string()];
         let commands = vec![];
+        let invocation_stats = InvocationStats::new();
 
-        let analytics = aggregate_plugin_usage(&sessions, &skills, &commands);
+        let analytics = aggregate_plugin_usage(&sessions, &skills, &commands, &invocation_stats);
 
         assert_eq!(analytics.active_plugins, 2);
         assert_eq!(analytics.plugins[0].name, "rust-expert");
@@ -427,12 +442,21 @@ mod tests {
         let skills = vec!["rust-expert".to_string(), "unused-skill".to_string()];
         let commands = vec!["commit".to_string(), "never-used".to_string()];
 
-        let analytics = aggregate_plugin_usage(&sessions, &skills, &commands);
+        // rust-expert and commit were actually invoked (per InvocationStats,
+        // which tracks real skill/command names, unlike session.tool_usage's
+        // generic "Skill"/"Task" buckets); only the other two are dead
+        let mut invocation_stats = InvocationStats::new();
+        invocation_stats.skills.insert("rust-expert".to_string(), 3);
+        invocation_stats.commands.insert("commit".to_string(), 2);
+
+        let analytics = aggregate_plugin_usage(&sessions, &skills, &commands, &invocation_stats);
 
         assert_eq!(analytics.active_plugins, 0);
-        assert_eq!(analytics.dead_plugins.len(), 4); // All skills + commands unused
+        assert_eq!(analytics.dead_plugins.len(), 2);
         assert!(analytics.dead_plugins.contains(&"unused-skill".to_string()));
         assert!(analytics.dead_plugins.contains(&"never-used".to_string()));
+        assert!(!analytics.dead_plugins.contains(&"rust-expert".to_string()));
+        assert!(!analytics.dead_plugins.contains(&"commit".to_string()));
     }
 
     #[test]
@@ -440,8 +464,9 @@ mod tests {
         let sessions = vec![];
         let skills = vec![];
         let commands = vec![];
+        let invocation_stats = InvocationStats::new();
 
-        let analytics = aggregate_plugin_usage(&sessions, &skills, &commands);
+        let analytics = aggregate_plugin_usage(&sessions, &skills, &commands, &invocation_stats);
 
         assert_eq!(analytics.active_plugins, 0);
         assert_eq!(analytics.total_plugins, 0);

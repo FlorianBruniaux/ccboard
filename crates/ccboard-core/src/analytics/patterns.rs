@@ -63,9 +63,15 @@ impl UsagePatterns {
     }
 }
 
-/// Estimate cost from session (same as trends.rs)
+/// Estimate cost from session using real per-model pricing
 fn estimate_cost(session: &SessionMetadata) -> f64 {
-    (session.total_tokens as f64 / 1000.0) * 0.01
+    crate::pricing::calculate_cost(
+        session.primary_model(),
+        session.input_tokens,
+        session.output_tokens,
+        session.cache_creation_tokens,
+        session.cache_read_tokens,
+    )
 }
 
 /// Compute current and longest consecutive-day streaks across all sessions.

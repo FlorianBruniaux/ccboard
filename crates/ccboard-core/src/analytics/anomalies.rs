@@ -189,7 +189,11 @@ pub fn detect_anomalies_with_thresholds(
                         date: session
                             .first_timestamp
                             .as_ref()
-                            .map(|ts| ts.format("%Y-%m-%d %H:%M").to_string())
+                            .map(|ts| {
+                                ts.with_timezone(&Local)
+                                    .format("%Y-%m-%d %H:%M")
+                                    .to_string()
+                            })
                             .unwrap_or_else(|| "unknown".to_string()),
                         metric: AnomalyMetric::Tokens,
                         value,
@@ -230,7 +234,7 @@ pub fn detect_anomalies_with_thresholds(
 pub struct DailyCostAnomaly {
     /// Date of the spike
     pub date: NaiveDate,
-    /// Estimated cost for this day (tokens × $0.01/K)
+    /// Estimated cost for this day (real per-model pricing)
     pub cost_estimate: f64,
     /// Rolling mean cost per day over the window
     pub avg_cost: f64,
@@ -272,8 +276,6 @@ pub fn detect_daily_cost_spikes_with_thresholds(
     const MIN_DAYS: usize = 7;
     let spike_2x = thresholds.spike_2x;
     let spike_3x = thresholds.spike_3x;
-    // Rough cost estimate: $0.01 per 1K tokens
-    const COST_PER_1K_TOKENS: f64 = 0.01;
 
     let cutoff_date = (Local::now() - chrono::Duration::days(window_days as i64)).date_naive();
 
@@ -285,7 +287,13 @@ pub fn detect_daily_cost_spikes_with_thresholds(
             if local_date < cutoff_date {
                 continue;
             }
-            let cost = (session.total_tokens as f64 / 1000.0) * COST_PER_1K_TOKENS;
+            let cost = crate::pricing::calculate_cost(
+                session.primary_model(),
+                session.input_tokens,
+                session.output_tokens,
+                session.cache_creation_tokens,
+                session.cache_read_tokens,
+            );
             *daily_costs.entry(local_date).or_default() += cost;
         }
     }
@@ -328,7 +336,7 @@ pub fn detect_daily_cost_spikes_with_thresholds(
         .collect();
 
     // Most recent first
-    spikes.sort_by(|a, b| b.date.cmp(&a.date));
+    spikes.sort_by_key(|b| std::cmp::Reverse(b.date));
     spikes
 }
 

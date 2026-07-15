@@ -416,7 +416,7 @@ impl DataStore {
             );
 
             let mut sorted = sessions;
-            sorted.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+            sorted.sort_by_key(|b| std::cmp::Reverse(b.last_timestamp));
             sorted.truncate(self.config.max_session_metadata_count);
             sorted
         } else {
@@ -545,17 +545,25 @@ impl DataStore {
         self.stats.read().clone()
     }
 
-    /// Calculate context window saturation from current sessions
+    /// Calculate context window saturation from sessions in the last 30 calendar days
     pub fn context_window_stats(&self) -> crate::models::ContextWindowStats {
+        let cutoff = chrono::Local::now() - chrono::Duration::days(30);
         // Clone Arc (cheap) to avoid lifetime issues with DashMap iterators
         let sessions: Vec<_> = self
             .sessions
             .iter()
+            .filter(|entry| {
+                entry
+                    .value()
+                    .first_timestamp
+                    .is_some_and(|ts| ts.with_timezone(&chrono::Local) >= cutoff)
+            })
             .map(|entry| Arc::clone(entry.value()))
             .collect();
         // Dereference Arc to get &SessionMetadata
         let refs: Vec<_> = sessions.iter().map(|s| s.as_ref()).collect();
-        crate::models::StatsCache::calculate_context_saturation(&refs, 30)
+        let n = refs.len();
+        crate::models::StatsCache::calculate_context_saturation(&refs, n)
     }
 
     /// Get merged settings
@@ -578,15 +586,21 @@ impl DataStore {
         self.invocation_stats.read().clone()
     }
 
-    /// Calculate current quota status from stats and budget config
+    /// Calculate current quota status from sessions and budget config
     ///
     /// Returns None if stats are not loaded or budget is not configured.
     pub fn quota_status(&self) -> Option<crate::quota::QuotaStatus> {
-        let stats = self.stats.read().clone()?;
+        self.stats.read().clone()?;
         let settings = self.settings.read();
         let budget = settings.merged.budget.as_ref()?;
 
-        Some(crate::quota::calculate_quota_status(&stats, budget))
+        let sessions: Vec<_> = self
+            .sessions
+            .iter()
+            .map(|entry| Arc::clone(entry.value()))
+            .collect();
+
+        Some(crate::quota::calculate_quota_status(&sessions, budget))
     }
 
     /// Get live Claude Code sessions enriched with incremental transcript data.
@@ -948,7 +962,7 @@ impl DataStore {
 
         // Sort sessions within each project by timestamp (newest first)
         for sessions in by_project.values_mut() {
-            sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+            sessions.sort_by_key(|b| std::cmp::Reverse(b.last_timestamp));
         }
 
         by_project
@@ -967,7 +981,7 @@ impl DataStore {
     /// Returns Arc<SessionMetadata> for cheap cloning
     pub fn recent_sessions(&self, limit: usize) -> Vec<Arc<SessionMetadata>> {
         let mut sessions = self.all_sessions();
-        sessions.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+        sessions.sort_by_key(|b| std::cmp::Reverse(b.last_timestamp));
         sessions.truncate(limit);
         sessions
     }
@@ -1106,7 +1120,7 @@ impl DataStore {
         }
 
         let mut result: Vec<McpCallStat> = stats.into_values().collect();
-        result.sort_by(|a, b| b.call_count.cmp(&a.call_count));
+        result.sort_by_key(|b| std::cmp::Reverse(b.call_count));
         result
     }
 
@@ -1194,7 +1208,7 @@ impl DataStore {
             .iter()
             .map(|r| Arc::clone(r.value()))
             .collect();
-        sessions.sort_by(|a, b| b.total_tokens.cmp(&a.total_tokens));
+        sessions.sort_by_key(|b| std::cmp::Reverse(b.total_tokens));
         sessions.truncate(limit);
         sessions
     }
@@ -1213,7 +1227,7 @@ impl DataStore {
 
         // Convert to vec and sort
         let mut results: Vec<_> = model_totals.into_iter().collect();
-        results.sort_by(|a, b| b.1.cmp(&a.1));
+        results.sort_by_key(|b| std::cmp::Reverse(b.1));
         results.truncate(10); // Top 10
         results
     }
@@ -1233,7 +1247,7 @@ impl DataStore {
 
         // Convert to vec and sort
         let mut results: Vec<_> = day_totals.into_iter().collect();
-        results.sort_by(|a, b| b.1.cmp(&a.1));
+        results.sort_by_key(|b| std::cmp::Reverse(b.1));
         results.truncate(10); // Top 10
         results
     }
@@ -1471,14 +1485,32 @@ impl DataStore {
                 metadata.cache_read_tokens,
             );
 
-            manager.add_usage(
-                timestamp,
-                metadata.input_tokens,
-                metadata.output_tokens,
-                metadata.cache_creation_tokens,
-                metadata.cache_read_tokens,
-                cost,
-            );
+            let end = metadata.last_timestamp.filter(|end| *end > *timestamp);
+
+            match end {
+                Some(end) => {
+                    for (segment_ts, weight) in Self::billing_block_segments(*timestamp, end) {
+                        manager.add_usage(
+                            &segment_ts,
+                            (metadata.input_tokens as f64 * weight).round() as u64,
+                            (metadata.output_tokens as f64 * weight).round() as u64,
+                            (metadata.cache_creation_tokens as f64 * weight).round() as u64,
+                            (metadata.cache_read_tokens as f64 * weight).round() as u64,
+                            cost * weight,
+                        );
+                    }
+                }
+                None => {
+                    manager.add_usage(
+                        timestamp,
+                        metadata.input_tokens,
+                        metadata.output_tokens,
+                        metadata.cache_creation_tokens,
+                        metadata.cache_read_tokens,
+                        cost,
+                    );
+                }
+            }
         }
 
         debug!(
@@ -1492,6 +1524,45 @@ impl DataStore {
         *guard = manager;
 
         self.event_bus.publish(DataEvent::LoadCompleted);
+    }
+
+    /// Split a session's `[start, end]` time span into per-billing-block segments,
+    /// weighted by the fraction of the span that falls in each 5-hour block.
+    ///
+    /// Returns `(representative_timestamp, weight)` pairs, one per block touched,
+    /// where weights sum to 1.0. Used so multi-day/resumed sessions attribute cost
+    /// to the blocks where usage actually happened instead of dumping it all at `start`.
+    fn billing_block_segments(
+        start: chrono::DateTime<chrono::Utc>,
+        end: chrono::DateTime<chrono::Utc>,
+    ) -> Vec<(chrono::DateTime<chrono::Utc>, f64)> {
+        use chrono::Timelike;
+
+        let total_ms = (end - start).num_milliseconds() as f64;
+        if total_ms <= 0.0 {
+            return vec![(start, 1.0)];
+        }
+
+        let mut segments = Vec::new();
+        let mut cursor = start;
+
+        while cursor < end {
+            let block_hour = (cursor.hour() / 5) * 5;
+            let block_start = cursor
+                .date_naive()
+                .and_hms_opt(block_hour, 0, 0)
+                .expect("valid block hour")
+                .and_utc();
+            let block_end = block_start + chrono::Duration::hours(5);
+
+            let segment_end = block_end.min(end);
+            let overlap_ms = (segment_end - cursor).num_milliseconds() as f64;
+
+            segments.push((cursor, overlap_ms / total_ms));
+            cursor = block_end;
+        }
+
+        segments
     }
 
     /// Get billing blocks (read-only access)

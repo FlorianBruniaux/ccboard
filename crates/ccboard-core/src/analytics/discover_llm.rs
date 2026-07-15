@@ -96,7 +96,7 @@ fn deduplicate_messages(
         });
     }
 
-    deduped.sort_by(|a, b| b.count.cmp(&a.count));
+    deduped.sort_by_key(|b| std::cmp::Reverse(b.count));
     deduped.truncate(max_messages);
     deduped
 }

@@ -1,10 +1,13 @@
 //! Quota tracking and budget alerts
 //!
-//! MVP approach: Uses total cost from model_usage with prorata for month-to-date.
-//! Simple projection based on daily average (no forecasting for v0.8.0 MVP).
+//! Month-to-date cost sums true per-session cost (via `pricing::calculate_cost`)
+//! for sessions started in the current calendar month. Monthly projection uses a
+//! simple daily average (no forecasting for v0.8.0 MVP).
 
-use crate::models::{config::BudgetConfig, stats::StatsCache};
+use crate::models::{config::BudgetConfig, session::SessionMetadata};
+use crate::usage_estimator::days_in_month;
 use chrono::{Datelike, Local};
+use std::sync::Arc;
 
 /// Alert level based on budget usage
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,14 +39,17 @@ pub struct QuotaStatus {
     pub alert_level: AlertLevel,
 }
 
-/// Calculate quota status from stats and budget config
+/// Calculate quota status from sessions and budget config
 ///
-/// MVP approach:
-/// 1. Calculate MTD cost from total model_usage.cost_usd + prorata for current month
-/// 2. Project monthly cost as simple daily average * 30 days
-pub fn calculate_quota_status(stats: &StatsCache, budget: &BudgetConfig) -> QuotaStatus {
-    // 1. Calculate month-to-date cost (simple prorata from total)
-    let current_cost = calculate_month_to_date_cost(stats);
+/// 1. Calculate MTD cost by summing true per-session cost (via `pricing::calculate_cost`)
+///    for sessions started in the current calendar month
+/// 2. Project monthly cost as simple daily average * days in the current month
+pub fn calculate_quota_status(
+    sessions: &[Arc<SessionMetadata>],
+    budget: &BudgetConfig,
+) -> QuotaStatus {
+    // 1. Calculate month-to-date cost (true per-session cost sum)
+    let current_cost = calculate_month_to_date_cost(sessions);
 
     // 2. Calculate usage percentage
     let usage_pct = if let Some(limit) = budget.monthly_limit {
@@ -55,8 +61,8 @@ pub fn calculate_quota_status(stats: &StatsCache, budget: &BudgetConfig) -> Quot
     // 3. Determine alert level
     let alert_level = determine_alert_level(usage_pct, budget);
 
-    // 4. Project monthly cost (simple: daily avg * 30)
-    let projected_monthly_cost = project_monthly_cost(stats, current_cost);
+    // 4. Project monthly cost (simple: daily avg * days in month)
+    let projected_monthly_cost = project_monthly_cost(current_cost);
 
     // 5. Calculate projected overage if limit exists
     let projected_overage = if let Some(limit) = budget.monthly_limit {
@@ -79,58 +85,47 @@ pub fn calculate_quota_status(stats: &StatsCache, budget: &BudgetConfig) -> Quot
     }
 }
 
-/// Calculate month-to-date cost using token-based prorata
+/// Calculate month-to-date cost by summing true per-session cost
 ///
-/// Uses daily_model_tokens to compute the proportion of tokens in current month vs total.
-fn calculate_month_to_date_cost(stats: &StatsCache) -> f64 {
-    // Total cost across all models
-    let total_cost: f64 = stats.model_usage.values().map(|m| m.cost_usd).sum();
-
-    if total_cost == 0.0 {
-        return 0.0;
-    }
-
-    // Get current month prefix (e.g., "2026-02")
+/// Filters sessions started in the current calendar month (local time) and sums
+/// each session's cost via `pricing::calculate_cost`, attributed to
+/// `SessionMetadata::primary_model()` instead of a blended average rate.
+fn calculate_month_to_date_cost(sessions: &[Arc<SessionMetadata>]) -> f64 {
     let now = Local::now();
-    let month_prefix = format!("{}-{:02}", now.year(), now.month());
+    let month_start = now.date_naive().with_day(1).expect("day 1 is always valid");
 
-    // Calculate total tokens in current month from daily_model_tokens
-    let mtd_tokens: u64 = stats
-        .daily_model_tokens
+    sessions
         .iter()
-        .filter(|d| d.date.starts_with(&month_prefix))
-        .flat_map(|d| d.tokens_by_model.values())
-        .sum();
-
-    // Calculate total tokens across all models
-    let total_tokens: u64 = stats
-        .model_usage
-        .values()
-        .map(|m| m.input_tokens + m.output_tokens)
-        .sum();
-
-    if total_tokens == 0 {
-        return 0.0;
-    }
-
-    // MTD cost = total_cost * (mtd_tokens / total_tokens)
-    total_cost * (mtd_tokens as f64 / total_tokens as f64)
+        .filter_map(|session| {
+            let ts = session.first_timestamp?;
+            if ts.with_timezone(&Local).date_naive() < month_start {
+                return None;
+            }
+            Some(crate::pricing::calculate_cost(
+                session.primary_model(),
+                session.input_tokens,
+                session.output_tokens,
+                session.cache_creation_tokens,
+                session.cache_read_tokens,
+            ))
+        })
+        .sum()
 }
 
 /// Project monthly cost using simple daily average
 ///
-/// Calculates: (MTD cost / days in month so far) * 30
-fn project_monthly_cost(_stats: &StatsCache, mtd_cost: f64) -> f64 {
+/// Calculates: (MTD cost / days in month so far) * days in the current month
+fn project_monthly_cost(mtd_cost: f64) -> f64 {
     let now = Local::now();
     let current_day = now.day() as f64;
+    let total_days = days_in_month(now.date_naive()) as f64;
 
     if current_day < 1.0 {
-        return mtd_cost * 30.0; // Fallback
+        return mtd_cost * total_days; // Fallback
     }
 
-    // Daily average * 30 days
     let daily_avg = mtd_cost / current_day;
-    daily_avg * 30.0
+    daily_avg * total_days
 }
 
 /// Determine alert level from usage percentage and thresholds
@@ -149,75 +144,38 @@ fn determine_alert_level(usage_pct: f64, budget: &BudgetConfig) -> AlertLevel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::stats::ModelUsage;
-    use std::collections::HashMap;
+    use chrono::{DateTime, Duration};
 
-    /// Mock stats with specified MTD ratio
-    ///
-    /// `mtd_ratio`: proportion of tokens in current month (0.0-1.0)
-    /// Example: mtd_ratio=0.2 means 20% of tokens are in current month
-    fn mock_stats_with_mtd_ratio(total_cost: f64, mtd_ratio: f64, first_date: &str) -> StatsCache {
-        use crate::models::stats::DailyModelTokens;
-
-        let total_tokens = 15000u64;
-        let mtd_tokens = (total_tokens as f64 * mtd_ratio) as u64;
-
-        let mut model_usage = HashMap::new();
-        model_usage.insert(
-            "claude-sonnet-4".to_string(),
-            ModelUsage {
-                input_tokens: total_tokens * 2 / 3,
-                output_tokens: total_tokens / 3,
-                cost_usd: total_cost,
-                ..Default::default()
-            },
+    /// Mock a session started at `local_ts` with the given token counts.
+    fn mock_session(
+        local_ts: DateTime<Local>,
+        input_tokens: u64,
+        output_tokens: u64,
+    ) -> Arc<SessionMetadata> {
+        let ts = local_ts.with_timezone(&chrono::Utc);
+        let mut session = SessionMetadata::from_path(
+            std::path::PathBuf::from(format!("/test/{}.jsonl", ts.timestamp_micros())),
+            "/test".into(),
         );
-
-        // Mock daily_model_tokens for current month
-        let now = Local::now();
-        let current_day = now.day();
-        let mut daily_model_tokens = Vec::new();
-
-        // Add token data for each day of current month so far
-        if mtd_tokens > 0 {
-            for day in 1..=current_day {
-                let mut tokens_by_model = HashMap::new();
-                tokens_by_model.insert(
-                    "claude-sonnet-4".to_string(),
-                    mtd_tokens / current_day as u64,
-                );
-
-                daily_model_tokens.push(DailyModelTokens {
-                    date: format!("{}-{:02}-{:02}", now.year(), now.month(), day),
-                    tokens_by_model,
-                });
-            }
-        }
-
-        StatsCache {
-            model_usage,
-            daily_model_tokens,
-            first_session_date: Some(first_date.to_string()),
-            ..Default::default()
-        }
-    }
-
-    // Convenience wrapper for backward compatibility
-    fn mock_stats_with_total_cost(total_cost: f64, first_date: &str) -> StatsCache {
-        mock_stats_with_mtd_ratio(total_cost, 1.0, first_date)
+        session.first_timestamp = Some(ts);
+        session.last_timestamp = Some(ts);
+        session.input_tokens = input_tokens;
+        session.output_tokens = output_tokens;
+        session.total_tokens = input_tokens + output_tokens;
+        session.models_used = vec!["claude-sonnet-4-5".to_string()];
+        Arc::new(session)
     }
 
     #[test]
     fn test_quota_status_safe() {
-        // $100 total cost, 20% in current month → ~$20 MTD
-        // With $50 limit → 40% usage → Safe
-        let stats = mock_stats_with_mtd_ratio(100.0, 0.2, "2024-01-01");
+        // Small MTD spend against a generous limit → Safe
+        let sessions = vec![mock_session(Local::now(), 10_000, 5_000)];
         let budget = BudgetConfig {
-            monthly_limit: Some(50.0),
+            monthly_limit: Some(1000.0),
             warning_threshold: 75.0,
             critical_threshold: 90.0,
         };
-        let status = calculate_quota_status(&stats, &budget);
+        let status = calculate_quota_status(&sessions, &budget);
 
         assert_eq!(status.alert_level, AlertLevel::Safe);
         assert!(status.usage_pct < 75.0);
@@ -225,16 +183,15 @@ mod tests {
 
     #[test]
     fn test_quota_status_warning() {
-        // High total cost → high MTD
-        let stats = mock_stats_with_total_cost(500.0, "2024-01-01");
+        // Large MTD spend against a tight limit → Warning or above
+        let sessions = vec![mock_session(Local::now(), 5_000_000, 2_000_000)];
         let budget = BudgetConfig {
-            monthly_limit: Some(100.0),
+            monthly_limit: Some(10.0),
             warning_threshold: 75.0,
             critical_threshold: 90.0,
         };
-        let status = calculate_quota_status(&stats, &budget);
+        let status = calculate_quota_status(&sessions, &budget);
 
-        // Should be warning or critical or exceeded
         assert!(
             status.alert_level == AlertLevel::Warning
                 || status.alert_level == AlertLevel::Critical
@@ -243,14 +200,33 @@ mod tests {
     }
 
     #[test]
+    fn test_quota_excludes_sessions_outside_current_month() {
+        // A session from 45 days ago always falls outside the current calendar month
+        let sessions = vec![mock_session(
+            Local::now() - Duration::days(45),
+            5_000_000,
+            2_000_000,
+        )];
+        let budget = BudgetConfig {
+            monthly_limit: Some(10.0),
+            warning_threshold: 75.0,
+            critical_threshold: 90.0,
+        };
+        let status = calculate_quota_status(&sessions, &budget);
+
+        assert_eq!(status.current_cost, 0.0);
+        assert_eq!(status.alert_level, AlertLevel::Safe);
+    }
+
+    #[test]
     fn test_quota_no_limit() {
-        let stats = mock_stats_with_total_cost(1000.0, "2024-01-01");
+        let sessions = vec![mock_session(Local::now(), 1_000_000, 500_000)];
         let budget = BudgetConfig {
             monthly_limit: None,
             warning_threshold: 75.0,
             critical_threshold: 90.0,
         };
-        let status = calculate_quota_status(&stats, &budget);
+        let status = calculate_quota_status(&sessions, &budget);
 
         assert_eq!(status.alert_level, AlertLevel::Safe);
         assert_eq!(status.usage_pct, 0.0);

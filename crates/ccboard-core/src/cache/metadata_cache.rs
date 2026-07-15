@@ -257,10 +257,10 @@ impl MetadataCache {
     /// Get cached metadata if fresh, otherwise None
     pub fn get(&self, path: &Path, current_mtime: SystemTime) -> Result<Option<SessionMetadata>> {
         let path_str = path.to_string_lossy();
-        let mtime_secs = current_mtime
+        let mtime_nanos = current_mtime
             .duration_since(SystemTime::UNIX_EPOCH)
             .context("Invalid mtime")?
-            .as_secs();
+            .as_nanos() as i64;
 
         let conn = self
             .conn
@@ -270,7 +270,7 @@ impl MetadataCache {
         let result: Option<Vec<u8>> = conn
             .query_row(
                 "SELECT data FROM session_metadata WHERE path = ? AND mtime = ?",
-                params![path_str.as_ref(), mtime_secs as i64],
+                params![path_str.as_ref(), mtime_nanos],
                 |row| row.get(0),
             )
             .optional()
@@ -293,10 +293,10 @@ impl MetadataCache {
     /// Store metadata in cache
     pub fn put(&self, path: &Path, meta: &SessionMetadata, mtime: SystemTime) -> Result<()> {
         let path_str = path.to_string_lossy();
-        let mtime_secs = mtime
+        let mtime_nanos = mtime
             .duration_since(SystemTime::UNIX_EPOCH)
             .context("Invalid mtime")?
-            .as_secs();
+            .as_nanos() as i64;
 
         let data = bincode::serialize(meta).context("Failed to serialize metadata")?;
 
@@ -319,7 +319,7 @@ impl MetadataCache {
             "#,
             params![
                 path_str.as_ref(),
-                mtime_secs as i64,
+                mtime_nanos,
                 meta.project_path.as_str(),
                 meta.id.as_str(),
                 meta.first_timestamp.as_ref().map(|t| t.to_rfc3339()),
@@ -344,7 +344,7 @@ impl MetadataCache {
             WHERE path = ? AND mtime != ?
             "#,
             params![
-                mtime_secs as i64,
+                mtime_nanos,
                 meta.project_path.as_str(),
                 meta.id.as_str(),
                 meta.first_timestamp.as_ref().map(|t| t.to_rfc3339()),
@@ -356,7 +356,7 @@ impl MetadataCache {
                 &meta.first_user_message,
                 &data,
                 path_str.as_ref(),
-                mtime_secs as i64,
+                mtime_nanos,
             ],
         )
         .context("Failed to update metadata")?;
@@ -625,10 +625,10 @@ impl MetadataCache {
         current_mtime: SystemTime,
     ) -> Result<Option<ActivitySummary>> {
         let path_str = path.to_string_lossy();
-        let mtime_secs = current_mtime
+        let mtime_nanos = current_mtime
             .duration_since(SystemTime::UNIX_EPOCH)
             .context("Invalid mtime")?
-            .as_secs();
+            .as_nanos() as i64;
 
         let conn = self
             .conn
@@ -638,7 +638,7 @@ impl MetadataCache {
         let result: Option<Vec<u8>> = conn
             .query_row(
                 "SELECT data FROM activity_cache WHERE session_path = ? AND mtime = ?",
-                params![path_str.as_ref(), mtime_secs as i64],
+                params![path_str.as_ref(), mtime_nanos],
                 |row| row.get(0),
             )
             .optional()
@@ -669,10 +669,10 @@ impl MetadataCache {
         mtime: SystemTime,
     ) -> Result<()> {
         let path_str = path.to_string_lossy();
-        let mtime_secs = mtime
+        let mtime_nanos = mtime
             .duration_since(SystemTime::UNIX_EPOCH)
             .context("Invalid mtime")?
-            .as_secs();
+            .as_nanos() as i64;
 
         let data = bincode::serialize(summary).context("Failed to serialize activity summary")?;
 
@@ -696,7 +696,7 @@ impl MetadataCache {
                 "#,
                 params![
                     path_str.as_ref(),
-                    mtime_secs as i64,
+                    mtime_nanos,
                     session_id,
                     (summary.file_accesses.len()
                         + summary.bash_commands.len()

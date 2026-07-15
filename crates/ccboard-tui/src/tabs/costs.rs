@@ -13,52 +13,6 @@ use ratatui::{
     Frame,
 };
 
-/// Model pricing (per 1M tokens) - approximate as of 2024
-#[derive(Debug, Clone, Copy)]
-struct ModelPricing {
-    input_per_million: f64,
-    output_per_million: f64,
-    cache_read_per_million: f64,
-}
-
-impl ModelPricing {
-    fn opus() -> Self {
-        Self {
-            input_per_million: 15.0,
-            output_per_million: 75.0,
-            cache_read_per_million: 1.5,
-        }
-    }
-
-    fn sonnet() -> Self {
-        Self {
-            input_per_million: 3.0,
-            output_per_million: 15.0,
-            cache_read_per_million: 0.3,
-        }
-    }
-
-    fn haiku() -> Self {
-        Self {
-            input_per_million: 0.25,
-            output_per_million: 1.25,
-            cache_read_per_million: 0.03,
-        }
-    }
-
-    fn for_model(model: &str) -> Self {
-        let model_lower = model.to_lowercase();
-        if model_lower.contains("opus") {
-            Self::opus()
-        } else if model_lower.contains("haiku") {
-            Self::haiku()
-        } else {
-            // Default to sonnet pricing
-            Self::sonnet()
-        }
-    }
-}
-
 /// Sort mode for cost data
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SortMode {
@@ -281,14 +235,13 @@ impl CostsTab {
                 let mut details = Vec::new();
 
                 for (model, usage) in &s.model_usage {
-                    let pricing = ModelPricing::for_model(model);
-                    let input_cost =
-                        usage.input_tokens as f64 / 1_000_000.0 * pricing.input_per_million;
-                    let output_cost =
-                        usage.output_tokens as f64 / 1_000_000.0 * pricing.output_per_million;
-                    let cache_cost = usage.cache_read_input_tokens as f64 / 1_000_000.0
-                        * pricing.cache_read_per_million;
-                    let model_total = input_cost + output_cost + cache_cost;
+                    let model_total = ccboard_core::pricing::calculate_cost(
+                        model,
+                        usage.input_tokens,
+                        usage.output_tokens,
+                        usage.cache_creation_input_tokens,
+                        usage.cache_read_input_tokens,
+                    );
                     total += model_total;
                     details.push((model.clone(), model_total));
                 }
@@ -544,11 +497,13 @@ impl CostsTab {
             .model_usage
             .iter()
             .map(|(model, usage)| {
-                let pricing = ModelPricing::for_model(model);
-                let cost = usage.input_tokens as f64 / 1_000_000.0 * pricing.input_per_million
-                    + usage.output_tokens as f64 / 1_000_000.0 * pricing.output_per_million
-                    + usage.cache_read_input_tokens as f64 / 1_000_000.0
-                        * pricing.cache_read_per_million;
+                let cost = ccboard_core::pricing::calculate_cost(
+                    model,
+                    usage.input_tokens,
+                    usage.output_tokens,
+                    usage.cache_creation_input_tokens,
+                    usage.cache_read_input_tokens,
+                );
                 (model.clone(), cost, usage.input_tokens, usage.output_tokens)
             })
             .collect();
@@ -617,13 +572,17 @@ impl CostsTab {
             .model_usage
             .iter()
             .map(|(model, usage)| {
-                let pricing = ModelPricing::for_model(model);
                 let input_cost =
-                    usage.input_tokens as f64 / 1_000_000.0 * pricing.input_per_million;
+                    ccboard_core::pricing::calculate_cost(model, usage.input_tokens, 0, 0, 0);
                 let output_cost =
-                    usage.output_tokens as f64 / 1_000_000.0 * pricing.output_per_million;
-                let cache_cost = usage.cache_read_input_tokens as f64 / 1_000_000.0
-                    * pricing.cache_read_per_million;
+                    ccboard_core::pricing::calculate_cost(model, 0, usage.output_tokens, 0, 0);
+                let cache_cost = ccboard_core::pricing::calculate_cost(
+                    model,
+                    0,
+                    0,
+                    usage.cache_creation_input_tokens,
+                    usage.cache_read_input_tokens,
+                );
                 let total = input_cost + output_cost + cache_cost;
                 (model.clone(), total, input_cost, output_cost, cache_cost)
             })

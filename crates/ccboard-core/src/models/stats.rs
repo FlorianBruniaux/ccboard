@@ -207,7 +207,7 @@ impl StatsCache {
             .filter(|(_, usage)| usage.total_tokens() > 0)
             .map(|(k, v)| (k.as_str(), v))
             .collect();
-        models.sort_by(|a, b| b.1.total_tokens().cmp(&a.1.total_tokens()));
+        models.sort_by_key(|b| std::cmp::Reverse(b.1.total_tokens()));
         models.truncate(n);
         models
     }
@@ -232,8 +232,30 @@ impl StatsCache {
         cache_read as f64 / total_input as f64
     }
 
-    /// Context window size for Sonnet 4.5 (200K tokens)
+    /// Default context window size for models without 1M-token beta support (200K tokens)
     pub const CONTEXT_WINDOW: u64 = 200_000;
+
+    /// Context window ceiling for a model, accounting for the Sonnet/Opus 1M-token beta.
+    /// Falls back to `CONTEXT_WINDOW` (200K) for Haiku and unknown models.
+    fn context_window_for_model(model: &str) -> u64 {
+        let model = model.to_ascii_lowercase();
+        if model.contains("opus") || model.contains("sonnet") {
+            1_000_000
+        } else {
+            Self::CONTEXT_WINDOW
+        }
+    }
+
+    /// Number of assistant turns in a session, used to de-cumulate `total_tokens`
+    /// (a whole-session running sum) into a per-turn context estimate.
+    fn turn_count(session: &crate::models::SessionMetadata) -> u64 {
+        let from_segments: usize = session.model_segments.iter().map(|(_, count)| *count).sum();
+        if from_segments > 0 {
+            from_segments as u64
+        } else {
+            (session.message_count / 2).max(1)
+        }
+    }
 
     /// Calculate context window saturation from session metadata
     ///
@@ -252,7 +274,7 @@ impl StatsCache {
             .iter()
             .filter(|s| s.last_timestamp.is_some() && s.total_tokens > 0)
             .collect();
-        sorted.sort_by(|a, b| b.last_timestamp.cmp(&a.last_timestamp));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.last_timestamp));
 
         // Take last N sessions
         let recent: Vec<_> = sorted.into_iter().take(last_n).collect();
@@ -266,7 +288,11 @@ impl StatsCache {
         let pct_values: Vec<f64> = recent
             .iter()
             .rev() // oldest first for regression index ordering
-            .map(|s| (s.total_tokens as f64 / Self::CONTEXT_WINDOW as f64) * 100.0)
+            .map(|s| {
+                let window = Self::context_window_for_model(s.primary_model());
+                let last_turn_tokens = s.total_tokens as f64 / Self::turn_count(s) as f64;
+                (last_turn_tokens / window as f64) * 100.0
+            })
             .collect();
 
         let total_pct: f64 = pct_values.iter().sum();
