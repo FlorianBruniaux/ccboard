@@ -5,13 +5,13 @@
 
 use crate::analytics::{AnalyticsData, Period};
 use crate::bookmarks::BookmarkStore;
-use crate::cache::{ClaudeMemDb, MetadataCache, StoredAlert};
+use crate::cache::{ClaudeMemDb, MetadataCache, SkillLeaderboardFilter, StoredAlert};
 use crate::error::{CoreError, DegradedState, LoadReport};
 use crate::event::{DataEvent, EventBus};
 use crate::models::activity::ActivitySummary;
 use crate::models::{
     BillingBlockManager, CcboardConfig, ClaudeMemSummary, InvocationStats, MergedConfig, SessionId,
-    SessionMetadata, StatsCache,
+    SessionMetadata, SkillInvocationEvent, SkillLeaderboardEntry, StatsCache,
 };
 use crate::parsers::{
     classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats, CodexParser,
@@ -1459,6 +1459,8 @@ impl DataStore {
         for path in paths {
             match parser.scan_session(&path).await {
                 Ok(stats) => {
+                    self.persist_skill_events(&path, stats.skill_events.clone())
+                        .await;
                     per_file.insert(path, stats);
                 }
                 Err(e) => {
@@ -1523,6 +1525,8 @@ impl DataStore {
         let parser = InvocationParser::new();
         match parser.scan_session(path).await {
             Ok(stats) => {
+                self.persist_skill_events(path, stats.skill_events.clone())
+                    .await;
                 // fetch_add before taking the lock: the epoch must be reserved
                 // ahead of the write so a concurrent compute_invocations() that
                 // reads invocation_epoch after this point is guaranteed to see
@@ -1573,6 +1577,60 @@ impl DataStore {
 
         let mut guard = self.invocation_stats.write();
         *guard = aggregated;
+    }
+
+    /// Persist a session file's skill invocation events to the SQLite cache.
+    ///
+    /// No-op (graceful degradation) if the metadata cache is unavailable or the
+    /// file's mtime can't be read. SQLite work runs in `spawn_blocking` since
+    /// `rusqlite` is synchronous; the `mtime` stat is cheap enough to do inline.
+    async fn persist_skill_events(&self, path: &Path, events: Vec<SkillInvocationEvent>) {
+        let Some(cache) = self.metadata_cache.clone() else {
+            return;
+        };
+        let Ok(mtime) = std::fs::metadata(path).and_then(|m| m.modified()) else {
+            return;
+        };
+        let path_owned = path.to_path_buf();
+        let result = tokio::task::spawn_blocking(move || {
+            cache.put_skill_events(&path_owned, mtime, &events)
+        })
+        .await;
+        match result {
+            Ok(Err(e)) => {
+                warn!(path = %path.display(), error = %e, "Failed to persist skill events");
+            }
+            Err(e) => {
+                warn!(path = %path.display(), error = %e, "Skill event persistence task panicked");
+            }
+            Ok(Ok(())) => {}
+        }
+    }
+
+    /// Skill invocation leaderboard, aggregated from the persisted `skill_events`
+    /// cache with cost computed at read time. Empty if the metadata cache is
+    /// unavailable (graceful degradation) or no skills have been scanned yet
+    /// (call `compute_invocations()` first).
+    pub fn skill_leaderboard(&self) -> Vec<SkillLeaderboardEntry> {
+        self.skill_leaderboard_filtered(&SkillLeaderboardFilter::default())
+    }
+
+    /// Skill invocation leaderboard with filtering (project/skill/since/subagents),
+    /// used by the `ccboard skills` CLI subcommand.
+    pub fn skill_leaderboard_filtered(
+        &self,
+        filter: &SkillLeaderboardFilter,
+    ) -> Vec<SkillLeaderboardEntry> {
+        let Some(ref cache) = self.metadata_cache else {
+            return Vec::new();
+        };
+        match cache.skill_leaderboard(filter) {
+            Ok(entries) => entries,
+            Err(e) => {
+                warn!(error = %e, "Failed to compute skill leaderboard");
+                Vec::new()
+            }
+        }
     }
 
     /// Compute billing blocks from all sessions
@@ -2227,6 +2285,32 @@ mod tests {
             "Incremental refresh must pick up the new skill invocation without a full rescan"
         );
         assert_eq!(stats.total_invocations(), 1);
+    }
+
+    /// Integration test for the full Phase 1 pipeline: parser extracts a
+    /// SkillInvocationEvent, `update_session()` persists it via
+    /// `refresh_invocations_for()` -> `persist_skill_events()`, and
+    /// `skill_leaderboard()` reads it back aggregated from SQLite.
+    #[tokio::test]
+    async fn test_skill_leaderboard_reflects_persisted_events() {
+        let dir = tempdir().unwrap();
+        let store = DataStore::with_defaults(dir.path().to_path_buf(), None);
+
+        let session_path = dir.path().join("session.jsonl");
+        std::fs::write(
+            &session_path,
+            r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"superpowers:brainstorming"}}]},"usage":{"input_tokens":100,"output_tokens":20},"timestamp":"2024-01-01T00:01:00Z"}
+"#,
+        )
+        .unwrap();
+
+        store.update_session(&session_path).await;
+
+        let leaderboard = store.skill_leaderboard();
+        assert_eq!(leaderboard.len(), 1);
+        assert_eq!(leaderboard[0].skill, "superpowers:brainstorming");
+        assert_eq!(leaderboard[0].invocations, 1);
+        assert_eq!(leaderboard[0].total_tokens, 120);
     }
 
     /// Regression test for the lost-update race flagged in code review:

@@ -9,5 +9,6 @@ pub mod metadata_cache;
 pub use claude_mem_db::ClaudeMemDb;
 pub use insights_db::InsightsDb;
 pub use metadata_cache::{
-    ActivityCacheStats, AggregateStats, CacheStats, MetadataCache, SearchResult, StoredAlert,
+    ActivityCacheStats, AggregateStats, CacheStats, MetadataCache, SearchResult,
+    SkillLeaderboardFilter, StoredAlert,
 };

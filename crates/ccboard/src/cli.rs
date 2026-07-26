@@ -3,7 +3,7 @@
 //! Provides search, recent, info, and resume commands using DataStore directly.
 
 use anyhow::{Context, Result};
-use ccboard_core::models::SessionMetadata;
+use ccboard_core::models::{SessionMetadata, SkillLeaderboardEntry};
 use chrono::{DateTime, Utc};
 use comfy_table::{Cell, Color, ContentArrangement, Row, Table};
 use std::sync::Arc;
@@ -344,6 +344,71 @@ pub fn format_session_info(session: &SessionMetadata, json: bool) -> String {
     ));
 
     lines.join("\n")
+}
+
+/// Format skill invocation leaderboard as table (human) or JSON
+pub fn format_skill_leaderboard(
+    entries: &[SkillLeaderboardEntry],
+    json: bool,
+    no_color: bool,
+) -> String {
+    if json {
+        return serde_json::to_string_pretty(entries).unwrap_or_else(|_| "[]".to_string());
+    }
+
+    if entries.is_empty() {
+        return "No skill invocations found.".to_string();
+    }
+
+    let mut table = Table::new();
+    table.set_content_arrangement(ContentArrangement::Dynamic);
+
+    if no_color {
+        table.set_header(vec![
+            "Skill",
+            "Invocations",
+            "Projects",
+            "Tokens",
+            "Est. Cost",
+            "First Seen",
+            "Last Seen",
+        ]);
+    } else {
+        table.set_header(vec![
+            Cell::new("Skill").fg(Color::Cyan),
+            Cell::new("Invocations").fg(Color::Cyan),
+            Cell::new("Projects").fg(Color::Cyan),
+            Cell::new("Tokens").fg(Color::Cyan),
+            Cell::new("Est. Cost").fg(Color::Cyan),
+            Cell::new("First Seen").fg(Color::Cyan),
+            Cell::new("Last Seen").fg(Color::Cyan),
+        ]);
+    }
+
+    for entry in entries {
+        let tokens = format_tokens(entry.total_tokens);
+        let cost = format!("${:.4}", entry.estimated_cost_usd);
+        let first_seen = entry
+            .first_seen
+            .map(|t| t.format("%Y-%m-%d").to_string())
+            .unwrap_or_else(|| "-".to_string());
+        let last_seen = entry
+            .last_seen
+            .map(|t| t.format("%Y-%m-%d").to_string())
+            .unwrap_or_else(|| "-".to_string());
+
+        table.add_row(Row::from(vec![
+            entry.skill.clone(),
+            entry.invocations.to_string(),
+            entry.projects.to_string(),
+            tokens,
+            cost,
+            first_seen,
+            last_seen,
+        ]));
+    }
+
+    table.to_string()
 }
 
 // ============================================================================
