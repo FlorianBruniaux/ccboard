@@ -1,0 +1,67 @@
+crates/ccboard-core/src/models/invocations.rs
+  s_12c3534ac32c1a::t_856665d69284b2 3,7-43,65-69,85
+  s_12c3534ac32c1a::t_24c95dcc2a6c8d 112
+crates/ccboard-core/src/store.rs
+  s_12c3534ac32c1a::t_b7c085237edeea 1582-1594,1599-1635
+  s_12c3534ac32c1a::t_d66a01705ed9f5 1595-1598
+  s_12c3534ac32c1a::t_2b9af97ddfde57 8,14
+  s_12c3534ac32c1a::t_606c8d8fdde14c 2290-2315
+  s_12c3534ac32c1a::t_39a51ea94e6673 1528-1529
+  s_12c3534ac32c1a::t_fe20bc1573c4a4 1462-1463
+crates/ccboard/src/main.rs
+  s_12c3534ac32c1a::t_49aae114a277ea 196-213
+  s_12c3534ac32c1a::t_1754b8420c6875 419-437
+  s_12c3534ac32c1a::t_13f693a594a988 1375-1422
+crates/ccboard/src/cli.rs
+  s_12c3534ac32c1a::t_f8ad0c9b4ef810 6
+  s_12c3534ac32c1a::t_3f3d0d982efa42 349-413
+crates/ccboard-core/src/cache/mod.rs
+  s_12c3534ac32c1a::t_f72cdd02e0f766 12-13
+crates/ccboard-core/src/models/mod.rs
+  s_12c3534ac32c1a::t_588315a90d247d 21
+crates/ccboard-core/src/parsers/invocations.rs
+  s_12c3534ac32c1a::t_fc3db454bf58e6 50-52
+  s_12c3534ac32c1a::t_bd5d3c08bb8e10 494
+  s_12c3534ac32c1a::t_0f15d08b93cd1d 133-147,151-204
+  s_12c3534ac32c1a::t_d86c05221404cd 4-5,19-23
+  s_12c3534ac32c1a::t_727397f4233f95 24,149-150
+  s_12c3534ac32c1a::t_2708816930216f 449,519-520
+  s_12c3534ac32c1a::t_9e53056ffa9be2 148
+  s_12c3534ac32c1a::t_b0d36a882fe8cd 289
+  s_12c3534ac32c1a::t_7e98952dcc1455 376-448,450-493,495-518,521-530
+  s_7b6fa8c588bf3b::t_d6388824566d63 25-26
+crates/ccboard-core/src/cache/metadata_cache.rs
+  s_12c3534ac32c1a::t_3510969f2845bf 186-203
+  s_12c3534ac32c1a::t_2e1a8864cf7a69 10-13
+  s_12c3534ac32c1a::t_0801728dabff96 1604-1611,1653,1794-1801,1826-1828,1835-1837
+  s_12c3534ac32c1a::t_77e3f42d3bad58 32,34-35
+  s_12c3534ac32c1a::t_f49ce5bf0ea456 488-491
+  s_12c3534ac32c1a::t_97a12f556c98a4 235-241
+  s_12c3534ac32c1a::t_b670c320393986 1568-1603,1612-1652,1654-1793,1802-1825,1829-1834,1838-1889
+  s_12c3534ac32c1a::t_c5d126d7f79d0a 1163
+  s_12c3534ac32c1a::t_b189633dd5713d 888-1162,1164-1178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "b3d6bcf6417ff6e5c97c5ae466d507dc742af0b8",
+  "prompts": {},
+  "sessions": {
+    "s_12c3534ac32c1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ef50c6c-224e-4614-a0e9-735339eb30c7",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    },
+    "s_7b6fa8c588bf3b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "354298a2-cae4-4b90-a92a-b8e616f5f2be",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
