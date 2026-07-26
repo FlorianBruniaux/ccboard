@@ -156,6 +156,7 @@ pub fn create_router(store: Arc<DataStore>) -> Router {
         .route("/api/agents", get(agents_handler))
         .route("/api/commands", get(commands_handler))
         .route("/api/skills", get(skills_handler))
+        .route("/api/skills/leaderboard", get(skills_leaderboard_handler))
         .route("/api/plugins", get(plugins_handler))
         .route(
             "/api/analytics/suggestions",
@@ -1017,6 +1018,70 @@ fn scan_skills_recursive(dir_path: &std::path::Path) -> Vec<serde_json::Value> {
     });
 
     items
+}
+
+/// Skills leaderboard handler - skill invocation leaderboard (Phase 1's
+/// `DataStore::skill_leaderboard()`), annotated with a `retired` flag for
+/// skills that have invocation history but no matching on-disk definition.
+///
+/// GET /api/skills/leaderboard
+async fn skills_leaderboard_handler(
+    axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
+) -> axum::Json<serde_json::Value> {
+    let on_disk = on_disk_skill_names();
+
+    let entries: Vec<serde_json::Value> = store
+        .skill_leaderboard()
+        .into_iter()
+        .map(|entry| {
+            let retired = !on_disk.contains(&entry.skill);
+            serde_json::json!({
+                "skill": entry.skill,
+                "invocations": entry.invocations,
+                "projects": entry.projects,
+                "total_tokens": entry.total_tokens,
+                "estimated_cost_usd": entry.estimated_cost_usd,
+                "first_seen": entry.first_seen,
+                "last_seen": entry.last_seen,
+                "retired": retired,
+            })
+        })
+        .collect();
+
+    axum::Json(serde_json::json!({
+        "entries": entries,
+        "total": entries.len(),
+    }))
+}
+
+/// Build the set of skill names currently defined on disk: bare directory
+/// names under `~/.claude/skills/<name>/SKILL.md`. Matches the same source
+/// `scan_skills_recursive`/`skills_handler` already use, and the same
+/// `~/.claude/skills` scan the TUI's `SkillsTab` reads for its own
+/// `[retired]` badge (see `ccboard-tui/src/tabs/agents.rs::scan_all_blocking`),
+/// so both surfaces agree on which skills count as "defined" including their
+/// shared blind spot: plugin-provided namespaced skills (e.g.
+/// `superpowers:brainstorming`) live under `~/.claude/plugins/`, not
+/// `~/.claude/skills/`, and neither surface resolves that catalogue today.
+///
+/// Recomputed fresh on every request. No "defined" flag is ever persisted,
+/// per the design doc: catalogue membership must reflect the live filesystem.
+fn on_disk_skill_names() -> std::collections::HashSet<String> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let skills_dir = std::path::Path::new(&home).join(".claude/skills");
+
+    let mut names = std::collections::HashSet::new();
+    if let Ok(entries) = std::fs::read_dir(&skills_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() && path.join("SKILL.md").exists() {
+                if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
+                    names.insert(name.to_string());
+                }
+            }
+        }
+    }
+    names
 }
 
 /// Task graph handler - returns task dependency graph from PLAN.md
