@@ -1,0 +1,20 @@
+docs/superpowers/specs/2026-07-26-skill-usage-analytics-design.md
+  s_0ae520860ec195::t_16c30159e74f4d 1
+  s_0ae520860ec195::t_f83ed4fa4a47b9 2-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "f9c3e9611b53731a9c5357cf6becd9816f9fde4f",
+  "prompts": {},
+  "sessions": {
+    "s_0ae520860ec195": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49be0a81-3c1a-4a37-a258-61d6bd1ffd47",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
