@@ -1,0 +1,31 @@
+.superpowers/sdd/skill-usage-analytics-design/task-0-report.md
+  s_12c3534ac32c1a::t_1b3d123cf43f27 8,10,16,18,20-21,23,27,38-42,46-47,53,84,91,96,104
+  s_12c3534ac32c1a::t_1e3b2b9c191560 1-7,9,11-15,17,19,22,24-26,28-37,43-45,48-52,54-83,85-90,92-95,97-103,105-106
+  s_12c3534ac32c1a::t_dc272d4f4a01c7 107-201
+crates/ccboard-core/src/store.rs
+  s_12c3534ac32c1a::t_dbc11d30513c7f 2254-2256,2267
+  s_12c3534ac32c1a::t_7f3fe2fa450c65 1488-1517
+  s_12c3534ac32c1a::t_f0a616fb5bae5e 1436-1441,1451-1455,1526-1531,1534,1552
+  s_12c3534ac32c1a::t_4d0202d8cd610a 2231-2253,2257-2266,2268-2282
+  s_12c3534ac32c1a::t_509d09997cb536 25
+  s_12c3534ac32c1a::t_a8fd5d4e43ccd0 102-115
+  s_12c3534ac32c1a::t_90d613f8b5dd46 243
+  s_12c3534ac32c1a::t_68bbe6c6f9a027 1470
+  s_12c3534ac32c1a::t_996c37e9e8be9c 1456
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "971c6294cb422e466bb5e056eb070e4403b30c51",
+  "prompts": {},
+  "sessions": {
+    "s_12c3534ac32c1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ef50c6c-224e-4614-a0e9-735339eb30c7",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
