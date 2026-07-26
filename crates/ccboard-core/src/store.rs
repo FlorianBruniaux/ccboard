@@ -22,6 +22,7 @@ use dashmap::DashMap;
 use moka::future::Cache;
 use parking_lot::RwLock; // parking_lot > std::sync::RwLock: smaller (40B vs 72B), no poisoning, better fairness
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info, warn};
@@ -98,7 +99,20 @@ pub struct DataStore {
     /// Per-file invocation stats, keyed by session path. Source of truth folded
     /// into `invocation_stats` on every compute/refresh so a single file's stats
     /// can be replaced without rescanning every other session.
-    invocation_by_path: RwLock<std::collections::HashMap<PathBuf, InvocationStats>>,
+    ///
+    /// Each entry is tagged with the epoch (from `invocation_epoch`) at which it
+    /// was last written. `compute_invocations()` (a full, slow, sequential rescan)
+    /// snapshots the epoch before it starts scanning and, when writing its results
+    /// back, skips any path whose current entry has a newer epoch than that
+    /// snapshot — such an entry was written by a concurrent
+    /// `refresh_invocations_for()` (the file-watcher path) after the full scan
+    /// started, and must not be clobbered by the full scan's now-stale read.
+    invocation_by_path: RwLock<std::collections::HashMap<PathBuf, (u64, InvocationStats)>>,
+
+    /// Monotonic counter bumped by every `refresh_invocations_for()` write.
+    /// See `invocation_by_path` doc for how this prevents the lost-update race
+    /// between it and `compute_invocations()`.
+    invocation_epoch: AtomicU64,
 
     /// Billing blocks (5h usage tracking)
     billing_blocks: RwLock<BillingBlockManager>,
@@ -226,6 +240,7 @@ impl DataStore {
             rules: RwLock::new(Rules::default()),
             invocation_stats: RwLock::new(InvocationStats::new()),
             invocation_by_path: RwLock::new(std::collections::HashMap::new()),
+            invocation_epoch: AtomicU64::new(0),
             billing_blocks: RwLock::new(BillingBlockManager::new()),
             analytics_cache: RwLock::new(None),
             discover_cache: RwLock::new(None),
@@ -1418,6 +1433,12 @@ impl DataStore {
     /// This scans all session files to count agent/command/skill invocations,
     /// populating `invocation_by_path` file by file, then folds the result into
     /// the aggregate. Should be called after initial load or when sessions are updated.
+    ///
+    /// This is a full, sequential, potentially slow rescan (it can run concurrently
+    /// with the file watcher's `refresh_invocations_for()`, e.g. during startup on a
+    /// large `~/.claude` directory). It merges its results rather than blindly
+    /// replacing the map, so a concurrent incremental refresh is never lost — see
+    /// the `invocation_by_path` field doc for the epoch mechanism.
     pub async fn compute_invocations(&self) {
         let paths: Vec<PathBuf> = self
             .sessions
@@ -1426,6 +1447,12 @@ impl DataStore {
             .collect();
 
         debug!(session_count = paths.len(), "Computing invocation stats");
+
+        // Snapshot the epoch before scanning starts. Any refresh_invocations_for()
+        // write that lands with a newer epoch than this, whether during the scan
+        // below or between the scan finishing and the write-back, must survive.
+        let start_epoch = self.invocation_epoch.load(Ordering::SeqCst);
+        let live_paths: std::collections::HashSet<PathBuf> = paths.iter().cloned().collect();
 
         let parser = InvocationParser::new();
         let mut per_file = std::collections::HashMap::with_capacity(paths.len());
@@ -1440,11 +1467,7 @@ impl DataStore {
             }
         }
 
-        // Write lock held only for the map swap (ADR-001).
-        {
-            let mut guard = self.invocation_by_path.write();
-            *guard = per_file;
-        }
+        self.merge_invocation_snapshot(start_epoch, per_file, &live_paths);
 
         self.fold_invocations();
 
@@ -1462,6 +1485,36 @@ impl DataStore {
         self.event_bus.publish(DataEvent::LoadCompleted);
     }
 
+    /// Merge a full-scan snapshot into `invocation_by_path`.
+    ///
+    /// Skips any path whose current entry carries an epoch newer than
+    /// `start_epoch`: that entry was written by a concurrent
+    /// `refresh_invocations_for()` after the scan that produced `per_file`
+    /// began, and the scan's now-stale result must not clobber it. Also drops
+    /// entries for sessions no longer in `live_paths`, unless they too were
+    /// refreshed concurrently. Write lock held only for this merge, no I/O or
+    /// awaits inside it (ADR-001). Split out from `compute_invocations()` so
+    /// the race it fixes can be driven deterministically in a test.
+    fn merge_invocation_snapshot(
+        &self,
+        start_epoch: u64,
+        per_file: std::collections::HashMap<PathBuf, InvocationStats>,
+        live_paths: &std::collections::HashSet<PathBuf>,
+    ) {
+        let mut guard = self.invocation_by_path.write();
+        for (path, stats) in per_file {
+            let clobbered_by_newer_refresh = guard
+                .get(&path)
+                .is_some_and(|(epoch, _)| *epoch > start_epoch);
+            if !clobbered_by_newer_refresh {
+                guard.insert(path, (start_epoch, stats));
+            }
+        }
+        // Drop entries for sessions no longer present, but never drop one
+        // written by a concurrent refresh after this scan started.
+        guard.retain(|path, (epoch, _)| *epoch > start_epoch || live_paths.contains(path));
+    }
+
     /// Rescan a single session file and refresh its entry in `invocation_by_path`,
     /// then re-fold the aggregate. Called from `update_session()` (file-watcher
     /// entry point) so a single changed file does not trigger a full rescan of
@@ -1470,10 +1523,15 @@ impl DataStore {
         let parser = InvocationParser::new();
         match parser.scan_session(path).await {
             Ok(stats) => {
-                // Write lock held only for the map swap (ADR-001).
+                // fetch_add before taking the lock: the epoch must be reserved
+                // ahead of the write so a concurrent compute_invocations() that
+                // reads invocation_epoch after this point is guaranteed to see
+                // this write as newer once it lands (see field doc).
+                let epoch = self.invocation_epoch.fetch_add(1, Ordering::SeqCst) + 1;
+                // Write lock held only for the map insert (ADR-001).
                 {
                     let mut guard = self.invocation_by_path.write();
-                    guard.insert(path.to_path_buf(), stats);
+                    guard.insert(path.to_path_buf(), (epoch, stats));
                 }
                 self.fold_invocations();
             }
@@ -1489,10 +1547,9 @@ impl DataStore {
     /// since that attribution depends on the final merged set of agent types.
     fn fold_invocations(&self) {
         let mut aggregated = InvocationStats::new();
-        aggregated.sessions_analyzed = 0;
         {
             let map = self.invocation_by_path.read();
-            for stats in map.values() {
+            for (_epoch, stats) in map.values() {
                 aggregated.merge(stats);
             }
         }
@@ -2170,5 +2227,57 @@ mod tests {
             "Incremental refresh must pick up the new skill invocation without a full rescan"
         );
         assert_eq!(stats.total_invocations(), 1);
+    }
+
+    /// Regression test for the lost-update race flagged in code review:
+    /// `compute_invocations()` is a full, slow, sequential rescan that can run
+    /// concurrently with the file watcher's `refresh_invocations_for()` (both
+    /// are kicked off around startup, see `ccboard/src/main.rs::run_web()`).
+    /// If a refresh lands a fresher entry for a path while the full scan is
+    /// mid-flight, the scan's later write-back must not silently discard it.
+    ///
+    /// The race can't be driven reliably through real concurrent tasks (no
+    /// stable interleaving point), so this drives `merge_invocation_snapshot()`
+    /// directly with an explicit `start_epoch`, exactly reproducing what
+    /// `compute_invocations()` would have captured before a concurrent refresh
+    /// bumped the epoch and wrote a fresher entry.
+    #[tokio::test]
+    async fn test_compute_invocations_does_not_clobber_concurrent_refresh() {
+        let dir = tempdir().unwrap();
+        let store = DataStore::with_defaults(dir.path().to_path_buf(), None);
+
+        let path = PathBuf::from("/fake/session.jsonl");
+
+        // Simulate refresh_invocations_for() landing at epoch 1, after
+        // compute_invocations() would have captured start_epoch = 0.
+        let mut fresh_stats = InvocationStats::new();
+        fresh_stats
+            .skills
+            .insert("concurrent-refresh-skill".to_string(), 1);
+        store
+            .invocation_by_path
+            .write()
+            .insert(path.clone(), (1, fresh_stats));
+
+        // Simulate the full scan's write-back: a stale (start_epoch = 0)
+        // snapshot for the same path, as if it had been scanned before the
+        // concurrent refresh's skill invocation happened.
+        let mut stale_snapshot = std::collections::HashMap::new();
+        stale_snapshot.insert(path.clone(), InvocationStats::new());
+        let live_paths: std::collections::HashSet<PathBuf> = [path.clone()].into_iter().collect();
+
+        store.merge_invocation_snapshot(0, stale_snapshot, &live_paths);
+
+        let map = store.invocation_by_path.read();
+        let (epoch, stats) = map.get(&path).expect("entry must survive the merge");
+        assert_eq!(
+            *epoch, 1,
+            "the concurrent refresh's epoch must survive the full scan's write-back"
+        );
+        assert_eq!(
+            stats.skills.get("concurrent-refresh-skill"),
+            Some(&1),
+            "the full scan's stale snapshot must not clobber the fresher concurrent refresh"
+        );
     }
 }
