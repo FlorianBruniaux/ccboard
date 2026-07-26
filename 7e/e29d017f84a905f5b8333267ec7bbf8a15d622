@@ -1,0 +1,63 @@
+crates/ccboard-tui/src/tabs/mod.rs
+  s_12c3534ac32c1a::t_9d2501ac3e6218 17
+  s_12c3534ac32c1a::t_f274e3693a74d5 33
+crates/ccboard-tui/src/components/help_modal.rs
+  s_12c3534ac32c1a::t_bbe0c4777b7d9e 375-388
+crates/ccboard-tui/src/app.rs
+  s_12c3534ac32c1a::t_bca7d0967eaedd 129
+  s_12c3534ac32c1a::t_e4b4e17e075d64 148
+  s_12c3534ac32c1a::t_e6befbdc756943 71,90
+  s_12c3534ac32c1a::t_8c7285d37a5fc3 52
+  s_12c3534ac32c1a::t_0a1f6df45ad787 31-33
+  s_12c3534ac32c1a::t_9886c7c316d392 110
+crates/ccboard-tui/src/lib.rs
+  s_12c3534ac32c1a::t_3d4f1e3b7355e7 145-151,160-167
+  s_4f14c427d8aa05::t_8576d06fbcac62 168
+crates/ccboard-tui/src/ui.rs
+  s_12c3534ac32c1a::t_c33970ce73cda9 83,86-87,90,94-101
+  s_12c3534ac32c1a::t_ef8fd71540791d 737
+  s_12c3534ac32c1a::t_ef524d0cbbf9ec 702-704
+  s_12c3534ac32c1a::t_e8c2e0faa238db 59
+  s_12c3534ac32c1a::t_866bcec646911f 275-277
+  s_12c3534ac32c1a::t_c578f400fadd20 35
+  s_12c3534ac32c1a::t_93353813a3a3a4 8
+  s_4f14c427d8aa05::t_1314b6871ae790 102-103
+crates/ccboard-tui/src/tabs/agents.rs
+  s_12c3534ac32c1a::t_564ce9be2db711 672-675,681
+  s_12c3534ac32c1a::t_d2c03a0d8a9f1c 682-685
+crates/ccboard-tui/src/tabs/skills.rs
+  s_12c3534ac32c1a::t_1c96b6e37a08ea 17
+  s_12c3534ac32c1a::t_30eb2827f5ce0a 109,163-166,204-206,315-318,369
+  s_12c3534ac32c1a::t_0412e246ba8819 1-16,18-108,110-162,167-203,207-287,289-314,319-368,370-399
+  s_12c3534ac32c1a::t_96aace6009d9a5 288
+crates/ccboard-core/src/analytics/plugin_usage.rs
+  s_12c3534ac32c1a::t_54f45b925912fc 172,177
+  s_12c3534ac32c1a::t_7a2d71f761c183 408-430
+  s_12c3534ac32c1a::t_044dd1fad1360e 170-171,173-174,176,181-182
+  s_12c3534ac32c1a::t_672b806cb2385d 183
+  s_12c3534ac32c1a::t_738568e2f51b95 407
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "7ee29d017f84a905f5b8333267ec7bbf8a15d622",
+  "prompts": {},
+  "sessions": {
+    "s_12c3534ac32c1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ef50c6c-224e-4614-a0e9-735339eb30c7",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    },
+    "s_4f14c427d8aa05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "21b8b4a5-003d-4641-b035-1760b585aa9b",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
