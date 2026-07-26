@@ -1,0 +1,39 @@
+.superpowers/sdd/skill-usage-analytics-design/task-2-tui-report.md
+  s_12c3534ac32c1a::t_27b0093ef60d26 24-25
+  s_12c3534ac32c1a::t_26bfa624f19df7 55
+  s_12c3534ac32c1a::t_ddd36c0dea1d19 98-190
+  s_12c3534ac32c1a::t_f6a244fc509ae9 34
+  s_12c3534ac32c1a::t_b7164fe383af13 1-23,26-33,35-41,43-54,56-97
+  s_12c3534ac32c1a::t_2c05d5ea61765c 42
+crates/ccboard-tui/src/tabs/skills.rs
+  s_12c3534ac32c1a::t_011f9326e55503 23,29-40,44-46,65-66,71-72,74-85,87-117,132-134,136-137
+  s_12c3534ac32c1a::t_94c132abc0a5ca 429,431-433,441-447,452-472
+  s_12c3534ac32c1a::t_16e8e265975b54 86
+crates/ccboard-tui/src/lib.rs
+  s_12c3534ac32c1a::t_afe59a28ccd40e 160-163,167-168,170
+crates/ccboard-tui/src/ui.rs
+  s_12c3534ac32c1a::t_fbd8737c14c5f8 86-89,95-96,103-112,116-123
+crates/ccboard-core/src/analytics/plugin_usage.rs
+  s_12c3534ac32c1a::t_26cbb931771f0a 170-179,182-184,187-193
+  s_12c3534ac32c1a::t_3692d52cb796d0 417-427,430-431,433-441
+crates/ccboard-tui/src/tabs/agents.rs
+  s_12c3534ac32c1a::t_b03386e876cd87 981-1030,1035-1054,1059-1073
+  s_12c3534ac32c1a::t_8cce5500d01c9e 100-176
+  s_12c3534ac32c1a::t_cb4aabbe0967aa 1031-1034,1055-1058
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "c49b84be218788a7e292c8060162fd31fd51f498",
+  "prompts": {},
+  "sessions": {
+    "s_12c3534ac32c1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ef50c6c-224e-4614-a0e9-735339eb30c7",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
