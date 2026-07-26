@@ -95,6 +95,11 @@ pub struct DataStore {
     /// Invocation statistics (agents, commands, skills)
     invocation_stats: RwLock<InvocationStats>,
 
+    /// Per-file invocation stats, keyed by session path. Source of truth folded
+    /// into `invocation_stats` on every compute/refresh so a single file's stats
+    /// can be replaced without rescanning every other session.
+    invocation_by_path: RwLock<std::collections::HashMap<PathBuf, InvocationStats>>,
+
     /// Billing blocks (5h usage tracking)
     billing_blocks: RwLock<BillingBlockManager>,
 
@@ -220,6 +225,7 @@ impl DataStore {
             mcp_config: RwLock::new(None),
             rules: RwLock::new(Rules::default()),
             invocation_stats: RwLock::new(InvocationStats::new()),
+            invocation_by_path: RwLock::new(std::collections::HashMap::new()),
             billing_blocks: RwLock::new(BillingBlockManager::new()),
             analytics_cache: RwLock::new(None),
             discover_cache: RwLock::new(None),
@@ -1392,6 +1398,9 @@ impl DataStore {
                 // Analytics will be recomputed on demand or periodically
                 // Only invalidate on significant changes (detected by UI)
 
+                // Incremental refresh: rescan only this file, re-fold the aggregate.
+                self.refresh_invocations_for(path).await;
+
                 if is_new {
                     self.event_bus.publish(DataEvent::SessionCreated(id));
                 } else {
@@ -1406,10 +1415,11 @@ impl DataStore {
 
     /// Compute invocation statistics from all sessions
     ///
-    /// This scans all session files to count agent/command/skill invocations.
-    /// Should be called after initial load or when sessions are updated.
+    /// This scans all session files to count agent/command/skill invocations,
+    /// populating `invocation_by_path` file by file, then folds the result into
+    /// the aggregate. Should be called after initial load or when sessions are updated.
     pub async fn compute_invocations(&self) {
-        let paths: Vec<_> = self
+        let paths: Vec<PathBuf> = self
             .sessions
             .iter()
             .map(|r| r.value().file_path.clone())
@@ -1418,7 +1428,74 @@ impl DataStore {
         debug!(session_count = paths.len(), "Computing invocation stats");
 
         let parser = InvocationParser::new();
-        let mut stats = parser.scan_sessions(&paths).await;
+        let mut per_file = std::collections::HashMap::with_capacity(paths.len());
+        for path in paths {
+            match parser.scan_session(&path).await {
+                Ok(stats) => {
+                    per_file.insert(path, stats);
+                }
+                Err(e) => {
+                    debug!(path = %path.display(), error = %e, "Failed to scan session for invocations");
+                }
+            }
+        }
+
+        // Write lock held only for the map swap (ADR-001).
+        {
+            let mut guard = self.invocation_by_path.write();
+            *guard = per_file;
+        }
+
+        self.fold_invocations();
+
+        let stats = self.invocation_stats.read();
+        debug!(
+            agents = stats.agents.len(),
+            commands = stats.commands.len(),
+            skills = stats.skills.len(),
+            total = stats.total_invocations(),
+            "Invocation stats computed"
+        );
+        drop(stats);
+
+        // Note: Using LoadCompleted as there's no specific invocation stats event
+        self.event_bus.publish(DataEvent::LoadCompleted);
+    }
+
+    /// Rescan a single session file and refresh its entry in `invocation_by_path`,
+    /// then re-fold the aggregate. Called from `update_session()` (file-watcher
+    /// entry point) so a single changed file does not trigger a full rescan of
+    /// every session's invocation stats.
+    pub async fn refresh_invocations_for(&self, path: &Path) {
+        let parser = InvocationParser::new();
+        match parser.scan_session(path).await {
+            Ok(stats) => {
+                // Write lock held only for the map swap (ADR-001).
+                {
+                    let mut guard = self.invocation_by_path.write();
+                    guard.insert(path.to_path_buf(), stats);
+                }
+                self.fold_invocations();
+            }
+            Err(e) => {
+                warn!(path = %path.display(), error = %e, "Failed to refresh invocation stats for session");
+            }
+        }
+    }
+
+    /// Fold `invocation_by_path` into the `invocation_stats` aggregate.
+    ///
+    /// Also recomputes `agent_token_stats` from each session's `tool_token_usage`,
+    /// since that attribution depends on the final merged set of agent types.
+    fn fold_invocations(&self) {
+        let mut aggregated = InvocationStats::new();
+        aggregated.sessions_analyzed = 0;
+        {
+            let map = self.invocation_by_path.read();
+            for stats in map.values() {
+                aggregated.merge(stats);
+            }
+        }
 
         // Populate agent_token_stats from session tool_token_usage
         // The Task tool tokens serve as a proxy for agent token consumption
@@ -1430,25 +1507,15 @@ impl DataStore {
                     session.tool_usage.get("Task").copied().unwrap_or(0).max(1) as u64;
                 let tokens_per_agent = task_tokens / agent_count;
                 // Attribute to all agent types found in stats that were invoked
-                for agent_type in stats.agents.keys().cloned().collect::<Vec<_>>() {
-                    *stats.agent_token_stats.entry(agent_type).or_insert(0) += tokens_per_agent;
+                for agent_type in aggregated.agents.keys().cloned().collect::<Vec<_>>() {
+                    *aggregated.agent_token_stats.entry(agent_type).or_insert(0) +=
+                        tokens_per_agent;
                 }
             }
         }
 
         let mut guard = self.invocation_stats.write();
-        *guard = stats;
-
-        debug!(
-            agents = guard.agents.len(),
-            commands = guard.commands.len(),
-            skills = guard.skills.len(),
-            total = guard.total_invocations(),
-            "Invocation stats computed"
-        );
-
-        // Note: Using LoadCompleted as there's no specific invocation stats event
-        self.event_bus.publish(DataEvent::LoadCompleted);
+        *guard = aggregated;
     }
 
     /// Compute billing blocks from all sessions
@@ -2057,5 +2124,51 @@ mod tests {
 
         // Sorting: Critical before Info
         assert_eq!(violations[0].severity, AlertSeverity::Critical);
+    }
+
+    /// Phase 0: `update_session()` must refresh invocation stats incrementally
+    /// (only the touched file re-scanned) instead of requiring a full
+    /// `compute_invocations()` rescan of every session.
+    #[tokio::test]
+    async fn test_watcher_recompute_skills() {
+        let dir = tempdir().unwrap();
+        let store = DataStore::with_defaults(dir.path().to_path_buf(), None);
+
+        let session_path = dir.path().join("session.jsonl");
+        std::fs::write(
+            &session_path,
+            r#"{"type":"user","message":{"role":"user","content":"hello"},"timestamp":"2024-01-01T00:00:00Z"}
+"#,
+        )
+        .unwrap();
+
+        store.update_session(&session_path).await;
+        assert_eq!(
+            store.invocation_stats().total_invocations(),
+            0,
+            "No tool_use lines yet, invocation stats must be empty"
+        );
+
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&session_path)
+            .unwrap();
+        use std::io::Write;
+        writeln!(
+            file,
+            r#"{{"type":"assistant","message":{{"role":"assistant","content":[{{"type":"tool_use","name":"Skill","input":{{"skill":"pdf-generator"}}}}]}},"timestamp":"2024-01-01T00:01:00Z"}}"#
+        )
+        .unwrap();
+        drop(file);
+
+        store.update_session(&session_path).await;
+
+        let stats = store.invocation_stats();
+        assert_eq!(
+            stats.skills.get("pdf-generator"),
+            Some(&1),
+            "Incremental refresh must pick up the new skill invocation without a full rescan"
+        );
+        assert_eq!(stats.total_invocations(), 1);
     }
 }
