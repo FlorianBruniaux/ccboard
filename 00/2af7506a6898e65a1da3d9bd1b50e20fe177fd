@@ -1,0 +1,23 @@
+crates/ccboard-core/src/store.rs
+  s_12c3534ac32c1a::t_3411db217aa55f 1511-1512
+  s_12c3534ac32c1a::t_4ce6de6021e11d 2128-2173
+  s_12c3534ac32c1a::t_46142e572a51ff 1401-1403,1418-1420,1422,1431-1498,1510,1518
+  s_12c3534ac32c1a::t_99c09e25b9a2a7 228
+  s_12c3534ac32c1a::t_245b2d6669d7a8 98-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "002af7506a6898e65a1da3d9bd1b50e20fe177fd",
+  "prompts": {},
+  "sessions": {
+    "s_12c3534ac32c1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ef50c6c-224e-4614-a0e9-735339eb30c7",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
