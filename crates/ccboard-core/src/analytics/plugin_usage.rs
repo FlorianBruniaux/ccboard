@@ -167,19 +167,20 @@ fn classify_plugin(name: &str, skills: &[String], commands: &[String]) -> Plugin
         return PluginType::Agent;
     }
 
-    // Check against known skills (case-insensitive)
+    // Check against known skills (case-insensitive). Exact match on the full
+    // (possibly namespaced) name first, substring only as a fallback when no
+    // exact match is found, since a plain `.contains()` alone produces false
+    // positives across namespaces, e.g. a local "brainstorming" matching
+    // "superpowers:brainstorming".
     let lower_name = name.to_lowercase();
-    if skills
-        .iter()
-        .any(|s| lower_name.contains(&s.to_lowercase()))
-    {
+    let lower_skills: Vec<String> = skills.iter().map(|s| s.to_lowercase()).collect();
+    if lower_skills.contains(&lower_name) || lower_skills.iter().any(|s| lower_name.contains(s)) {
         return PluginType::Skill;
     }
 
-    // Check against known commands
-    if commands
-        .iter()
-        .any(|c| lower_name.contains(&c.to_lowercase()))
+    // Check against known commands, same exact-first strategy
+    let lower_commands: Vec<String> = commands.iter().map(|c| c.to_lowercase()).collect();
+    if lower_commands.contains(&lower_name) || lower_commands.iter().any(|c| lower_name.contains(c))
     {
         return PluginType::Command;
     }
@@ -400,6 +401,30 @@ mod tests {
         assert_eq!(
             classify_plugin("Task", &skills, &commands),
             PluginType::Agent
+        );
+    }
+
+    #[test]
+    fn test_classify_plugin_exact_match_avoids_namespace_false_positive() {
+        // A local "brainstorming" skill must not swallow the classification of
+        // a differently-namespaced "superpowers:brainstorming" invocation just
+        // because the plain-substring test used to match across namespaces.
+        let skills = vec!["brainstorming".to_string()];
+        let commands = vec![];
+
+        assert_eq!(
+            classify_plugin("superpowers:brainstorming", &skills, &commands),
+            PluginType::Skill
+        );
+
+        // Exact match still wins over substring when both are present.
+        let skills = vec![
+            "brainstorming".to_string(),
+            "superpowers:brainstorming".to_string(),
+        ];
+        assert_eq!(
+            classify_plugin("superpowers:brainstorming", &skills, &commands),
+            PluginType::Skill
         );
     }
 

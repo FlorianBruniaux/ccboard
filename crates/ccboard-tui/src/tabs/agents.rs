@@ -669,11 +669,19 @@ impl AgentsTab {
                     Span::styled(entry.name.clone(), style),
                 ];
 
-                // Add invocation count if present
+                // Invocation badge: exact count when used, explicit "unused" only when
+                // the count is exactly zero. Tightened so this can never contradict the
+                // real per-skill counts shown on the Skills leaderboard tab, which reads
+                // the same `invocation_stats`-derived source of truth.
                 if entry.invocation_count > 0 {
                     spans.push(Span::styled(
                         format!(" (× {})", entry.invocation_count),
                         Style::default().fg(p.warning),
+                    ));
+                } else if entry.entry_type == AgentType::Skill && entry.invocation_count == 0 {
+                    spans.push(Span::styled(
+                        " [unused]",
+                        Style::default().fg(p.muted).italic(),
                     ));
                 }
 
