@@ -20,16 +20,30 @@ use ratatui::{
     Frame,
 };
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Skills leaderboard tab state
 pub struct SkillsTab {
     entries: Vec<SkillLeaderboardEntry>,
-    /// Names of skills currently defined on disk (from `.claude/skills/` scan), used to
-    /// recompute the `[retired]` badge at render time. Never persisted as a "defined" flag.
+    /// Lowercased leaf skill names currently defined on disk: local
+    /// `.claude/skills/*` directory names plus the leaf directory name of every
+    /// installed plugin skill under `plugins/{marketplaces,cache}/**/skills/*`.
+    /// Used to recompute the `[retired]` badge at render time; never persisted as
+    /// a "defined" flag. Matching is done on the leaf (the part after the last
+    /// `:`) because the exact plugin-name-to-namespace mapping isn't reliably
+    /// derivable from directory structure alone (the `marketplaces/` and
+    /// `cache/` trees don't nest plugin skills the same way), so a namespaced
+    /// invocation like "superpowers:brainstorming" is confirmed defined by any
+    /// installed plugin skill leaf named "brainstorming". A false "not retired"
+    /// from this looseness is preferred over a false "retired": the latter is an
+    /// active, contradicted claim, the former is silence.
     known_skill_names: HashSet<String>,
     list_state: ListState,
     show_detail: bool,
+    /// Background catalogue rescan in flight, drained by `poll_catalogue_update()`.
+    catalogue_rx: Option<tokio::sync::mpsc::UnboundedReceiver<HashSet<String>>>,
+    catalogue_scan_pending: bool,
 }
 
 impl Default for SkillsTab {
@@ -48,13 +62,59 @@ impl SkillsTab {
             known_skill_names: HashSet::new(),
             list_state,
             show_detail: false,
+            catalogue_rx: None,
+            catalogue_scan_pending: false,
         }
     }
 
     /// Set the on-disk skill catalogue, used to compute the `[retired]` badge.
-    /// Names are stored verbatim, never split on `:`.
+    /// Names are lowercased for case-insensitive matching (e.g. a `TDD/` skill
+    /// directory must match an invocation recorded as "tdd").
     pub fn set_known_skills(&mut self, names: impl IntoIterator<Item = String>) {
-        self.known_skill_names = names.into_iter().collect();
+        self.known_skill_names = names.into_iter().map(|n| n.to_lowercase()).collect();
+    }
+
+    /// Kick off a non-blocking background rescan of the on-disk skill catalogue
+    /// (local skills dir plus installed plugin skills), picked up later by
+    /// `poll_catalogue_update()`. No-op if a scan is already in flight. This is
+    /// how the `[retired]` badge stays live across a skill being installed or
+    /// removed mid-session, per the design doc's "recomputed at render time"
+    /// requirement, without blocking the render thread on a filesystem walk.
+    pub fn request_catalogue_rescan(
+        &mut self,
+        claude_home: PathBuf,
+        project_path: Option<PathBuf>,
+    ) {
+        if self.catalogue_scan_pending {
+            return;
+        }
+        self.catalogue_scan_pending = true;
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        self.catalogue_rx = Some(rx);
+        tokio::spawn(async move {
+            let names = tokio::task::spawn_blocking(move || {
+                crate::tabs::agents::scan_known_skill_names_blocking(
+                    &claude_home,
+                    project_path.as_deref(),
+                )
+            })
+            .await
+            .unwrap_or_default();
+            let _ = tx.send(names);
+        });
+    }
+
+    /// Drain a completed background catalogue scan, if any. Cheap (non-blocking
+    /// `try_recv`), safe to call every tick.
+    pub fn poll_catalogue_update(&mut self) {
+        let Some(rx) = self.catalogue_rx.as_mut() else {
+            return;
+        };
+        if let Ok(names) = rx.try_recv() {
+            self.known_skill_names = names;
+            self.catalogue_scan_pending = false;
+            self.catalogue_rx = None;
+        }
     }
 
     /// Refresh the leaderboard from the store. Cheap: reads an already-persisted
@@ -69,9 +129,12 @@ impl SkillsTab {
         self.entries = entries;
     }
 
-    /// A skill is retired if it has invocation history but is no longer defined on disk.
+    /// A skill is retired if it has invocation history but its leaf name is not
+    /// found anywhere in the on-disk catalogue (local skills or installed plugin
+    /// skills). See `known_skill_names` doc comment for why leaf-only matching.
     fn is_retired(&self, skill: &str) -> bool {
-        !self.known_skill_names.contains(skill)
+        let leaf = skill.rsplit(':').next().unwrap_or(skill).to_lowercase();
+        !self.known_skill_names.contains(&leaf)
     }
 
     pub fn handle_key(&mut self, key: crossterm::event::KeyCode) {
@@ -363,9 +426,11 @@ mod tests {
     }
 
     #[test]
-    fn retired_badge_fires_only_when_absent_from_disk_catalogue() {
+    fn retired_badge_fires_only_when_leaf_absent_from_disk_catalogue() {
         let mut tab = SkillsTab::new();
-        tab.set_known_skills(["superpowers:brainstorming".to_string()]);
+        // "brainstorming" is the leaf directory name harvested from an installed
+        // plugin's skills/ dir (see scan_known_skill_names_blocking).
+        tab.set_known_skills(["brainstorming".to_string()]);
         tab.entries = vec![entry("superpowers:brainstorming", 5), entry("old-skill", 3)];
 
         assert!(!tab.is_retired("superpowers:brainstorming"));
@@ -373,14 +438,38 @@ mod tests {
     }
 
     #[test]
-    fn namespaced_and_local_skill_names_are_distinct() {
+    fn namespaced_skill_confirmed_by_any_installed_plugin_leaf() {
+        // The exact plugin-name-to-namespace mapping isn't reliably derivable
+        // from disk layout (marketplaces/ and cache/ nest skills differently),
+        // so any installed plugin skill leaf named "brainstorming" positively
+        // confirms a namespaced invocation, regardless of which namespace the
+        // invocation actually used. This is a deliberate false-not-retired bias:
+        // see the `known_skill_names` doc comment on SkillsTab.
         let mut tab = SkillsTab::new();
         tab.set_known_skills(["brainstorming".to_string()]);
 
-        // A local "brainstorming" being defined does NOT clear the retired
-        // badge for the differently-namespaced "superpowers:brainstorming".
         assert!(!tab.is_retired("brainstorming"));
-        assert!(tab.is_retired("superpowers:brainstorming"));
+        assert!(!tab.is_retired("superpowers:brainstorming"));
+        assert!(!tab.is_retired("other-namespace:brainstorming"));
+    }
+
+    #[test]
+    fn genuinely_removed_namespaced_skill_is_still_retired() {
+        let mut tab = SkillsTab::new();
+        tab.set_known_skills(["brainstorming".to_string()]);
+
+        assert!(tab.is_retired("superpowers:some-removed-skill"));
+    }
+
+    #[test]
+    fn retired_check_is_case_insensitive() {
+        // ~/.claude/skills/TDD/SKILL.md on disk must match an invocation
+        // recorded verbatim as "tdd".
+        let mut tab = SkillsTab::new();
+        tab.set_known_skills(["TDD".to_string()]);
+
+        assert!(!tab.is_retired("tdd"));
+        assert!(!tab.is_retired("TDD"));
     }
 
     #[test]

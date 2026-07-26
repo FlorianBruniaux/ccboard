@@ -83,22 +83,44 @@ impl Ui {
         store: &std::sync::Arc<ccboard_core::DataStore>,
     ) {
         let (agents, commands, skills) = scan;
+        // Seed with the local skills dir immediately (already scanned, no extra
+        // wait); a background rescan below fills in installed plugin skills
+        // shortly after, so the `[retired]` badge doesn't falsely fire on
+        // plugin-namespaced skills during the brief window before it lands.
         self.skills
             .set_known_skills(skills.iter().map(|s| s.name.clone()));
         self.agents.apply_scanned(agents, commands, skills);
         self.agents.update_invocation_counts(invocation_stats);
         self.skills.refresh(store);
+        self.skills
+            .request_catalogue_rescan(claude_home.to_path_buf(), project_path.map(Into::into));
         self.config.init(claude_home, project_path);
     }
 
     /// Re-fetch in-memory invocation aggregates and refresh the tabs that
     /// display them. Called from the tick loop when `App::needs_refresh` is
     /// set (see `DataEvent`-driven `App::poll_events`). Cheap: reads
-    /// already-computed `DataStore` state, never triggers a rescan.
-    pub fn refresh_invocation_data(&mut self, store: &std::sync::Arc<ccboard_core::DataStore>) {
+    /// already-computed `DataStore` state, never triggers a rescan; also kicks
+    /// off a background on-disk skill catalogue rescan (see
+    /// `SkillsTab::request_catalogue_rescan`) so the `[retired]` badge stays
+    /// live across skills installed/removed mid-session.
+    pub fn refresh_invocation_data(
+        &mut self,
+        store: &std::sync::Arc<ccboard_core::DataStore>,
+        claude_home: &std::path::Path,
+        project_path: Option<&std::path::Path>,
+    ) {
         let stats = store.invocation_stats();
         self.agents.update_invocation_counts(&stats);
         self.skills.refresh(store);
+        self.skills
+            .request_catalogue_rescan(claude_home.to_path_buf(), project_path.map(Into::into));
+    }
+
+    /// Drain any completed background skill-catalogue rescan. Cheap
+    /// (non-blocking), safe to call every tick regardless of `needs_refresh`.
+    pub fn poll_skill_catalogue(&mut self) {
+        self.skills.poll_catalogue_update();
     }
 
     /// Handle key input for the active tab
