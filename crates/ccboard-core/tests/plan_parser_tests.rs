@@ -5,18 +5,18 @@ use std::path::PathBuf;
 
 #[test]
 fn test_parse_real_plan_file() {
-    // Parse the archived PLAN_PHASES_F-15.md file
+    // Parse a real, historically-archived PLAN.md, committed as a test fixture
+    // (tests/fixtures/plans/) rather than read from claudedocs/, which is
+    // gitignored and never present on a fresh checkout or in CI.
     let mut plan_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    plan_path.pop(); // Go up from ccboard-core
-    plan_path.pop(); // Go up from crates
-    plan_path.push("claudedocs");
-    plan_path.push("archive");
-    plan_path.push("phases");
+    plan_path.push("tests");
+    plan_path.push("fixtures");
+    plan_path.push("plans");
     plan_path.push("PLAN_PHASES_F-15.md");
 
     if !plan_path.exists() {
         panic!(
-            "PLAN_PHASES_F-15.md not found at {:?}. Test requires archived file.",
+            "PLAN_PHASES_F-15.md not found at {:?}. Test requires the committed fixture.",
             plan_path
         );
     }
