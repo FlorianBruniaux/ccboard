@@ -1,0 +1,21 @@
+crates/ccboard-core/tests/fixtures/plans/PLAN_PHASES_F-15.md
+  s_12c3534ac32c1a::t_4f98ebba34f5eb 1-1002
+crates/ccboard-core/tests/plan_parser_tests.rs
+  s_12c3534ac32c1a::t_81e9507a1534b5 8-10,12-14,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "3ca1b4596ec58b05b05e6de0b06873b2d6987c7c",
+  "prompts": {},
+  "sessions": {
+    "s_12c3534ac32c1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ef50c6c-224e-4614-a0e9-735339eb30c7",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
