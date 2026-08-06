@@ -97,6 +97,83 @@ pub fn scan_all_blocking(claude_home: &Path, project_path: Option<&Path>) -> Sca
     (agents, commands, skills)
 }
 
+/// Full on-disk skill name catalogue used by the Skills leaderboard's `[retired]`
+/// badge: lowercased local `.claude/skills/*` directory names, plus the lowercased
+/// leaf directory name of every installed plugin skill under
+/// `plugins/{marketplaces,cache}/**/skills/*/SKILL.md`.
+///
+/// Only the leaf name is kept, not a resolved `<plugin>:<skill>` namespace, because
+/// the marketplace/plugin-to-namespace mapping isn't reliably derivable from
+/// directory structure alone (`plugins/marketplaces/<marketplace>/skills/<name>` and
+/// `plugins/cache/<marketplace>/<plugin>/<version>/skills/<name>` nest differently,
+/// and the namespace prefix used at invocation time is the plugin name, not the
+/// marketplace directory name). Callers match a namespaced invocation like
+/// "superpowers:brainstorming" by its leaf ("brainstorming") against this set.
+///
+/// Must be called from `tokio::task::spawn_blocking`, same constraint as
+/// `scan_all_blocking`: this walks hundreds of files across the plugin cache and
+/// marketplace trees.
+pub fn scan_known_skill_names_blocking(
+    claude_home: &Path,
+    project_path: Option<&Path>,
+) -> std::collections::HashSet<String> {
+    let mut names = std::collections::HashSet::new();
+
+    for base in [Some(claude_home), project_path].into_iter().flatten() {
+        collect_skill_leaf_names(&base.join("skills"), &mut names);
+    }
+
+    for subdir in ["plugins/marketplaces", "plugins/cache"] {
+        collect_plugin_skill_leaf_names(&claude_home.join(subdir), &mut names);
+    }
+
+    names
+}
+
+/// Collect the lowercased names of every immediate child directory of `dir` that
+/// contains a `SKILL.md`. Used both for the local skills directory and for a
+/// resolved plugin `skills/` directory.
+fn collect_skill_leaf_names(dir: &Path, out: &mut std::collections::HashSet<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() && path.join("SKILL.md").exists() {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                out.insert(name.to_lowercase());
+            }
+        }
+    }
+}
+
+/// Recursively walk a plugin marketplace/cache tree looking for `skills/`
+/// directories, skipping hidden directories (`.git`, `.claude-plugin`, ...) to
+/// bound the walk. Stops recursing once a `skills/` directory is found and
+/// delegates to `collect_skill_leaf_names` for its immediate children.
+fn collect_plugin_skill_leaf_names(dir: &Path, out: &mut std::collections::HashSet<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if dir_name.starts_with('.') {
+            continue;
+        }
+        if dir_name == "skills" {
+            collect_skill_leaf_names(&path, out);
+        } else {
+            collect_plugin_skill_leaf_names(&path, out);
+        }
+    }
+}
+
 fn collect_subdir(base: &Path, subdir: &str, entry_type: AgentType, out: &mut Vec<AgentEntry>) {
     let dir = base.join(subdir);
     if dir.exists() {
@@ -669,11 +746,19 @@ impl AgentsTab {
                     Span::styled(entry.name.clone(), style),
                 ];
 
-                // Add invocation count if present
+                // Invocation badge: exact count when used, explicit "unused" only when
+                // the count is exactly zero. Tightened so this can never contradict the
+                // real per-skill counts shown on the Skills leaderboard tab, which reads
+                // the same `invocation_stats`-derived source of truth.
                 if entry.invocation_count > 0 {
                     spans.push(Span::styled(
                         format!(" (× {})", entry.invocation_count),
                         Style::default().fg(p.warning),
+                    ));
+                } else if entry.entry_type == AgentType::Skill && entry.invocation_count == 0 {
+                    spans.push(Span::styled(
+                        " [unused]",
+                        Style::default().fg(p.muted).italic(),
                     ));
                 }
 
@@ -891,5 +976,98 @@ impl AgentsTab {
 
         let paragraph = Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: true });
         frame.render_widget(paragraph, inner);
+    }
+}
+
+#[cfg(test)]
+mod catalogue_tests {
+    use super::scan_known_skill_names_blocking;
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// Isolated scratch directory under the OS temp dir, unique per test run.
+    struct TempHome(PathBuf);
+
+    impl TempHome {
+        fn new(label: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!(
+                "ccboard-skills-catalogue-test-{}-{}-{}",
+                label,
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+    }
+
+    impl Drop for TempHome {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn write_skill(dir: &std::path::Path, rel: &str) {
+        let skill_dir = dir.join(rel);
+        fs::create_dir_all(&skill_dir).unwrap();
+        fs::write(skill_dir.join("SKILL.md"), "---\ndescription: test\n---\n").unwrap();
+    }
+
+    #[test]
+    fn finds_local_skills() {
+        let home = TempHome::new("local");
+        write_skill(&home.0, "skills/rust-expert");
+
+        let names = scan_known_skill_names_blocking(&home.0, None);
+        assert!(names.contains("rust-expert"));
+    }
+
+    #[test]
+    fn finds_skills_under_plugins_marketplaces() {
+        let home = TempHome::new("marketplaces");
+        write_skill(
+            &home.0,
+            "plugins/marketplaces/claude-plugins-official/superpowers/skills/brainstorming",
+        );
+
+        let names = scan_known_skill_names_blocking(&home.0, None);
+        assert!(names.contains("brainstorming"));
+    }
+
+    #[test]
+    fn finds_skills_under_plugins_cache_with_version_dir() {
+        let home = TempHome::new("cache");
+        write_skill(
+            &home.0,
+            "plugins/cache/claude-plugins-official/superpowers/6.1.1/skills/brainstorming",
+        );
+
+        let names = scan_known_skill_names_blocking(&home.0, None);
+        assert!(names.contains("brainstorming"));
+    }
+
+    #[test]
+    fn skips_hidden_directories() {
+        let home = TempHome::new("hidden");
+        write_skill(
+            &home.0,
+            "plugins/marketplaces/.git/skills/should-not-appear",
+        );
+
+        let names = scan_known_skill_names_blocking(&home.0, None);
+        assert!(!names.contains("should-not-appear"));
+    }
+
+    #[test]
+    fn names_are_lowercased() {
+        let home = TempHome::new("case");
+        write_skill(&home.0, "skills/TDD");
+
+        let names = scan_known_skill_names_blocking(&home.0, None);
+        assert!(names.contains("tdd"));
+        assert!(!names.contains("TDD"));
     }
 }

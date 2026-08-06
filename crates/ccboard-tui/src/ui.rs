@@ -5,7 +5,7 @@ use crate::app::{App, Tab};
 use crate::tabs::render_search_tab;
 use crate::tabs::{
     ActivityTab, AgentsTab, AnalyticsTab, ConfigTab, ConversationTab, CostsTab, DashboardTab,
-    HistoryTab, HooksTab, McpTab, PluginsTab, SessionsTab,
+    HistoryTab, HooksTab, McpTab, PluginsTab, SessionsTab, SkillsTab,
 };
 // BrainTab state lives in App; we just call render/handle_key via app.brain_tab
 use crate::theme::Palette;
@@ -32,6 +32,7 @@ pub struct Ui {
     plugins: PluginsTab,
     activity: ActivityTab,
     conversation: ConversationTab,
+    skills: SkillsTab,
 }
 
 impl Default for Ui {
@@ -55,6 +56,7 @@ impl Ui {
             plugins: PluginsTab::new(),
             activity: ActivityTab::new(),
             conversation: ConversationTab::new(),
+            skills: SkillsTab::new(),
         }
     }
 
@@ -78,11 +80,47 @@ impl Ui {
         claude_home: &std::path::Path,
         project_path: Option<&std::path::Path>,
         invocation_stats: &ccboard_core::models::InvocationStats,
+        store: &std::sync::Arc<ccboard_core::DataStore>,
     ) {
         let (agents, commands, skills) = scan;
+        // Seed with the local skills dir immediately (already scanned, no extra
+        // wait); a background rescan below fills in installed plugin skills
+        // shortly after, so the `[retired]` badge doesn't falsely fire on
+        // plugin-namespaced skills during the brief window before it lands.
+        self.skills
+            .set_known_skills(skills.iter().map(|s| s.name.clone()));
         self.agents.apply_scanned(agents, commands, skills);
         self.agents.update_invocation_counts(invocation_stats);
+        self.skills.refresh(store);
+        self.skills
+            .request_catalogue_rescan(claude_home.to_path_buf(), project_path.map(Into::into));
         self.config.init(claude_home, project_path);
+    }
+
+    /// Re-fetch in-memory invocation aggregates and refresh the tabs that
+    /// display them. Called from the tick loop when `App::needs_refresh` is
+    /// set (see `DataEvent`-driven `App::poll_events`). Cheap: reads
+    /// already-computed `DataStore` state, never triggers a rescan; also kicks
+    /// off a background on-disk skill catalogue rescan (see
+    /// `SkillsTab::request_catalogue_rescan`) so the `[retired]` badge stays
+    /// live across skills installed/removed mid-session.
+    pub fn refresh_invocation_data(
+        &mut self,
+        store: &std::sync::Arc<ccboard_core::DataStore>,
+        claude_home: &std::path::Path,
+        project_path: Option<&std::path::Path>,
+    ) {
+        let stats = store.invocation_stats();
+        self.agents.update_invocation_counts(&stats);
+        self.skills.refresh(store);
+        self.skills
+            .request_catalogue_rescan(claude_home.to_path_buf(), project_path.map(Into::into));
+    }
+
+    /// Drain any completed background skill-catalogue rescan. Cheap
+    /// (non-blocking), safe to call every tick regardless of `needs_refresh`.
+    pub fn poll_skill_catalogue(&mut self) {
+        self.skills.poll_catalogue_update();
     }
 
     /// Handle key input for the active tab
@@ -255,6 +293,9 @@ impl Ui {
             }
             Tab::Brain => {
                 app.brain_tab.handle_key(key, Some(&app.store));
+            }
+            Tab::Skills => {
+                self.skills.handle_key(key);
             }
             Tab::Search => {
                 use crossterm::event::KeyCode;
@@ -680,6 +721,9 @@ impl Ui {
             Tab::Brain => {
                 app.brain_tab.render(frame, area, scheme, Some(&app.store));
             }
+            Tab::Skills => {
+                self.skills.render(frame, area, scheme);
+            }
         }
     }
 
@@ -712,6 +756,7 @@ impl Ui {
                 Tab::Activity => "j/k navigate │ a analyze session │ Tab/Shift+Tab switch tabs",
                 Tab::Search => "i type query │ Enter search/open │ j/k navigate │ ESC exit input",
                 Tab::Brain => "j/k navigate │ ←/→ filter │ Enter expand │ d archive │ r reload",
+                Tab::Skills => "j/k navigate │ g/G top/bottom │ Enter detail",
             };
 
             Line::from(vec![

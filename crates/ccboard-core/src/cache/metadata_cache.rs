@@ -7,6 +7,10 @@
 //! - session_metadata: parsed metadata + mtime + cache_version
 //! - activity_cache: serialized ActivitySummary + mtime per session file
 //! - activity_alerts: searchable alert records (severity/category) across all sessions
+//! - skill_scan_inventory: per-path scan bookkeeping (mtime, parser_revision) for skill events
+//! - skill_events: one row per real `Skill` tool_use invocation, additive since CACHE_VERSION 9
+//!   (see `CACHE_VERSION` doc: these two tables are `CREATE TABLE IF NOT EXISTS`, unconditional
+//!   on every open, and are never gated by a version bump)
 //! - Indexes: project, mtime, session_id, severity for fast queries
 //!
 //! Invalidation:
@@ -25,9 +29,10 @@
 //! - v7: Added tool_token_usage field to SessionMetadata (Phase K analytics)
 
 use crate::models::activity::ActivitySummary;
-use crate::models::SessionMetadata;
+use crate::models::{SessionMetadata, SkillInvocationEvent, SkillLeaderboardEntry};
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection, OptionalExtension};
+use chrono::{DateTime, Utc};
+use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
@@ -178,6 +183,24 @@ impl MetadataCache {
                 INSERT INTO session_fts(rowid, session_id, project, first_user_message, models_used)
                 VALUES (new.rowid, new.session_id, new.project, new.first_user_message, new.models_used);
             END;
+
+            CREATE TABLE IF NOT EXISTS skill_scan_inventory (
+                path TEXT PRIMARY KEY, mtime INTEGER NOT NULL, scanned_at INTEGER NOT NULL,
+                event_count INTEGER NOT NULL DEFAULT 0, parser_revision INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE INDEX IF NOT EXISTS idx_skill_inv_mtime ON skill_scan_inventory(mtime);
+
+            CREATE TABLE IF NOT EXISTS skill_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT NOT NULL, skill TEXT NOT NULL,
+                args TEXT, ts TEXT, day TEXT, project TEXT NOT NULL, is_subagent INTEGER NOT NULL DEFAULT 0,
+                model TEXT, tokens_total INTEGER NOT NULL DEFAULT 0, tokens_input INTEGER NOT NULL DEFAULT 0,
+                tokens_output INTEGER NOT NULL DEFAULT 0, tokens_cache_read INTEGER NOT NULL DEFAULT 0,
+                tokens_cache_write INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_skill_events_path ON skill_events(path);
+            CREATE INDEX IF NOT EXISTS idx_skill_events_skill ON skill_events(skill);
+            CREATE INDEX IF NOT EXISTS idx_skill_events_day ON skill_events(day);
+            CREATE INDEX IF NOT EXISTS idx_skill_events_project ON skill_events(project);
             "#,
         )
         .context("Failed to create schema")?;
@@ -209,6 +232,13 @@ impl MetadataCache {
                     .context("Failed to clear stale activity alerts")?;
                 conn.execute("DELETE FROM aggregate_stats", [])
                     .context("Failed to clear stale aggregate stats")?;
+                // Orphan-prevention only: skill tables are additive and not part
+                // of CACHE_VERSION's contract (see module docs), but a future
+                // unrelated version bump must not leave stale skill rows behind.
+                conn.execute("DELETE FROM skill_scan_inventory", [])
+                    .context("Failed to clear stale skill scan inventory")?;
+                conn.execute("DELETE FROM skill_events", [])
+                    .context("Failed to clear stale skill events")?;
                 conn.execute(
                     "INSERT OR IGNORE INTO aggregate_stats (key, value) VALUES ('total_sessions', 0)",
                     [],
@@ -455,6 +485,10 @@ impl MetadataCache {
 
         conn.execute("DELETE FROM session_metadata", [])
             .context("Failed to clear cache")?;
+        conn.execute("DELETE FROM skill_scan_inventory", [])
+            .context("Failed to clear skill scan inventory")?;
+        conn.execute("DELETE FROM skill_events", [])
+            .context("Failed to clear skill events")?;
 
         debug!("Cache cleared");
         Ok(())
@@ -851,6 +885,297 @@ impl MetadataCache {
             critical_alerts: critical_alerts as usize,
         })
     }
+
+    // ─── Skill invocation cache methods (Phase 1) ─────────────────────────────
+
+    /// Persist skill invocation events for a session file.
+    ///
+    /// Idempotent: deletes any prior events for the same path and re-inserts,
+    /// in the same transaction as the `skill_scan_inventory` upsert, so a
+    /// re-scan of an unchanged file never double-counts.
+    pub fn put_skill_events(
+        &self,
+        path: &Path,
+        mtime: SystemTime,
+        events: &[SkillInvocationEvent],
+    ) -> Result<()> {
+        let path_str = path.to_string_lossy();
+        let mtime_nanos = mtime
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .context("Invalid mtime")?
+            .as_nanos() as i64;
+        let scanned_at = Utc::now().timestamp();
+
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
+
+        conn.execute_batch("BEGIN IMMEDIATE")
+            .context("Failed to begin skill events transaction")?;
+
+        let result = (|| -> anyhow::Result<()> {
+            conn.execute(
+                r#"
+                INSERT INTO skill_scan_inventory (path, mtime, scanned_at, event_count, parser_revision)
+                VALUES (?, ?, ?, ?, 1)
+                ON CONFLICT(path) DO UPDATE SET
+                    mtime = excluded.mtime,
+                    scanned_at = excluded.scanned_at,
+                    event_count = excluded.event_count,
+                    parser_revision = excluded.parser_revision
+                "#,
+                params![
+                    path_str.as_ref(),
+                    mtime_nanos,
+                    scanned_at,
+                    events.len() as i64
+                ],
+            )
+            .context("Failed to upsert skill scan inventory")?;
+
+            conn.execute(
+                "DELETE FROM skill_events WHERE path = ?",
+                params![path_str.as_ref()],
+            )
+            .context("Failed to clear stale skill events")?;
+
+            for event in events {
+                let ts = event.timestamp.map(|t| t.to_rfc3339());
+                let day = event.timestamp.map(|t| t.format("%Y-%m-%d").to_string());
+                conn.execute(
+                    r#"
+                    INSERT INTO skill_events
+                    (path, skill, args, ts, day, project, is_subagent, model,
+                     tokens_total, tokens_input, tokens_output, tokens_cache_read, tokens_cache_write)
+                    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    "#,
+                    params![
+                        path_str.as_ref(),
+                        event.skill,
+                        ts,
+                        day,
+                        event.project.as_str(),
+                        if event.is_subagent { 1 } else { 0 },
+                        event.model,
+                        event.tokens as i64,
+                        event.tokens_input as i64,
+                        event.tokens_output as i64,
+                        event.tokens_cache_read as i64,
+                        event.tokens_cache_write as i64,
+                    ],
+                )
+                .context("Failed to insert skill event")?;
+            }
+
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => conn
+                .execute_batch("COMMIT")
+                .context("Failed to commit skill events transaction")?,
+            Err(e) => {
+                let _ = conn.execute_batch("ROLLBACK");
+                return Err(e);
+            }
+        }
+
+        debug!(path = %path.display(), events = events.len(), "Skill events cached");
+        Ok(())
+    }
+
+    /// Read back all persisted skill events for a single session path.
+    pub fn get_skill_events(&self, path: &Path) -> Result<Vec<SkillInvocationEvent>> {
+        let path_str = path.to_string_lossy();
+
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
+
+        let mut stmt = conn
+            .prepare(
+                r#"
+                SELECT skill, ts, project, is_subagent, model,
+                       tokens_total, tokens_input, tokens_output, tokens_cache_read, tokens_cache_write
+                FROM skill_events WHERE path = ? ORDER BY id
+                "#,
+            )
+            .context("Failed to prepare skill events query")?;
+
+        let path_for_rows = path.to_path_buf();
+        let rows = stmt
+            .query_map(params![path_str.as_ref()], move |row| {
+                let ts: Option<String> = row.get(1)?;
+                let is_subagent: i64 = row.get(3)?;
+                Ok(SkillInvocationEvent {
+                    skill: row.get(0)?,
+                    timestamp: ts
+                        .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+                        .map(|dt| dt.with_timezone(&Utc)),
+                    project: row.get::<_, String>(2)?.into(),
+                    session_path: path_for_rows.clone(),
+                    is_subagent: is_subagent != 0,
+                    model: row.get(4)?,
+                    tokens: row.get::<_, i64>(5)? as u64,
+                    tokens_input: row.get::<_, i64>(6)? as u64,
+                    tokens_output: row.get::<_, i64>(7)? as u64,
+                    tokens_cache_read: row.get::<_, i64>(8)? as u64,
+                    tokens_cache_write: row.get::<_, i64>(9)? as u64,
+                })
+            })
+            .context("Failed to query skill events")?;
+
+        let mut events = Vec::new();
+        for row in rows {
+            events.push(row.context("Failed to read skill event row")?);
+        }
+        Ok(events)
+    }
+
+    /// Compute the skill invocation leaderboard from persisted `skill_events`.
+    ///
+    /// Cost is never stored; it's computed here at read time via
+    /// `calculate_cost(model, ...)` per (skill, model) token breakdown, since
+    /// different invocations of the same skill can carry different models.
+    pub fn skill_leaderboard(
+        &self,
+        filter: &SkillLeaderboardFilter,
+    ) -> Result<Vec<SkillLeaderboardEntry>> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Metadata cache lock poisoned: {}", e))?;
+
+        let mut where_clauses: Vec<String> = Vec::new();
+        let mut query_params: Vec<String> = Vec::new();
+
+        if !filter.include_subagents {
+            where_clauses.push("is_subagent = 0".to_string());
+        }
+        if let Some(since) = filter.since {
+            where_clauses.push("ts >= ?".to_string());
+            query_params.push(since.to_rfc3339());
+        }
+        if let Some(ref project) = filter.project {
+            where_clauses.push("project = ?".to_string());
+            query_params.push(project.clone());
+        }
+        if let Some(ref skill) = filter.skill {
+            where_clauses.push("skill = ?".to_string());
+            query_params.push(skill.clone());
+        }
+
+        let where_sql = if where_clauses.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", where_clauses.join(" AND "))
+        };
+
+        let summary_sql = format!(
+            "SELECT skill, COUNT(*), COUNT(DISTINCT project), SUM(tokens_total), MIN(ts), MAX(ts) \
+             FROM skill_events {where_sql} GROUP BY skill"
+        );
+
+        let mut stmt = conn
+            .prepare(&summary_sql)
+            .context("Failed to prepare skill leaderboard summary query")?;
+
+        let mut entries: std::collections::HashMap<String, SkillLeaderboardEntry> =
+            std::collections::HashMap::new();
+        let rows = stmt
+            .query_map(params_from_iter(query_params.iter()), |row| {
+                let skill: String = row.get(0)?;
+                let invocations: i64 = row.get(1)?;
+                let projects: i64 = row.get(2)?;
+                let total_tokens: i64 = row.get(3)?;
+                let first_seen: Option<String> = row.get(4)?;
+                let last_seen: Option<String> = row.get(5)?;
+                Ok((
+                    skill,
+                    invocations,
+                    projects,
+                    total_tokens,
+                    first_seen,
+                    last_seen,
+                ))
+            })
+            .context("Failed to query skill leaderboard summary")?;
+
+        for row in rows {
+            let (skill, invocations, projects, total_tokens, first_seen, last_seen) =
+                row.context("Failed to read skill leaderboard summary row")?;
+            entries.insert(
+                skill.clone(),
+                SkillLeaderboardEntry {
+                    skill,
+                    invocations: invocations.max(0) as usize,
+                    projects: projects.max(0) as usize,
+                    total_tokens: total_tokens.max(0) as u64,
+                    estimated_cost_usd: 0.0,
+                    first_seen: first_seen
+                        .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+                        .map(|dt| dt.with_timezone(&Utc)),
+                    last_seen: last_seen
+                        .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+                        .map(|dt| dt.with_timezone(&Utc)),
+                },
+            );
+        }
+
+        let cost_sql = format!(
+            "SELECT skill, model, SUM(tokens_input), SUM(tokens_output), SUM(tokens_cache_write), SUM(tokens_cache_read) \
+             FROM skill_events {where_sql} GROUP BY skill, model"
+        );
+        let mut cost_stmt = conn
+            .prepare(&cost_sql)
+            .context("Failed to prepare skill leaderboard cost query")?;
+        let cost_rows = cost_stmt
+            .query_map(params_from_iter(query_params.iter()), |row| {
+                let skill: String = row.get(0)?;
+                let model: Option<String> = row.get(1)?;
+                let input: i64 = row.get(2)?;
+                let output: i64 = row.get(3)?;
+                let cache_write: i64 = row.get(4)?;
+                let cache_read: i64 = row.get(5)?;
+                Ok((skill, model, input, output, cache_write, cache_read))
+            })
+            .context("Failed to query skill leaderboard cost breakdown")?;
+
+        for row in cost_rows {
+            let (skill, model, input, output, cache_write, cache_read) =
+                row.context("Failed to read skill leaderboard cost row")?;
+            let model = model.unwrap_or_else(|| "unknown".to_string());
+            let cost = crate::pricing::calculate_cost(
+                &model,
+                input.max(0) as u64,
+                output.max(0) as u64,
+                cache_write.max(0) as u64,
+                cache_read.max(0) as u64,
+            );
+            if let Some(entry) = entries.get_mut(&skill) {
+                entry.estimated_cost_usd += cost;
+            }
+        }
+
+        let mut result: Vec<SkillLeaderboardEntry> = entries.into_values().collect();
+        result.sort_by_key(|e| std::cmp::Reverse(e.total_tokens));
+        Ok(result)
+    }
+}
+
+/// Filter for querying the skill invocation leaderboard from `skill_events`.
+///
+/// `include_subagents` defaults to `false`: subagent-triggered skill
+/// invocations (transcripts under a `subagents/` directory) are excluded
+/// unless explicitly requested, matching the `ccboard skills` CLI default.
+#[derive(Debug, Clone, Default)]
+pub struct SkillLeaderboardFilter {
+    pub since: Option<DateTime<Utc>>,
+    pub project: Option<String>,
+    pub skill: Option<String>,
+    pub include_subagents: bool,
 }
 
 impl Drop for MetadataCache {
@@ -1239,5 +1564,327 @@ mod tests {
         // Old alerts should be gone
         let alerts = cache.get_all_alerts(None).unwrap();
         assert_eq!(alerts.len(), 0, "Stale alerts should be replaced");
+    }
+
+    // ── Skill invocation cache tests (Phase 1) ──────────────────────────────
+
+    fn make_skill_event(
+        skill: &str,
+        session_path: &Path,
+        project: &str,
+        tokens: u64,
+        model: &str,
+        timestamp: DateTime<Utc>,
+    ) -> SkillInvocationEvent {
+        SkillInvocationEvent {
+            skill: skill.to_string(),
+            timestamp: Some(timestamp),
+            project: project.into(),
+            session_path: session_path.to_path_buf(),
+            is_subagent: false,
+            tokens,
+            model: Some(model.to_string()),
+            tokens_input: tokens / 2,
+            tokens_output: tokens / 2,
+            tokens_cache_read: 0,
+            tokens_cache_write: 0,
+        }
+    }
+
+    #[test]
+    fn test_skill_invocations_roundtrip() {
+        let dir = tempdir().unwrap();
+        let cache = MetadataCache::new(dir.path()).unwrap();
+
+        let path = PathBuf::from("/tmp/roundtrip/session.jsonl");
+        let mtime = SystemTime::now();
+        let ts = Utc::now();
+        let events = vec![
+            make_skill_event("pdf-generator", &path, "/roundtrip", 100, "sonnet-4", ts),
+            make_skill_event(
+                "superpowers:brainstorming",
+                &path,
+                "/roundtrip",
+                42,
+                "opus-4",
+                ts,
+            ),
+        ];
+
+        cache.put_skill_events(&path, mtime, &events).unwrap();
+
+        let read_back = cache.get_skill_events(&path).unwrap();
+        assert_eq!(read_back.len(), 2, "no events lost on roundtrip");
+        assert_eq!(read_back[0].skill, "pdf-generator");
+        assert_eq!(read_back[0].tokens, 100);
+        assert_eq!(read_back[0].model.as_deref(), Some("sonnet-4"));
+        assert_eq!(read_back[1].skill, "superpowers:brainstorming");
+        assert_eq!(read_back[1].tokens, 42);
+        assert_eq!(read_back[1].tokens_input, 21);
+        assert_eq!(read_back[1].tokens_output, 21);
+    }
+
+    #[test]
+    fn test_skill_invocations_migration_from_populated_v9_db() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("session-metadata.db");
+
+        // Build a realistic pre-existing v9 database by hand: the schema as
+        // it existed before this feature, no skill_scan_inventory/skill_events.
+        {
+            let conn = Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                r#"
+                CREATE TABLE cache_metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+                CREATE TABLE session_metadata (
+                    path TEXT PRIMARY KEY, mtime INTEGER NOT NULL, project TEXT NOT NULL,
+                    session_id TEXT NOT NULL, first_timestamp TEXT, last_timestamp TEXT,
+                    message_count INTEGER NOT NULL, total_tokens INTEGER NOT NULL,
+                    models_used TEXT NOT NULL, has_subagents INTEGER NOT NULL,
+                    first_user_message TEXT, data BLOB NOT NULL
+                );
+                INSERT INTO cache_metadata (key, value) VALUES ('version', 9);
+                "#,
+            )
+            .unwrap();
+
+            for i in 0..5 {
+                let path = format!("/tmp/v9-project/session{i}.jsonl");
+                let meta = SessionMetadata::from_path(PathBuf::from(&path), "/v9-project".into());
+                let data = bincode::serialize(&meta).unwrap();
+                conn.execute(
+                    "INSERT INTO session_metadata (path, mtime, project, session_id, \
+                     first_timestamp, last_timestamp, message_count, total_tokens, models_used, \
+                     has_subagents, first_user_message, data) \
+                     VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, 0, NULL, ?)",
+                    params![
+                        path,
+                        1_000_000_000_i64 + i,
+                        "/v9-project",
+                        format!("session-{i}"),
+                        i * 3,
+                        i * 100,
+                        "[]",
+                        &data,
+                    ],
+                )
+                .unwrap();
+            }
+        }
+
+        // Reopen with the new code, which unconditionally creates
+        // skill_scan_inventory + skill_events alongside the existing tables.
+        let cache = MetadataCache::new(dir.path()).unwrap();
+
+        let stats = cache.stats().unwrap();
+        assert_eq!(
+            stats.total_entries, 5,
+            "pre-existing v9 session_metadata rows must survive opening with the new code"
+        );
+
+        // New tables must exist and be queryable (empty, no error).
+        let leaderboard = cache
+            .skill_leaderboard(&SkillLeaderboardFilter::default())
+            .unwrap();
+        assert!(leaderboard.is_empty());
+    }
+
+    #[test]
+    fn test_additive_schema_preserves_existing_rows() {
+        let dir = tempdir().unwrap();
+        let mtime = SystemTime::now();
+
+        {
+            let cache = MetadataCache::new(dir.path()).unwrap();
+            for i in 0..8u64 {
+                let path = PathBuf::from(format!("/tmp/additive/session{i}.jsonl"));
+                let mut meta = SessionMetadata::from_path(path.clone(), "/additive".into());
+                meta.id = format!("session-{i}").into();
+                meta.message_count = i * 7;
+                meta.total_tokens = i * 1000;
+                cache.put(&path, &meta, mtime).unwrap();
+            }
+        } // cache dropped here: connection closed, WAL checkpointed
+
+        // Reopen, simulating a fresh process start with the new code.
+        let cache = MetadataCache::new(dir.path()).unwrap();
+        assert_eq!(cache.stats().unwrap().total_entries, 8);
+
+        for i in 0..8u64 {
+            let path = PathBuf::from(format!("/tmp/additive/session{i}.jsonl"));
+            let cached = cache
+                .get(&path, mtime)
+                .unwrap()
+                .unwrap_or_else(|| panic!("session {i} missing after reopen"));
+            assert_eq!(cached.id.as_str(), format!("session-{i}"));
+            assert_eq!(cached.message_count, i * 7);
+            assert_eq!(cached.total_tokens, i * 1000);
+        }
+    }
+
+    #[test]
+    fn test_skill_leaderboard_aggregation() {
+        let dir = tempdir().unwrap();
+        let cache = MetadataCache::new(dir.path()).unwrap();
+        let mtime = SystemTime::now();
+
+        let t1 = Utc::now() - chrono::Duration::days(2);
+        let t2 = Utc::now() - chrono::Duration::days(1);
+        let t3 = Utc::now();
+
+        let session_a = PathBuf::from("/tmp/proj-a/session1.jsonl");
+        let session_b = PathBuf::from("/tmp/proj-b/session2.jsonl");
+        let session_c = PathBuf::from("/tmp/proj-a/session3.jsonl");
+
+        cache
+            .put_skill_events(
+                &session_a,
+                mtime,
+                &[make_skill_event(
+                    "pdf-generator",
+                    &session_a,
+                    "/proj-a",
+                    100,
+                    "sonnet-4",
+                    t1,
+                )],
+            )
+            .unwrap();
+        cache
+            .put_skill_events(
+                &session_b,
+                mtime,
+                &[make_skill_event(
+                    "pdf-generator",
+                    &session_b,
+                    "/proj-b",
+                    200,
+                    "sonnet-4",
+                    t2,
+                )],
+            )
+            .unwrap();
+        cache
+            .put_skill_events(
+                &session_c,
+                mtime,
+                &[make_skill_event(
+                    "superpowers:brainstorming",
+                    &session_c,
+                    "/proj-a",
+                    50,
+                    "opus-4",
+                    t3,
+                )],
+            )
+            .unwrap();
+
+        let leaderboard = cache
+            .skill_leaderboard(&SkillLeaderboardFilter::default())
+            .unwrap();
+
+        let pdf_entry = leaderboard
+            .iter()
+            .find(|e| e.skill == "pdf-generator")
+            .expect("pdf-generator entry present");
+        assert_eq!(pdf_entry.invocations, 2, "aggregated across two sessions");
+        assert_eq!(pdf_entry.projects, 2, "aggregated across two projects");
+        assert_eq!(pdf_entry.total_tokens, 300);
+        assert!(pdf_entry.estimated_cost_usd > 0.0);
+        assert_eq!(
+            pdf_entry.first_seen.map(|t| t.date_naive()),
+            Some(t1.date_naive())
+        );
+        assert_eq!(
+            pdf_entry.last_seen.map(|t| t.date_naive()),
+            Some(t2.date_naive())
+        );
+
+        let brainstorm_entry = leaderboard
+            .iter()
+            .find(|e| e.skill == "superpowers:brainstorming")
+            .expect("namespaced skill entry present, not split on ':'");
+        assert_eq!(brainstorm_entry.invocations, 1);
+        assert_eq!(brainstorm_entry.projects, 1);
+        assert_eq!(brainstorm_entry.total_tokens, 50);
+    }
+
+    #[test]
+    fn test_skill_leaderboard_filters_by_project_and_skill() {
+        let dir = tempdir().unwrap();
+        let cache = MetadataCache::new(dir.path()).unwrap();
+        let mtime = SystemTime::now();
+        let now = Utc::now();
+
+        let session_a = PathBuf::from("/tmp/proj-a/session1.jsonl");
+        let session_b = PathBuf::from("/tmp/proj-b/session2.jsonl");
+
+        cache
+            .put_skill_events(
+                &session_a,
+                mtime,
+                &[make_skill_event(
+                    "skill-x", &session_a, "/proj-a", 10, "sonnet-4", now,
+                )],
+            )
+            .unwrap();
+        cache
+            .put_skill_events(
+                &session_b,
+                mtime,
+                &[make_skill_event(
+                    "skill-y", &session_b, "/proj-b", 20, "sonnet-4", now,
+                )],
+            )
+            .unwrap();
+
+        let filtered = cache
+            .skill_leaderboard(&SkillLeaderboardFilter {
+                project: Some("/proj-a".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].skill, "skill-x");
+
+        let by_skill = cache
+            .skill_leaderboard(&SkillLeaderboardFilter {
+                skill: Some("skill-y".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(by_skill.len(), 1);
+        assert_eq!(by_skill[0].skill, "skill-y");
+    }
+
+    #[test]
+    fn test_skill_leaderboard_excludes_subagents_by_default() {
+        let dir = tempdir().unwrap();
+        let cache = MetadataCache::new(dir.path()).unwrap();
+        let mtime = SystemTime::now();
+        let now = Utc::now();
+
+        let path = PathBuf::from("/tmp/proj/subagents/agent.jsonl");
+        let mut event = make_skill_event("skill-z", &path, "/proj", 30, "sonnet-4", now);
+        event.is_subagent = true;
+
+        cache.put_skill_events(&path, mtime, &[event]).unwrap();
+
+        let default_filter = cache
+            .skill_leaderboard(&SkillLeaderboardFilter::default())
+            .unwrap();
+        assert!(
+            default_filter.is_empty(),
+            "subagent invocations must be excluded unless include_subagents is set"
+        );
+
+        let with_subagents = cache
+            .skill_leaderboard(&SkillLeaderboardFilter {
+                include_subagents: true,
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(with_subagents.len(), 1);
+        assert_eq!(with_subagents[0].skill, "skill-z");
     }
 }

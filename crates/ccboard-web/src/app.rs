@@ -85,6 +85,12 @@ pub fn App() -> impl IntoView {
                                     }
                                 />
                                 <Route
+                                    path=path!("/skills")
+                                    view=|| {
+                                        view! { <crate::pages::Skills /> }
+                                    }
+                                />
+                                <Route
                                     path=path!("/tasks")
                                     view=|| {
                                         view! { <crate::pages::TaskGraphPage /> }

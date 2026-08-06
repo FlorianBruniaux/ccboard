@@ -193,6 +193,24 @@ enum Mode {
         #[arg(long, short = 'o')]
         output: Option<PathBuf>,
     },
+    /// Show the real Skill invocation leaderboard (extracted from session
+    /// transcripts, never textual mentions)
+    Skills {
+        /// Filter to a single skill name (verbatim, e.g. "superpowers:brainstorming")
+        skill: Option<String>,
+        /// Date filter: 7d, 30d, 3m, 1y, YYYY-MM-DD
+        #[arg(long, short = 'd')]
+        since: Option<String>,
+        /// Filter to a single project path (exact match)
+        #[arg(long)]
+        project: Option<String>,
+        /// Include subagent-triggered invocations (excluded by default)
+        #[arg(long)]
+        include_subagents: bool,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Analyze session history to suggest skills, commands, and CLAUDE.md rules
     Discover {
         /// Time window: 7d, 30d, 90d, or YYYY-MM-DD (default: 90d)
@@ -394,6 +412,25 @@ async fn main() -> Result<()> {
                 budget,
                 error_threshold,
                 output,
+                no_color,
+            )
+            .await?;
+        }
+        Mode::Skills {
+            skill,
+            since,
+            project: project_filter,
+            include_subagents,
+            json,
+        } => {
+            run_skills(
+                claude_home,
+                project,
+                skill,
+                since,
+                project_filter,
+                include_subagents,
+                json,
                 no_color,
             )
             .await?;
@@ -1333,6 +1370,54 @@ async fn run_pricing_clear(_no_color: bool) -> Result<()> {
             Err(e)
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skills handler
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[allow(clippy::too_many_arguments)]
+async fn run_skills(
+    claude_home: PathBuf,
+    project: Option<PathBuf>,
+    skill: Option<String>,
+    since: Option<String>,
+    project_filter: Option<String>,
+    include_subagents: bool,
+    json: bool,
+    no_color: bool,
+) -> Result<()> {
+    use ccboard_core::cache::SkillLeaderboardFilter;
+
+    let store = DataStore::with_defaults(claude_home, project);
+
+    if !json {
+        eprint!("Scanning sessions for skill invocations... ");
+    }
+
+    store.initial_load().await;
+    store.compute_invocations().await;
+
+    if !json {
+        eprintln!("done");
+    }
+
+    let date_filter = parse_date_filter(since.as_deref())?;
+    let filter = SkillLeaderboardFilter {
+        since: date_filter.map(|f| f.cutoff()),
+        project: project_filter,
+        skill,
+        include_subagents,
+    };
+
+    let leaderboard = store.skill_leaderboard_filtered(&filter);
+
+    println!(
+        "{}",
+        cli::format_skill_leaderboard(&leaderboard, json, no_color)
+    );
+
+    Ok(())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

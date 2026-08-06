@@ -142,7 +142,13 @@ where
             let (_report, invocation_stats, scan) = result;
 
             // Initialize UI with pre-scanned data (scan ran in spawn_blocking, not on executor)
-            ui.init(scan, claude_home, project_path, &invocation_stats);
+            ui.init(
+                scan,
+                claude_home,
+                project_path,
+                &invocation_stats,
+                &app.store,
+            );
 
             // Mark loading as complete
             app.complete_loading();
@@ -150,6 +156,20 @@ where
 
         // Check for data events
         app.poll_events();
+
+        // Drain any background skill-catalogue rescan that completed since the
+        // last tick, regardless of needs_refresh (cheap non-blocking try_recv).
+        ui.poll_skill_catalogue();
+
+        // Re-fetch invocation aggregates and refresh the tabs that display them
+        // (Agents invocation badges, Skills leaderboard) whenever a DataEvent
+        // flagged a refresh. Cheap: reads already-computed in-memory state off
+        // DataStore, not a rescan. Also kicks off a background on-disk skill
+        // catalogue rescan, drained on a later tick above.
+        if app.needs_refresh && !app.is_loading {
+            ui.refresh_invocation_data(&app.store, claude_home, project_path);
+            app.needs_refresh = false;
+        }
 
         // Refresh live sessions if on Sessions tab (every 2s)
         app.refresh_live_sessions_if_needed();

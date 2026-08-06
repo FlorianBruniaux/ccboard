@@ -1,8 +1,46 @@
 //! Invocation statistics for agents, commands, and skills
 
+use crate::models::session::ProjectId;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
+
+/// A single real skill invocation extracted from a `Skill`-type `tool_use` block.
+///
+/// Emitted once per block, never for textual mentions of a skill name in prose.
+/// `session_path` (not the JSON `sessionId`) is the identity key, since subagent
+/// transcripts under a `subagents/` directory reuse their parent's sessionId.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillInvocationEvent {
+    /// Verbatim skill name, e.g. "superpowers:brainstorming", never split on ':'
+    pub skill: String,
+    pub timestamp: Option<DateTime<Utc>>,
+    pub project: ProjectId,
+    /// Identity key, never the sessionId from the JSON
+    pub session_path: PathBuf,
+    pub is_subagent: bool,
+    /// Proportional share of the assistant message's total tokens
+    pub tokens: u64,
+    pub model: Option<String>,
+    /// Proportional share of input tokens, for accurate cost computation at read time
+    pub tokens_input: u64,
+    pub tokens_output: u64,
+    pub tokens_cache_read: u64,
+    pub tokens_cache_write: u64,
+}
+
+/// Aggregated leaderboard row for a single skill across all projects/sessions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillLeaderboardEntry {
+    pub skill: String,
+    pub invocations: usize,
+    pub projects: usize,
+    pub total_tokens: u64,
+    pub estimated_cost_usd: f64,
+    pub first_seen: Option<DateTime<Utc>>,
+    pub last_seen: Option<DateTime<Utc>>,
+}
 
 /// Statistics about agent/command/skill invocations across all sessions
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -24,6 +62,11 @@ pub struct InvocationStats {
     #[serde(default)]
     pub agent_token_stats: HashMap<String, u64>,
 
+    /// Real skill invocations with per-event token attribution, one per
+    /// `Skill`-type `tool_use` block found across the scanned session(s)
+    #[serde(default)]
+    pub skill_events: Vec<SkillInvocationEvent>,
+
     /// When stats were last computed
     pub last_computed: DateTime<Utc>,
 
@@ -39,6 +82,7 @@ impl InvocationStats {
             commands: HashMap::new(),
             skills: HashMap::new(),
             agent_token_stats: HashMap::new(),
+            skill_events: Vec::new(),
             last_computed: Utc::now(),
             sessions_analyzed: 0,
         }
@@ -65,6 +109,7 @@ impl InvocationStats {
         for (name, tokens) in &other.agent_token_stats {
             *self.agent_token_stats.entry(name.clone()).or_insert(0) += tokens;
         }
+        self.skill_events.extend(other.skill_events.iter().cloned());
         self.sessions_analyzed += other.sessions_analyzed;
         // Keep the most recent timestamp
         if other.last_computed > self.last_computed {

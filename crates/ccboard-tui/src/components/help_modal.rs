@@ -372,6 +372,20 @@ impl HelpModal {
                     Span::raw("Reload from DB"),
                 ]));
             }
+            Tab::Skills => {
+                lines.push(Line::from(vec![
+                    Span::styled("  j/k or ↑/↓  ", Style::default().fg(focus_color)),
+                    Span::raw("Navigate skill leaderboard"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  g/G         ", Style::default().fg(focus_color)),
+                    Span::raw("Jump to top/bottom"),
+                ]));
+                lines.push(Line::from(vec![
+                    Span::styled("  Enter       ", Style::default().fg(focus_color)),
+                    Span::raw("Toggle detail panel"),
+                ]));
+            }
         }
 
         lines.push(Line::from(""));

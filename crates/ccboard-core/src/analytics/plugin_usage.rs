@@ -167,20 +167,30 @@ fn classify_plugin(name: &str, skills: &[String], commands: &[String]) -> Plugin
         return PluginType::Agent;
     }
 
-    // Check against known skills (case-insensitive)
+    // Exact matches across ALL categories take priority over substring matches
+    // in ANY category. A flat "does any skill substring-match OR any command
+    // substring-match" chain can let an unrelated short substring in one
+    // category shadow a real exact match in the other (e.g. skill "work"
+    // substring-matching the unrelated command "network" before "network" ever
+    // gets checked as an exact command match). Checking exact matches for both
+    // categories first, then falling back to substrings for both, closes that
+    // gap; it also avoids a namespaced name like "superpowers:brainstorming"
+    // being misclassified by an unrelated local skill whose name happens to be
+    // a substring of it.
     let lower_name = name.to_lowercase();
-    if skills
-        .iter()
-        .any(|s| lower_name.contains(&s.to_lowercase()))
-    {
+    let lower_skills: Vec<String> = skills.iter().map(|s| s.to_lowercase()).collect();
+    let lower_commands: Vec<String> = commands.iter().map(|c| c.to_lowercase()).collect();
+
+    if lower_skills.contains(&lower_name) {
         return PluginType::Skill;
     }
-
-    // Check against known commands
-    if commands
-        .iter()
-        .any(|c| lower_name.contains(&c.to_lowercase()))
-    {
+    if lower_commands.contains(&lower_name) {
+        return PluginType::Command;
+    }
+    if lower_skills.iter().any(|s| lower_name.contains(s)) {
+        return PluginType::Skill;
+    }
+    if lower_commands.iter().any(|c| lower_name.contains(c)) {
         return PluginType::Command;
     }
 
@@ -400,6 +410,39 @@ mod tests {
         assert_eq!(
             classify_plugin("Task", &skills, &commands),
             PluginType::Agent
+        );
+    }
+
+    #[test]
+    fn test_classify_plugin_exact_command_beats_substring_skill() {
+        // "network" is an exact command match, but also contains "work", an
+        // unrelated skill name, as a substring. Under the old flat
+        // `skills.any(contains) || commands.any(contains)` chain, the skill
+        // check ran first and "network".contains("work") == true, so this
+        // returned Skill even though "network" is a real, exact command match.
+        // Checking exact matches across both categories before any substring
+        // fallback fixes this: this assertion fails against the pre-fix
+        // function (verified by reverting the fix locally) and passes after.
+        let skills = vec!["work".to_string()];
+        let commands = vec!["network".to_string()];
+
+        assert_eq!(
+            classify_plugin("network", &skills, &commands),
+            PluginType::Command
+        );
+    }
+
+    #[test]
+    fn test_classify_plugin_substring_fallback_still_applies_when_no_exact_match() {
+        // No exact match for "superpowers:brainstorming" anywhere, so the
+        // substring fallback still classifies it as a Skill via the local
+        // "brainstorming" entry, same behavior as before the restructure.
+        let skills = vec!["brainstorming".to_string()];
+        let commands = vec![];
+
+        assert_eq!(
+            classify_plugin("superpowers:brainstorming", &skills, &commands),
+            PluginType::Skill
         );
     }
 

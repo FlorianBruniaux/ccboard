@@ -13,6 +13,7 @@ mod mcp;
 mod plugins;
 mod search;
 mod sessions;
+mod skills;
 mod task_graph;
 
 pub use activity::ActivityPage;
@@ -28,4 +29,5 @@ pub use mcp::Mcp;
 pub use plugins::PluginsPage;
 pub use search::SearchPage;
 pub use sessions::Sessions;
+pub use skills::Skills;
 pub use task_graph::TaskGraphPage;

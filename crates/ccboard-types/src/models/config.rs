@@ -92,7 +92,7 @@ impl Settings {
         self.api_key.as_ref().map(|key| {
             if key.len() <= 10 {
                 // Short key: mask everything except first 3 chars
-                format!("{}••••", &key.chars().take(3).collect::<String>())
+                format!("{}••••", key.chars().take(3).collect::<String>())
             } else {
                 // Standard key: show prefix and suffix
                 let prefix = key.chars().take(7).collect::<String>();

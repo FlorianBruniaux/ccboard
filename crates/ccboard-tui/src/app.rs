@@ -28,6 +28,9 @@ pub enum Tab {
     Search,
     /// Brain knowledge base — cross-session insights from session-stop hook
     Brain,
+    /// Skill invocation leaderboard — distinct from the Skills sub-tab in Agents,
+    /// which lists on-disk definitions rather than actual usage
+    Skills,
 }
 
 impl Tab {
@@ -46,6 +49,7 @@ impl Tab {
             Tab::Plugins,   // 10
             Tab::Search,    // 11
             Tab::Brain,     // 12
+            Tab::Skills,    // 13
         ]
     }
 
@@ -64,6 +68,7 @@ impl Tab {
             Tab::Plugins => 10,
             Tab::Search => 11,
             Tab::Brain => 12,
+            Tab::Skills => 13,
         }
     }
 
@@ -82,6 +87,7 @@ impl Tab {
             10 => Tab::Plugins,
             11 => Tab::Search,
             12 => Tab::Brain,
+            13 => Tab::Skills,
             _ => Tab::Dashboard,
         }
     }
@@ -101,6 +107,7 @@ impl Tab {
             Tab::Activity => "Audit Log",
             Tab::Search => "Search",
             Tab::Brain => "Brain",
+            Tab::Skills => "Skills",
         }
     }
 
@@ -119,6 +126,7 @@ impl Tab {
             Tab::Plugins => 'p', // decorative — beyond 0-9 range
             Tab::Search => 's',  // decorative — accessible via /
             Tab::Brain => 'b',   // decorative — accessible via Tab
+            Tab::Skills => 'k',  // decorative — beyond 0-9 range
         }
     }
 
@@ -137,6 +145,7 @@ impl Tab {
             Tab::Activity => "🔍",
             Tab::Search => "🔎",
             Tab::Brain => "🧠",
+            Tab::Skills => "🏆",
         }
     }
 }

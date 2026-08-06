@@ -5857,3 +5857,66 @@ pre code {
   font-size: 0.8125rem;
   color: #8b949e;
 }
+
+/* ========== Skills Leaderboard ========== */
+
+.skills-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.skills-table thead {
+  background-color: var(--hover-bg);
+}
+
+.skills-table th {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.skills-table th.skills-table__num,
+.skills-table td.skills-table__num {
+  text-align: right;
+}
+
+.skills-table td {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.skills-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.skills-table tbody tr:hover {
+  background-color: var(--hover-bg);
+}
+
+.skills-table__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.skills-table__cost {
+  font-weight: var(--font-semibold);
+  color: var(--accent-primary);
+}
+
+.skills-table__timestamp {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+}

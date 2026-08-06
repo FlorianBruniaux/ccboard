@@ -18,7 +18,7 @@ pub use config::{
     AnomalyThresholds, HookDefinition, HookGroup, MergedConfig, Permissions, Settings,
 };
 pub use insight::{Insight, InsightType};
-pub use invocations::InvocationStats;
+pub use invocations::{InvocationStats, SkillInvocationEvent, SkillLeaderboardEntry};
 pub use plan::{Phase, PhaseStatus, PlanFile, PlanMetadata, Task};
 pub use session::{
     ConversationMessage, MessageRole, ProjectId, SessionContent, SessionId, SessionLine,

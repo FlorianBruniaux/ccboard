@@ -215,7 +215,7 @@ pub fn Brain() -> impl IntoView {
                                 set_selected_insight.set(None);
                             }
                         >
-                            {if t != "all" { format!("{} {}", type_icon(t), &label) } else { label }}
+                            {if t != "all" { format!("{} {}", type_icon(t), label) } else { label }}
                         </button>
                     }
                 }).collect_view()}

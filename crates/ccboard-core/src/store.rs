@@ -5,13 +5,13 @@
 
 use crate::analytics::{AnalyticsData, Period};
 use crate::bookmarks::BookmarkStore;
-use crate::cache::{ClaudeMemDb, MetadataCache, StoredAlert};
+use crate::cache::{ClaudeMemDb, MetadataCache, SkillLeaderboardFilter, StoredAlert};
 use crate::error::{CoreError, DegradedState, LoadReport};
 use crate::event::{DataEvent, EventBus};
 use crate::models::activity::ActivitySummary;
 use crate::models::{
     BillingBlockManager, CcboardConfig, ClaudeMemSummary, InvocationStats, MergedConfig, SessionId,
-    SessionMetadata, StatsCache,
+    SessionMetadata, SkillInvocationEvent, SkillLeaderboardEntry, StatsCache,
 };
 use crate::parsers::{
     classify_tool_calls, parse_claude_global, parse_tool_calls, ClaudeGlobalStats, CodexParser,
@@ -22,6 +22,7 @@ use dashmap::DashMap;
 use moka::future::Cache;
 use parking_lot::RwLock; // parking_lot > std::sync::RwLock: smaller (40B vs 72B), no poisoning, better fairness
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info, warn};
@@ -94,6 +95,24 @@ pub struct DataStore {
 
     /// Invocation statistics (agents, commands, skills)
     invocation_stats: RwLock<InvocationStats>,
+
+    /// Per-file invocation stats, keyed by session path. Source of truth folded
+    /// into `invocation_stats` on every compute/refresh so a single file's stats
+    /// can be replaced without rescanning every other session.
+    ///
+    /// Each entry is tagged with the epoch (from `invocation_epoch`) at which it
+    /// was last written. `compute_invocations()` (a full, slow, sequential rescan)
+    /// snapshots the epoch before it starts scanning and, when writing its results
+    /// back, skips any path whose current entry has a newer epoch than that
+    /// snapshot — such an entry was written by a concurrent
+    /// `refresh_invocations_for()` (the file-watcher path) after the full scan
+    /// started, and must not be clobbered by the full scan's now-stale read.
+    invocation_by_path: RwLock<std::collections::HashMap<PathBuf, (u64, InvocationStats)>>,
+
+    /// Monotonic counter bumped by every `refresh_invocations_for()` write.
+    /// See `invocation_by_path` doc for how this prevents the lost-update race
+    /// between it and `compute_invocations()`.
+    invocation_epoch: AtomicU64,
 
     /// Billing blocks (5h usage tracking)
     billing_blocks: RwLock<BillingBlockManager>,
@@ -220,6 +239,8 @@ impl DataStore {
             mcp_config: RwLock::new(None),
             rules: RwLock::new(Rules::default()),
             invocation_stats: RwLock::new(InvocationStats::new()),
+            invocation_by_path: RwLock::new(std::collections::HashMap::new()),
+            invocation_epoch: AtomicU64::new(0),
             billing_blocks: RwLock::new(BillingBlockManager::new()),
             analytics_cache: RwLock::new(None),
             discover_cache: RwLock::new(None),
@@ -1392,6 +1413,9 @@ impl DataStore {
                 // Analytics will be recomputed on demand or periodically
                 // Only invalidate on significant changes (detected by UI)
 
+                // Incremental refresh: rescan only this file, re-fold the aggregate.
+                self.refresh_invocations_for(path).await;
+
                 if is_new {
                     self.event_bus.publish(DataEvent::SessionCreated(id));
                 } else {
@@ -1406,10 +1430,17 @@ impl DataStore {
 
     /// Compute invocation statistics from all sessions
     ///
-    /// This scans all session files to count agent/command/skill invocations.
-    /// Should be called after initial load or when sessions are updated.
+    /// This scans all session files to count agent/command/skill invocations,
+    /// populating `invocation_by_path` file by file, then folds the result into
+    /// the aggregate. Should be called after initial load or when sessions are updated.
+    ///
+    /// This is a full, sequential, potentially slow rescan (it can run concurrently
+    /// with the file watcher's `refresh_invocations_for()`, e.g. during startup on a
+    /// large `~/.claude` directory). It merges its results rather than blindly
+    /// replacing the map, so a concurrent incremental refresh is never lost — see
+    /// the `invocation_by_path` field doc for the epoch mechanism.
     pub async fn compute_invocations(&self) {
-        let paths: Vec<_> = self
+        let paths: Vec<PathBuf> = self
             .sessions
             .iter()
             .map(|r| r.value().file_path.clone())
@@ -1417,8 +1448,115 @@ impl DataStore {
 
         debug!(session_count = paths.len(), "Computing invocation stats");
 
+        // Snapshot the epoch before scanning starts. Any refresh_invocations_for()
+        // write that lands with a newer epoch than this, whether during the scan
+        // below or between the scan finishing and the write-back, must survive.
+        let start_epoch = self.invocation_epoch.load(Ordering::SeqCst);
+        let live_paths: std::collections::HashSet<PathBuf> = paths.iter().cloned().collect();
+
         let parser = InvocationParser::new();
-        let mut stats = parser.scan_sessions(&paths).await;
+        let mut per_file = std::collections::HashMap::with_capacity(paths.len());
+        for path in paths {
+            match parser.scan_session(&path).await {
+                Ok(stats) => {
+                    self.persist_skill_events(&path, stats.skill_events.clone())
+                        .await;
+                    per_file.insert(path, stats);
+                }
+                Err(e) => {
+                    debug!(path = %path.display(), error = %e, "Failed to scan session for invocations");
+                }
+            }
+        }
+
+        self.merge_invocation_snapshot(start_epoch, per_file, &live_paths);
+
+        self.fold_invocations();
+
+        let stats = self.invocation_stats.read();
+        debug!(
+            agents = stats.agents.len(),
+            commands = stats.commands.len(),
+            skills = stats.skills.len(),
+            total = stats.total_invocations(),
+            "Invocation stats computed"
+        );
+        drop(stats);
+
+        // Note: Using LoadCompleted as there's no specific invocation stats event
+        self.event_bus.publish(DataEvent::LoadCompleted);
+    }
+
+    /// Merge a full-scan snapshot into `invocation_by_path`.
+    ///
+    /// Skips any path whose current entry carries an epoch newer than
+    /// `start_epoch`: that entry was written by a concurrent
+    /// `refresh_invocations_for()` after the scan that produced `per_file`
+    /// began, and the scan's now-stale result must not clobber it. Also drops
+    /// entries for sessions no longer in `live_paths`, unless they too were
+    /// refreshed concurrently. Write lock held only for this merge, no I/O or
+    /// awaits inside it (ADR-001). Split out from `compute_invocations()` so
+    /// the race it fixes can be driven deterministically in a test.
+    fn merge_invocation_snapshot(
+        &self,
+        start_epoch: u64,
+        per_file: std::collections::HashMap<PathBuf, InvocationStats>,
+        live_paths: &std::collections::HashSet<PathBuf>,
+    ) {
+        let mut guard = self.invocation_by_path.write();
+        for (path, stats) in per_file {
+            let clobbered_by_newer_refresh = guard
+                .get(&path)
+                .is_some_and(|(epoch, _)| *epoch > start_epoch);
+            if !clobbered_by_newer_refresh {
+                guard.insert(path, (start_epoch, stats));
+            }
+        }
+        // Drop entries for sessions no longer present, but never drop one
+        // written by a concurrent refresh after this scan started.
+        guard.retain(|path, (epoch, _)| *epoch > start_epoch || live_paths.contains(path));
+    }
+
+    /// Rescan a single session file and refresh its entry in `invocation_by_path`,
+    /// then re-fold the aggregate. Called from `update_session()` (file-watcher
+    /// entry point) so a single changed file does not trigger a full rescan of
+    /// every session's invocation stats.
+    pub async fn refresh_invocations_for(&self, path: &Path) {
+        let parser = InvocationParser::new();
+        match parser.scan_session(path).await {
+            Ok(stats) => {
+                self.persist_skill_events(path, stats.skill_events.clone())
+                    .await;
+                // fetch_add before taking the lock: the epoch must be reserved
+                // ahead of the write so a concurrent compute_invocations() that
+                // reads invocation_epoch after this point is guaranteed to see
+                // this write as newer once it lands (see field doc).
+                let epoch = self.invocation_epoch.fetch_add(1, Ordering::SeqCst) + 1;
+                // Write lock held only for the map insert (ADR-001).
+                {
+                    let mut guard = self.invocation_by_path.write();
+                    guard.insert(path.to_path_buf(), (epoch, stats));
+                }
+                self.fold_invocations();
+            }
+            Err(e) => {
+                warn!(path = %path.display(), error = %e, "Failed to refresh invocation stats for session");
+            }
+        }
+    }
+
+    /// Fold `invocation_by_path` into the `invocation_stats` aggregate.
+    ///
+    /// Also recomputes `agent_token_stats` from each session's `tool_token_usage`,
+    /// since that attribution depends on the final merged set of agent types.
+    fn fold_invocations(&self) {
+        let mut aggregated = InvocationStats::new();
+        {
+            let map = self.invocation_by_path.read();
+            for (_epoch, stats) in map.values() {
+                aggregated.merge(stats);
+            }
+        }
 
         // Populate agent_token_stats from session tool_token_usage
         // The Task tool tokens serve as a proxy for agent token consumption
@@ -1430,25 +1568,69 @@ impl DataStore {
                     session.tool_usage.get("Task").copied().unwrap_or(0).max(1) as u64;
                 let tokens_per_agent = task_tokens / agent_count;
                 // Attribute to all agent types found in stats that were invoked
-                for agent_type in stats.agents.keys().cloned().collect::<Vec<_>>() {
-                    *stats.agent_token_stats.entry(agent_type).or_insert(0) += tokens_per_agent;
+                for agent_type in aggregated.agents.keys().cloned().collect::<Vec<_>>() {
+                    *aggregated.agent_token_stats.entry(agent_type).or_insert(0) +=
+                        tokens_per_agent;
                 }
             }
         }
 
         let mut guard = self.invocation_stats.write();
-        *guard = stats;
+        *guard = aggregated;
+    }
 
-        debug!(
-            agents = guard.agents.len(),
-            commands = guard.commands.len(),
-            skills = guard.skills.len(),
-            total = guard.total_invocations(),
-            "Invocation stats computed"
-        );
+    /// Persist a session file's skill invocation events to the SQLite cache.
+    ///
+    /// No-op (graceful degradation) if the metadata cache is unavailable or the
+    /// file's mtime can't be read. SQLite work runs in `spawn_blocking` since
+    /// `rusqlite` is synchronous; the `mtime` stat is cheap enough to do inline.
+    async fn persist_skill_events(&self, path: &Path, events: Vec<SkillInvocationEvent>) {
+        let Some(cache) = self.metadata_cache.clone() else {
+            return;
+        };
+        let Ok(mtime) = std::fs::metadata(path).and_then(|m| m.modified()) else {
+            return;
+        };
+        let path_owned = path.to_path_buf();
+        let result = tokio::task::spawn_blocking(move || {
+            cache.put_skill_events(&path_owned, mtime, &events)
+        })
+        .await;
+        match result {
+            Ok(Err(e)) => {
+                warn!(path = %path.display(), error = %e, "Failed to persist skill events");
+            }
+            Err(e) => {
+                warn!(path = %path.display(), error = %e, "Skill event persistence task panicked");
+            }
+            Ok(Ok(())) => {}
+        }
+    }
 
-        // Note: Using LoadCompleted as there's no specific invocation stats event
-        self.event_bus.publish(DataEvent::LoadCompleted);
+    /// Skill invocation leaderboard, aggregated from the persisted `skill_events`
+    /// cache with cost computed at read time. Empty if the metadata cache is
+    /// unavailable (graceful degradation) or no skills have been scanned yet
+    /// (call `compute_invocations()` first).
+    pub fn skill_leaderboard(&self) -> Vec<SkillLeaderboardEntry> {
+        self.skill_leaderboard_filtered(&SkillLeaderboardFilter::default())
+    }
+
+    /// Skill invocation leaderboard with filtering (project/skill/since/subagents),
+    /// used by the `ccboard skills` CLI subcommand.
+    pub fn skill_leaderboard_filtered(
+        &self,
+        filter: &SkillLeaderboardFilter,
+    ) -> Vec<SkillLeaderboardEntry> {
+        let Some(ref cache) = self.metadata_cache else {
+            return Vec::new();
+        };
+        match cache.skill_leaderboard(filter) {
+            Ok(entries) => entries,
+            Err(e) => {
+                warn!(error = %e, "Failed to compute skill leaderboard");
+                Vec::new()
+            }
+        }
     }
 
     /// Compute billing blocks from all sessions
@@ -2057,5 +2239,129 @@ mod tests {
 
         // Sorting: Critical before Info
         assert_eq!(violations[0].severity, AlertSeverity::Critical);
+    }
+
+    /// Phase 0: `update_session()` must refresh invocation stats incrementally
+    /// (only the touched file re-scanned) instead of requiring a full
+    /// `compute_invocations()` rescan of every session.
+    #[tokio::test]
+    async fn test_watcher_recompute_skills() {
+        let dir = tempdir().unwrap();
+        let store = DataStore::with_defaults(dir.path().to_path_buf(), None);
+
+        let session_path = dir.path().join("session.jsonl");
+        std::fs::write(
+            &session_path,
+            r#"{"type":"user","message":{"role":"user","content":"hello"},"timestamp":"2024-01-01T00:00:00Z"}
+"#,
+        )
+        .unwrap();
+
+        store.update_session(&session_path).await;
+        assert_eq!(
+            store.invocation_stats().total_invocations(),
+            0,
+            "No tool_use lines yet, invocation stats must be empty"
+        );
+
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&session_path)
+            .unwrap();
+        use std::io::Write;
+        writeln!(
+            file,
+            r#"{{"type":"assistant","message":{{"role":"assistant","content":[{{"type":"tool_use","name":"Skill","input":{{"skill":"pdf-generator"}}}}]}},"timestamp":"2024-01-01T00:01:00Z"}}"#
+        )
+        .unwrap();
+        drop(file);
+
+        store.update_session(&session_path).await;
+
+        let stats = store.invocation_stats();
+        assert_eq!(
+            stats.skills.get("pdf-generator"),
+            Some(&1),
+            "Incremental refresh must pick up the new skill invocation without a full rescan"
+        );
+        assert_eq!(stats.total_invocations(), 1);
+    }
+
+    /// Integration test for the full Phase 1 pipeline: parser extracts a
+    /// SkillInvocationEvent, `update_session()` persists it via
+    /// `refresh_invocations_for()` -> `persist_skill_events()`, and
+    /// `skill_leaderboard()` reads it back aggregated from SQLite.
+    #[tokio::test]
+    async fn test_skill_leaderboard_reflects_persisted_events() {
+        let dir = tempdir().unwrap();
+        let store = DataStore::with_defaults(dir.path().to_path_buf(), None);
+
+        let session_path = dir.path().join("session.jsonl");
+        std::fs::write(
+            &session_path,
+            r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"superpowers:brainstorming"}}]},"usage":{"input_tokens":100,"output_tokens":20},"timestamp":"2024-01-01T00:01:00Z"}
+"#,
+        )
+        .unwrap();
+
+        store.update_session(&session_path).await;
+
+        let leaderboard = store.skill_leaderboard();
+        assert_eq!(leaderboard.len(), 1);
+        assert_eq!(leaderboard[0].skill, "superpowers:brainstorming");
+        assert_eq!(leaderboard[0].invocations, 1);
+        assert_eq!(leaderboard[0].total_tokens, 120);
+    }
+
+    /// Regression test for the lost-update race flagged in code review:
+    /// `compute_invocations()` is a full, slow, sequential rescan that can run
+    /// concurrently with the file watcher's `refresh_invocations_for()` (both
+    /// are kicked off around startup, see `ccboard/src/main.rs::run_web()`).
+    /// If a refresh lands a fresher entry for a path while the full scan is
+    /// mid-flight, the scan's later write-back must not silently discard it.
+    ///
+    /// The race can't be driven reliably through real concurrent tasks (no
+    /// stable interleaving point), so this drives `merge_invocation_snapshot()`
+    /// directly with an explicit `start_epoch`, exactly reproducing what
+    /// `compute_invocations()` would have captured before a concurrent refresh
+    /// bumped the epoch and wrote a fresher entry.
+    #[tokio::test]
+    async fn test_compute_invocations_does_not_clobber_concurrent_refresh() {
+        let dir = tempdir().unwrap();
+        let store = DataStore::with_defaults(dir.path().to_path_buf(), None);
+
+        let path = PathBuf::from("/fake/session.jsonl");
+
+        // Simulate refresh_invocations_for() landing at epoch 1, after
+        // compute_invocations() would have captured start_epoch = 0.
+        let mut fresh_stats = InvocationStats::new();
+        fresh_stats
+            .skills
+            .insert("concurrent-refresh-skill".to_string(), 1);
+        store
+            .invocation_by_path
+            .write()
+            .insert(path.clone(), (1, fresh_stats));
+
+        // Simulate the full scan's write-back: a stale (start_epoch = 0)
+        // snapshot for the same path, as if it had been scanned before the
+        // concurrent refresh's skill invocation happened.
+        let mut stale_snapshot = std::collections::HashMap::new();
+        stale_snapshot.insert(path.clone(), InvocationStats::new());
+        let live_paths: std::collections::HashSet<PathBuf> = [path.clone()].into_iter().collect();
+
+        store.merge_invocation_snapshot(0, stale_snapshot, &live_paths);
+
+        let map = store.invocation_by_path.read();
+        let (epoch, stats) = map.get(&path).expect("entry must survive the merge");
+        assert_eq!(
+            *epoch, 1,
+            "the concurrent refresh's epoch must survive the full scan's write-back"
+        );
+        assert_eq!(
+            stats.skills.get("concurrent-refresh-skill"),
+            Some(&1),
+            "the full scan's stale snapshot must not clobber the fresher concurrent refresh"
+        );
     }
 }
