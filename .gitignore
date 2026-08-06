@@ -33,3 +33,6 @@ claudedocs/
 
 # LSP config
 .lsp.json
+
+# Superpowers subagent-driven-development scratch workspace
+.superpowers/
