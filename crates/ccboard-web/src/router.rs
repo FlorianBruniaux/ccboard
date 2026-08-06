@@ -1028,7 +1028,12 @@ fn scan_skills_recursive(dir_path: &std::path::Path) -> Vec<serde_json::Value> {
 async fn skills_leaderboard_handler(
     axum::extract::State(store): axum::extract::State<Arc<DataStore>>,
 ) -> axum::Json<serde_json::Value> {
-    let on_disk = on_disk_skill_names();
+    // Walks the local skills dir plus the plugin marketplace/cache trees
+    // (hundreds of files on a populated ~/.claude), never block the async
+    // executor with that I/O.
+    let on_disk = tokio::task::spawn_blocking(on_disk_skill_names)
+        .await
+        .unwrap_or_default();
 
     let entries: Vec<serde_json::Value> = store
         .skill_leaderboard()
