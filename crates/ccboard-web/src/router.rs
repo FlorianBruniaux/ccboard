@@ -1034,7 +1034,13 @@ async fn skills_leaderboard_handler(
         .skill_leaderboard()
         .into_iter()
         .map(|entry| {
-            let retired = !on_disk.contains(&entry.skill);
+            let leaf = entry
+                .skill
+                .rsplit(':')
+                .next()
+                .unwrap_or(entry.skill.as_str())
+                .to_lowercase();
+            let retired = !on_disk.contains(&leaf);
             serde_json::json!({
                 "skill": entry.skill,
                 "invocations": entry.invocations,
@@ -1054,34 +1060,84 @@ async fn skills_leaderboard_handler(
     }))
 }
 
-/// Build the set of skill names currently defined on disk: bare directory
-/// names under `~/.claude/skills/<name>/SKILL.md`. Matches the same source
-/// `scan_skills_recursive`/`skills_handler` already use, and the same
-/// `~/.claude/skills` scan the TUI's `SkillsTab` reads for its own
-/// `[retired]` badge (see `ccboard-tui/src/tabs/agents.rs::scan_all_blocking`),
-/// so both surfaces agree on which skills count as "defined" including their
-/// shared blind spot: plugin-provided namespaced skills (e.g.
-/// `superpowers:brainstorming`) live under `~/.claude/plugins/`, not
-/// `~/.claude/skills/`, and neither surface resolves that catalogue today.
+/// Build the set of skill names currently defined on disk: lowercased leaf
+/// directory names under `~/.claude/skills/<name>/SKILL.md`, plus the
+/// lowercased leaf name of every installed plugin skill under
+/// `~/.claude/plugins/{marketplaces,cache}/**/skills/<name>/SKILL.md`.
+///
+/// Mirrors `ccboard-tui/src/tabs/agents.rs::scan_known_skill_names_blocking`
+/// (fixed in c49b84b): only the leaf name is kept, not a resolved
+/// `<plugin>:<skill>` namespace, because the marketplace/plugin-to-namespace
+/// mapping isn't reliably derivable from directory structure alone. Callers
+/// match a namespaced invocation like "superpowers:brainstorming" by its leaf
+/// ("brainstorming") against this set, via the `rsplit(':')` in
+/// `skills_leaderboard_handler`.
 ///
 /// Recomputed fresh on every request. No "defined" flag is ever persisted,
 /// per the design doc: catalogue membership must reflect the live filesystem.
 fn on_disk_skill_names() -> std::collections::HashSet<String> {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let skills_dir = std::path::Path::new(&home).join(".claude/skills");
+    let claude_home = std::path::Path::new(&home).join(".claude");
+    on_disk_skill_names_at(&claude_home)
+}
 
+/// Testable core of `on_disk_skill_names`: builds the catalogue given a
+/// `~/.claude` directory instead of reading `$HOME` directly, so tests don't
+/// need to mutate process-global environment state.
+fn on_disk_skill_names_at(claude_home: &std::path::Path) -> std::collections::HashSet<String> {
     let mut names = std::collections::HashSet::new();
-    if let Ok(entries) = std::fs::read_dir(&skills_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() && path.join("SKILL.md").exists() {
-                if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                    names.insert(name.to_string());
-                }
+    collect_skill_leaf_names(&claude_home.join("skills"), &mut names);
+    for subdir in ["plugins/marketplaces", "plugins/cache"] {
+        collect_plugin_skill_leaf_names(&claude_home.join(subdir), &mut names);
+    }
+    names
+}
+
+/// Collect the lowercased names of every immediate child directory of `dir`
+/// that contains a `SKILL.md`. Used both for the local skills directory and
+/// for a resolved plugin `skills/` directory.
+fn collect_skill_leaf_names(dir: &std::path::Path, out: &mut std::collections::HashSet<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() && path.join("SKILL.md").exists() {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                out.insert(name.to_lowercase());
             }
         }
     }
-    names
+}
+
+/// Recursively walk a plugin marketplace/cache tree looking for `skills/`
+/// directories, skipping hidden directories (`.git`, `.claude-plugin`, ...)
+/// to bound the walk. Stops recursing once a `skills/` directory is found
+/// and delegates to `collect_skill_leaf_names` for its immediate children.
+fn collect_plugin_skill_leaf_names(
+    dir: &std::path::Path,
+    out: &mut std::collections::HashSet<String>,
+) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if dir_name.starts_with('.') {
+            continue;
+        }
+        if dir_name == "skills" {
+            collect_skill_leaf_names(&path, out);
+        } else {
+            collect_plugin_skill_leaf_names(&path, out);
+        }
+    }
 }
 
 /// Task graph handler - returns task dependency graph from PLAN.md
@@ -1557,4 +1613,91 @@ async fn claude_mem_toggle_handler(
         .unwrap_or(false);
     store.toggle_claude_mem(enabled);
     axum::Json(serde_json::json!({ "enabled": enabled }))
+}
+
+#[cfg(test)]
+mod skill_catalogue_tests {
+    use super::on_disk_skill_names_at;
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// Isolated scratch directory under the OS temp dir, unique per test run.
+    struct TempHome(PathBuf);
+
+    impl TempHome {
+        fn new(label: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!(
+                "ccboard-web-skills-catalogue-test-{}-{}-{}",
+                label,
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("system clock before UNIX epoch")
+                    .as_nanos()
+            ));
+            fs::create_dir_all(&dir).expect("create temp home");
+            Self(dir)
+        }
+    }
+
+    impl Drop for TempHome {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn write_skill(dir: &std::path::Path, rel: &str) {
+        let skill_dir = dir.join(rel);
+        fs::create_dir_all(&skill_dir).expect("create skill dir");
+        fs::write(skill_dir.join("SKILL.md"), "---\ndescription: test\n---\n")
+            .expect("write SKILL.md");
+    }
+
+    /// A namespaced plugin skill invocation (e.g. "superpowers:brainstorming")
+    /// must not be flagged retired when its leaf directory is present under
+    /// the plugin marketplace catalogue. Mirrors the equivalent TUI test in
+    /// `ccboard-tui/src/tabs/agents.rs::catalogue_tests`, guarding the exact
+    /// regression fixed for the web leaderboard (23/94 rows falsely
+    /// flagged `[retired]`, including the highest-cost skill on the board).
+    #[test]
+    fn namespaced_plugin_skill_is_not_retired() {
+        let home = TempHome::new("plugin-not-retired");
+        write_skill(
+            &home.0,
+            "plugins/marketplaces/claude-plugins-official/superpowers/skills/brainstorming",
+        );
+
+        let on_disk = on_disk_skill_names_at(&home.0);
+
+        let invocation_name = "superpowers:brainstorming";
+        let leaf = invocation_name
+            .rsplit(':')
+            .next()
+            .unwrap_or(invocation_name)
+            .to_lowercase();
+        let retired = !on_disk.contains(&leaf);
+
+        assert!(
+            !retired,
+            "namespaced plugin skill should resolve via its leaf name and not be retired"
+        );
+    }
+
+    #[test]
+    fn unknown_skill_is_retired() {
+        let home = TempHome::new("unknown-retired");
+        write_skill(&home.0, "skills/rust-expert");
+
+        let on_disk = on_disk_skill_names_at(&home.0);
+
+        let invocation_name = "some-uninstalled-skill";
+        let leaf = invocation_name
+            .rsplit(':')
+            .next()
+            .unwrap_or(invocation_name)
+            .to_lowercase();
+        let retired = !on_disk.contains(&leaf);
+
+        assert!(retired, "skill absent from any catalogue should be retired");
+    }
 }
