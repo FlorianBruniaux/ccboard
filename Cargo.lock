@@ -524,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "ccboard"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "anyhow",
  "ccboard-core",
@@ -545,7 +545,7 @@ dependencies = [
 
 [[package]]
 name = "ccboard-core"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "anyhow",
  "bincode",
@@ -586,7 +586,7 @@ dependencies = [
 
 [[package]]
 name = "ccboard-tui"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "anyhow",
  "arboard",
@@ -605,7 +605,7 @@ dependencies = [
 
 [[package]]
 name = "ccboard-types"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "chrono",
  "serde",
@@ -614,7 +614,7 @@ dependencies = [
 
 [[package]]
 name = "ccboard-web"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "anyhow",
  "axum 0.8.8",

@@ -5,6 +5,19 @@ All notable changes to ccboard will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-08-06
+
+### Added
+
+- **Skill usage analytics** (`#56`): real Skill invocations, extracted from session transcripts and never confused with textual mentions of a skill's name, are now tracked end to end. `ccboard skills [--json] [--since] [--project] [--include-subagents] [<skill>]` prints an exact leaderboard (invocation count, project count, total tokens, estimated cost, first/last seen) straight from SQLite, no rescan needed. Token and cost attribution reuses the exact proportional split already used for tool-call accounting in the session parser, applied to the real namespaced skill name (`superpowers:brainstorming`, never split on `:`), never the generic `"Skill"` literal.
+- **Skills leaderboard, TUI and Web** (`#56`): a new dedicated tab (TUI) and page (Web), at parity, surfacing the same leaderboard. Skills with invocation history but no matching on-disk definition (including plugin-installed, namespaced skills) get a `[retired]` badge, resolved against the local skills directory plus the full plugin marketplace/cache catalogue on both surfaces.
+- **Live invocation counters**: the file watcher now updates skill/agent/command invocation counts incrementally as sessions change, instead of only at startup. Fixes a pre-existing gap where the TUI's `needs_refresh` signal was set but never consumed, so the Agents tab's usage badges never actually updated live.
+
+### Fixed
+
+- **`classify_plugin()` namespace false positives**: exact matches across all categories (skill, command) are now checked before any substring fallback, closing a case where a short local name could shadow an unrelated namespaced plugin invocation.
+- Two pre-existing `clippy::useless_borrows_in_formatting` lint violations, unrelated to this feature but caught by a newer stable toolchain, in `masked_api_key()` (duplicated across `ccboard-core` and `ccboard-types`) and the Brain page.
+
 ## [0.24.0] - 2026-06-24
 
 ### Added

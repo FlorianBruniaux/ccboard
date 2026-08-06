@@ -32,7 +32,7 @@
 
 ## Features
 
-### 13 Interactive Tabs (TUI + Web)
+### 14 Interactive Tabs (TUI + Web)
 
 | Tab | Key | Description | Highlights |
 |-----|-----|-------------|------------|
@@ -46,6 +46,7 @@
 | **Config** | `8` | Cascading configuration editor | 4-column diff (default/global/project/local), edit with `e`, reveal in file manager (`o`) |
 | **Hooks** | `9` | Event-based hook management | Bash syntax highlighting, badge indicators |
 | **Tools** | `0` | Agents, commands, and skills browser | Frontmatter YAML parsing, real invocation counts (includes session-discovered agents) |
+| **Skills** | `Tab` cycle | Skill invocation leaderboard | Real `Skill` tool_use invocations only, never textual mentions; invocation/project count, tokens, estimated cost, first/last seen; `[retired]` badge for skills with history but no on-disk definition, resolved against local skills and installed plugin skills |
 | **Plugins** | `p` | Plugin & capability usage analytics | Dead code detection, sort by usage/cost/name |
 | **Search** | `/` | Full-text search across all sessions | FTS5-powered, search-as-you-type (≥2 chars), ranked snippets, opens conversation viewer |
 | **Brain** | `b` | Cross-session knowledge base | Insights captured by session-stop hook (progress/decision/blocked/pattern/fix/context), filter by type, archive, detail pane, `/ccboard-remember` skill for manual entries |
@@ -571,6 +572,7 @@ ccboard both --port 3333
 - `/hooks` - Hooks with syntax highlighting
 - `/mcp` - MCP servers with status
 - `/agents` - Agents/Commands/Skills browser
+- `/skills` - Skill invocation leaderboard with `[retired]` badge
 - `/costs` - 4 tabs (Overview, By Model, Daily, Billing Blocks)
 - `/history` - History search and filters
 - `/activity` - Security audit & violations feed
@@ -766,6 +768,28 @@ ccboard report --budget 1000000 --error-threshold 10 --since 30d
 - Exit code 0 when all gates pass, exit code 1 when any gate fails
 - Report is always printed to stdout (or `--output` file) regardless of gate result
 - Error details go to stderr so stdout remains parseable
+
+### Skills (invocation leaderboard)
+
+Exact counts of real Skill invocations (the `Skill` tool_use block), never textual mentions of a skill's name in a message.
+
+```bash
+# Full leaderboard, table output
+ccboard skills
+
+# JSON for scripting
+ccboard skills --json
+
+# Include subagent-driven invocations
+ccboard skills --include-subagents
+
+# Filter by time window or project
+ccboard skills --since 30d
+ccboard skills --project ccboard
+
+# Detail for a single skill
+ccboard skills flow-lean
+```
 
 ---
 
