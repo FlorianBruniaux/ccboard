@@ -1,0 +1,19 @@
+crates/ccboard-core/src/models/config.rs
+  s_12c3534ac32c1a::t_addb32083fb8d9 209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "41e4ea0172458b6e90cecf61f9613f43dc22e7b0",
+  "prompts": {},
+  "sessions": {
+    "s_12c3534ac32c1a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ef50c6c-224e-4614-a0e9-735339eb30c7",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
