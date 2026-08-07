@@ -45,7 +45,10 @@ enum McpView {
 }
 
 /// Server runtime status
+// Running/Stopped are only constructed by the #[cfg(unix)] detection path below;
+// on Windows the lib target never constructs them outside tests.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(windows, allow(dead_code))]
 enum ServerStatus {
     /// Server is running with given PID
     Running(u32),
