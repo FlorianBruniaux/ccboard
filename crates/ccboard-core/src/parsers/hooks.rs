@@ -224,10 +224,14 @@ impl HooksParser {
 mod tests {
     use super::*;
     use std::fs;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
     use tempfile::TempDir;
 
     // Scenario 1: Valid hook with shebang
+    // Unix-only: is_executable is derived from the permission bits, which
+    // don't exist on Windows (production code hardcodes it to false there).
+    #[cfg(unix)]
     #[test]
     fn test_valid_hook_with_shebang() {
         let temp_dir = TempDir::new().unwrap();
@@ -262,6 +266,9 @@ mod tests {
     }
 
     // Scenario 3: Non-executable hook
+    // Unix-only: relies on chmod bits to force non-executable, which don't
+    // exist on Windows (production code hardcodes is_executable to false there).
+    #[cfg(unix)]
     #[test]
     fn test_non_executable_hook_marked_correctly() {
         let temp_dir = TempDir::new().unwrap();
