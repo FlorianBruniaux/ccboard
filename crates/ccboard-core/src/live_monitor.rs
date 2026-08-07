@@ -8,7 +8,9 @@
 
 use crate::hook_state::{HookSessionStatus, LiveSessionFile};
 use anyhow::{Context, Result};
-use chrono::{DateTime, Local, TimeZone};
+#[cfg(unix)]
+use chrono::TimeZone;
+use chrono::{DateTime, Local};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
@@ -37,6 +39,7 @@ impl SessionType {
 }
 
 /// Parsed CLI flags from the claude command line
+#[cfg(unix)]
 struct ParsedFlags {
     session_type: SessionType,
     model: Option<String>,
@@ -45,6 +48,7 @@ struct ParsedFlags {
 
 /// Extract the value following a flag from a command string.
 /// E.g. `extract_flag_value("claude --model opus-4", "--model")` → `Some("opus-4")`
+#[cfg(unix)]
 fn extract_flag_value(command: &str, flag: &str) -> Option<String> {
     let tokens: Vec<&str> = command.split_whitespace().collect();
     for i in 0..tokens.len().saturating_sub(1) {
@@ -56,6 +60,7 @@ fn extract_flag_value(command: &str, flag: &str) -> Option<String> {
 }
 
 /// Parse CLI flags from a claude command string to determine session type and metadata.
+#[cfg(unix)]
 fn parse_claude_flags(command: &str) -> ParsedFlags {
     let has_stream_json = command.contains("stream-json");
     let has_stdio_tool = command.contains("permission-prompt-tool") && command.contains("stdio");
@@ -319,7 +324,7 @@ fn get_cwd_for_pid(pid: u32) -> Option<String> {
 fn detect_live_sessions_windows() -> Result<Vec<LiveSession>> {
     // Run tasklist with CSV output for parsing
     let output = Command::new("tasklist")
-        .args(&["/FI", "IMAGENAME eq claude.exe", "/FO", "CSV", "/NH"])
+        .args(["/FI", "IMAGENAME eq claude.exe", "/FO", "CSV", "/NH"])
         .output()
         .context("Failed to run tasklist command")?;
 
@@ -331,7 +336,7 @@ fn detect_live_sessions_windows() -> Result<Vec<LiveSession>> {
     let sessions: Vec<LiveSession> = stdout
         .lines()
         .filter(|line| !line.is_empty())
-        .filter_map(|line| parse_tasklist_csv(line))
+        .filter_map(parse_tasklist_csv)
         .collect();
 
     Ok(sessions)
@@ -382,6 +387,7 @@ fn parse_tasklist_csv(line: &str) -> Option<LiveSession> {
 }
 
 /// Session metadata extracted from active JSONL file
+#[cfg(unix)]
 struct LiveSessionMetadata {
     tokens: Option<u64>,
     session_id: Option<String>,
@@ -400,6 +406,7 @@ struct LiveSessionMetadata {
 /// - Session directory doesn't exist
 /// - No JSONL files found
 /// - Parse errors occur
+#[cfg(unix)]
 fn get_session_metadata(working_directory: &Option<String>) -> Option<LiveSessionMetadata> {
     let cwd = working_directory.as_ref()?;
 

@@ -179,11 +179,10 @@ impl HooksParser {
                 .unwrap_or("unknown"),
         );
 
-        let metadata = fs::metadata(path)
-            .with_context(|| format!("Failed to read hook metadata: {}", path.display()))?;
-
         #[cfg(unix)]
         let is_executable = {
+            let metadata = fs::metadata(path)
+                .with_context(|| format!("Failed to read hook metadata: {}", path.display()))?;
             use std::os::unix::fs::PermissionsExt;
             metadata.permissions().mode() & 0o111 != 0
         };
