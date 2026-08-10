@@ -170,22 +170,24 @@ impl SessionIndexParser {
                 _ => None,
             })
             .collect();
-        let normalized = normal_parts.iter().collect::<PathBuf>();
-
         // Validate no symlinks (if path exists)
         #[cfg(unix)]
-        if normalized.exists() {
-            use std::fs;
-            let metadata = fs::symlink_metadata(&normalized).map_err(|e| CoreError::FileRead {
-                path: normalized.clone(),
-                source: e,
-            })?;
+        {
+            let normalized = normal_parts.iter().collect::<PathBuf>();
+            if normalized.exists() {
+                use std::fs;
+                let metadata =
+                    fs::symlink_metadata(&normalized).map_err(|e| CoreError::FileRead {
+                        path: normalized.clone(),
+                        source: e,
+                    })?;
 
-            if metadata.is_symlink() {
-                return Err(CoreError::InvalidPath {
-                    path: normalized,
-                    reason: "Symlinks not allowed in project paths".to_string(),
-                });
+                if metadata.is_symlink() {
+                    return Err(CoreError::InvalidPath {
+                        path: normalized,
+                        reason: "Symlinks not allowed in project paths".to_string(),
+                    });
+                }
             }
         }
 
