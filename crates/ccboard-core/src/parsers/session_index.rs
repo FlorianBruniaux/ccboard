@@ -163,10 +163,14 @@ impl SessionIndexParser {
         };
 
         // Strip ".." components to prevent traversal
-        let normalized = Path::new(&decoded)
+        let normal_parts: Vec<&str> = Path::new(&decoded)
             .components()
-            .filter(|c| matches!(c, Component::Normal(_)))
-            .collect::<PathBuf>();
+            .filter_map(|c| match c {
+                Component::Normal(part) => part.to_str(),
+                _ => None,
+            })
+            .collect();
+        let normalized = normal_parts.iter().collect::<PathBuf>();
 
         // Validate no symlinks (if path exists)
         #[cfg(unix)]
@@ -185,8 +189,9 @@ impl SessionIndexParser {
             }
         }
 
-        // Convert to string, preserving leading / for absolute paths
-        let path_str = normalized.to_string_lossy().to_string();
+        // Join with '/' explicitly: the encoded format always uses forward
+        // slashes, regardless of the host OS's own path separator.
+        let path_str = normal_parts.join("/");
         if decoded.starts_with('/') && !path_str.starts_with('/') {
             Ok(format!("/{}", path_str))
         } else {
