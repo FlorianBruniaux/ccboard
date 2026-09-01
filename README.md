@@ -1162,12 +1162,19 @@ This project was developed following Test-Driven Development (TDD) principles wi
 - **Crates.io**: https://crates.io/crates/ccboard
 - **Documentation**: [User Guide](docs/GUIDE.md) | [CHANGELOG.md](CHANGELOG.md)
 
-### Related Projects
+<!-- BEGIN GENERATED RELATED PROJECTS -->
+<!-- Source: https://github.com/FlorianBruniaux/FlorianBruniaux/blob/main/ecosystem/projects.json; project: ccboard -->
+## Explore the ecosystem
 
-- **[RTK (Rust Token Killer)](https://github.com/FlorianBruniaux/rtk)** - CLI proxy for 60-90% token reduction on dev operations
-- **[Claude Code Ultimate Guide](https://cc.bruniaux.com/)** - Comprehensive guide to Claude Code CLI
-- **[ccbridge](https://ccbridge.bruniaux.com/)** - Claude Code bridge for team collaboration
-- **[Cowork Guide](https://cowork.bruniaux.com/)** - Technical coworking patterns and practices
+These projects extend the workflow without duplicating this tool:
+
+- **Search with [CC-Sessions](https://github.com/FlorianBruniaux/cc-sessions)**: move from the dashboard to a focused CLI search of local history.
+- **Measure with [cc-skill-usage](https://github.com/FlorianBruniaux/cc-skill-usage)**: add a specialist analysis of real skill invocations.
+- **Learn with [Claude Code Ultimate Guide](https://github.com/FlorianBruniaux/claude-code-ultimate-guide)**: connect observed signals to the guide's observability practices.
+- **Route with [CC-Copilot Bridge](https://github.com/FlorianBruniaux/cc-copilot-bridge)**: observe sessions whose model provider can be selected through the bridge.
+
+[Browse the complete open-source galaxy](https://github.com/FlorianBruniaux#open-source-galaxy)
+<!-- END GENERATED RELATED PROJECTS -->
 
 ---
 
