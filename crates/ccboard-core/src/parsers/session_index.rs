@@ -1275,7 +1275,10 @@ mod tests {
         let parser = SessionIndexParser::new();
         let meta = parser.scan_session(&file_path).await.unwrap();
 
-        assert_eq!(meta.parent_session_id.as_deref(), Some("parent-folder-uuid"));
+        assert_eq!(
+            meta.parent_session_id.as_deref(),
+            Some("parent-folder-uuid")
+        );
         assert_eq!(meta.project_path.as_str(), "/test/project");
     }
 }

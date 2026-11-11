@@ -2004,7 +2004,8 @@ mod tests {
             .unwrap();
 
             // Insert a row into session_metadata WITHOUT inserting it into session_fts
-            let meta = SessionMetadata::from_path(PathBuf::from("/test/session.jsonl"), "/test".into());
+            let meta =
+                SessionMetadata::from_path(PathBuf::from("/test/session.jsonl"), "/test".into());
             let data = bincode::serialize(&meta).unwrap();
             conn.execute(
                 "INSERT INTO session_metadata (path, mtime, project, session_id, \
@@ -2020,7 +2021,10 @@ mod tests {
         // If DROP TRIGGER and DROP TABLE session_fts were not executed before DELETE FROM session_metadata,
         // this would fail with SQLite error 267 ("Content in the virtual table is corrupt").
         let cache_result = MetadataCache::new(dir.path());
-        assert!(cache_result.is_ok(), "Cache opening must succeed without failing on corrupt FTS");
+        assert!(
+            cache_result.is_ok(),
+            "Cache opening must succeed without failing on corrupt FTS"
+        );
         let cache = cache_result.unwrap();
 
         // Verify session_metadata was cleared cleanly
@@ -2028,4 +2032,3 @@ mod tests {
         assert_eq!(count, 0);
     }
 }
-

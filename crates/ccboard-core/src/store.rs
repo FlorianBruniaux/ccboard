@@ -2417,7 +2417,10 @@ mod tests {
         store.initial_load().await;
 
         let parent_session = store.get_session(parent_id).expect("parent session loaded");
-        assert!(parent_session.has_subagents, "parent should have has_subagents = true");
+        assert!(
+            parent_session.has_subagents,
+            "parent should have has_subagents = true"
+        );
 
         let children = store.subagent_children(parent_id);
         assert_eq!(children.len(), 1, "should have 1 subagent child");
@@ -2429,4 +2432,3 @@ mod tests {
         );
     }
 }
-

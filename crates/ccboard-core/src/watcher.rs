@@ -103,7 +103,8 @@ impl FileWatcher {
                     let project_path = entry.path();
                     if project_path.is_dir() {
                         if cfg!(target_os = "linux") {
-                            let _ = file_watcher.watch_path(&project_path, RecursiveMode::NonRecursive);
+                            let _ =
+                                file_watcher.watch_path(&project_path, RecursiveMode::NonRecursive);
 
                             // Watch existing subagents directories non-recursively on Linux
                             if let Ok(session_entries) = std::fs::read_dir(&project_path) {
@@ -112,7 +113,10 @@ impl FileWatcher {
                                     if session_path.is_dir() {
                                         let subagents_dir = session_path.join("subagents");
                                         if subagents_dir.is_dir() {
-                                            let _ = file_watcher.watch_path(&subagents_dir, RecursiveMode::NonRecursive);
+                                            let _ = file_watcher.watch_path(
+                                                &subagents_dir,
+                                                RecursiveMode::NonRecursive,
+                                            );
                                         }
                                     }
                                 }
@@ -120,7 +124,8 @@ impl FileWatcher {
                         } else {
                             // Windows & macOS: native recursive watch captures all sessions and
                             // nested subagents/ created dynamically after ccboard starts.
-                            let _ = file_watcher.watch_path(&project_path, RecursiveMode::Recursive);
+                            let _ =
+                                file_watcher.watch_path(&project_path, RecursiveMode::Recursive);
                         }
                     }
                 }
@@ -503,4 +508,3 @@ mod tests {
         );
     }
 }
-
