@@ -269,6 +269,7 @@ mod tests {
             usage: None,
             summary: None,
             parent_session_id: None,
+            agent_id: None,
         };
 
         let events = TodoWriteParser::extract_task_events(&line);
@@ -309,6 +310,7 @@ mod tests {
             usage: None,
             summary: None,
             parent_session_id: None,
+            agent_id: None,
         };
 
         let events = TodoWriteParser::extract_task_events(&line);

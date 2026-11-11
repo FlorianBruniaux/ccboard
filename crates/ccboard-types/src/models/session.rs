@@ -48,6 +48,10 @@ pub struct SessionLine {
     /// Parent session ID (for subagents)
     #[serde(default)]
     pub parent_session_id: Option<String>,
+
+    /// Agent ID (for subagents in modern Claude Code layout)
+    #[serde(default)]
+    pub agent_id: Option<String>,
 }
 
 /// Message content in a session
