@@ -1961,4 +1961,71 @@ mod tests {
         assert_eq!(with_subagents.len(), 1);
         assert_eq!(with_subagents[0].skill, "skill-z");
     }
+
+    #[test]
+    fn test_cache_invalidation_recovers_from_corrupted_fts_state_error_267() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("session-metadata.db");
+
+        // Set up database in a state simulating version mismatch where session_metadata
+        // has rows but session_fts has no matching rows (simulating desynced external content FTS table).
+        {
+            let conn = Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                r#"
+                CREATE TABLE cache_metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+                INSERT INTO cache_metadata (key, value) VALUES ('version', 8);
+
+                CREATE TABLE session_metadata (
+                    path TEXT PRIMARY KEY, mtime INTEGER NOT NULL, project TEXT NOT NULL,
+                    session_id TEXT NOT NULL, first_timestamp TEXT, last_timestamp TEXT,
+                    message_count INTEGER NOT NULL, total_tokens INTEGER NOT NULL,
+                    models_used TEXT NOT NULL, has_subagents INTEGER NOT NULL,
+                    first_user_message TEXT, data BLOB NOT NULL
+                );
+
+                CREATE VIRTUAL TABLE session_fts USING fts5(
+                    session_id  UNINDEXED,
+                    project     UNINDEXED,
+                    first_user_message,
+                    models_used,
+                    content='session_metadata',
+                    content_rowid='rowid',
+                    tokenize='unicode61'
+                );
+
+                CREATE TRIGGER session_fts_ad
+                AFTER DELETE ON session_metadata BEGIN
+                    INSERT INTO session_fts(session_fts, rowid, session_id, project, first_user_message, models_used)
+                    VALUES ('delete', old.rowid, old.session_id, old.project, old.first_user_message, old.models_used);
+                END;
+                "#,
+            )
+            .unwrap();
+
+            // Insert a row into session_metadata WITHOUT inserting it into session_fts
+            let meta = SessionMetadata::from_path(PathBuf::from("/test/session.jsonl"), "/test".into());
+            let data = bincode::serialize(&meta).unwrap();
+            conn.execute(
+                "INSERT INTO session_metadata (path, mtime, project, session_id, \
+                 first_timestamp, last_timestamp, message_count, total_tokens, models_used, \
+                 has_subagents, first_user_message, data) \
+                 VALUES (?, ?, ?, ?, NULL, NULL, 1, 10, 'claude', 0, 'hello', ?)",
+                params!["/test/session.jsonl", 12345, "/test", "session-1", data],
+            )
+            .unwrap();
+        }
+
+        // Opening the cache should detect version mismatch and clear the stale cache.
+        // If DROP TRIGGER and DROP TABLE session_fts were not executed before DELETE FROM session_metadata,
+        // this would fail with SQLite error 267 ("Content in the virtual table is corrupt").
+        let cache_result = MetadataCache::new(dir.path());
+        assert!(cache_result.is_ok(), "Cache opening must succeed without failing on corrupt FTS");
+        let cache = cache_result.unwrap();
+
+        // Verify session_metadata was cleared cleanly
+        let count = cache.stats().unwrap().total_entries;
+        assert_eq!(count, 0);
+    }
 }
+
