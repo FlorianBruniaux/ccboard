@@ -83,8 +83,13 @@ impl FileWatcher {
             shutdown_tx,
         };
 
-        // Watch paths - non-recursive for performance (26k+ files in ~/.claude)
-        // Watch top-level files (stats-cache.json, settings.json)
+        // Watch paths:
+        // Linux: inotify allocates an OS watch descriptor per subdirectory, which exhausts
+        // `fs.inotify.max_user_watches` on large directory trees (26k+ files in ~/.claude).
+        // Therefore, Linux uses NonRecursive on project directories and scans existing subagents/.
+        // Windows & macOS: ReadDirectoryChangesW (bWatchSubtree = TRUE) and FSEvents are natively
+        // recursive at the kernel/OS level with a single handle/stream, making recursive monitoring
+        // cheap and O(1), and allowing newly spawned subagents (<session>/subagents/) to be detected in real time.
         file_watcher.watch_path(&claude_home, RecursiveMode::NonRecursive)?;
 
         // Watch projects directory non-recursively to detect new projects
@@ -92,24 +97,30 @@ impl FileWatcher {
         if projects_dir.exists() {
             file_watcher.watch_path(&projects_dir, RecursiveMode::NonRecursive)?;
 
-            // Watch each project directory non-recursively to detect new sessions
+            // Watch each project directory
             if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                 for entry in entries.flatten() {
                     let project_path = entry.path();
                     if project_path.is_dir() {
-                        let _ = file_watcher.watch_path(&project_path, RecursiveMode::NonRecursive);
+                        if cfg!(target_os = "linux") {
+                            let _ = file_watcher.watch_path(&project_path, RecursiveMode::NonRecursive);
 
-                        // Watch existing subagents directories non-recursively
-                        if let Ok(session_entries) = std::fs::read_dir(&project_path) {
-                            for session_entry in session_entries.flatten() {
-                                let session_path = session_entry.path();
-                                if session_path.is_dir() {
-                                    let subagents_dir = session_path.join("subagents");
-                                    if subagents_dir.is_dir() {
-                                        let _ = file_watcher.watch_path(&subagents_dir, RecursiveMode::NonRecursive);
+                            // Watch existing subagents directories non-recursively on Linux
+                            if let Ok(session_entries) = std::fs::read_dir(&project_path) {
+                                for session_entry in session_entries.flatten() {
+                                    let session_path = session_entry.path();
+                                    if session_path.is_dir() {
+                                        let subagents_dir = session_path.join("subagents");
+                                        if subagents_dir.is_dir() {
+                                            let _ = file_watcher.watch_path(&subagents_dir, RecursiveMode::NonRecursive);
+                                        }
                                     }
                                 }
                             }
+                        } else {
+                            // Windows & macOS: native recursive watch captures all sessions and
+                            // nested subagents/ created dynamically after ccboard starts.
+                            let _ = file_watcher.watch_path(&project_path, RecursiveMode::Recursive);
                         }
                     }
                 }
@@ -431,4 +442,65 @@ mod tests {
         let result = FileWatcher::process_event(&event, &claude_home, None);
         assert!(matches!(result, Some((DataEvent::SessionUpdated(id), _)) if id == "abc123"));
     }
+
+    #[tokio::test]
+    #[cfg(not(target_os = "linux"))]
+    async fn test_live_subagent_watch_after_startup() {
+        use tempfile::tempdir;
+        use tokio::time::{sleep, timeout, Duration};
+
+        let temp = tempdir().unwrap();
+        let claude_home = temp.path().to_path_buf();
+        let projects_dir = claude_home.join("projects");
+        let project_dir = projects_dir.join("test-project");
+        std::fs::create_dir_all(&project_dir).unwrap();
+
+        let store = Arc::new(DataStore::with_defaults(claude_home.clone(), None));
+        let mut event_rx = store.event_bus().subscribe();
+
+        let config = WatcherConfig {
+            debounce_delay: Duration::from_millis(50),
+            max_debounce_delay: Duration::from_millis(200),
+            burst_threshold: 10,
+            extra_watch_paths: vec![],
+        };
+
+        let _watcher = FileWatcher::start(claude_home.clone(), None, store.clone(), config)
+            .await
+            .expect("Watcher must start");
+
+        // Small wait to ensure watcher is registered in the OS
+        sleep(Duration::from_millis(150)).await;
+
+        // Dynamically create a new session directory and subagents subdirectory AFTER watcher started
+        let session_dir = project_dir.join("session-dynamic-1");
+        let subagents_dir = session_dir.join("subagents");
+        std::fs::create_dir_all(&subagents_dir).unwrap();
+
+        let subagent_file = subagents_dir.join("agent-dynamic1.jsonl");
+        std::fs::write(
+            &subagent_file,
+            b"{\"sessionId\":\"session-dynamic-1\",\"agentId\":\"dynamic1\"}\n",
+        )
+        .unwrap();
+
+        // Expect to receive a SessionUpdated event for the dynamically created subagent
+        let received = timeout(Duration::from_secs(3), async {
+            loop {
+                if let Ok(DataEvent::SessionUpdated(id)) = event_rx.recv().await {
+                    if id.as_ref() == "agent-dynamic1" {
+                        return true;
+                    }
+                }
+            }
+        })
+        .await;
+
+        assert_eq!(
+            received,
+            Ok(true),
+            "Dynamic subagent created after watcher start must be detected"
+        );
+    }
 }
+
