@@ -88,8 +88,23 @@ impl SessionIndexParser {
     ///
     /// SECURITY: Validates path to prevent traversal attacks
     pub fn extract_project_path(&self, session_path: &Path) -> String {
-        let raw_path = session_path
+        // Modern Claude Code layout: <project>/<session-id>/subagents/agent-<id>.jsonl
+        // The project directory is two levels above the `subagents` folder.
+        let project_dir = if session_path
             .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            == Some("subagents")
+        {
+            session_path
+                .parent()
+                .and_then(|p| p.parent())
+                .and_then(|p| p.parent())
+        } else {
+            session_path.parent()
+        };
+
+        let raw_path = project_dir
             .and_then(|p| p.file_name())
             .and_then(|n| n.to_str())
             .and_then(|encoded| Self::sanitize_project_path(encoded).ok())
@@ -264,6 +279,22 @@ impl SessionIndexParser {
         let project_path = self.extract_project_path(path);
         let mut metadata = SessionMetadata::from_path(path.to_path_buf(), project_path.into());
 
+        let is_subagent_dir = path
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|n| n.to_str())
+            == Some("subagents");
+
+        let folder_session_id = if is_subagent_dir {
+            path.parent()
+                .and_then(|p| p.parent())
+                .and_then(|p| p.file_name())
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+        } else {
+            None
+        };
+
         let file = File::open(path).await.map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 CoreError::FileNotFound {
@@ -350,12 +381,14 @@ impl SessionIndexParser {
             }
 
             // Extract session ID from first line with it
-            // Prefer sessionId from content over filename-derived ID
+            // Prefer sessionId from content over filename-derived ID for root sessions
             if let Some(ref id) = session_line.session_id {
-                if metadata.id.is_empty()
-                    || metadata.id == "unknown"
-                    || !metadata.id.chars().all(|c| c.is_alphanumeric() || c == '-')
-                    || metadata.id.starts_with(".tmp")
+                if !is_subagent_dir
+                    && session_line.agent_id.is_none()
+                    && (metadata.id.is_empty()
+                        || metadata.id == "unknown"
+                        || !metadata.id.chars().all(|c| c.is_alphanumeric() || c == '-')
+                        || metadata.id.starts_with(".tmp"))
                 {
                     metadata.id = id.clone().into();
                 }
@@ -385,7 +418,13 @@ impl SessionIndexParser {
             // Capture parent session ID (first non-null occurrence wins)
             if metadata.parent_session_id.is_none() {
                 if let Some(ref pid) = session_line.parent_session_id {
+                    // Legacy format: line has explicit parentSessionId
                     metadata.parent_session_id = Some(pid.clone());
+                } else if session_line.agent_id.is_some() {
+                    // Modern layout: line has agentId, so sessionId is the parent session ID
+                    if let Some(ref sid) = session_line.session_id {
+                        metadata.parent_session_id = Some(sid.clone());
+                    }
                 }
             }
 
@@ -582,6 +621,14 @@ impl SessionIndexParser {
         // Apply code metrics
         metadata.lines_added = lines_added;
         metadata.lines_removed = lines_removed;
+
+        // Fallback: If parent_session_id is still None and file is under <session-id>/subagents/,
+        // use the folder name as the parent session ID.
+        if metadata.parent_session_id.is_none() && is_subagent_dir {
+            if let Some(folder_id) = folder_session_id {
+                metadata.parent_session_id = Some(folder_id);
+            }
+        }
 
         Ok(metadata)
     }
@@ -1157,5 +1204,83 @@ mod tests {
         );
         // models_used still has all three (unordered)
         assert_eq!(meta.models_used.len(), 3);
+    }
+
+    #[test]
+    fn test_extract_project_path_modern_subagent() {
+        let parser = SessionIndexParser::new();
+        let path = Path::new("/home/user/.claude/projects/-Users-foo-myproject/session-123/subagents/agent-abc.jsonl");
+        let project = parser.extract_project_path(path);
+        assert_eq!(project, "/Users/foo/myproject");
+    }
+
+    #[tokio::test]
+    async fn test_scan_session_legacy_subagent() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(
+            file,
+            r#"{{"type": "user", "sessionId": "child-legacy", "parentSessionId": "parent-123", "message": {{"content": "Legacy child"}}}}"#
+        )
+        .unwrap();
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(file.path()).await.unwrap();
+
+        assert_eq!(meta.parent_session_id.as_deref(), Some("parent-123"));
+    }
+
+    #[tokio::test]
+    async fn test_scan_session_modern_subagent_with_agent_id() {
+        let dir = tempdir().unwrap();
+        let subagent_dir = dir
+            .path()
+            .join("projects")
+            .join("-test-project")
+            .join("parent-uuid-123")
+            .join("subagents");
+        std::fs::create_dir_all(&subagent_dir).unwrap();
+
+        let file_path = subagent_dir.join("agent-a5ffc3e4.jsonl");
+        // Anonymized fixture matching Claude Code v2.1.296 ad26e7ed session format
+        std::fs::write(
+            &file_path,
+            r#"{"type":"user","isSidechain":true,"agentId":"a5ffc3e4","sessionId":"parent-uuid-123","message":{"role":"user","content":"Inspect config"}}
+{"type":"assistant","agentId":"a5ffc3e4","sessionId":"parent-uuid-123","model":"claude-sonnet-5-5","message":{"role":"assistant","content":"Done"}}
+"#,
+        )
+        .unwrap();
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(&file_path).await.unwrap();
+
+        assert_eq!(meta.id.as_str(), "agent-a5ffc3e4");
+        assert_eq!(meta.parent_session_id.as_deref(), Some("parent-uuid-123"));
+        assert_eq!(meta.project_path.as_str(), "/test/project");
+    }
+
+    #[tokio::test]
+    async fn test_scan_session_modern_subagent_fallback_folder() {
+        let dir = tempdir().unwrap();
+        let subagent_dir = dir
+            .path()
+            .join("projects")
+            .join("-test-project")
+            .join("parent-folder-uuid")
+            .join("subagents");
+        std::fs::create_dir_all(&subagent_dir).unwrap();
+
+        let file_path = subagent_dir.join("agent-fallback.jsonl");
+        std::fs::write(
+            &file_path,
+            r#"{"type":"user","message":{"role":"user","content":"No sessionId in line"}}
+"#,
+        )
+        .unwrap();
+
+        let parser = SessionIndexParser::new();
+        let meta = parser.scan_session(&file_path).await.unwrap();
+
+        assert_eq!(meta.parent_session_id.as_deref(), Some("parent-folder-uuid"));
+        assert_eq!(meta.project_path.as_str(), "/test/project");
     }
 }

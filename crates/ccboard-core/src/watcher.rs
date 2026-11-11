@@ -96,8 +96,8 @@ impl FileWatcher {
             if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                 for entry in entries.flatten() {
                     if entry.path().is_dir() {
-                        // Watch project directory non-recursively (only .jsonl files at this level)
-                        let _ = file_watcher.watch_path(&entry.path(), RecursiveMode::NonRecursive);
+                        // Watch project directory recursively to detect sessions and subagents
+                        let _ = file_watcher.watch_path(&entry.path(), RecursiveMode::Recursive);
                     }
                 }
             }

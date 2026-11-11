@@ -2364,4 +2364,69 @@ mod tests {
             "the full scan's stale snapshot must not clobber the fresher concurrent refresh"
         );
     }
+
+    #[tokio::test]
+    async fn test_store_initial_load_subagents_hierarchy() {
+        let dir = tempdir().unwrap();
+        let claude_home = dir.path();
+        let project_dir = claude_home.join("projects").join("test-project");
+        let parent_id = "ad26e7ed-0db0-4e7f-be20-f98a322cba7e";
+        let subagent_dir = project_dir.join(parent_id).join("subagents");
+        std::fs::create_dir_all(&subagent_dir).unwrap();
+
+        // Write parent session file
+        let parent_file = project_dir.join(format!("{}.jsonl", parent_id));
+        std::fs::write(
+            &parent_file,
+            format!(
+                "{}\n",
+                serde_json::json!({
+                    "type": "user",
+                    "sessionId": parent_id,
+                    "timestamp": "2026-10-13T19:27:32.860Z",
+                    "message": {
+                        "role": "user",
+                        "content": [{"type": "text", "text": "Delega en un subagente"}]
+                    }
+                })
+            ),
+        )
+        .unwrap();
+
+        // Write child subagent session file
+        let child_file = subagent_dir.join("agent-a5ffc3e419a6585ee.jsonl");
+        std::fs::write(
+            &child_file,
+            format!(
+                "{}\n",
+                serde_json::json!({
+                    "type": "user",
+                    "sessionId": parent_id,
+                    "agentId": "a5ffc3e419a6585ee",
+                    "timestamp": "2026-10-13T19:27:38.904Z",
+                    "message": {
+                        "role": "user",
+                        "content": [{"type": "text", "text": "Lee el archivo .mcp.json"}]
+                    }
+                })
+            ),
+        )
+        .unwrap();
+
+        let store = DataStore::with_defaults(claude_home.to_path_buf(), None);
+        store.initial_load().await;
+
+        let parent_session = store.get_session(parent_id).expect("parent session loaded");
+        assert!(parent_session.has_subagents, "parent should have has_subagents = true");
+
+        let children = store.subagent_children(parent_id);
+        assert_eq!(children.len(), 1, "should have 1 subagent child");
+        assert_eq!(children[0].id.as_str(), "agent-a5ffc3e419a6585ee");
+        assert_eq!(
+            children[0].parent_session_id.as_deref(),
+            Some(parent_id),
+            "child parent_session_id should point to parent"
+        );
+    }
 }
+
