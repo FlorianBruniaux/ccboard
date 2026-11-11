@@ -61,6 +61,39 @@ use tracing::{debug, warn};
 /// - v10: Modern subagents directory layout (<project>/<session-id>/subagents/)
 const CACHE_VERSION: i32 = 10;
 
+/// DDL for full-text search virtual table and synchronizing triggers.
+const FTS_SCHEMA_DDL: &str = r#"
+CREATE VIRTUAL TABLE IF NOT EXISTS session_fts USING fts5(
+    session_id  UNINDEXED,
+    project     UNINDEXED,
+    first_user_message,
+    models_used,
+    content='session_metadata',
+    content_rowid='rowid',
+    tokenize='unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS session_fts_ai
+AFTER INSERT ON session_metadata BEGIN
+    INSERT INTO session_fts(rowid, session_id, project, first_user_message, models_used)
+    VALUES (new.rowid, new.session_id, new.project, new.first_user_message, new.models_used);
+END;
+
+CREATE TRIGGER IF NOT EXISTS session_fts_ad
+AFTER DELETE ON session_metadata BEGIN
+    INSERT INTO session_fts(session_fts, rowid, session_id, project, first_user_message, models_used)
+    VALUES ('delete', old.rowid, old.session_id, old.project, old.first_user_message, old.models_used);
+END;
+
+CREATE TRIGGER IF NOT EXISTS session_fts_au
+AFTER UPDATE ON session_metadata BEGIN
+    INSERT INTO session_fts(session_fts, rowid, session_id, project, first_user_message, models_used)
+    VALUES ('delete', old.rowid, old.session_id, old.project, old.first_user_message, old.models_used);
+    INSERT INTO session_fts(rowid, session_id, project, first_user_message, models_used)
+    VALUES (new.rowid, new.session_id, new.project, new.first_user_message, new.models_used);
+END;
+"#;
+
 /// SQLite-based metadata cache (thread-safe)
 pub struct MetadataCache {
     conn: Mutex<Connection>,
@@ -155,36 +188,6 @@ impl MetadataCache {
                 UPDATE aggregate_stats SET value = MAX(0, value - old.message_count) WHERE key = 'total_messages';
             END;
 
-            CREATE VIRTUAL TABLE IF NOT EXISTS session_fts USING fts5(
-                session_id  UNINDEXED,
-                project     UNINDEXED,
-                first_user_message,
-                models_used,
-                content='session_metadata',
-                content_rowid='rowid',
-                tokenize='unicode61'
-            );
-
-            CREATE TRIGGER IF NOT EXISTS session_fts_ai
-            AFTER INSERT ON session_metadata BEGIN
-                INSERT INTO session_fts(rowid, session_id, project, first_user_message, models_used)
-                VALUES (new.rowid, new.session_id, new.project, new.first_user_message, new.models_used);
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS session_fts_ad
-            AFTER DELETE ON session_metadata BEGIN
-                INSERT INTO session_fts(session_fts, rowid, session_id, project, first_user_message, models_used)
-                VALUES ('delete', old.rowid, old.session_id, old.project, old.first_user_message, old.models_used);
-            END;
-
-            CREATE TRIGGER IF NOT EXISTS session_fts_au
-            AFTER UPDATE ON session_metadata BEGIN
-                INSERT INTO session_fts(session_fts, rowid, session_id, project, first_user_message, models_used)
-                VALUES ('delete', old.rowid, old.session_id, old.project, old.first_user_message, old.models_used);
-                INSERT INTO session_fts(rowid, session_id, project, first_user_message, models_used)
-                VALUES (new.rowid, new.session_id, new.project, new.first_user_message, new.models_used);
-            END;
-
             CREATE TABLE IF NOT EXISTS skill_scan_inventory (
                 path TEXT PRIMARY KEY, mtime INTEGER NOT NULL, scanned_at INTEGER NOT NULL,
                 event_count INTEGER NOT NULL DEFAULT 0, parser_revision INTEGER NOT NULL DEFAULT 1
@@ -205,6 +208,9 @@ impl MetadataCache {
             "#,
         )
         .context("Failed to create schema")?;
+
+        conn.execute_batch(FTS_SCHEMA_DDL)
+            .context("Failed to create FTS schema")?;
 
         // Check cache version and auto-invalidate if mismatch
         let stored_version: Option<i32> = conn
@@ -248,40 +254,8 @@ impl MetadataCache {
                     .context("Failed to clear stale skill events")?;
 
                 // Recreate clean FTS table and triggers
-                conn.execute_batch(
-                    r#"
-                    CREATE VIRTUAL TABLE IF NOT EXISTS session_fts USING fts5(
-                        session_id  UNINDEXED,
-                        project     UNINDEXED,
-                        first_user_message,
-                        models_used,
-                        content='session_metadata',
-                        content_rowid='rowid',
-                        tokenize='unicode61'
-                    );
-
-                    CREATE TRIGGER IF NOT EXISTS session_fts_ai
-                    AFTER INSERT ON session_metadata BEGIN
-                        INSERT INTO session_fts(rowid, session_id, project, first_user_message, models_used)
-                        VALUES (new.rowid, new.session_id, new.project, new.first_user_message, new.models_used);
-                    END;
-
-                    CREATE TRIGGER IF NOT EXISTS session_fts_ad
-                    AFTER DELETE ON session_metadata BEGIN
-                        INSERT INTO session_fts(session_fts, rowid, session_id, project, first_user_message, models_used)
-                        VALUES ('delete', old.rowid, old.session_id, old.project, old.first_user_message, old.models_used);
-                    END;
-
-                    CREATE TRIGGER IF NOT EXISTS session_fts_au
-                    AFTER UPDATE ON session_metadata BEGIN
-                        INSERT INTO session_fts(session_fts, rowid, session_id, project, first_user_message, models_used)
-                        VALUES ('delete', old.rowid, old.session_id, old.project, old.first_user_message, old.models_used);
-                        INSERT INTO session_fts(rowid, session_id, project, first_user_message, models_used)
-                        VALUES (new.rowid, new.session_id, new.project, new.first_user_message, new.models_used);
-                    END;
-                    "#,
-                )
-                .context("Failed to recreate FTS schema")?;
+                conn.execute_batch(FTS_SCHEMA_DDL)
+                    .context("Failed to recreate FTS schema")?;
                 conn.execute(
                     "INSERT OR IGNORE INTO aggregate_stats (key, value) VALUES ('total_sessions', 0)",
                     [],
@@ -1668,7 +1642,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skill_invocations_migration_from_populated_v10_db() {
+    fn test_skill_invocations_migration_from_populated_db() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("session-metadata.db");
 
@@ -1676,7 +1650,7 @@ mod tests {
         // it existed before this feature, no skill_scan_inventory/skill_events.
         {
             let conn = Connection::open(&db_path).unwrap();
-            conn.execute_batch(
+            conn.execute_batch(&format!(
                 r#"
                 CREATE TABLE cache_metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
                 CREATE TABLE session_metadata (
@@ -1686,9 +1660,9 @@ mod tests {
                     models_used TEXT NOT NULL, has_subagents INTEGER NOT NULL,
                     first_user_message TEXT, data BLOB NOT NULL
                 );
-                INSERT INTO cache_metadata (key, value) VALUES ('version', 10);
+                INSERT INTO cache_metadata (key, value) VALUES ('version', {CACHE_VERSION});
                 "#,
-            )
+            ))
             .unwrap();
 
             for i in 0..5 {
