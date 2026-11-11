@@ -10,6 +10,7 @@ use crate::cache::MetadataCache;
 use crate::error::{CoreError, LoadError, LoadReport};
 use crate::models::{session::SessionSummary, SessionLine, SessionMetadata};
 use crate::parsers::filters::is_meaningful_user_message;
+use crate::parsers::invocations::is_subagent_path;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -88,14 +89,13 @@ impl SessionIndexParser {
     ///
     /// SECURITY: Validates path to prevent traversal attacks
     pub fn extract_project_path(&self, session_path: &Path) -> String {
+        self.extract_project_path_internal(session_path, is_subagent_path(session_path))
+    }
+
+    fn extract_project_path_internal(&self, session_path: &Path, is_subagent: bool) -> String {
         // Modern Claude Code layout: <project>/<session-id>/subagents/agent-<id>.jsonl
         // The project directory is two levels above the `subagents` folder.
-        let project_dir = if session_path
-            .parent()
-            .and_then(|p| p.file_name())
-            .and_then(|n| n.to_str())
-            == Some("subagents")
-        {
+        let project_dir = if is_subagent {
             session_path
                 .parent()
                 .and_then(|p| p.parent())
@@ -276,16 +276,11 @@ impl SessionIndexParser {
 
     /// Scan session without cache (internal)
     async fn scan_session_uncached(&self, path: &Path) -> Result<SessionMetadata, CoreError> {
-        let project_path = self.extract_project_path(path);
+        let is_subagent = is_subagent_path(path);
+        let project_path = self.extract_project_path_internal(path, is_subagent);
         let mut metadata = SessionMetadata::from_path(path.to_path_buf(), project_path.into());
 
-        let is_subagent_dir = path
-            .parent()
-            .and_then(|p| p.file_name())
-            .and_then(|n| n.to_str())
-            == Some("subagents");
-
-        let folder_session_id = if is_subagent_dir {
+        let folder_session_id = if is_subagent {
             path.parent()
                 .and_then(|p| p.parent())
                 .and_then(|p| p.file_name())
@@ -383,7 +378,7 @@ impl SessionIndexParser {
             // Extract session ID from first line with it
             // Prefer sessionId from content over filename-derived ID for root sessions
             if let Some(ref id) = session_line.session_id {
-                if !is_subagent_dir
+                if !is_subagent
                     && session_line.agent_id.is_none()
                     && (metadata.id.is_empty()
                         || metadata.id == "unknown"
@@ -624,7 +619,7 @@ impl SessionIndexParser {
 
         // Fallback: If parent_session_id is still None and file is under <session-id>/subagents/,
         // use the folder name as the parent session ID.
-        if metadata.parent_session_id.is_none() && is_subagent_dir {
+        if metadata.parent_session_id.is_none() && is_subagent {
             if let Some(folder_id) = folder_session_id {
                 metadata.parent_session_id = Some(folder_id);
             }

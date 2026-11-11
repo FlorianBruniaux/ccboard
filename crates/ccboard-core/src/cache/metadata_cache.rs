@@ -58,7 +58,8 @@ use tracing::{debug, warn};
 /// - v7: Added tool_token_usage field to SessionMetadata (Phase K analytics)
 /// - v8: Added source_tool field to SessionMetadata (multi-LLM support)
 /// - v9: Added lines_added/lines_removed fields to SessionMetadata (code metrics)
-const CACHE_VERSION: i32 = 9;
+/// - v10: Modern subagents directory layout (<project>/<session-id>/subagents/)
+const CACHE_VERSION: i32 = 10;
 
 /// SQLite-based metadata cache (thread-safe)
 pub struct MetadataCache {
@@ -223,6 +224,12 @@ impl MetadataCache {
                     "Cache version mismatch detected, clearing stale cache"
                 );
 
+                // Drop FTS triggers and virtual table before clearing so desynced or partial tables don't fail
+                let _ = conn.execute("DROP TRIGGER IF EXISTS session_fts_ai", []);
+                let _ = conn.execute("DROP TRIGGER IF EXISTS session_fts_ad", []);
+                let _ = conn.execute("DROP TRIGGER IF EXISTS session_fts_au", []);
+                let _ = conn.execute("DROP TABLE IF EXISTS session_fts", []);
+
                 // Clear all session and activity entries
                 conn.execute("DELETE FROM session_metadata", [])
                     .context("Failed to clear stale session cache")?;
@@ -239,6 +246,42 @@ impl MetadataCache {
                     .context("Failed to clear stale skill scan inventory")?;
                 conn.execute("DELETE FROM skill_events", [])
                     .context("Failed to clear stale skill events")?;
+
+                // Recreate clean FTS table and triggers
+                conn.execute_batch(
+                    r#"
+                    CREATE VIRTUAL TABLE IF NOT EXISTS session_fts USING fts5(
+                        session_id  UNINDEXED,
+                        project     UNINDEXED,
+                        first_user_message,
+                        models_used,
+                        content='session_metadata',
+                        content_rowid='rowid',
+                        tokenize='unicode61'
+                    );
+
+                    CREATE TRIGGER IF NOT EXISTS session_fts_ai
+                    AFTER INSERT ON session_metadata BEGIN
+                        INSERT INTO session_fts(rowid, session_id, project, first_user_message, models_used)
+                        VALUES (new.rowid, new.session_id, new.project, new.first_user_message, new.models_used);
+                    END;
+
+                    CREATE TRIGGER IF NOT EXISTS session_fts_ad
+                    AFTER DELETE ON session_metadata BEGIN
+                        INSERT INTO session_fts(session_fts, rowid, session_id, project, first_user_message, models_used)
+                        VALUES ('delete', old.rowid, old.session_id, old.project, old.first_user_message, old.models_used);
+                    END;
+
+                    CREATE TRIGGER IF NOT EXISTS session_fts_au
+                    AFTER UPDATE ON session_metadata BEGIN
+                        INSERT INTO session_fts(session_fts, rowid, session_id, project, first_user_message, models_used)
+                        VALUES ('delete', old.rowid, old.session_id, old.project, old.first_user_message, old.models_used);
+                        INSERT INTO session_fts(rowid, session_id, project, first_user_message, models_used)
+                        VALUES (new.rowid, new.session_id, new.project, new.first_user_message, new.models_used);
+                    END;
+                    "#,
+                )
+                .context("Failed to recreate FTS schema")?;
                 conn.execute(
                     "INSERT OR IGNORE INTO aggregate_stats (key, value) VALUES ('total_sessions', 0)",
                     [],
@@ -1625,12 +1668,76 @@ mod tests {
     }
 
     #[test]
-    fn test_skill_invocations_migration_from_populated_v9_db() {
+    fn test_skill_invocations_migration_from_populated_v10_db() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("session-metadata.db");
 
-        // Build a realistic pre-existing v9 database by hand: the schema as
+        // Build a realistic pre-existing database by hand: the schema as
         // it existed before this feature, no skill_scan_inventory/skill_events.
+        {
+            let conn = Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                r#"
+                CREATE TABLE cache_metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+                CREATE TABLE session_metadata (
+                    path TEXT PRIMARY KEY, mtime INTEGER NOT NULL, project TEXT NOT NULL,
+                    session_id TEXT NOT NULL, first_timestamp TEXT, last_timestamp TEXT,
+                    message_count INTEGER NOT NULL, total_tokens INTEGER NOT NULL,
+                    models_used TEXT NOT NULL, has_subagents INTEGER NOT NULL,
+                    first_user_message TEXT, data BLOB NOT NULL
+                );
+                INSERT INTO cache_metadata (key, value) VALUES ('version', 10);
+                "#,
+            )
+            .unwrap();
+
+            for i in 0..5 {
+                let path = format!("/tmp/v10-project/session{i}.jsonl");
+                let meta = SessionMetadata::from_path(PathBuf::from(&path), "/v10-project".into());
+                let data = bincode::serialize(&meta).unwrap();
+                conn.execute(
+                    "INSERT INTO session_metadata (path, mtime, project, session_id, \
+                     first_timestamp, last_timestamp, message_count, total_tokens, models_used, \
+                     has_subagents, first_user_message, data) \
+                     VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, 0, NULL, ?)",
+                    params![
+                        path,
+                        1_000_000_000_i64 + i,
+                        "/v10-project",
+                        format!("session-{i}"),
+                        i * 3,
+                        i * 100,
+                        "[]",
+                        &data,
+                    ],
+                )
+                .unwrap();
+            }
+        }
+
+        // Reopen with the new code, which unconditionally creates
+        // skill_scan_inventory + skill_events alongside the existing tables.
+        let cache = MetadataCache::new(dir.path()).unwrap();
+
+        let stats = cache.stats().unwrap();
+        assert_eq!(
+            stats.total_entries, 5,
+            "pre-existing matching-version session_metadata rows must survive opening with the new code"
+        );
+
+        // New tables must exist and be queryable (empty, no error).
+        let leaderboard = cache
+            .skill_leaderboard(&SkillLeaderboardFilter::default())
+            .unwrap();
+        assert!(leaderboard.is_empty());
+    }
+
+    #[test]
+    fn test_cache_version_mismatch_auto_clears_stale_v9_cache() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("session-metadata.db");
+
+        // Build a legacy v9 database
         {
             let conn = Connection::open(&db_path).unwrap();
             conn.execute_batch(
@@ -1672,21 +1779,14 @@ mod tests {
             }
         }
 
-        // Reopen with the new code, which unconditionally creates
-        // skill_scan_inventory + skill_events alongside the existing tables.
+        // Reopen with v10 code: version mismatch triggers auto-clear
         let cache = MetadataCache::new(dir.path()).unwrap();
 
         let stats = cache.stats().unwrap();
         assert_eq!(
-            stats.total_entries, 5,
-            "pre-existing v9 session_metadata rows must survive opening with the new code"
+            stats.total_entries, 0,
+            "stale v9 cache entries must be automatically cleared when opened with v10 code"
         );
-
-        // New tables must exist and be queryable (empty, no error).
-        let leaderboard = cache
-            .skill_leaderboard(&SkillLeaderboardFilter::default())
-            .unwrap();
-        assert!(leaderboard.is_empty());
     }
 
     #[test]

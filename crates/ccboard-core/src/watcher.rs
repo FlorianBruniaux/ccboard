@@ -95,9 +95,22 @@ impl FileWatcher {
             // Watch each project directory non-recursively to detect new sessions
             if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                 for entry in entries.flatten() {
-                    if entry.path().is_dir() {
-                        // Watch project directory recursively to detect sessions and subagents
-                        let _ = file_watcher.watch_path(&entry.path(), RecursiveMode::Recursive);
+                    let project_path = entry.path();
+                    if project_path.is_dir() {
+                        let _ = file_watcher.watch_path(&project_path, RecursiveMode::NonRecursive);
+
+                        // Watch existing subagents directories non-recursively
+                        if let Ok(session_entries) = std::fs::read_dir(&project_path) {
+                            for session_entry in session_entries.flatten() {
+                                let session_path = session_entry.path();
+                                if session_path.is_dir() {
+                                    let subagents_dir = session_path.join("subagents");
+                                    if subagents_dir.is_dir() {
+                                        let _ = file_watcher.watch_path(&subagents_dir, RecursiveMode::NonRecursive);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
