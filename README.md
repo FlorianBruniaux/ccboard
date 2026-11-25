@@ -1,5 +1,9 @@
 # ccboard
 
+<!-- yarkr:badges:start -->
+[![Indexed on Yarkr](https://api.yarkr.com/functions/v1/api/api/v1/badges/repos/FlorianBruniaux/ccboard/version.svg)](https://yarkr.com/arks/florianbruniaux/ccboard)
+<!-- yarkr:badges:end -->
+
 <table>
   <tr>
     <td width="64">
@@ -168,6 +172,40 @@ chmod +x ~/.local/bin/ccboard
 - 🧪 **Windows**: Best-effort support (feedback appreciated)
 
 ---
+
+<!-- yarkr:install:start -->
+## Install with Yarkr
+
+This repo is indexed on [Yarkr](https://yarkr.com/arks/florianbruniaux/ccboard) as the ark [florianbruniaux/ccboard](https://yarkr.com/arks/florianbruniaux/ccboard), so its skills install into Claude Code, Codex, Cursor and other agent harnesses with one command.
+
+### CLI
+
+Install the whole ark, which Yarkr keeps equal to this repo:
+
+```bash
+npx yarkr-cli sync florianbruniaux/ccboard
+```
+
+Or add individual skills:
+
+```bash
+npx yarkr-cli add skill:florianbruniaux/ccboard/backend-architect
+npx yarkr-cli add skill:florianbruniaux/ccboard/ccboard-remember
+npx yarkr-cli add skill:florianbruniaux/ccboard/code-simplifier
+```
+
+No Node.js? `curl -fsSL https://yarkr.com/install.sh | sh` (macOS, Linux) or `irm https://yarkr.com/install.ps1 | iex` (Windows PowerShell) installs `yarkr` as a standalone binary; then type `yarkr` in place of `npx yarkr-cli`.
+
+### MCP
+
+Connect your agent to the ark over MCP:
+
+```bash
+npx yarkr-cli mcp add florianbruniaux/ccboard
+```
+
+Or point any MCP client at `https://api.yarkr.com/functions/v1/api/mcp/o/florianbruniaux/ccboard`.
+<!-- yarkr:install:end -->
 
 ## Quick Start
 
