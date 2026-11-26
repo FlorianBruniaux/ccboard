@@ -13,6 +13,8 @@
 </table>
 
 **A free, open-source TUI/Web dashboard for Claude Code session monitoring, cost tracking & config management**
+
+[Explore the product site](https://ccboard.bruniaux.com/) · [Installation](#installation) · [User guide](docs/GUIDE.md)
 <p align="center">
   <a href="https://github.com/FlorianBruniaux/ccboard/stargazers"><img src="https://img.shields.io/github/stars/FlorianBruniaux/ccboard?style=for-the-badge" alt="GitHub stars"/></a>
   <a href="https://starmapper.bruniaux.com/FlorianBruniaux/ccboard"><img src="https://starmapper.bruniaux.com/api/badge/FlorianBruniaux/ccboard" alt="StarMapper"/></a>
@@ -1159,6 +1161,7 @@ This project was developed following Test-Driven Development (TDD) principles wi
 - **Repository**: https://github.com/FlorianBruniaux/ccboard
 - **Issues**: https://github.com/FlorianBruniaux/ccboard/issues
 - **Releases**: https://github.com/FlorianBruniaux/ccboard/releases
+- **Product site**: https://ccboard.bruniaux.com/
 - **Crates.io**: https://crates.io/crates/ccboard
 - **Documentation**: [User Guide](docs/GUIDE.md) | [CHANGELOG.md](CHANGELOG.md)
 
@@ -1170,7 +1173,7 @@ These projects extend the workflow without duplicating this tool:
 
 - **Search with [CC-Sessions](https://github.com/FlorianBruniaux/cc-sessions)**: move from the dashboard to a focused CLI search of local history.
 - **Measure with [cc-skill-usage](https://github.com/FlorianBruniaux/cc-skill-usage)**: add a specialist analysis of real skill invocations.
-- **Learn with [Claude Code Ultimate Guide](https://github.com/FlorianBruniaux/claude-code-ultimate-guide)**: connect observed signals to the guide's observability practices.
+- **Learn with [Claude Code Ultimate Guide](https://cc.bruniaux.com/guide/observability/#why-monitor-sessions)**: connect observed signals to the guide's observability practices.
 - **Route with [CC-Copilot Bridge](https://github.com/FlorianBruniaux/cc-copilot-bridge)**: observe sessions whose model provider can be selected through the bridge.
 
 [Browse the complete open-source galaxy](https://github.com/FlorianBruniaux#open-source-galaxy)
