@@ -20,7 +20,7 @@ fn command_regex() -> &'static Regex {
 /// directory next to its parent session file. Subagent transcripts reuse their
 /// parent's sessionId in their JSON content, so path (not sessionId) is the
 /// only reliable identity signal for deduplication.
-fn is_subagent_path(path: &Path) -> bool {
+pub(crate) fn is_subagent_path(path: &Path) -> bool {
     path.components().any(|c| c.as_os_str() == "subagents")
 }
 
