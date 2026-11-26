@@ -1,0 +1,20 @@
+README.md
+  s_f5d4f7633adaed::t_c689bb02925cee 16-17,1164
+  s_f5d4f7633adaed::t_a4ab16e66c6380 1176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "467357f735abc85098bbd3f09aafa2fb1e5b33f8",
+  "prompts": {},
+  "sessions": {
+    "s_f5d4f7633adaed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21733-83bc-7eb3-8496-5e8609b7af25",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Florian BRUNIAUX <florian@bruniaux.com>"
+    }
+  }
+}
